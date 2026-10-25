@@ -25,12 +25,12 @@
 | 공식 산출물 문서 언어 | 미확정 |
 | 마지막 갱신일 | 2026-10-25 |
 | 마지막 갱신자 | AI |
-| 최근 세션 상태 | 2026-10-25 #002 종료 — 다음 세션은 첫 구현 범위의 실행 구조 대안/권고안 검토부터 재개 |
-| 참조 세션 로그 | [lim8603 / session_2026-10-25_002.md](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md) — API 상세화·FR-018/TDD 확정·종료 요약과 다음 시작점 |
+| 최근 세션 상태 | 2026-10-25 #003 종료 — 6대 설계 반영·플랫폼 Tier 1/2 및 코어 격리 확정·C++ 쌍둥이 프로젝트 생성·Git 첫 커밋 완료. 다음 세션은 첫 구현 범위 실행 구조 결정부터 재개 |
+| 참조 세션 로그 | [lim8603 / session_2026-10-25_003.md](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md) — 6대 설계 반영·Tier 1/2 확정·cpp-logger 생성·Git 커밋 및 다음 시작점 |
 
 ### 한 줄 상태
 
-ADR-005·006의 기준선으로 Design 진행 중이며 핵심 API 상세 권고안은 리뷰 전이다. FR-018 긴급 기록은 Human 지정으로 선택 옵션·기본 비활성이다. 활성 시 UPS 신호 발생부터 전원 차단까지 전체 약 3초 조건을 적용하며 상세 전략/수락 기준·구현/장비 검증은 미완료다.
+ADR-005·006 기준선에 플랫폼 Tier 1/2 계층화 및 CPU 코어 격리를 확정했고 6대 설계 고려사항(역방향 회수·타임스탬프 삼원화·ENOSPC 페일세이프 등)을 반영했다. C++ 쌍둥이 프로젝트(`~/src/cpp-logger`) 생성 및 로컬 Git 첫 커밋을 완료했다. 다음 시작점은 첫 구현 범위 실행 구조 결정이다.
 
 ### 현재 작업 스트림
 
@@ -126,6 +126,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 | 파일 | 변경 요약 | 관련 작업 |
 |------|----------|----------|
+| project_state / my_state / session_2026-10-25_003 | [세션 #003](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md) 종료: 6대 설계 반영·Tier 1/2 및 코어 격리 확정·C++ 쌍둥이 프로젝트(`~/src/cpp-logger`) 생성·Git 첫 커밋(`916d550`) 완료 및 다음 시작점(실행 구조 결정) 동기화 | INT-001 |
 | requirement_spec / domain_model / interface_contract | 플랫폼 역할 계층화(Tier 1 Linux RT: Full SLA/성능 보장 vs Tier 2 Win/Mac: 기능 호환/Best-effort) 및 백그라운드 I/O 워커 CPU 코어 격리(Affinity/Pinning) 명문화 반영 | INT-001 |
 | domain_model / interface_contract | 6대 설계 고려사항(RT 메모리 역방향 회수·타임스탬프 삼원화·스키마 진화·ENOSPC 페일세이프·OS별 영속/락 플래그·FR-018 3단계 긴급 차단 프로토콜)을 설계 초안 및 인터페이스 계약에 반영 | INT-001 |
 | project_state / my_state / session_2026-10-25_002 | [세션 #002](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md) 종료: API 상세안·FR-018 사용 정책·TDD 승인 반영을 기록하고 다음 시작점을 실행 구조 대안/권고안 검토로 동기화 | INT-001 |

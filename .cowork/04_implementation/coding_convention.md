@@ -129,5 +129,12 @@
 > - 프로젝트에서 사용하지 않는 기술의 컨벤션은 포함하지 않는다
 > - 기존에 없는 기술이 선정되면 AI가 모범 사례 기반으로 초안을 제안한다
 
-- 아직 확정된 기술스택별 추가 규칙 없음
-- 기술스택 확정 후 이 아래에 실제 언어/프레임워크별 컨벤션 섹션을 추가한다
+### Rust·Cargo — ADR-007~009 승인 기준
+
+- Cargo workspace·edition 2024. MSRV 1.85 후보와 실제 dependency patch/feature 호환은 TASK-002에서 검증하고 고정한다.
+- 공개 API에 외부 crate의 내부 wire/runtime 타입을 강제 노출하지 않는다. core와 DB/remote feature 의존을 분리한다.
+- RT 호출/거절/Drop 경로의 할당·해제·I/O·blocking·무한 재시도·사용자 콜백을 금지한다. 등록/예열과 최종 owner 해제는 일반 경로다.
+- `unsafe`가 필요한 수명/원자 연산 경계는 최소 모듈로 한정하고 Safety 불변식·메모리 순서·소유권 증명과 실패 테스트를 함께 둔다. 후보 queue의 특성으로 전체 API 안전성을 대체하지 않는다.
+- 예상 가능한 오류는 고정 코드/`Result`로 반환하고 RT 경로에서 문자열을 포맷하지 않는다. 일반 I/O 오류에 `unwrap`/`expect`를 사용하지 않는다.
+- 형식/계약에 영향 없는 내부 변경은 자율 수행한다. 공개 소유권·오류·완료 의미나 MSRV/기술 계열 변경은 ADR 영향도를 검토한다.
+- 구현 Task의 기본 검증은 영향 feature에 맞춘 `cargo test`, `cargo fmt --check`, `cargo clippy`이며 native/장비 검증은 별도 TC/EV로 남긴다. 외부 의존성의 실행 성공과 성능 달성을 혼동하지 않는다.

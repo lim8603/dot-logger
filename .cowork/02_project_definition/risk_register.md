@@ -36,3 +36,7 @@ AI는 기술적 리스크를, Human은 비즈니스/조직적 리스크를 주�
 ## 평가 근거
 
 2026-10-25 초기 조사에 따른 예비 정성 평가다. 발생 확률·영향도는 실측 수치가 아니다. [조사 자료](../06_evolution/imported_context/research_2026-10-25_logging_telemetry.md)와 [요구사항의 미결 항목](requirement_spec.md)을 기준으로 후속 답변에 맞춰 갱신한다.
+
+## 2026-10-26 상세 대응 연결
+
+기존 리스크는 아직 Open이다. RSK-001/004는 TASK-003·004의 RT 전체 호출·최종 해제·반납 포화·앱 thread 수명 검증, RSK-002/005는 TASK-008·009·021·024의 파일/긴급 예산·실제 차단, RSK-003은 TASK-005·012·023의 fanout/복사/부하, RSK-006은 TASK-014~017·023의 관측 정합성/오차/비용, RSK-007은 TASK-002·022·024의 native OS·교환 검증으로 연결했다. MCAP 인덱스 메모리·active reader, DB timestamp 충돌은 각각 TASK-007·010·019에서 확인한다.

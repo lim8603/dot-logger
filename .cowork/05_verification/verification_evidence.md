@@ -46,34 +46,20 @@
 
 ## 근거 영역 요약
 
-| 영역 | 최근 상태 | 주요 근거 문서 | 마지막 갱신일 | 비고 |
-|------|----------|----------------|--------------|------|
-| Review Evidence | Not Started / In Progress / Ready | `04_implementation/review_checklist.md`, 관련 `TASK-*` | | |
-| Test Execution Evidence | Not Started / In Progress / Ready | `test_case.md`, 관련 실행 로그/리포트 | | |
-| NFR Evidence | Not Started / In Progress / Ready | `test_strategy.md`, 관련 측정 결과 | | |
-| Release Readiness Evidence | Not Started / In Progress / Ready | `quality_gate.md`, `project_state.md`, 관련 release source | | |
-
----
+INT-001 / 2026-10-26 / Design 기준선 완료·Gate 3 Pass, 제품 구현 전. 제품 코드와 실행 근거는 없다. 문서 링크/추적 검사는 제품 성능·기능 Pass 증거가 아니다.
 
 ## Evidence Index
 
-| EV ID | 유형 | 검증 대상 / 범위 | 판정 | 관련 Gate | 원본 근거 위치 | 마지막 갱신일 | 대상 revision / 환경 / 실행자 |
-|-------|------|------------------|------|-----------|----------------|--------------|------|
-| EV-001 | Review / Unit / Integration / E2E / NFR / Release | | Pass / Fail / Partial / Deferred | Gate 4 / Gate 5 | | YYYY-MM-DD | commit/build; OS/config; AI/Human |
-
----
+현재 제품 실행 EV 없음. TC-001~012는 절차 승인/Not Run이다. 실제 실행 뒤 revision·환경·실행자·명령·결과 경로와 함께 EV를 채번한다.
 
 ## Gate 판정 메모
 
-| Gate | 판정 상태 | 핵심 EV ID | 요약 | 비고 |
-|------|-----------|------------|------|------|
-| Gate 4 | Ready / Blocked / Partial | `EV-*` | | |
-| Gate 5 | Ready / Blocked / Partial | `EV-*` | | |
-
----
+Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
 
 ## Open Evidence Gaps
 
-| ID | 항목 / 마지막 검증 revision | 미검증 범위 | 담당 / 재실행 시점·조건 | 상태 |
-|----|------|------------|----------|------|
-| GAP-001 | | | | Open / Resolved / Deferred |
+| ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
+|---|---|---|---|
+| GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
+| GAP-002 | 전체 제품 코드·TC 실행 없음 | AI, Gate 3 Pass 이후 각 TDD Task와 MS 인수 | Open |
+| GAP-003 | rustup default toolchain 미설정, MSRV/patch/native CI 미검증 | AI, TASK-002 toolchain 구성 후 feature/MSRV 검증 | Open |

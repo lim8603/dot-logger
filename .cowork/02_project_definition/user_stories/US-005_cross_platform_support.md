@@ -1,7 +1,7 @@
 # US-005 — Linux·macOS·Windows의 공통 기능과 기록 교환
 
 - 관련 Intent: INT-001
-- 관련 Milestone: 없음
+- 관련 Milestone: MS-002·003·004·007 (계획 승인)
 - 상태: Approved — Human의 크로스 플랫폼 지원 지시 기준. 세부 매트릭스/검증은 Design에서 정의
 - 우선순위: Must
 - 관련 요구사항: NFR-007·CON-002, FR-001~014·016·017
@@ -27,3 +27,5 @@
 
 - [요구사항 §16](../requirement_spec.md#16-크로스-플랫폼-지원과-검증-범위)
 - [ADR-006](../../03_design_artifacts/adrs/ADR-006_cross_platform_linux_macos_windows.md)
+
+2026-10-26 상세설계·ADR-008/009·MS 계획 기준선 채택으로 위 미결 중 계약/기술 선택을 해소했다. 실제 장비·의존성 호환·수명/성능 실행 검증은 해당 Task에서 수행하며 FR-015는 별도 제안이다.

@@ -1,10 +1,11 @@
-# 핵심 인터페이스 계약 초안
+# 핵심 인터페이스 계약
 
 - 관련 Intent: INT-001
-- 상태: Draft — 수집·소유권·포화·완료 계약 상세 검토안. §3~4·9~11의 새 권고안은 Human 검토 전이며 실제 Rust 타입·ABI·큐/전송 프로토콜 채택이 아니다.
-- 승인 기준선: ADR-003·004·005·006, US-001~005
-- 후속 요구: FR-018 — 선택 옵션·기본 비활성은 Human 확정. 활성 시 전원 예고 전체 약 3초·중요 파일 우선 기록, §12의 상세 동작은 검토안.
-- 갱신: 2026-10-25 / AI
+- 상태: Approved — 2026-10-26 상세설계·ADR-008/009 기준선 채택. 공개 함수 표기는 설계 계약이며 컴파일/수명·실제 호환 검증은 구현 Task에서 수행한다.
+- 해석 우선순위: §13~17과 ADR-008·009가 현재 상세 계약이다. §1~12의 초기 제안/미정 표현은 여기서 구체화한 범위에서 대체된다. 장비별 수치·알고리즘 증명은 미검증이다.
+- 승인 기준선: ADR-003~009, US-001~005(US-002 AC6~10 포함)
+- 후속 요구: FR-018 — 선택 옵션·기본 비활성은 Human 확정. 활성 시 전원 예고 전체 약 3초·중요 파일 우선 기록, §12·16의 상세 동작도 기준선 채택 완료, 실제 차단 검증 전.
+- 갱신: 2026-10-26 / AI
 
 ## 1. 제공자·소비자와 실행 경계
 
@@ -17,7 +18,7 @@
 | 관측·조절 비교 | 개발자/클라이언트 | 계측·보고 경로 | 조건과 근거가 포함된 관측/검증/추정 보고 |
 | 점검·종료 | 관리 클라이언트 | 관리·백그라운드 경로 | 완료/실패/시간 제한·미완료 범위를 포함한 결과 |
 
-RT 호출은 기록 제시까지로 제한하는 안이다. 대기가 필요한 완료 확인·종료·점검·조회는 일반/관리 경로에 둔다. Rust 라이브러리 경계를 먼저 검토하고 원격 프로토콜·별도 서비스 배치는 후속 선정한다.
+RT 호출은 기록 제시까지로 제한하는 안이다. 대기가 필요한 완료 확인·종료·점검·조회는 일반/관리 경로에 둔다. Rust 라이브러리 경계를 먼저 검토하고 원격 프로토콜·실행 배치는 ADR-007·009를 따른다.
 
 ## 2. 작업별 계약 검토안
 
@@ -172,10 +173,10 @@ stateDiagram-v2
 | 장애 상황 | 로거 백그라운드 동작 | RT 생산자/상위 제어 영향 |
 |-----------|----------------------|--------------------------|
 | 디스크 풀 (`ENOSPC`) | 영향받는 파일 대상에 `IoFailure(ENOSPC)` 상태 마킹. 백그라운드 재시도 중단 및 손상 방지 파일 닫기 | RT 호출에 패닉·블로킹 전파 금지. 수집 큐 포화 시 정책에 따라 새 입력 거절 또는 카운터 집계 |
-| 파일 권한/잠금 충돌 | 대상별 실패 기록, 리포트에 장애 알림 발행 | 정상 출력(DB, 원격, 타 파일)은 격리되어 계속 처리 |
+| 파일 권한/잠금 충돌 | 대상별 실패 기록, 리포트에 장애 알림 발행 | 정상 출력은 계속 처리하되 공유 CPU/장치 경합의 영향은 별도 계측 |
 | 순환 로깅 회전 실패 | 오래된 파일 삭제 실패 시 신규 파일 강제 생성 중단 (디스크 고갈 방지) | 자원 한계에 도달하면 신규 수락을 `Capacity(DiskFull)`로 명시적 거절 |
 
-- 백그라운드 I/O 스레드의 `unwrap()` 또는 Panic이 상위 애플리케이션 프로세스로 전파되지 않도록 완벽히 격리(Fail-Safe boundary)한다.
+- 복구 가능한 I/O 오류는 `Result`와 대상별 상태로 처리하며 RT에 panic/대기를 전파하지 않는다. 내장형 구조는 panic=abort·OOM·메모리 손상의 프로세스 장애까지 격리하지 못한다(ADR-007).
 - 장애가 감지되면 관측 리포트에 즉각 `StorageDegraded` 지표를 노출하고, 복구(디스크 공간 확보 등) 전까지는 지정된 안전 정책(신규 입력 거절 또는 메모리 내 손실 카운팅)을 따른다.
 
 ## 5. 운영 관측·기준 능력·개발자 조절
@@ -191,11 +192,11 @@ stateDiagram-v2
 | 관련 미결 | 정할 내용 | 확정 시점 |
 |-----------|-----------|-----------|
 | OQ-002 | 실제 dot-probe 장비·제어 주기/부하·소형/원본 타입·크기·단계별 수치 | 실제 장비 대응/검증 설계 및 해당 계약 리뷰 |
-| OQ-003 | §3~4·9~11에 소유권/회수·예약/포화·토큰/부분 완료 권고안 작성, Human 검토 전. 수치·동기화/복구·알고리즘 증명은 계속 미결 | 수집/저장 핵심 API·알고리즘 구현 전 |
-| OQ-004 | 실제 프로세스/worker/어댑터·파일 형식·DB·전송/클라이언트 | 관련 기술/외부 계약 구현 전 ADR/API 검토 |
-| OQ-005 | 설정 적용 일관성·실행 중 변경 범위·리포트/점검 형식·계측/오차 예산 | 설계 리뷰와 구현 게이트 전 관련 범위 확정 |
+| OQ-003 | ADR-008/§13~17 계약 승인. 잔여: 장비별 quota·보호량/허용 손실 수치와 수명/동시성 증명 | TASK-003~009·021·022 및 실제 검증 |
+| OQ-004 | ADR-007·009 배치/기술 채택. 잔여: patch·MSRV·실제 OS/CPU/DB 호환 | TASK-002·019·022 |
+| OQ-005 | 설정·리포트·점검 및 계측 목표 승인. FR-015는 별도 제안 | 관련 구현/검증 Task, TASK-018은 범위 승인 후 |
 
-[요구사항 §15.4](../02_project_definition/requirement_spec.md#154-미결을-설계에서-확정할-보완-계획)의 승인된 수집 계획을 따른다. 새로운 수치를 임시로 채워 확정하지 않으며 crate/큐/형식 채택은 현재 초안만으로 결정하지 않는다.
+[요구사항 §15.4](../02_project_definition/requirement_spec.md#154-미결을-설계에서-확정할-보완-계획)의 승인된 수집 계획을 따른다. 채택한 계약/기술은 ADR-008·009를 따른다. 미확정 실장비 수치를 임의로 채우지 않는다.
 
 ## 7. 관련 기준
 
@@ -209,16 +210,16 @@ stateDiagram-v2
 
 Linux·macOS·Windows에서 공통 수집·기록·조회/재생·리포트/점검·개발자 조절 계약을 제공하되, 플랫폼 역할을 **Tier 1 (Target / Full SLA)**과 **Tier 2 (Compatibility / Best-Effort)**로 분리한다.
 
-- **Tier 1: Linux (PREEMPT_RT / 일반 Linux)**: 실제 로봇 탑재 타겟. 엄격한 실시간 호출 지연(p99 ≤5 µs), 대용량 처리(1.0 GB/s), 전원 차단 긴급 동기화(FR-018)를 100% 보장하며, 백그라운드 워커의 CPU 코어 격리(Pinning) 및 RT 우선순위 설정을 지원한다.
-- **Tier 2: Windows, macOS**: 개발자 워크스테이션 및 분석기. 기능적 호환성(API 동작, 데이터 수집/파일 생성, 크로스 파일 판독, 모니터링 클라이언트)은 100% 보장하되, 엄격한 실시간 SLA 및 성능 측정 대상에서 제외(Best-effort)한다.
+- **Tier 1: Linux (PREEMPT_RT / 일반 Linux)**: 실제 로봇 탑재 타겟. 승인된 조건부 실시간 호출 지연(p99 ≤5 µs), 대용량 처리(1.0 GB/s), 활성 구성의 전원 차단 긴급 동기화(FR-018)를 목표로 장비별 검증하며, 백그라운드 워커의 CPU 코어 격리(Pinning) 및 RT 우선순위 설정을 지원한다.
+- **Tier 2: Windows, macOS**: 개발자 워크스테이션 및 분석기. 기능적 호환성(API 동작, 데이터 수집/파일 생성, 크로스 파일 판독, 모니터링 클라이언트)을 제공·네이티브 검증하며, 엄격한 실시간 SLA 및 성능 측정 대상에서 제외(Best-effort)한다.
 
 플랫폼/권한에 따라 지원하지 않는 고급 스레드 설정(예: CPU 코어 격리)·계측 지표는 지원 여부와 사유로 표현하는 안이다. 미지원 요청을 조용히 성공 처리하거나 해당 지표를0·정상 여유로 변환하지 않는다. 가능한 공통 경로와 성능/보장 범위를 설명하고, 플랫폼 전용 API/핸들을 일반 호출자의 필수 입력으로 정하지 않는다.
 
 완료 경계와 단위·시각 의미는 공통으로 문서화하고 OS별 파일/영속 동기화·열린 파일 회전/삭제·오류·공간 조회의 실행 동작을 확인한다. R1은 Linux PREEMPT_RT 참조 프로필이며 다른 OS의 측정값·성능 보장으로 재사용하지 않는다. 보고서의 장비/설정/기준 프로필 식별에는 OS와 실행 환경도 포함한다.
 
 - **OS별 영속 동기화 프리미티브**: Linux는 `fdatasync`/`fsync`, macOS는 `fcntl(fd, F_FULLFSYNC)`, Windows는 `FlushFileBuffers`를 기본 매핑 후보로 하며, 각 플랫폼 시스템 콜의 지연 특성과 전원 장애 내구성 보장 차이를 문서화하고 벤치마크 프로필에 반영한다.
-- **파일 락 및 공유 플래그 (특히 Windows)**: Windows 환경에서 로거가 기록 중인 파일에 모니터링 클라이언트나 점검 도구가 접근할 때, 또는 순환 로깅 중 이전 세그먼트를 회전/삭제할 때 배타적 락으로 인한 `Access Denied` 실패가 발생하지 않도록 파일 생성 시 `FILE_SHARE_READ | FILE_SHARE_DELETE` (Unix의 `O_RDWR` 공유 의미와 동등) 플래그를 기본 적용한다.
-- **백그라운드 워커 CPU 코어 격리 (Affinity/Pinning)**: 로거 설정(`WorkerThreadingConfig`)을 통해 백그라운드 I/O 워커들이 동작할 CPU 코어 목록(예: Core 0, 1)을 지정할 수 있다. Tier 1 Linux에서는 `sched_setaffinity`를 통해 RT 제어 코어(Core 2, 3 등)와의 간섭을 완벽히 격리하며, Tier 2 OS에서는 플랫폼 지원 수준에 따라 적용하거나 기본 스케줄러에 위임한다.
+- **파일 락 및 공유 플래그 (특히 Windows)**: Windows 환경에서 로거가 기록 중인 파일에 모니터링 클라이언트나 점검 도구가 접근할 때, 또는 순환 로깅 중 이전 세그먼트를 회전/삭제할 때 배타적 락으로 인한 `Access Denied` 실패가 발생하지 않도록 파일 생성 시 `FILE_SHARE_READ | FILE_SHARE_DELETE` (Unix open 플래그와 동등한 의미는 아니며 OS별 검증 필요) 플래그를 기본 적용한다.
+- **백그라운드 워커 CPU 코어 격리 (Affinity/Pinning)**: 로거 설정(`WorkerThreadingConfig`)을 통해 백그라운드 I/O 워커들이 동작할 CPU 코어 목록(예: Core 0, 1)을 지정할 수 있다. Tier 1 Linux에서는 `sched_setaffinity`를 통해 RT 제어 코어(Core 2, 3 등)에서 worker 실행을 분리하며 IRQ·공유 자원 간섭은 별도 검증하고, Tier 2 OS에서는 플랫폼 지원 수준에 따라 적용하거나 기본 스케줄러에 위임한다.
 
 [ADR-006](adrs/ADR-006_cross_platform_linux_macos_windows.md), [US-005](../02_project_definition/user_stories/US-005_cross_platform_support.md).
 
@@ -226,7 +227,7 @@ Linux·macOS·Windows에서 공통 수집·기록·조회/재생·리포트/점�
 
 ### 9.1 기본 동작과 대안
 
-ADR-003의 중요 기록 우선 기본값을 구체화하는 **미승인 권고안**이다. 옵션 지원 방향은 유지하며 RT 호출의 공간/저장 무대기는 기존 확정 계약이다.
+ADR-003의 중요 기록 우선 기본값을 구체화하는 **2026-10-26 승인된 상세 계약**이다. 옵션 지원 방향은 유지하며 RT 호출의 공간/저장 무대기는 기존 확정 계약이다.
 
 | 쟁점 | 권고안 | 대안과 비용 |
 |------|--------|-------------|
@@ -279,7 +280,7 @@ RT:   try_record_raw(producer, metadata, loan)
 
 ### 11.1 계약 대조 시나리오
 
-아래는 **설계 리뷰 항목**이며 실행된 테스트/새 AC 승인 기록이 아니다. 코드가 없는 현재는 모두 실행 미검증이다.
+아래는 **설계 리뷰 항목**이며 실행된 테스트 기록은 아니다. 세부 AC의 현재 승인 근거는 ADR-008이다. 코드가 없는 현재는 모두 실행 미검증이다.
 
 | 소비자/조건 | 확인할 동작 | 후속 실행 검증 |
 |-------------|-------------|----------------|
@@ -301,7 +302,7 @@ Linux 일반/PREEMPT_RT·macOS·Windows에서 해당 경로를 네이티브 실�
 
 Human 검토 대상은 (1) 제한된 원본 풀/소유권 반환·RT 밖 회수, (2) 두 중요도와 예약 보호·신규 거절 기본 동작, (3) 생산자별 수락 식별·revision/출력 계획 고정과 대상별 부분 완료·제한된 조회 이력이다. §9.1의 대안 비용과 함께 검토한다. 기존 ADR-003의 옵션·기본값과 ADR-004의 저장 예산 분리는 유지한다.
 
-확정되면 장기 자원/비용·운영 의미가 결합된 결정으로 ADR에 기록하고 관련 문서를 정렬한다. 현재는 Draft이며 OQ-003 해결/전체 도메인 승인/Gate 3 통과로 처리하지 않는다. 실제 예약 비율·풀/추적 상한·동시성/회수 알고리즘·OS/장비·동기화/복구/허용 손실·어댑터 재시도/중복·설정 전역 적용·성능/계측 비용은 남는다. 구현은 해당 계약·기술·검증 프로필을 보완하고 Gate 3를 평가한 뒤 진행한다.
+2026-10-26 ADR-008·009와 §13~17을 기준선으로 승인받았다. 장비별 quota·보호량·허용 손실 수치와 동시성/회수 알고리즘의 실제 안전성·성능은 구현/검증 Task에서 확인한다. 설계 승인과 제품 실행 증거를 구분한다.
 
 ## 12. 전원 이상 시 중요 파일 우선 기록
 
@@ -352,4 +353,80 @@ UPS 신호 감지부터 실제 전원 차단까지의 전체 예산(약 3초) �
 
 ### 12.3 검증·잔여 결정
 
-US-002 AC-6~10의 추가 초안을 따른다. 기본 비활성의 일반 경로를 확인하고, 활성 구성은 여러 순위 파일·최대 보호량·큰 일반 IO 진행 중·신호 지연/중복·종료 경합·디스크 장애·CPU/IO 편중에서 신호 발생→전원 차단까지 계측해 재기동 후 파일/내용/복구 범위를 확인한다. OS/UPS/SSD·파일 시스템별 실행과 실제 차단 검증은 아직 없다. 우선순위/새 입력 제한·복구 경계는 OQ-003, 장비/보호량은 OQ-002, 어댑터와 계측/수락 조건은 OQ-004·005로 보완한다. 기능 추가는 이전 세 가지 핵심 API 권고안의 자동 승인이 아니다.
+US-002 AC-6~10의 승인된 추가 수락 기준을 따른다. 기본 비활성의 일반 경로를 확인하고, 활성 구성은 여러 순위 파일·최대 보호량·큰 일반 IO 진행 중·신호 지연/중복·종료 경합·디스크 장애·CPU/IO 편중에서 신호 발생→전원 차단까지 계측해 재기동 후 파일/내용/복구 범위를 확인한다. OS/UPS/SSD·파일 시스템별 실행과 실제 차단 검증은 아직 없다. 우선순위/새 입력 제한·복구 경계는 OQ-003, 장비/보호량은 OQ-002, 어댑터와 계측/수락 조건은 OQ-004·005로 보완한다. 기능 추가는 이전 세 가지 핵심 API 권고안의 자동 승인이 아니다.
+
+## 13. 상세 API 설계안
+
+2026-10-26 추가 및 Human 기준선 채택 완료. §1~12의 초기 논의를 아래 계약으로 구체화했다. ADR-008·009에 따라 새 기본값·오류·소유권·통신을 채택한다. 컴파일/실제 수명 검증은 TASK-003·004에서 한다.
+
+| API 후보 | 입력/결과 | 실행 경계 |
+|---|---|---|
+| `SessionBuilder::validate/build` | limits·target·schema·worker·durability 계획 → owner 또는 구조화된 설정 오류 | 일반 경로, 모든 quota 합계·최대 단일 원본 검증·예열 |
+| `owner.scope(callback)` | scope 안에서 producer/loan을 빌려 사용, owner보다 오래 유지 불가 | RT 스레드 생성 전에 등록. 최종 해제는 scope 종료 후 관리 스레드 |
+| `Producer::try_record_small` | 고정 metadata + `&[u8]` → receipt/생략/거절 | `&mut self`, 하나의 생산자·고정 상한 복사 |
+| `Producer::try_acquire` | 크기 등급·importance → `Loan<'session>` 또는 Capacity | 유한 풀에서 하나 대여, 외부 SDK 버퍼 아님 |
+| `Producer::try_record_raw` | metadata + loan → receipt 또는 이유와 같은 loan | 성공 때만 이동. pool/producer/class 불일치 거절 |
+| `Loan::drop` | 슬롯 상태를 ReturnPending으로 게시 | payload free·callback·blocking 없이 반환 의무 보존 |
+| `GeneralProducer::record_until` | 입력 + 단조 deadline → receipt 또는 Timeout/Closing | 일반 핸들만 사용, 매 시도 기한 확인. RT API에 대기 옵션 없음 |
+| `completion.poll/wait` | receipt 또는 생산자별 고정 상한 + target/boundary | 일반 경로. `Expired`, `UnsupportedBoundary`, `TimedOut(snapshot)` 분리 |
+| `control.sync` | 대상/생산자별 scope + deadline | 각 writer의 barrier까지 들어온 기록을 마감·sync. 단순 poll은 sync를 시작하지 않음 |
+| `control.shutdown` | drain·sync 계획 + deadline → Closed 또는 Incomplete(report, owner) | timeout이면 owner/IO 메모리 유지. 후속 poll/join으로 정리 |
+
+`SessionOwner`의 무거운 Drop을 RT에서 안전하다고 선언하지 않는다. borrowed producer/loan만 RT-safe Drop 대상이다. scoped API 제약 때문에 dot-probe의 장기 thread 통합이 곤란하면 TASK-004에서 owner 기반 대안을 재검토하고, 미검증 `Arc`로 수명을 우회하지 않는다.
+
+고정 오류 코드는 `InvalidInput`, `SchemaMismatch`, `TooLarge`, `Capacity(resource)`, `RevisionBusy`, `Closing`, `EmergencyPowerOff`, `Unsupported`, `IoFailure`, `DeadlineExceeded`를 포함한다. 동적 진단은 일반 경로의 별도 리포트다. no-op tracing 어댑터도 RT 안전하다고 자동 선언하지 않는다.
+
+### 13.1 완료 추적의 실제 상한
+
+생산자별 `accepted_seq mod window_size` 슬롯에 sequence generation과 대상별 bitset/상태를 저장한다. 모든 필수 추적 예산을 먼저 확보한 뒤 수락한다. 미완료 슬롯을 재사용하지 않는다. window가 가득 차면 `Capacity(Completion)`으로 거절한다. 완료 뒤 상세 이력의 보존 한도에 따라 축출하고 그 이전 receipt는 `Expired`다. 최고 sequence만으로 완료 공백을 지우지 않는다.
+
+범위 결과는 bounded page로 반환한다. 각 페이지의 complete/failed/dropped/pending/unknown/expired 구간을 구분하며 상세 구간 개수가 응답 상한을 넘으면 cursor를 제공한다. 전체 성공 판정에는 모든 요청 범위의 결과가 필요하다. 수락 토큰은 원본 메모리를 소유하지 않는다.
+
+## 14. 조회·재생·원격 계약안
+
+| 작업 | 계약 |
+|---|---|
+| `Query` | session + time_basis(mono/real/source) + [from,to) + 채널/레벨 + snapshot + cursor. source 축은 clock domain·변환 정보 없으면 명시 거절 |
+| 소형 페이지 | 기본 시험 상한 1,000건 또는 256 KiB 중 먼저 도달. 커다란 원본은 descriptor와 blob handle을 반환해 페이지 초과 방지 |
+| 원본 읽기 | blob ID + offset + bounded length, 만료·보존 삭제는 Gone. 무제한 전체 파일 응답 없음 |
+| 정렬 | 오프라인은 `(mono, producer_id, accepted_seq)`로 결정적 정렬. 벽시계 조회는 real + tie-break. live는 수락 순서/부분 순서와 late 여부를 노출 |
+| Snapshot | segment/offset·설정 revision 고정. 후속 기록은 다음 snapshot. 핀 만료 시 cursor 만료 오류 |
+| Replay | start/pause/resume/seek/stop, 유한 양수 배속. mono 기준 상대 스케줄, seek 때 generation 증가·기존 전송 취소/폐기 구분 |
+| 늦은 replay 소비자 | offline은 제한 prefetch 안에서 재생 시계를 늦추고 지연 보고, live는 해당 구독만 drop/disconnect. RT 생산자까지 대기 전파 없음 |
+| Subscribe | 필터·최대 records/bytes/age·원본 opt-in. overflow는 Gap(범위/이유) 후 계속 또는 disconnect 정책을 시작 때 선택 |
+| 원격 완료 | receiver가 전체 record 조립·검증·소비 큐 인계한 뒤 receipt ACK. 네트워크 send 완료와 구별 |
+
+gRPC/Protobuf를 통신 후보로 한다. `GetStatus`, `Query`, `ReadBlob`, `Replay`, `Subscribe`, `ApplyConfig`, `RunCheck`, `Compare`, `GetCompletion`을 서비스 메서드 후보로 둔다. bulk payload는 최대 256 KiB 조각, 레코드 ID/offset/총 길이/checksum과 완료 ACK를 갖는다. 연결별 동시에 조립할 원본 수·bytes·TTL을 협상해 메모리를 제한한다. 재연결 후 미확인 전송은 Unknown이며 자동 exactly-once를 제공하지 않는다. HTTP/2 흐름제어가 애플리케이션 큐 전체의 예산을 대신하지 않는다.
+
+네트워크 서버는 기본 비활성, 활성화 시 기본 loopback이다. 비-loopback은 인증/TLS 구성을 명시하고 dot-probe의 기존 보안 정책과 연결한다. 파일 읽기·관측 권한과 설정·점검 권한을 구분한다. 원격 요청에서 임의 파일 경로·무제한 데이터/실행 예산을 받지 않는다. 서비스 token/인증 설정은 운영 로그에서 제외한다.
+
+## 15. 설정·운영 계측·점검 계약안
+
+`validate_config(base_revision, patch)`는 차이·예산·정보 손실·재시작 필요 여부를 반환한다. `apply_config`는 명시 요청만 수행하고 revision 불일치면 Conflict다. 라우팅/필터는 producer 경계에서 적용하며 모든 생산자가 같은 순간에 바뀐다는 보장을 하지 않는다. 응답은 posted revision과 per-producer applied revision을 분리한다. old plan을 처리 중이면 추가 업데이트는 RevisionBusy다.
+
+RT는 producer-local 고정 카운터만 갱신하고, 관리 경로는 고정 atomic snapshot을 읽어 1초마다 집계하는 안이다. 상세 지연 histogram은 샘플링 또는 시험 모드로 분리한다. 채널 ID는 등록된 유한 집합이고 문자열 label·record ID를 지표 label로 늘리지 않는다. 기본 이력은 10/60/300초 추세에 필요한 고정 ring이며 raw 관측 무제한 보관은 없다.
+
+보고서 값은 `Observed`, `Validated(profile_id)`, `Estimated(assumptions)`, `Unavailable(reason)`, `Stale`로 구분한다. 부하율의 분모는 동일 장비/기능/부하 조합의 검증된 완료 능력이다. 포화 예상은 가용 bytes와 slots 각각의 양의 순증가율로 계산해 먼저 오는 한계를 표시한다. 거절/폐기로 큐가 정체한 경우 Overloaded를 유지한다. 순환 보존 창과 디스크 소진 시간을 다른 필드로 둔다.
+
+`RunCheck`는 dry-run 계획에서 시간·CPU worker 수·RAM·총 쓰기 bytes·디스크 reserve·상대 수신자·완료 경계를 먼저 보여준다. 실행은 명시 요청이다. 어느 예산이 먼저 소진되거나 운영 오류/공간 reserve 침범·취소가 오면 신규 부하를 중단하고 진행 중 IO를 정리한다. 결과는 Pass/Fail/Aborted/Inconclusive이며 짧은 점검을 24시간/UPS 검증으로 바꾸지 않는다. 사용자가 지정한 전용 시험 디렉터리만 만들고 지운다.
+
+`Compare`는 before/after의 profile/revision/window·완료/지연/손실·의도적 생략·CPU/메모리를 대조한다. 다른 장비·부하/측정 경계는 비비교 가능으로 표시한다. 입력 자체를 조절하는 코드는 사용자 앱의 책임이며 로거의 샘플링은 기록량만 바꾼다. FR-015 추천은 제안 기능으로 명시하고 자동 적용을 하지 않는다.
+
+## 16. 동기화·긴급 동작의 구체안
+
+정상 파일 동기화는 explicit 또는 interval 옵션이다. 시험 프로필은 1초 요청 주기를 쓰되 실제 sync 완료 지연/미동기화 bytes를 계측한다. 제품 데이터 손실 상한으로 해석하지 않는다. 기본 모드·disk quota는 명시 설정이 필요하다. compression은 첫 성능 기준선에서 off, chunk CRC와 인덱스는 on이다.
+
+FR-018 활성화는 재시작 때만 허용하는 안이다. 시작 전에 중요 파일 rank, 최대 미동기화 bytes, 신호 지연 상한, 안전 여유, 현재 장비의 검증 프로필을 받는다. 검증 프로필이 없으면 시험용 활성화임을 표시하고 Supported/3초 보장을 반환하지 않는다. 같은 rank는 target ID 순으로 결정적으로 처리한다.
+
+긴급 통지는 사전 할당 atomic mailbox에 사건 ID와 **가장 이른 deadline**을 게시한다. 중요 snapshot용 사전 예약 슬롯 외의 신규 입력을 닫고, 선택 출력의 신규 작업을 중지한다. 실행 중 OS IO는 즉시 취소됐다고 가정하지 않으며 원본 참조를 유지한다. 이미 진행 중인 파일 sync의 최악 지연도 전체 예산에 포함한다. 정상 종료와 긴급 종료는 동일 coordinator가 상태 전이한다. 긴급 종료 뒤 자동 Running 복귀는 하지 않는다.
+
+`available = poweroff_deadline - signal_received - safety_margin`이며 signal_received가 늦어졌으면 예산도 줄어든다. 전체 판정에는 신호 생성→수신의 지연을 포함한다. 예상 drain/sync가 available보다 크면 Unachievable과 파일별 partial 결과를 보고한다. 비활성에서는 긴급 전용 예약/전이가 없고 Disabled를 반환한다.
+
+## 17. 첫 검증 구성과 상세 리뷰 경계
+
+- 수집: 2 importance, Normal 기본, explicit → channel policy → Normal, Important 예약 slots/bytes, 신규 거절, producer별 FIFO.
+- 원본/완료: owner가 메모리 소유, 슬롯별 반납 표시, bounded 완료 window, partial/expired/unknown 구분.
+- 파일: MCAP·chunk CRC/index, 제한 회전, active safe offset, 복구 파일 별도 생성, 명시 quota/보존 설정.
+- 활용: Rust API + CLI 범위는 승인. query/subscribe/replay·DB/gRPC 상세도 기준선 채택 완료.
+- 관측/계측의 승인된 합격선: 안정 합성 입력에서 카운터 정합성은 배출 후 정확 일치, 안정 추세의 포화/소진 시간 추정 오차 ≤20%(5초 이상 예측 구간), 기본 계측 활성/비활성 완료 처리량 차이 ≤5%. RT 호출 목표는 계측 포함해서 기존 §12 목표로 판정한다. 이 추가 목표는 2026-10-26 Human 승인, 실제 달성은 미검증이다.
+- 실장비 미확정: R1 조건은 유지하고 OS/CPU/SSD/UPS·제어 주기·deadline의 대응은 TASK-022에서 수집한다. 해당 정보 없이 실물 수락·Gate 4/5 통과로 표시하지 않는다.

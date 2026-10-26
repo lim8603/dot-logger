@@ -61,3 +61,9 @@ Linux·macOS·Windows의 로보틱스 프로젝트에서 재사용할 Rust 로�
 Human이 장비 사양·실제 로그 양/발생 간격에 따른 사용률·추가 처리 여유·잔여 시간 리포트를 제안했다(FR-014). [요구사항 §13](../requirement_spec.md#13-장비별-사용률처리-여유잔여-시간-리포트-검토안)에 가능성·관측/실측 기준·조건부 예측을 정리했다. 핵심 방향은 위에 반영했고 상세 계약·오차·실행 비용은 검토 대상이다. 개발자 조절과 비교는 [§13.5](../requirement_spec.md#135-핵심-강점과-개발자-조절-지원)를 따른다.
 
 Q5에서 첫 적용은 자체 기록·조회·재생 기능으로 정했다. ROS 2 파일 호환·토픽 연동은 dot-probe 첫 적용 완료 후 검토한다(project_state.md T1). 파일 형식과 구체 재생 API는 미정이다. [조사 자료](../../06_evolution/imported_context/research_2026-10-25_rosbag2_interop.md).
+
+## 2026-10-26 상세설계 실행 구조
+
+Human 선택으로 첫 클라이언트는 Rust API + CLI와 dot-probe 기존 화면 연동, 실행 구조는 내장형 Ports and Adapters + 제한된 파이프라인(ADR-007)이다. 이 범위에서 위 초기 미정 표현을 해소한다. 실제 장비는 미확정이며 정량 수치 자체는 ADR-005 설계 기준선이다.
+
+목표를 추가 Intent로 쪼개지 않고 INT-001 아래 [MS-001~007](../../04_implementation/milestone_registry.md)와 [실행 Task](../../04_implementation/task_registry.md)로 분해한다. [요구 추적표](../../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트)에서 MS별 구현/검증을 관리한다. 현재 상세 계약/기술/계획은 2026-10-26 Human 승인됐고 Gate 3 Pass다. MS-001/TASK-001 완료, 제품 구현/시험은 미완료다.

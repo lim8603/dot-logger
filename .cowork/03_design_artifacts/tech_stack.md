@@ -1,48 +1,40 @@
-# Tech Stack Registry
+# 기술스택 등록부
 
-> 기술스택 등록부 — 이 프로젝트에서 사용하는 기술의 확정 목록과 선정 근거
-
----
-
-## 목적
-
-프로젝트에서 사용하는 언어, 프레임워크, 라이브러리, 통신 프로토콜, 인프라 등을
-한 곳에 등록하고, 각 선택의 근거 ADR을 연결한다.
-
-- 기술 선택 시 ADR이 자동 생성되고, 이 문서에 등록된다
-- `coding_convention.md`는 이 문서에 등록된 기술 기준으로 동적 구성된다
-- 필요 시 4대 AI 진입점 파일의 기술 스택 필드도 이 문서와 `tooling_environment_guide.md` 기준으로 갱신된다
-
----
+- INT-001 / 2026-10-26 / Approved — Human의 상세 기준선 채택, ADR-007~009.
+- 기술/버전 계열의 선택과 실제 설치·호환·성능 검증을 구분한다. 장비별 수락 조건과 의존성 호환 검증은 계획대로 수행한다.
 
 ## 확정 기술스택
 
-| 영역 | 기술 | 버전/사양 | 선정 ADR | 비고 |
-|------|------|----------|---------|------|
-| 주 언어 | Rust | 버전·edition·MSRV 미정 | ADR-006 | ADR-001의 언어 결정을 계승 |
-| 지원 환경 | Linux·macOS·Windows | OS 버전·CPU 아키텍처·MSRV/실행 매트릭스 미정 | ADR-006 | 라이브러리/클라이언트 공통. Linux PREEMPT_RT 실시간·R1 프로필 유지 |
-| 프레임워크·빌드·패키지 관리 | 미정 | 미정 | | 조사·요구 확인 후 선정 |
-| 통신 프로토콜 | 미정 | 미정 | | 조회·전송 범위 확인 후 선정 |
-| 데이터 저장소 | 시계열 DB 연동 요구, 제품 미정 | 미정 | | dot-probe의 InfluxDB 2는 호환 조사 근거 |
-| 파일 저장 매체 | SSD 기본 가정 | SATA/NVMe·제품·용량·성능 미정 | ADR-004 | 입력·처리 성능과 저장 성능·보존량을 별도 평가 |
-| 주요 라이브러리·파일 형식 | 미정 | 미정 | | 아래 조사 자료의 후보는 미승인 |
-| 테스트·CI/CD | 미정 | 미정 | | ADR-005의 초기 목표/프로필을 바탕으로 실제 장비·도구·시험 계약 선정 |
+| 영역 | 채택 | 버전/사양 | 근거 | 검증 경계 |
+|---|---|---|---|---|
+| 주 언어/빌드 | Rust·Cargo workspace | edition 2024, MSRV 1.85 검증 후보 | ADR-006·009 | TASK-002에서 dependency/MSRV 확인, 불일치 시 재검토 |
+| 아키텍처 | 내장형 Ports and Adapters·제한된 파이프라인 | 생산자별 큐, 비-RT background | ADR-007·008 | 프로세스 장애 완전 격리 아님 |
+| 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | Linux RT 커널/장비·추가 CPU는 TASK-022; native 실행 전 |
+| 큐 | rtrb | 0.4 계열 SPSC | ADR-009 | 전체 API/Drop의 RT 안전성은 TASK-003·004 |
+| 파일 | MCAP | mcap 0.25 계열; CRC/index on, 초기 압축 off | ADR-009 | 인덱스 상한·active reader·복구/성능 검증 |
+| 저장 매체 | SSD | SATA/NVMe·용량/제품 미정 | ADR-004 | 처리와 저장/보존 예산 분리 |
+| 봉투·통신 | Protobuf·gRPC | tonic/prost 0.13 계열 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
+| 외부 I/O runtime | Tokio | 1 계열 | ADR-009 | DB/remote background만, RT 경로 제외 |
+| 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
+| 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4·JSON 출력 | Human 선택·ADR-009 | 독립 GUI 제외, native 클라이언트 테스트 |
+| 일반 로그 어댑터 | tracing/log | 0.1 / 0.4 | ADR-009 | 전용 RT 계약과 분리 |
+| 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | 세부 도구 patch·CI 실행 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
-> 영역은 프로젝트에 맞게 추가/제거할 수 있다. 고정 목록이 아닌 프로젝트 고유 목록이다.
-> `선정 ADR`에는 실제 ADR 번호를 적고, 미정이면 비워둔다. 다수 결정이 얽히면 `adr_registry.md`를 기준으로 연결한다.
+## 설치·실측 전 남은 작업
 
----
+TASK-002에서 실제 toolchain·patch·feature 조합·라이선스·MSRV를 검증한다. 현재 rustup default toolchain은 미설정이다. 선택 계열의 호환이 성립하지 않아 계약/최소 지원 버전 변경이 필요하면 근거와 대안을 제시한다. 제품 의존성 설치는 아직 수행하지 않았다.
 
-## 검토했으나 채택하지 않은 기술
+TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다. R1은 참조 조건이며 다른 장비·Tier 2에 자동 적용하지 않는다. FR-015 추천 기능은 별도 제안이며 자동 채택하지 않았다.
 
-| 기술 | 검토 사유 | 미채택 사유 | 관련 ADR |
-|------|----------|-----------|---------|
-| 없음 | 후보별 초기 조사만 수행 | 채택/기각 결정 전 | 없음 |
+## 검토했으나 첫 범위에 채택하지 않은 대안
 
-## 조사 자료
+| 대안 | 이유 | 근거 |
+|---|---|---|
+| 독립 수집 데몬·IPC | 첫 적용의 배포·수명/크래시 회수 복잡성 | ADR-007 |
+| 전 RT 경로 async 제출 | 할당·스케줄링·대기의 RT 경로 결합 | ADR-007 |
+| 자체 파일 container·raw TCP | 호환·복구·framing·취소 구현 부담 | ADR-009 |
+| 전역 공유 MPSC | RT 경합·재시도 상한 검증 부담 | ADR-009 |
 
-[2026-10-25 로깅·텔레메트리 초기 조사](../06_evolution/imported_context/research_2026-10-25_logging_telemetry.md). 조사에 등장하는 `tracing`, `rtrb`, MCAP, OTel, DB, 클라이언트 도구는 선정된 의존성이 아니다.
+## 조사 근거
 
-초기 통합 사양안의 우선 검증 후보는 [requirement_spec.md §12.6](../02_project_definition/requirement_spec.md#126-우선-검증할-설계기술-후보)에 있다. 생산자별 큐/rtrb·tracing/log 어댑터·MCAP·DB/관측 연동은 AI 제안이며 위 확정 기술스택에 채택한 것이 아니다. R1 장비 조건은 ADR-005로 설계 참조 프로필로 승인됐다. 실제 장비 제품·배포 CPU 범위·CLI 형태는 별도 선정 사항이다.
-
-[ADR-005](adrs/ADR-005_design_baseline_and_deferred_decisions.md)의 초기 목표/R1/P0~P6·수락 기준·설계 이월을 승인했다. 현재 [모듈 경계](domain_model.md)와 [핵심 API 계약](interface_contract.md)은 Draft이며 이를 의존성 채택으로 취급하지 않는다.
+[2026-10-26 상세설계 조사](../06_evolution/imported_context/research_2026-10-26_detailed_design.md)와 [2026-10-25 초기 조사](../06_evolution/imported_context/research_2026-10-25_logging_telemetry.md)는 조사 당시의 사실·권고 기록이다. 현재 채택 여부의 기준은 이 표와 Accepted ADR이며, 조사에만 등장하는 OTel/기타 도구까지 채택하지 않는다.

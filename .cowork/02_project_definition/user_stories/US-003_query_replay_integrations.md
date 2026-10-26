@@ -1,7 +1,7 @@
 # US-003 — 기록 데이터의 조회·재생과 외부 활용
 
 - 관련 Intent: INT-001
-- 관련 Milestone: 없음
+- 관련 Milestone: MS-004·006·007 (계획 승인)
 - 상태: Approved — 2026-10-25 Human 「확정」으로 설계 기준선/AC 승인. 구현·검증 전
 - 우선순위: Must(기능 방향 기준)
 - 관련 요구사항: FR-004~006·010 / NFR-002
@@ -27,3 +27,5 @@
 
 - [요구사항](../requirement_spec.md)
 - [Intent](../intents/INT-001_realtime_robotics_logging.md)
+
+2026-10-26 상세설계·ADR-008/009·MS 계획 기준선 채택으로 위 미결 중 계약/기술 선택을 해소했다. 실제 장비·의존성 호환·수명/성능 실행 검증은 해당 Task에서 수행하며 FR-015는 별도 제안이다.

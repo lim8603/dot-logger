@@ -25,7 +25,7 @@
 
 | Intent ID | 제목 | 상태 | 우선순위 | 현재 초점 Phase | 관련 Milestone | 문서 경로 | 비고 |
 |-----------|------|------|----------|-----------------|----------------|----------|------|
-| INT-001 | 재사용 가능한 실시간 로보틱스 로깅·텔레메트리 | Approved | Must | Design | 없음 | [상세](intents/INT-001_realtime_robotics_logging.md) | Human이 프로젝트 목표·핵심 가치를 지정. ADR-005로 초기 성능/AC·문서 계획·설계 이월 승인, Design 진입 |
+| INT-001 | 재사용 가능한 실시간 로보틱스 로깅·텔레메트리 | Approved | Must | Design | MS-001~007 | [상세](intents/INT-001_realtime_robotics_logging.md) | Human이 프로젝트 목표·핵심 가치를 지정. ADR-005 초기 기준선과 ADR-007~009 상세설계·계획 승인. Gate 3 Pass, Design 완료·Build 착수 준비 |
 
 - `상태`: `Draft` / `Approved` / `Superseded` / `Split` / `Closed`
 - `우선순위`: `Must` / `Should` / `Could`

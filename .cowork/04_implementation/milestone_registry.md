@@ -1,13 +1,13 @@
 # Milestone 목록과 승인된 실행 계획
 
-- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, 제품 구현 전.
+- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, MS-002 In Progress — TASK-002 구성 구현/로컬 검증 완료(EV-001), Human 리뷰·native CI 잔여.
 - 1인 순차 진행 기준의 상대 일정이다. 시작일·가용 시간·검증 장비가 미정이므로 달력 날짜/납기를 확정하지 않는다.
 - 인일은 설계 추정치이며 TASK-004 수명·MCAP 복구·실제 장비 검증 후 재산정한다. 소요 범위에 리뷰/장비 대기·실제 24시간 경과 대기는 별도다.
 
 | MS | 제목 | Phase | 상태 | Task | 종료 결과 | 인일 초안 | 상세 |
 |---|---|---|---|---|---|---|---|
 | MS-001 | 상세설계 합의 | Design | Done | TASK-001 | 검토 가능한 상세설계·추적표·구현 계획 확정 | 1~2 | [상세](milestones/MS-001.md) |
-| MS-002 | 제한된 수집 코어 | Build | Planned | TASK-002·TASK-003·TASK-004·TASK-005·TASK-006 | RT 수집·원본 수명·fanout·완료를 대역으로 증명 | 8~14 | [상세](milestones/MS-002.md) |
+| MS-002 | 제한된 수집 코어 | Build | In Progress | TASK-002·TASK-003·TASK-004·TASK-005·TASK-006 | RT 수집·원본 수명·fanout·완료를 대역으로 증명 | 8~14 | [상세](milestones/MS-002.md) |
 | MS-003 | 파일 영속성과 보존 | Build | Planned | TASK-007·TASK-008·TASK-009 | 다중 파일 기록·회전·이벤트·복구 완성 | 6~9 | [상세](milestones/MS-003.md) |
 | MS-004 | 조회·재생·클라이언트 | Build | Planned | TASK-010·TASK-011·TASK-012·TASK-013 | Rust API/CLI로 실제 기록 활용 | 7~12 | [상세](milestones/MS-004.md) |
 | MS-005 | 운영 관측·조절·간편 점검 | Build | Planned | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |

@@ -19,11 +19,11 @@
 
 | 항목 | 내용 |
 |------|------|
-| 관련 Intent | 활성 Intent 또는 관련 `INT-*` 참조 |
-| 관련 Milestone | 검증 근거가 연결되는 `MS-*` (해당 시) |
+| 관련 Intent | INT-001 |
+| 관련 Milestone | MS-002 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 프로젝트 기준 |
+| 버전 | 2026-10-26 / EV-001 |
 
 ---
 
@@ -46,11 +46,29 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-26 / Design 기준선 완료·Gate 3 Pass, 제품 구현 전. 제품 코드와 실행 근거는 없다. 문서 링크/추적 검사는 제품 성능·기능 Pass 증거가 아니다.
+INT-001 / 2026-10-26 / Build, MS-002·TASK-002 In Progress. 시작 전 구성 검증과 로컬 의존성 검증 EV-001을 확보했다. Human 구현 리뷰·native CI와 수집/저장 런타임·장비 검증은 남아 있다.
 
 ## Evidence Index
 
-현재 제품 실행 EV 없음. TC-001~012는 절차 승인/Not Run이다. 실제 실행 뒤 revision·환경·실행자·명령·결과 경로와 함께 EV를 채번한다.
+### EV-001 — TASK-002 구성·공개 API·도구체인·의존성
+
+- 대상: 코드 커밋 `2f9015d`. `23a499c` 위 작업 트리에서 검증한 소스와 commit blob의 SHA-256이 일치함을 세션 마감 시 확인했다. [기계 판독 결과·소스 SHA-256](../06_evolution/imported_context/task_002_2026-10-26/results.json)에 각 소스/manifest·lock/CI/script의 검증 대상 hash를 기록했다.
+- 실행: 2026-10-26 / AI / Ubuntu 26.04.1 x86_64 / 개발 Rust 1.96.0·MSRV 1.85.0 / 실제 R1·로봇 수락 환경 아님.
+- TDD: [API 미구현 Red](../06_evolution/imported_context/task_002_2026-10-26/red-missing-api.log), [잘못된 구성 수락 Red](../06_evolution/imported_context/task_002_2026-10-26/red-behavior.log) 후 최소 검증 구현. 최종 구성 테스트 13개, 전체 feature 의존성 probe 6개, 불변 구성 compile-fail doctest 1개 Pass. feature별 활성 probe 수는 다르다.
+
+| 범위·명령 | 결과·원문 |
+|---|---|
+| `python3 scripts/check-feature-matrix.py --toolchain 1.96.0` | 16 조합·독립 public consumer·core에 네트워크/압축 의존 없음 Pass / [로그](../06_evolution/imported_context/task_002_2026-10-26/features-1.96.0.log) |
+| 같은 script `--toolchain 1.85.0` | 16 조합·consumer·doctest Pass / [로그](../06_evolution/imported_context/task_002_2026-10-26/features-1.85.0.log) |
+| `cargo fmt --all --check` | Pass |
+| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | [1.96.0 Pass](../06_evolution/imported_context/task_002_2026-10-26/clippy-1.96.0.log), [1.85.0 Pass](../06_evolution/imported_context/task_002_2026-10-26/clippy-1.85.0.log) |
+| `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked` | [1.96.0 Pass](../06_evolution/imported_context/task_002_2026-10-26/rustdoc.log) |
+| `cargo audit --no-fetch --deny unsound --json` / cargo-audit 0.22.2 | [최종 결과](../06_evolution/imported_context/task_002_2026-10-26/audit.json): 취약점 0·unsound 0·unmaintained 1(`paste`, GAP-005). DB `a78282a1414d6c28cc228c4eae3570451affb0dc`, 2026-10-26 갱신 |
+| Cargo metadata·lock·기존 dot-probe 비교 | [외부 177개 라이선스/버전 목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json), license metadata 누락 0. 배포 라이선스/고지 완료 판정은 아님 |
+
+MCAP 0.25.0 선택 zstd 경로의 취약점 3·zstd-safe unsound 10건은 Human 승인 ADR-010의 MCAP 0.26.0 적용 후 해소됐다. Tokio unsound 1건은 1.51.6 patch로 해소했다. 과거 선택 기준과 변경 근거는 ADR-009·010/세션 로그에 보존한다.
+
+유효 범위는 TASK-002의 시작 전 구성/API·의존성 호환뿐이다. runtime `build`·수집·worker 적용·실제 파일 API·실제 할당 상한·내구성·종료는 후속 Task다. TC-001의 CLI 대조/실행 자원 정리와 다른 TC·native OS·실장비는 이 결과로 Pass 처리하지 않는다.
 
 ## Gate 판정 메모
 
@@ -61,5 +79,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | 전체 제품 코드·TC 실행 없음 | AI, Gate 3 Pass 이후 각 TDD Task와 MS 인수 | Open |
-| GAP-003 | rustup default toolchain 미설정, MSRV/patch/native CI 미검증 | AI, TASK-002 toolchain 구성 후 feature/MSRV 검증 | Open |
+| GAP-002 | TASK-002 구성/의존성만 EV-001 로컬 Pass; 수집·저장·클라이언트·실장비 TC는 미실행 | AI, TASK-003 이후 TDD와 각 MS 인수 | Open |
+| GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
+| GAP-004 | Ubuntu 24.04/Windows Server 2025/macOS 14 native CI 구성만 완료, 실행 revision 없음. Windows 11/PREEMPT_RT는 별도 | AI, 저장소 원격/runner 확보 후 첫 CI 실행; TASK-022·024에서 실제 OS/장비 수락 | Open |
+| GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 최종 감사에 경고로 노출 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

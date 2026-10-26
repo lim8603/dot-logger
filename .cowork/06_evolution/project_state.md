@@ -4,21 +4,23 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger, Greenfield — 제품/테스트 코드 없음 |
+| 프로젝트 | dot-logger — TASK-002 구성 코드·테스트 구현, 수집/저장 런타임 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Design 완료 — Gate 3 Pass, Build 착수 준비 |
+| 현재 Phase | Build — TASK-002 구현·로컬 검증 완료, 리뷰/CI 잔여 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-002 Planned — 다음 구현 범위(MS-001 Done) |
-| 활성 Task | TASK-002 Planned / 담당 AI(TASK-001 Done) |
-| 상태 | Yellow — 설계 기준선·계획 승인/Gate 3 Pass. 제품 미구현, 장비·호환 검증 잔여 |
+| 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
+| 활성 Task | TASK-002 In Progress / 담당 AI(TASK-001 Done) |
+| 상태 | Yellow — TASK-002 로컬 검증 Pass. Human 구현 리뷰·native CI·런타임/장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 갱신 | 2026-10-26 / AI |
-| 최근 세션 | [2026-10-26 #001](../members/lim8603/workspace/session_logs/session_2026-10-26_001.md) 종료 — 설계 승인·구현 인계 완료 |
+| 최근 세션 | [2026-10-26 #002](../members/lim8603/workspace/session_logs/session_2026-10-26_002.md) 종료 — 코드 커밋·검증 근거 보존, 2026-10-27 재개 예정 |
 
 ## 현재 결정과 제약
 
 - **2026-10-26 Human 승인:** 「권고 기준선 채택 — 장비·호환 검증은 계획대로 진행」. 상세설계·ADR-008/009·추가 시험 목표·MS 계획을 채택했다. 검증 이월은 면제가 아니다.
+
+- **ADR-010 Accepted / 2026-10-26 Human 승인:** MCAP 0.26.0 채택. 0.25 선택 zstd 경로의 보안 공지를 해소했다. Tokio는 1.51.6 patch. 최종 audit 취약점/unsound 0, `paste` 유지보수 경고 1(GAP-005).
 
 - Gate 1·2 Pass, ADR-003~006 기준선 유지. 1 GB/s 원본+10만 소형/s·32생산자/16파일/128채널·R1 2 GiB 및 512 MiB/4 GiB 비교는 조건부 목표이며 제품 기본값·달성 결과가 아니다.
 - **ADR-007 Accepted:** dot-probe 내장형 Ports and Adapters + 제한된 생산자/소비자 파이프라인. 별도 데몬은 첫 범위에 넣지 않는다. 프로세스 장애까지 격리하지 않음.
@@ -32,26 +34,29 @@
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-002 | workspace와 플랫폼·설정 계약 | AI | Planned | 2026-10-26 | 도구체인·의존성/MSRV를 확인하고 quota·capability 구성 실패 테스트부터 작성 |
+| TASK-002 | workspace와 플랫폼·설정 계약 | AI | In Progress | 2026-10-26 | 구현 Human 리뷰·native CI 확인(EV-001/GAP-004) |
 
 ## 다음 시작점
 
-1. 상세설계·ADR-008/009·추가 AC·MS 계획 채택 완료. MS-001/TASK-001 Done, [Gate 3 Pass](../05_verification/quality_gate.md). 같은 기준선 승인을 다시 요청하지 않는다.
-2. [TASK-002](../04_implementation/tasks/TASK-002.md)의 도구체인/patch/MSRV·workspace와 구성 검증부터 TDD 착수 가능. 이어 TASK-003 소형 수집 → TASK-004 원본 풀/수명. 현재 설계·계획 요청 범위를 완료했으며 제품 코드는 아직 없다.
-3. TASK-022 장비/OS/UPS 프로필을 확보하고 MS-007에서 실제 성능·24h·전원 차단·OS 교환을 검증한다. FR-015/TASK-018은 별도 제안으로 유지한다.
+재개 예정: **2026-10-27(한국 시간)**. 새 세션에서 「TASK-002 이어서 하자」로 시작한다.
+
+1. [TASK-002](../04_implementation/tasks/TASK-002.md) 구현과 [EV-001](../05_verification/verification_evidence.md)을 Human 리뷰한다. Rust 1.96.0/1.85.0 각 16 feature 조합·consumer·정적 검사·보안 검사 로컬 Pass. Human 리뷰 미완료로 Task는 In Progress다.
+2. `.github/workflows/ci.yml`은 Ubuntu 24.04·Windows Server 2025·macOS 14 및 두 Rust 버전으로 구성했다. 현재 Git remote가 없어 원격 CI를 실행하지 않았다(GAP-004). 실행 환경과 실제 Windows 11/PREEMPT_RT 수락을 구분한다.
+3. TASK-002 완료 조건 확인 후 TASK-003 소형 수집·중요 예약 → TASK-004 원본 수명 순서다. TASK-022 장비/OS/UPS 프로필은 계속 미확정이며 실제 성능·24h·차단·OS 교환은 MS-007에서 검증한다. FR-015/TASK-018은 별도 제안이다.
 
 ## 새 세션 재개 메모
 
-- 먼저 이 문서 → `04_implementation/tasks/TASK-002.md` → `03_design_artifacts/tech_stack.md`·`04_implementation/coding_convention.md`·TC-001을 읽고 시작한다. API/예산 검증은 인터페이스 §13·도메인 §5를 추가로 확인한다.
-- 다음 실행은 TASK-002이며 아직 Planned다. 실제 착수할 때 Task/MS 상태를 In Progress로 맞춘다. 설계 기준선·TDD 승인은 재질문하지 않는다.
-- 이번 문서 변경은 작업 트리에 저장됐고 미커밋 상태다. 신규 ADR/MS/Task 파일을 포함해 보존한다. 개인 세션 로그는 기존 .gitignore 정책으로 Git 제외다.
-- 장비 미확정·toolchain/MSRV 미검증·제품 전체 Not Run·FR-015 별도 제안·T1 미도래 상태를 유지한다.
+- 먼저 이 문서 → TASK-002 → EV-001 결과·코드(`config.rs`, `platform.rs`, TC-001)와 GAP-004/005를 읽는다. TASK-003 진입 시 해당 Task·인터페이스 §13·도메인 §4~5를 추가로 확인한다.
+- `rust-toolchain.toml`의 개발 1.96.0과 Cargo MSRV 1.85/lock을 유지한다. 로컬 환경은 Ubuntu 26.04.1 x86_64이며 실제 R1 장비가 아니다. 전역 rustup default는 계속 미설정으로 두고 프로젝트 pin을 사용한다.
+- `SessionBuilder::validate`는 시작 전 구성 검사다. 실제 build·worker·파일·schema·durability·할당 예산·수집/종료는 후속 Task에서 구현한다. 문서상 설계 API를 구현 완료로 오인하지 않는다.
+- 코드·테스트·CI는 `2f9015d`에 커밋했다. 설계/ADR-010·EV 원본·세션 마감 상태는 별도 `docs(cowork)` 커밋에 보존한다. EV-001의 소스 hash가 이 코드 커밋과 일치한다. 개인 세션 로그는 기존 .gitignore 정책으로 Git 제외다.
+- 기존 설계·TDD 및 MCAP 0.26 승인은 재질문하지 않는다. 장비 미확정·native CI 미실행·나머지 제품 TC Not Run·FR-015 별도 제안·T1 미도래를 유지한다.
 
 ## 선택 로딩
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
 - [MS 목록](../04_implementation/milestone_registry.md): 7개 MS, [Task 목록](../04_implementation/task_registry.md): 26개 Task(1개 선택). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
-- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. 제품 실행 전부 Not Run.
+- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 시험만 EV-001 로컬 Pass; 나머지 실행은 Not Run.
 - [2026-10-26 조사](imported_context/research_2026-10-26_detailed_design.md): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
 
@@ -71,17 +76,17 @@
 |---|---|---|
 | OQ-002 | 실제 장비·제어 주기/부하·UPS 미정. 초기 정량 목표 승인 | TASK-022에서 환경·수락 프로필 확보, TC-011·012 실물 검증 |
 | OQ-003 | 계약/US-002 AC6~10 승인. 장비별 보호량·수명/동시성 증명은 미검증 | TASK-003~009·021·022 및 장비 검증 |
-| OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV·native 호환 미검증 | TASK-002·019·022 호환 확인 |
+| OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬 확인(EV-001), native·실제 DB 호환 잔여 | TASK-002·019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001~003 | 장비 미확정·제품 시험 미실행·toolchain 미설정 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·004·005 | 장비·나머지 제품 TC·native CI·paste 유지보수 경고. toolchain GAP-003은 로컬 범위 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
 
+- 2026-10-26 #002: TASK-002 구성/API 구현·두 Rust 버전 각 16 feature·EV-001, MCAP 보안 수정 ADR-010 승인. 코드 커밋·세션 마감, Human 구현 리뷰·native CI는 다음 세션 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_002.md).
 - 2026-10-26 #001: 상세설계·33행 요구 추적·7MS/26Task·공식 조사 작성, ADR-007~009·클라이언트/상세 기준선·계획 승인, Gate 3 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_001.md).
 - 2026-10-25 #003: Tier 1/2·코어 배치·6대 설계 고려사항·cpp-logger 생성·Git 초기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md).
-- 2026-10-25 #002: 핵심 API 초안·FR-018 기본 off·TDD 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md).
 
-이전 공유 상태 원문은 [상태 아카이브](state_archive.md)에 이관했다. 현재 Git 저장소이며 이 세션 시작 HEAD는 `66a438b`다. 제품 구현/성능 검증/커밋·배포는 이번 작업에서 수행하지 않았다.
+이전 공유 상태 원문은 [상태 아카이브](state_archive.md)에 이관했다. 현재 Git 저장소이며 이 세션 시작 HEAD는 `23a499c`다. TASK-002 구성 구현/로컬 검증과 코드 커밋 `2f9015d`를 완료했다. 실제 성능·장비 검증·배포는 미실행이다. 사용자 요청에 따라 2026-10-26 세션을 종료하고 다음 날 재개한다.

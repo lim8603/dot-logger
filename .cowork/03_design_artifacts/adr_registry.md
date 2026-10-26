@@ -33,7 +33,8 @@
 | ADR-006 | Linux·macOS·Windows의 크로스 플랫폼 지원 | Accepted | 2026-10-25 | INT-001 | 없음 | [상세](adrs/ADR-006_cross_platform_linux_macos_windows.md) | ADR-001 대체. 라이브러리/클라이언트 공통 지원, Linux RT 프로필 유지 |
 | ADR-007 | 내장형 Ports and Adapters와 제한된 파이프라인 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-007_embedded_ports_adapters_pipeline.md) | Human 권고안 채택, 기술·세부 계약 별도 |
 | ADR-008 | 제한된 소유권·예약·완료와 실패 계약 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-008_bounded_ownership_completion.md) | Human 기준선 채택·추가 AC 승인, 구현/장비 검증 전 |
-| ADR-009 | 파일·외부 연동·도구체인 권고 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-009_storage_transport_toolchain.md) | Human 기술 기준선 채택, patch/MSRV·장비 호환 검증은 Task에서 수행 |
+| ADR-009 | 파일·외부 연동·도구체인 권고 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-009_storage_transport_toolchain.md) | MCAP 계열만 ADR-010으로 대체, 나머지 기술 기준선 유지 |
+| ADR-010 | 압축 의존성 보안 수정에 따른 MCAP 0.26 채택 | Accepted | 2026-10-26 | INT-001 | MS-002 | [상세](adrs/ADR-010_mcap_security_update.md) | Human 승인, MCAP 0.26.0·선택 zstd 보안 의존성 수정 |
 
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`

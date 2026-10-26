@@ -193,7 +193,7 @@ stateDiagram-v2
 |-----------|-----------|-----------|
 | OQ-002 | 실제 dot-probe 장비·제어 주기/부하·소형/원본 타입·크기·단계별 수치 | 실제 장비 대응/검증 설계 및 해당 계약 리뷰 |
 | OQ-003 | ADR-008/§13~17 계약 승인. 잔여: 장비별 quota·보호량/허용 손실 수치와 수명/동시성 증명 | TASK-003~009·021·022 및 실제 검증 |
-| OQ-004 | ADR-007·009 배치/기술 채택. 잔여: patch·MSRV·실제 OS/CPU/DB 호환 | TASK-002·019·022 |
+| OQ-004 | ADR-007·009 배치/기술 채택. patch·MSRV 로컬 확인(EV-001). 잔여: native OS/CPU/DB 호환 | TASK-002·019·022 |
 | OQ-005 | 설정·리포트·점검 및 계측 목표 승인. FR-015는 별도 제안 | 관련 구현/검증 Task, TASK-018은 범위 승인 후 |
 
 [요구사항 §15.4](../02_project_definition/requirement_spec.md#154-미결을-설계에서-확정할-보완-계획)의 승인된 수집 계획을 따른다. 채택한 계약/기술은 ADR-008·009를 따른다. 미확정 실장비 수치를 임의로 채우지 않는다.
@@ -375,6 +375,8 @@ US-002 AC-6~10의 승인된 추가 수락 기준을 따른다. 기본 비활성�
 `SessionOwner`의 무거운 Drop을 RT에서 안전하다고 선언하지 않는다. borrowed producer/loan만 RT-safe Drop 대상이다. scoped API 제약 때문에 dot-probe의 장기 thread 통합이 곤란하면 TASK-004에서 owner 기반 대안을 재검토하고, 미검증 `Arc`로 수명을 우회하지 않는다.
 
 고정 오류 코드는 `InvalidInput`, `SchemaMismatch`, `TooLarge`, `Capacity(resource)`, `RevisionBusy`, `Closing`, `EmergencyPowerOff`, `Unsupported`, `IoFailure`, `DeadlineExceeded`를 포함한다. 동적 진단은 일반 경로의 별도 리포트다. no-op tracing 어댑터도 RT 안전하다고 자동 선언하지 않는다.
+
+TASK-002 구현 범위: `crates/dot-logger/src/config.rs`의 `SessionBuilder::new(config).validate(&PlatformCapabilities)`가 총 메모리·생산자별 소형/원본 고정 slot·중요 예약·worker stack·CPU 목록·required capability를 검증하고 읽기 전용 `ValidatedConfig`를 반환한다. quota/slot 크기는 명시 설정이며 R1 수치를 기본값으로 쓰지 않는다. 지원 미확인·실패·미지원은 구분하고 optional 상태도 결과에 보존한다. 이 API는 worker/IO를 시작하지 않는다. `build`·예열·실제 플랫폼 탐색/적용·target/schema/durability와 실제 metadata 할당 예산 검사는 해당 자원을 구현하는 후속 Task에서 확장한다. 위 표의 owner/수집/완료/종료 API는 설계 계약이며 아직 구현하지 않았다. 로컬 검증은 EV-001, native CI는 GAP-004다.
 
 ### 13.1 완료 추적의 실제 상한
 

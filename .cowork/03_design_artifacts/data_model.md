@@ -1,7 +1,7 @@
 # 데이터 구조·저장 설계
 
 - INT-001 / 2026-10-26 / Approved — ADR-008·009 기준선 채택. 구현·호환성 검증 전.
-- 채택: MCAP 파일, InfluxDB v2 어댑터. 실제 버전/patch·호환 확인은 TASK-002·019.
+- 채택: MCAP 0.26.0(ADR-010), InfluxDB v2 어댑터. TASK-002 로컬 의존성/기초 왕복 확인(EV-001), 제품 파일·DB·native 호환은 TASK-007·019·022에서 검증.
 - 식별·순서·완료의 기준은 [인터페이스](interface_contract.md), 자원 예산은 [도메인 §5](domain_model.md#5-자원-예산과-설정)다.
 
 ## 1. 논리 스키마

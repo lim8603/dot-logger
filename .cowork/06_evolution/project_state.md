@@ -14,7 +14,7 @@
 | 상태 | Yellow — TASK-002 로컬/native CI Pass·Human 리뷰 승인. 수집/저장 런타임·실장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 갱신 | 2026-10-27 / AI |
-| 최근 세션 | [2026-10-27 #001](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md) 진행 — TASK-002 Human 리뷰 승인, 비공개 GitHub 게시·native CI 7개 작업 Pass·TASK-002 Done |
+| 최근 세션 | [2026-10-27 #001](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md) 종료 — TASK-002 Done·GitHub 게시·CI 확인 완료 |
 
 ## 현재 결정과 제약
 
@@ -38,11 +38,9 @@
 
 ## 다음 시작점
 
-**2026-10-27 진행:** VS Code Git 인증을 통해 GitHub 계정 `lim8603`과 repo/workflow 권한을 확인했다. [lim8603/dot-logger](https://github.com/lim8603/dot-logger)를 비공개로 생성하고 `origin`을 설정했다. 기존 `main` 7개 커밋을 그대로 push했으며 최초 게시 때 로컬/원격 HEAD `f9894f25f7b43eee6faaa47c98ecd62cb61ff797` 일치를 확인했다. 토큰은 파일이나 문서에 저장하지 않았다.
-
-1. [TASK-002](../04_implementation/tasks/TASK-002.md)는 Done. Human 리뷰 승인과 로컬 검증에 이어 [첫 native CI](https://github.com/lim8603/dot-logger/actions/runs/40504484501)의 7개 작업이 모두 Pass했다. 검증 revision은 `f9894f25f7b43eee6faaa47c98ecd62cb61ff797`이며 코드·테스트·CI·lock은 `2f9015d`의 EV-001 소스 hash와 일치한다. GAP-004는 hosted native CI 범위에서 Closed다.
-2. 다음 작업은 [TASK-003](../04_implementation/tasks/TASK-003.md) 소형 RT 수집·중요 예약이며 아직 착수하지 않았다. 해당 Task의 첫 실패 조건과 인터페이스 §13·도메인 §4~5를 읽고 TDD로 진행한다. 이후 TASK-004 원본 수명 순서다.
-3. Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0 CI 완료와 실제 Windows 11/PREEMPT_RT·장비 수락을 구분한다. TASK-022 장비/OS/UPS 프로필은 미확정이며 실제 성능·24h·차단·OS 교환은 MS-007에서 검증한다. FR-015/TASK-018은 별도 제안이다.
+1. [TASK-003](../04_implementation/tasks/TASK-003.md) 소형 RT 수집·중요 예약부터 재개한다(Planned·미착수). 해당 Task → 인터페이스 §13 → 도메인 §4~5를 읽고, Normal 포화 뒤 Important 예약 수락·동일 등급 초과 거절·일반 deadline 만료의 첫 실패 테스트를 작성한다.
+2. 선행 TASK-002는 Done, [EV-001](../05_verification/verification_evidence.md)의 로컬/native CI Pass와 Human 리뷰 승인을 이어받는다. 구현·테스트·CI 변경 없이 세션 마감 문서만 동기화했다.
+3. 실제 Windows 11/PREEMPT_RT·장비 수락은 별도다. TASK-022의 장비/OS/UPS 프로필 미확정, GAP-001·002·005 및 FR-015/TASK-018 별도 제안을 유지한다. TASK-003 이후 TASK-004 순서다.
 
 ## 새 세션 재개 메모
 
@@ -88,6 +86,5 @@
 - 2026-10-27 #001: Human 리뷰 승인, lim8603/dot-logger 비공개 생성·기존 main 게시, native CI 6조합+audit Pass·TASK-002 Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md).
 - 2026-10-26 #002: TASK-002 구성/API 구현·두 Rust 버전 각 16 feature·EV-001, MCAP 보안 수정 ADR-010 승인. 코드 커밋·세션 마감, Human 구현 리뷰·native CI는 다음 세션 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_002.md).
 - 2026-10-26 #001: 상세설계·33행 요구 추적·7MS/26Task·공식 조사 작성, ADR-007~009·클라이언트/상세 기준선·계획 승인, Gate 3 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_001.md).
-- 2026-10-25 #003: Tier 1/2·코어 배치·6대 설계 고려사항·cpp-logger 생성·Git 초기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md).
 
-이전 공유 상태 원문은 [상태 아카이브](state_archive.md)에 이관했다. 현재 Git 저장소이며 2026-10-27 세션 시작 HEAD는 `37e4e9e`다. TASK-002 구성 구현/로컬 검증과 코드 커밋 `2f9015d`를 완료했다. 실제 성능·장비 검증·배포는 미실행이다. 2026-10-27 Human 구현 리뷰 승인과 비공개 GitHub 게시를 완료했고 native CI 7개 작업 Pass와 TASK-002 Done을 기록했다. 다음 시작점은 TASK-003이며 미착수다.
+이전 완료 이력은 [상태 아카이브](state_archive.md)에 보존했다.

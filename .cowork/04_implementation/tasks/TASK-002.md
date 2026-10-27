@@ -54,4 +54,4 @@
 
 ## 2026-10-27 승인과 GitHub 게시
 
-Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정 저장소 생성·업로드를 요청했다. GitHub 플러그인 설치/연결은 사용자 인증 대기다. 저장소명은 `dot-logger`, 공개 범위는 비공개로 준비하며 연결 확인 후 생성·push·CI 실행을 확인한다. 승인으로 native CI나 실제 장비 시험을 Pass 처리하지 않는다.
+Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정 저장소 생성·업로드를 요청했다. VS Code GitHub MCP 등록을 확인했고 Codex에도 서버를 등록했다. Codex OAuth 로그인은 동적 클라이언트 등록 미지원으로 실패했으며 Codex 측 인증 대기다. 저장소명은 `dot-logger`, 공개 범위는 비공개로 준비하며 연결 확인 후 생성·push·CI 실행을 확인한다. 승인으로 native CI나 실제 장비 시험을 Pass 처리하지 않는다.

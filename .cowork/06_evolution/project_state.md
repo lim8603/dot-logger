@@ -38,7 +38,7 @@
 
 ## 다음 시작점
 
-**2026-10-27 진행:** Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정 저장소 생성·업로드를 요청했다. GitHub 플러그인 설치/연결은 사용자 인증 대기다. `dot-logger` 비공개 저장소로 준비한다.
+**2026-10-27 진행:** Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정 저장소 생성·업로드를 요청했다. VS Code GitHub MCP 등록을 확인했고 Codex에도 `github` 서버를 등록했다. Codex OAuth는 GitHub 서버의 동적 클라이언트 등록 미지원으로 실패했다. 현재 세션 GitHub 도구·토큰·Git 인증 helper가 없어 Codex 측 인증 대기다. `dot-logger` 비공개 저장소로 준비한다.
 
 1. [TASK-002](../04_implementation/tasks/TASK-002.md) Human 구현 리뷰는 승인 완료. [EV-001](../05_verification/verification_evidence.md)의 로컬 Pass는 유지하고 GitHub 연결 확인 → 본인 계정 저장소 생성 → 기존 main 이력 push → native CI 결과 확인을 진행한다. CI 실행 전까지 Task는 In Progress다.
 2. `.github/workflows/ci.yml`은 Ubuntu 24.04·Windows Server 2025·macOS 14 및 두 Rust 버전으로 구성했다. 현재 Git remote가 없어 원격 CI를 실행하지 않았다(GAP-004). 사용자 연결 후 생성·게시가 승인된 상태다. 실행 환경과 실제 Windows 11/PREEMPT_RT 수락을 구분한다.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run TC-001 against all optional-feature combinations with a fixed lockfile."""
+"""Run contracts across optional features and the isolated RT allocation guard."""
 
 import argparse
 import itertools
@@ -42,6 +42,7 @@ def main():
     if unexpected:
         raise SystemExit(f"core consumer unexpectedly requires: {sorted(unexpected)}")
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer"], check=True)
+    subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation"], check=True)
     print("TC-001: all 16 feature combinations and independent core consumer passed", flush=True)
 
 

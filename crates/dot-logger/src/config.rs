@@ -105,6 +105,8 @@ pub enum Resource {
     Total,
     /// Input envelopes and small payloads.
     Input,
+    /// Capture registration, completion, and management metadata.
+    Control,
     /// Original payload storage.
     Raw,
     /// Background worker reservations.

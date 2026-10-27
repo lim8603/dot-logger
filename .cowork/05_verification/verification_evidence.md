@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-10-27 / EV-001·002 |
+| 버전 | 2026-10-27 / EV-001·002·003 |
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. TASK-002 구성/의존성 EV-001 로컬/native CI·Human 리뷰 Pass 이력을 유지한다. TASK-003 소형 ingress는 EV-002 로컬/native CI Pass·Human 리뷰 승인으로 Done이다. 원본/분배/완료/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
+INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. TASK-002 구성/의존성 EV-001 로컬/native CI·Human 리뷰 Pass 이력을 유지한다. TASK-003 소형 ingress는 EV-002 로컬/native CI Pass·Human 리뷰 승인으로 Done이다. TASK-004 원본 풀·반환은 EV-003 로컬 Pass, Human 리뷰 승인·변경분 native CI 대기다. 원본/분배/완료/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
 
 ## Evidence Index
 
@@ -134,6 +134,33 @@ allocator guard는 TLS의 실제 할당/해제 감지 보정 후 소형 수락·
 
 6개 구성 작업과 audit 총 7개 작업 Pass. TASK-003 Done·GAP-004 Closed(hosted native CI 범위). Windows Server 2025는 Windows 11, Ubuntu hosted는 PREEMPT_RT/실장비 수락을 대신하지 않는다. 원본 풀·회수/메모리 순서 모델·분배/완료·파일·p99·전원 차단 검증은 잔여다. GAP-001·002·005와 Gate 4/5 Not Ready를 유지한다.
 
+### EV-003 — TASK-004 원본 풀·수명·반환
+
+- 대상: base `98580cb3e9a42576a9cf93fb2224b740e8f9a497` 위 dirty 작업 트리. pool·capture 연동·원본 시험/allocator guard·scope 예제·package lint·CI/feature script 변경. [기계 판독 결과·24개 소스/manifest SHA-256](../06_evolution/imported_context/task_004_2026-10-27/results.json)으로 검증 대상을 고정했다. Cargo.lock·외부 dependency는 변경하지 않았다.
+- 코드 커밋 `9a4f34cbfc540d69aee0e8504238bf53760ec925`와 EV-003의24개 source/manifest SHA-256이 일치한다. Human 구현 리뷰·게시 요청은 2026-10-27 승인됐다.
+- 실행: 2026-10-27 / AI / Ubuntu 26.04.1 x86_64 / Rust 1.96.0·MSRV 1.85.0 / 검증 전용 Miri nightly-2026-10-26. 실제 R1·PREEMPT_RT 수락 환경이 아니다.
+- TDD: [원본 API 부재 Red](../06_evolution/imported_context/task_004_2026-10-27/red-missing-api.log), [회수 미구현 Red](../06_evolution/imported_context/task_004_2026-10-27/red-behavior.log), [범위 밖 generation alias Red](../06_evolution/imported_context/task_004_2026-10-27/red-generation.log) 후 구현·리팩토링 → [최종 workspace Green](../06_evolution/imported_context/task_004_2026-10-27/green-final.log).
+- 코드: [원본 풀/공개 guard](../../crates/dot-logger/src/pool/mod.rs), [원자 상태·UnsafeCell Safety 경계](../../crates/dot-logger/src/pool/storage.rs), [생산자별 혼합 ingress](../../crates/dot-logger/src/capture/mod.rs). [원본 통합 시험](../../crates/dot-logger/tests/tc_002_pool.rs) 17개, 신규 storage 경계 4개, 신규 compile-fail 7개, [원본 allocation guard](../../tests/rt-allocation/src/tests.rs) 1개 Pass. 기존 소형·구성·의존성 회귀도 Pass다.
+
+| 명령·범위 | 결과·근거 |
+|---|---|
+| `python3 scripts/check-feature-matrix.py --toolchain 1.96.0` | 16 feature·독립 consumer·기존/원본 allocator guard·scoped_capture 예제 Pass / [로그](../06_evolution/imported_context/task_004_2026-10-27/features-1.96.0.log) |
+| 같은 script `--toolchain 1.85.0` | 같은 범위 Pass / [로그](../06_evolution/imported_context/task_004_2026-10-27/features-1.85.0.log) |
+| `cargo +<version> clippy --workspace --all-targets --all-features --locked -- -D warnings` | [1.96.0 Pass](../06_evolution/imported_context/task_004_2026-10-27/clippy-1.96.0.log), [1.85.0 Pass](../06_evolution/imported_context/task_004_2026-10-27/clippy-1.85.0.log) |
+| `RUSTDOCFLAGS='-D warnings' cargo +<version> doc --workspace --all-features --no-deps --locked` | [1.96.0 Pass](../06_evolution/imported_context/task_004_2026-10-27/rustdoc-1.96.0.log), [1.85.0 Pass](../06_evolution/imported_context/task_004_2026-10-27/rustdoc-1.85.0.log) |
+| `MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-many-seeds=0..8' cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --locked` | 8 seeds × lib 6개(기존2·신규4)+원본17개 Pass / [로그](../06_evolution/imported_context/task_004_2026-10-27/miri.log) |
+| `cargo fmt --all --check`, `git diff --check` | Pass / [fmt](../06_evolution/imported_context/task_004_2026-10-27/fmt.log) |
+
+원본 거절/생략은 동일 slot·generation·pointer·내용의 Loan을 반환한다. 대여 단계부터 Normal의 Important bytes 점유를 막고, 수락 뒤 `try_take_raw`의 불변 reader는 같은 payload pointer를 사용한다. `try_read`의 일반 복사 경로는 별도다. Queued/InUse/Loaned는 회수하지 않고 마지막 guard/borrow 종료 뒤 ReturnPending만 한정 스캔으로 Free로 바꾼다. 원본과 소형은 한 FIFO/sequence를 사용하며 물리 원본 payload·슬롯 metadata·큐 예산을 중복 계산하지 않는다.
+
+원본 allocator guard는 대여·거절·생략·포화된 반환 알림·reader Drop·마지막 RT handle Drop 구간 **allocation/deallocation 0/0**, owner 일반 Drop의 실제 deallocation을 확인했다. 사전 할당/예열은 page locking이나 실제 RT 지연 합격을 뜻하지 않는다. generation+state를 한 atomic word로 비교하고, 범위 밖/stale/중복 token을 차단하며 소진 시 Retired로 유지한다. workspace forbid는 유지하되 dot-logger package만 deny/private pool-storage allow로 설정했다. Sync/UnsafeCell 접근은 해당 모듈에 격리했고 나머지 RT 경로에 callback/I/O/잠금/무한 재시도를 넣지 않았다. 이 unsafe 예외도 Human 구현 리뷰에 포함한다.
+
+Miri는 [공식 사용법](https://github.com/rust-lang/miri#using-miri)과 [다중 seed 실행](https://github.com/rust-lang/miri#testing-multiple-different-executions)에 따라 실행했다. 위 Pass는 실행한 입력/seed의 해석 결과이며 모든 interleaving의 완전한 모델 검사나 soundness 증명이 아니다. 신규 raw-memory CI job에도 동일 명령을 넣었으나 이 변경분 native CI는 미실행이다.
+
+**dot-probe 수명 검토:** 현재 process/control/safety의 'static spawn과 shutdown join 경로를 읽기 전용으로 조사했다. 관측 revision·4개 파일 SHA-256은 results.json에 보존했다. borrowed Producer의 직접 주입에는 생성부/run entry point 변경이 필요하다. [scoped_capture 예제](../../examples/scoped_capture.rs)는 owner를 가진 'static 관리 host 내부의 scoped RT worker·join→drain/reclaim→owner Drop을 두 Rust에서 실제 실행했다. 실제 앱 연결/실장비 검증은 TASK-026이며 dot-probe 파일은 수정하지 않았다. T1은 미도래다.
+
+유효 범위는 원본 풀·입력 수집·수명/반환과 수명 prototype이다. fanout·대상별 완료/이력·파일/durability·실제 shutdown·실제 dot-probe 어댑터·p99/장비/전원 수락은 미실행이다. Human 리뷰 승인·native CI 대기·변경분 native CI 대기(기존 6개 OS/Rust + audit + raw-memory = 8개 job)이며 TC-002 전체·MS-002·Gate 4/5를 Pass로 바꾸지 않는다. 새 RustSec audit은 미실행이고 외부 dependency pin은 동일하다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -143,7 +170,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | TASK-002 EV-001 로컬/native, TASK-003 소형 ingress EV-002 로컬 Pass. 원본/회수·분배/완료·저장·클라이언트·실장비 TC 잔여 | AI, TASK-003 이후 TDD와 각 MS 인수 | Open |
+| GAP-002 | TASK-002 EV-001·TASK-003 EV-002 로컬/native Pass, TASK-004 원본 EV-003 로컬 Pass. 분배/완료·저장·클라이언트·실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-003 변경분 `902043b`의 Ubuntu 24.04/Windows Server 2025/macOS 14 × Rust 1.85.0/1.96.0 및 audit Pass, run `40512793054`; TASK-002 Pass 이력 유지 | AI, 코드·의존성·CI 변경 시 해당 revision 재검증. 실제 Windows 11/PREEMPT_RT·장비 수락은 GAP-001/TASK-022·024 | Closed — hosted native CI 범위 |
+| GAP-004 | TASK-004 EV-003 dirty tree는 native CI 미실행. 마지막 native Pass는 TASK-003 `902043b`, run `40512793054` | AI, TASK-004 Human 리뷰 후 코드 게시·기존 6 OS/Rust+audit+신규 raw-memory 총 8 job 확인. 실제 Windows 11/PREEMPT_RT·장비는 GAP-001 | Open — TASK-004 변경분; TASK-003 Pass 이력 유지 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

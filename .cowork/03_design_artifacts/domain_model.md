@@ -75,6 +75,8 @@ RT 생산자가 syscall로 worker를 깨우지 않는다. Tier 1은 설정한 �
 
 예약은 생산자별 사전 할당 quota로 시작해 전역 경쟁을 피한다. Normal의 slots·풀 bytes 상한을 전체 quota보다 작게 두고 Important 예약분을 보호한다. 사용하지 않는 다른 생산자의 quota를 RT에서 빌리지 않는다. 사용률 손해는 구성/재시작으로 재분배하고, 동적 공유 예산은 측정 필요가 생기면 검토한다. 대여 단계부터 중요도·크기 등급을 고정해 일반 원본이 중요 bytes를 먼저 점유하는 우회를 막는다.
 
+TASK-004 로컬 구현·검증(2026-10-27): `CaptureOwner`가 원본 allocation을 보유하고 `Loan`/`RawRecord`는 borrowed guard다. 세부 상태·generation을 하나의 64-bit atomic에 넣어 stale generation과 상태를 함께 비교한다. 마지막 generation은 재사용하지 않는다. 반환 알림은 capacity 1의 atomic coalescing mailbox로 구현했고, 포화/알림 소모 뒤에도 슬롯별 ReturnPending 순환 스캔으로 전량 회수했다. mutable/immutable bytes borrow는 guard에 묶여 해제 뒤 접근을 금지한다. UnsafeCell과 Sync의 Safety 경계는 private `pool/storage.rs`이며 Miri 8개 seed·할당 감시·동시 수집/반환 시험을 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)에 기록했다. 실행한 경로 밖의 모든 interleaving 또는 실제 RT 지연을 증명한 것은 아니다. Human 리뷰 승인·변경분 native CI 대기다.
+
 ## 5. 자원 예산과 설정
 
 전역 승인 예산은 `입력 봉투 + 전체 원본 풀 + 출력 참조/복사 + 인코딩/인덱스 + 완료 추적 + 조회/원격/DB + 설정/계측 + 스레드 스택/기타 예약`의 합이다. 원본은 물리 bytes로 한 번, 출력 보유 원인은 별도로 집계한다. 미대여 풀·회수 대기·열린 파일 인덱스도 빠뜨리지 않는다. OS page cache·앱 메모리·커널 소켓 메모리는 별도 보고하며 전체 시스템 메모리 상한이라고 주장하지 않는다.

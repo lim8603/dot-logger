@@ -47,7 +47,7 @@
 | FR-018 선택 옵션·기본 비활성 | FR-018 / US-002 | 사용 정책·설정/통지 API·AC-6~10 승인, 모의/실물 시험 모두 실행 전 |
 | 긴급 기록 순위·기한·장애·복구 | FR-018 / US-002, 인터페이스 §12 | 제어 로직의결정적 시험과 실제 전원 차단 검증을 구분해 준비 |
 
-TC-001~012 검증 묶음과 MS별 요구 추적표를 [테스트 케이스](test_case.md)에 등록했다. TASK-002의 TC-001 하위 구성/의존성 시험은 로컬 Pass(EV-001)이고 나머지 제품 실행은 Not Run이며 상세 기대값은 2026-10-26 기준선 승인됐다.
+TC-001~012 검증 묶음과 MS별 요구 추적표를 [테스트 케이스](test_case.md)에 등록했다. TASK-002 구성/의존성(EV-001)·TASK-003 소형 수집(EV-002)은 로컬/native Pass, TASK-004 원본 수집/반환(EV-003)은 로컬 Pass이고 후속 제품/장비 시험은 잔여이며 상세 기대값은 2026-10-26 기준선 승인됐다.
 
 ## 4. 실행 결과와 요구사항 추적
 
@@ -78,4 +78,7 @@ P6 24시간은 정량적으로 선언한 배포 부하 1회 이상, 장애 주�
 
 OS 기능 행은 Linux 일반, Linux PREEMPT_RT, Windows, macOS로 구분하고 생성 OS × 읽기 OS의 파일 교환을 포함한다. 지원 CPU/버전과 도구chain·DB version은 ADR-009 후보와 TASK-022 실제 환경으로 고정한다. 실제 UPS 시험은 신호 원점·전달 지연·보호 bytes·진행 IO·차단/재기동·외부 oracle을 함께 기록한다.
 
-TASK-002에서 프로젝트 toolchain 1.96.0과 MSRV 1.85.0의 로컬 실행을 확인했다(EV-001). 전역 rustup default는 필요하지 않다. 실장비 미확정과 native CI 미실행은 계속 검증 공백이며, Ubuntu 26.04.1 로컬 Pass를 다른 OS·PREEMPT_RT·실물 장비 Pass로 확장하지 않는다. 나머지 구현도 TDD로 진행한다.
+TASK-002에서 프로젝트 toolchain 1.96.0과 MSRV 1.85.0의 로컬 실행을 확인했다(EV-001). 전역 rustup default는 필요하지 않다. TASK-003까지 hosted native CI Pass 이력은 있으나 TASK-004 변경분 native CI·실장비 미확정은 계속 검증 공백이며, Ubuntu 26.04.1 로컬 Pass를 다른 OS·PREEMPT_RT·실물 장비 Pass로 확장하지 않는다. 나머지 구현도 TDD로 진행한다.
+
+
+TASK-004는 ADR-009의 Miri 선택 검증을 nightly-2026-10-26으로 구체화했다. `MIRIFLAGS="-Zmiri-strict-provenance -Zmiri-many-seeds=0..8" cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --locked`로 private 경계/원본 통합을 검사한다. 해석한 seed/입력 밖의 모든 동시 실행이나 soundness를 증명한 것으로 표시하지 않는다. 생산자별 원본/소형 FIFO·거절/생략 동일 loan·포화된 반환 알림·한정 스캔·읽는 중 재사용 금지·관리 host 수명 예제는 EV-003으로 추적한다. 새 native CI에는 기존 6개 OS/Rust·audit 외에 raw-memory job을 포함한다.

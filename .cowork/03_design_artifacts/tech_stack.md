@@ -18,11 +18,11 @@
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
 | 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4·JSON 출력 | Human 선택·ADR-009 | 독립 GUI 제외, native 클라이언트 테스트 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
-| 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | 세부 도구 patch·CI 실행 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
+| 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
 ## 설치·실측 전 남은 작업
 
-TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-version = "1.85"`로 MSRV를 고정했다. Ubuntu 26.04.1 x86_64에서 Rust 1.85.0/1.96.0의 16가지 feature 조합·독립 consumer·clippy·개발 rustdoc/fmt를 확인했다([EV-001](../05_verification/verification_evidence.md)). `Cargo.lock`으로 patch/간접 의존성도 고정한다. 전역 rustup default는 계속 미설정이며 프로젝트 toolchain으로 실행한다.
+TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-version = "1.85"`로 MSRV를 고정했다. Ubuntu 26.04.1 x86_64에서 Rust 1.85.0/1.96.0의 16가지 feature 조합·독립 consumer·clippy·개발 rustdoc/fmt를 확인했다([EV-001](../05_verification/verification_evidence.md)). `Cargo.lock`으로 patch/간접 의존성도 고정한다. 전역 rustup default는 변경하지 않고 프로젝트 toolchain으로 실행한다.
 
 MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 [목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
 
@@ -42,3 +42,8 @@ TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다
 ## 조사 근거
 
 [2026-10-26 상세설계 조사](../06_evolution/imported_context/research_2026-10-26_detailed_design.md)와 [2026-10-25 초기 조사](../06_evolution/imported_context/research_2026-10-25_logging_telemetry.md)는 조사 당시의 사실·권고 기록이다. 현재 채택 여부의 기준은 이 표와 Accepted ADR이며, 조사에만 등장하는 OTel/기타 도구까지 채택하지 않는다.
+
+
+## TASK-004 검증 도구 구체화 — 2026-10-27
+
+ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그대로이고 검증 전용 `nightly-2026-10-26`(Miri 포함)을 추가 설치했다. strict provenance·8개 seed의 raw 수명/반환 해석 검사는 EV-003 로컬 Pass이며 CI에 동일 명령의 raw-memory job을 추가했다. 해당 변경분 native CI는 미실행이다. 제품 workspace forbid는 유지하고 dot-logger package deny/private pool-storage allow로 원본 UnsafeCell 접근을 한 모듈에 격리했다. 외부 dependency/lock 변경은 없다. Miri의 공식 사용법·coverage 한계는 [공식 문서](https://github.com/rust-lang/miri#using-miri)를 따르며 실제 장비 성능 수락을 대체하지 않는다.

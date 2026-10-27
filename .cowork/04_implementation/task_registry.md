@@ -1,6 +1,6 @@
 # Task 목록과 실행 계획
 
-- INT-001 / 2026-10-26 / 계획 Approved. TASK-001 Done, TASK-002 In Progress — 구현·로컬 검증 완료(EV-001), Human 리뷰 승인(2026-10-27)·native CI 대기.
+- INT-001 / 2026-10-26 / 계획 Approved. TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001, GAP-004 Closed). 다음 TASK-003 Planned(미착수).
 - 담당 AI는 승인된 실행 담당이며 Human이 H/J 결정·리뷰를 맡는다. solo 모드를 유지한다.
 - 모든 Build Task는 TASK-001의 Gate 3와 관련 ADR/계약 합의가 선행한다. 의존 Task의 완료가 추가 진입 조건이다.
 - TDD: 해당 상세 문서의 실패 동작부터 Red → Green → Refactor. 구현/테스트/근거는 서로 별도 체크한다.
@@ -9,7 +9,7 @@
 | Task ID | 제목 | MS | Intent | Story | 담당 | 상태 | 갱신 | 다음 액션 | 의존 | 상세 | 인일 초안 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | TASK-001 | 상세설계 합의와 Gate 3 정렬 | MS-001 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-10-26 | 없음 — 설계 기준선 승인·Gate 3 Pass | 없음 | [상세](tasks/TASK-001.md) | 1~2 |
-| TASK-002 | workspace와 플랫폼·설정 계약 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-27 | Human 리뷰 승인·GitHub 연결/게시 후 native CI 확인(EV-001/GAP-004) | TASK-001 | [상세](tasks/TASK-002.md) | 1~2 |
+| TASK-002 | workspace와 플랫폼·설정 계약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | native CI 6조합+audit Pass(EV-001/GAP-004 Closed); 다음 TASK-003 | TASK-001 | [상세](tasks/TASK-002.md) | 1~2 |
 | TASK-003 | 소형 RT 수집과 중요 예약 | MS-002 | INT-001 | US-001·005 | AI | Planned | 2026-10-26 | Normal 포화 뒤 Important 예약 수락·동일 등급 초과 거절·일반 deadline 만료 | TASK-002 | [상세](tasks/TASK-003.md) | 2~3 |
 | TASK-004 | 원본 풀·수명·무해제 반환 | MS-002 | INT-001 | US-001·005 | AI | Planned | 2026-10-26 | 거절 loan Drop과 마지막 RT 핸들 Drop에 allocator 호출 0, return 알림 포화에도 전량 회수 | TASK-003 | [상세](tasks/TASK-004.md) | 2~4 |
 | TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | Planned | 2026-10-26 | 파일 A 큐 정지에도 B enqueue 지속, 물리 bytes 중복 계상/누락 없음 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |

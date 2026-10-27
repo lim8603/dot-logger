@@ -7,9 +7,9 @@
 
 | 영역 | 채택 | 버전/사양 | 근거 | 검증 경계 |
 |---|---|---|---|---|
-| 주 언어/빌드 | Rust·Cargo workspace | edition 2024, 개발 1.96.0, MSRV 1.85 | ADR-006·009 | TASK-002 로컬 Ubuntu 26.04.1에서 두 버전·16 feature 조합 Pass(EV-001), native OS CI 미실행 |
+| 주 언어/빌드 | Rust·Cargo workspace | edition 2024, 개발 1.96.0, MSRV 1.85 | ADR-006·009 | TASK-002 로컬 Ubuntu 26.04.1에서 두 버전·16 feature 조합 Pass(EV-001), 3 OS × 2 Rust native CI·audit Pass(2026-10-27) |
 | 아키텍처 | 내장형 Ports and Adapters·제한된 파이프라인 | 생산자별 큐, 비-RT background | ADR-007·008 | 프로세스 장애 완전 격리 아님 |
-| 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | Linux RT 커널/장비·추가 CPU는 TASK-022; native 실행 전 |
+| 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | hosted native CI는 EV-001 Pass; Windows 11·Linux RT 커널/장비·추가 CPU는 TASK-022에서 별도 검증 |
 | 큐 | rtrb | 0.4.0 SPSC | ADR-009 | 전체 API/Drop의 RT 안전성은 TASK-003·004 |
 | 파일 | MCAP | mcap 0.26.0; CRC/index on, 초기 압축 off | ADR-009·010 | 인덱스 상한·active reader·복구/성능 검증 |
 | 저장 매체 | SSD | SATA/NVMe·용량/제품 미정 | ADR-004 | 처리와 저장/보존 예산 분리 |
@@ -26,7 +26,7 @@ TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-vers
 
 MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 [목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
 
-CI는 Ubuntu 24.04·Windows Server 2025·macOS 14와 두 Rust 버전으로 구성했지만 아직 원격 실행하지 않았다(GAP-004). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
+CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 [Pass](https://github.com/lim8603/dot-logger/actions/runs/40504484501)했다(2026-10-27, EV-001, GAP-004 Closed). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
 
 TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다. R1은 참조 조건이며 다른 장비·Tier 2에 자동 적용하지 않는다. FR-015 추천 기능은 별도 제안이며 자동 채택하지 않았다.
 

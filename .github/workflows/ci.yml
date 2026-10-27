@@ -49,3 +49,16 @@ jobs:
         run: cargo +1.96.0 install cargo-audit --version 0.22.2 --locked
       - name: Check RustSec advisories
         run: cargo +1.96.0 audit --deny unsound
+
+  raw-memory:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fixed Miri toolchain
+        run: rustup toolchain install nightly-2026-10-26 --profile minimal --component miri
+      - name: Prepare Miri sysroot
+        run: cargo +nightly-2026-10-26 miri setup
+      - name: Check raw ownership and reclamation
+        env:
+          MIRIFLAGS: -Zmiri-strict-provenance -Zmiri-many-seeds=0..8
+        run: cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --locked

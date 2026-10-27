@@ -26,15 +26,18 @@ fn entry() -> Entry {
             bytes: byte_write,
             sequence: 0,
             normal_accepted: 0,
+            raw_cursor: 0,
         },
         read: ReadState {
             records: record_read,
             bytes: byte_read,
             normal_consumed: 0,
+            reclaim_cursor: 0,
         },
         consumed: AtomicUsize::new(0),
         slot_bytes: 1,
         normal_limit: 1,
+        raw: None,
     }
 }
 
@@ -46,6 +49,8 @@ fn owner(entry: Entry) -> CaptureOwner {
         session_id: 3,
         revision: 4,
         input_reserved_bytes: 0,
+        raw_reserved_bytes: 0,
+        control_reserved_bytes: 0,
     }
 }
 

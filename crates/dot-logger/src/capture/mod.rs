@@ -1,4 +1,4 @@
-//! Preallocated small-record ingress, independent of storage and completion.
+//! Preallocated small/raw ingress, independent of storage and completion.
 //!
 //! The owner retains both rtrb endpoints. RT handles only borrow them, so even
 //! the last handle's Drop cannot free queue memory. No worker is started here.
@@ -9,6 +9,10 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
 use crate::config::{ConfigError, ImportancePolicy, Resource, ValidatedConfig};
+use crate::pool::{
+    Loan, PoolSnapshot, RawPool, RawRecord, RawRecordError, RawRecordOutcome, ReclaimReport,
+    SlotIdentity,
+};
 
 mod types;
 
@@ -20,17 +24,25 @@ pub use types::{
     ImportanceMapping, Level, ReadError, RecordMetadata, RecordOutcome, SourceTime,
 };
 
+#[derive(Clone, Copy)]
+struct QueuedRecord {
+    record: CapturedRecord,
+    raw: Option<SlotIdentity>,
+}
+
 struct WriteState {
-    records: rtrb::Producer<CapturedRecord>,
+    records: rtrb::Producer<QueuedRecord>,
     bytes: rtrb::Producer<u8>,
     sequence: u64,
     normal_accepted: usize,
+    raw_cursor: usize,
 }
 
 struct ReadState {
-    records: rtrb::Consumer<CapturedRecord>,
+    records: rtrb::Consumer<QueuedRecord>,
     bytes: rtrb::Consumer<u8>,
     normal_consumed: usize,
+    reclaim_cursor: usize,
 }
 
 struct Entry {
@@ -39,12 +51,13 @@ struct Entry {
     consumed: AtomicUsize,
     slot_bytes: usize,
     normal_limit: usize,
+    raw: Option<RawPool>,
 }
 
-/// Owns only preallocated small ingress and its fixed registration metadata.
+/// Owns preallocated small/raw ingress and its fixed registration metadata.
 ///
 /// Allocate and drop on a management thread. The application must supply a new
-/// session ID on restart. Raw quotas, targets, completion windows, workers, and
+/// session ID on restart. Targets, completion windows, workers, and
 /// durability are not instantiated by this stage-specific constructor.
 pub struct CaptureOwner {
     entries: Box<[Entry]>,
@@ -53,13 +66,16 @@ pub struct CaptureOwner {
     session_id: u128,
     revision: u64,
     input_reserved_bytes: usize,
+    raw_reserved_bytes: usize,
+    control_reserved_bytes: usize,
 }
 
 impl CaptureOwner {
     /// Validate concrete ingress memory, preallocate, and touch all queue slots.
     ///
     /// The input reservation includes payloads, envelopes, endpoint state, and
-    /// rtrb ring descriptors. Owner/channel metadata fits the control partition.
+    /// rtrb ring descriptors. Owner/channel/raw-slot metadata fits control;
+    /// original payload allocations fit the raw partition, counted once.
     /// Allocator bookkeeping and rounding remain in configured worker headroom.
     /// Touching storage does not lock pages into RAM or prove RT latency.
     pub fn new(
@@ -83,27 +99,46 @@ impl CaptureOwner {
         }
         let overflow = || CaptureBuildError::Config(ConfigError::ArithmeticOverflow);
         let mut input_reserved_bytes = 0usize;
+        let mut raw_reserved_bytes = 0usize;
+        let mut raw_metadata_bytes = 0usize;
         for producer in &config.producers {
             let slots = producer.small.slots;
             let bytes = slots
                 .checked_mul(producer.small.slot_bytes)
                 .ok_or_else(overflow)?;
             // rtrb uses positions in 0..2*capacity; Vec uses an isize-sized layout.
-            if slots > isize::MAX as usize / size_of::<CapturedRecord>()
+            if slots > isize::MAX as usize / size_of::<QueuedRecord>()
                 || bytes > isize::MAX as usize
             {
                 return Err(overflow());
             }
             let entry_bytes = slots
-                .checked_mul(size_of::<CapturedRecord>())
+                .checked_mul(size_of::<QueuedRecord>())
                 .and_then(|n| n.checked_add(bytes))
                 .and_then(|n| n.checked_add(size_of::<Entry>()))
-                .and_then(|n| n.checked_add(size_of::<rtrb::RingBuffer<CapturedRecord>>()))
+                .and_then(|n| n.checked_add(size_of::<rtrb::RingBuffer<QueuedRecord>>()))
                 .and_then(|n| n.checked_add(size_of::<rtrb::RingBuffer<u8>>()))
                 .ok_or_else(overflow)?;
             input_reserved_bytes = input_reserved_bytes
                 .checked_add(entry_bytes)
                 .ok_or_else(overflow)?;
+            if let Some(quota) = &producer.raw {
+                let metadata = RawPool::metadata_bytes(quota).ok_or_else(overflow)?;
+                if quota.slot_bytes > isize::MAX as usize || metadata > isize::MAX as usize {
+                    return Err(overflow());
+                }
+                raw_metadata_bytes = raw_metadata_bytes
+                    .checked_add(metadata)
+                    .ok_or_else(overflow)?;
+                raw_reserved_bytes = raw_reserved_bytes
+                    .checked_add(
+                        quota
+                            .slots
+                            .checked_mul(quota.slot_bytes)
+                            .ok_or_else(overflow)?,
+                    )
+                    .ok_or_else(overflow)?;
+            }
         }
         if input_reserved_bytes > config.memory.input_bytes {
             return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
@@ -116,6 +151,7 @@ impl CaptureOwner {
             .len()
             .checked_mul(size_of::<ChannelConfig>())
             .and_then(|n| n.checked_add(size_of::<Self>()))
+            .and_then(|n| n.checked_add(raw_metadata_bytes))
             .ok_or_else(overflow)?;
         if control_bytes > config.memory.control_bytes {
             return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
@@ -146,7 +182,13 @@ impl CaptureOwner {
         let mut entries = Vec::with_capacity(config.producers.len());
         for producer in &config.producers {
             let quota = &producer.small;
-            let (record_write, record_read) = warm_ring(quota.slots, warm_record)?;
+            let (record_write, record_read) = warm_ring(
+                quota.slots,
+                QueuedRecord {
+                    record: warm_record,
+                    raw: None,
+                },
+            )?;
             let (byte_write, byte_read) = warm_ring(quota.slots * quota.slot_bytes, 0u8)?;
             entries.push(Entry {
                 write: WriteState {
@@ -154,11 +196,13 @@ impl CaptureOwner {
                     bytes: byte_write,
                     sequence: 0,
                     normal_accepted: 0,
+                    raw_cursor: 0,
                 },
                 read: ReadState {
                     records: record_read,
                     bytes: byte_read,
                     normal_consumed: 0,
+                    reclaim_cursor: 0,
                 },
                 consumed: AtomicUsize::new(0),
                 slot_bytes: quota.slot_bytes,
@@ -166,6 +210,7 @@ impl CaptureOwner {
                     ImportancePolicy::PrioritizeImportant => quota.slots - quota.important_slots,
                     ImportancePolicy::TreatEqually => quota.slots,
                 },
+                raw: producer.raw.as_ref().map(RawPool::new),
             });
         }
         let entries = entries.into_boxed_slice();
@@ -176,12 +221,24 @@ impl CaptureOwner {
             session_id,
             revision,
             input_reserved_bytes,
+            raw_reserved_bytes,
+            control_reserved_bytes: control_bytes,
         })
     }
 
     /// Bytes reserved for concrete input arrays, queue descriptors, and endpoints.
     pub fn input_reserved_bytes(&self) -> usize {
         self.input_reserved_bytes
+    }
+
+    /// Physical original-payload storage, counted once including unused slots.
+    pub fn raw_reserved_bytes(&self) -> usize {
+        self.raw_reserved_bytes
+    }
+
+    /// Concrete owner, channel, and original-slot metadata reservation.
+    pub fn control_reserved_bytes(&self) -> usize {
+        self.control_reserved_bytes
     }
 
     /// Lend unique producer/consumer pairs without moving their owning endpoints.
@@ -268,10 +325,12 @@ impl<'owner> Iterator for CaptureScope<'owner> {
                     session_id: self.session_id,
                     producer_id: id as u32,
                     revision: self.revision,
+                    raw: entry.raw.as_ref(),
                 },
                 CaptureConsumer {
                     read: &mut entry.read,
                     consumed: &entry.consumed,
+                    raw: entry.raw.as_ref(),
                 },
             )
         })
@@ -314,6 +373,7 @@ pub struct Producer<'owner> {
     session_id: u128,
     producer_id: u32,
     revision: u64,
+    raw: Option<&'owner RawPool>,
 }
 
 impl<'owner> Producer<'owner> {
@@ -326,28 +386,10 @@ impl<'owner> Producer<'owner> {
         mut metadata: RecordMetadata,
         payload: &[u8],
     ) -> Result<RecordOutcome, CaptureError> {
-        if self.closing.load(Ordering::Acquire) {
-            return Err(CaptureError::Closing);
-        }
-        let channel = self
-            .channels
-            .iter()
-            .find(|channel| channel.channel_id == metadata.channel_id)
-            .ok_or(CaptureError::InvalidInput)?;
-        if metadata.schema_id != channel.schema_id
-            || metadata.schema_version != channel.schema_version
-        {
-            return Err(CaptureError::SchemaMismatch);
-        }
-        if payload.len() > self.slot_bytes {
-            return Err(CaptureError::TooLarge);
-        }
-        if metadata.level < channel.minimum_level {
+        let (importance, skip) = self.classify(&metadata, payload.len(), self.slot_bytes)?;
+        if skip {
             return Ok(RecordOutcome::Skipped);
         }
-        let importance = metadata
-            .importance
-            .unwrap_or_else(|| channel.importance.resolve(metadata.level));
         if importance == Importance::Normal {
             let consumed = self.consumed.load(Ordering::Acquire);
             // Only this producer increments accepted and only its consumer
@@ -387,13 +429,134 @@ impl<'owner> Producer<'owner> {
         }
         // rtrb's Release publication of this envelope follows the byte copy.
         // The consumer acquires the envelope before reading the byte queue.
-        records.fill_from_iter(std::iter::once(CapturedRecord {
-            receipt,
-            metadata,
-            revision: self.revision,
-            payload_len: payload.len(),
+        records.fill_from_iter(std::iter::once(QueuedRecord {
+            record: CapturedRecord {
+                receipt,
+                metadata,
+                revision: self.revision,
+                payload_len: payload.len(),
+            },
+            raw: None,
         }));
         Ok(RecordOutcome::Accepted(receipt))
+    }
+
+    fn classify(
+        &self,
+        metadata: &RecordMetadata,
+        length: usize,
+        maximum: usize,
+    ) -> Result<(Importance, bool), CaptureError> {
+        if self.closing.load(Ordering::Acquire) {
+            return Err(CaptureError::Closing);
+        }
+        let channel = self
+            .channels
+            .iter()
+            .find(|channel| channel.channel_id == metadata.channel_id)
+            .ok_or(CaptureError::InvalidInput)?;
+        if metadata.schema_id != channel.schema_id
+            || metadata.schema_version != channel.schema_version
+        {
+            return Err(CaptureError::SchemaMismatch);
+        }
+        if length > maximum {
+            return Err(CaptureError::TooLarge);
+        }
+        let importance = metadata
+            .importance
+            .unwrap_or_else(|| channel.importance.resolve(metadata.level));
+        Ok((importance, metadata.level < channel.minimum_level))
+    }
+
+    /// Borrow one fixed-class original slot. At most two finite slot scans;
+    /// no allocation, free, callback, I/O, waiting, or CAS retry loop.
+    pub fn try_acquire(
+        &mut self,
+        length: usize,
+        importance: Importance,
+    ) -> Result<Loan<'owner>, CaptureError> {
+        if self.closing.load(Ordering::Acquire) {
+            return Err(CaptureError::Closing);
+        }
+        self.raw.ok_or(CaptureError::Unsupported)?.acquire(
+            length,
+            importance,
+            &mut self.write.raw_cursor,
+        )
+    }
+
+    /// Submit an original without copying payload bytes. Failure or intentional
+    /// omission returns the exact same loan. Pool/producer/importance mismatches
+    /// are InvalidInput, checked before a filter can hide invalid ownership.
+    pub fn try_record_raw(
+        &mut self,
+        mut metadata: RecordMetadata,
+        loan: Loan<'owner>,
+    ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
+        let classify = (|| {
+            let (importance, skip) = self.classify(&metadata, loan.len(), usize::MAX)?;
+            let pool = self.raw.ok_or(CaptureError::Unsupported)?;
+            if !loan.belongs_to(pool) || importance != loan.importance() {
+                return Err(CaptureError::InvalidInput);
+            }
+            Ok((importance, skip))
+        })();
+        let (importance, skip) = match classify {
+            Ok(value) => value,
+            Err(reason) => return Err(RawRecordError { reason, loan }),
+        };
+        if skip {
+            return Ok(RawRecordOutcome::Skipped(loan));
+        }
+        if importance == Importance::Normal
+            && self
+                .write
+                .normal_accepted
+                .wrapping_sub(self.consumed.load(Ordering::Acquire))
+                >= self.normal_limit
+        {
+            return Err(RawRecordError {
+                reason: CaptureError::Capacity,
+                loan,
+            });
+        }
+        let Some(sequence) = self.write.sequence.checked_add(1) else {
+            return Err(RawRecordError {
+                reason: CaptureError::SequenceExhausted,
+                loan,
+            });
+        };
+        let Ok(records) = self.write.records.write_chunk_uninit(1) else {
+            return Err(RawRecordError {
+                reason: CaptureError::Capacity,
+                loan,
+            });
+        };
+        let receipt = CaptureReceipt {
+            session_id: self.session_id,
+            producer_id: self.producer_id,
+            accepted_seq: sequence,
+        };
+        let payload_len = loan.len();
+        metadata.importance = Some(importance);
+        // All fallible reservations finished. Publish ownership before the FIFO
+        // envelope; there is no further failure path or payload copy here.
+        let identity = loan.publish();
+        self.write.sequence = sequence;
+        if importance == Importance::Normal {
+            self.write.normal_accepted = self.write.normal_accepted.wrapping_add(1);
+        }
+        records.fill_from_iter(std::iter::once(QueuedRecord {
+            record: CapturedRecord {
+                receipt,
+                metadata,
+                revision: self.revision,
+                payload_len,
+            },
+            raw: Some(identity),
+        }));
+        Ok(RawRecordOutcome::Accepted(receipt))
     }
 
     /// Move this borrow into an explicitly general-path handle with deadline waits.
@@ -435,11 +598,12 @@ impl GeneralProducer<'_> {
 pub struct CaptureConsumer<'owner> {
     read: &'owner mut ReadState,
     consumed: &'owner AtomicUsize,
+    raw: Option<&'owner RawPool>,
 }
 
-impl CaptureConsumer<'_> {
-    /// Copy the oldest accepted record into a caller-owned buffer.
-    /// Does not consume anything if the destination is too small.
+impl<'owner> CaptureConsumer<'owner> {
+    /// Copy the next small or raw payload into caller-owned management storage.
+    /// A short destination consumes nothing. For raw no-copy access, use try_take_raw.
     pub fn try_read(
         &mut self,
         destination: &mut [u8],
@@ -447,33 +611,80 @@ impl CaptureConsumer<'_> {
         let Ok(records) = self.read.records.read_chunk(1) else {
             return Ok(None);
         };
-        let (first, second) = records.as_slices();
-        let record = first
-            .iter()
-            .chain(second)
-            .next()
-            .copied()
-            .ok_or(ReadError::InconsistentQueue)?;
+        let queued = queued_head(&records)?;
+        let record = queued.record;
         if destination.len() < record.payload_len {
             return Err(ReadError::BufferTooSmall(record.payload_len));
         }
-        let bytes = self
-            .read
-            .bytes
-            .read_chunk(record.payload_len)
-            .map_err(|_| ReadError::InconsistentQueue)?;
-        let (first, second) = bytes.as_slices();
-        destination[..first.len()].copy_from_slice(first);
-        destination[first.len()..record.payload_len].copy_from_slice(second);
-        bytes.commit_all();
-        // Release bytes before the envelope: observing a free envelope also
-        // establishes that the corresponding byte capacity has been returned.
-        records.commit_all();
-        if record.metadata.importance == Some(Importance::Normal) {
-            self.read.normal_consumed = self.read.normal_consumed.wrapping_add(1);
-            self.consumed
-                .store(self.read.normal_consumed, Ordering::Release);
+        if let Some(identity) = queued.raw {
+            let raw = self
+                .raw
+                .and_then(|pool| pool.take(identity, record))
+                .ok_or(ReadError::InconsistentQueue)?;
+            destination[..record.payload_len].copy_from_slice(raw.payload());
+        } else {
+            let bytes = self
+                .read
+                .bytes
+                .read_chunk(record.payload_len)
+                .map_err(|_| ReadError::InconsistentQueue)?;
+            let (first, second) = bytes.as_slices();
+            destination[..first.len()].copy_from_slice(first);
+            destination[first.len()..record.payload_len].copy_from_slice(second);
+            bytes.commit_all();
         }
+        // Return bytes before the envelope, then release the Normal ingress quota.
+        records.commit_all();
+        release_normal(self.read, self.consumed, record);
         Ok(Some(record))
+    }
+
+    /// Retain the next raw original without copying its bytes. A small record at
+    /// the head returns PayloadKindMismatch and remains queued, preserving FIFO.
+    pub fn try_take_raw(&mut self) -> Result<Option<RawRecord<'owner>>, ReadError> {
+        let Ok(records) = self.read.records.read_chunk(1) else {
+            return Ok(None);
+        };
+        let queued = queued_head(&records)?;
+        let identity = queued.raw.ok_or(ReadError::PayloadKindMismatch)?;
+        let raw = self
+            .raw
+            .and_then(|pool| pool.take(identity, queued.record))
+            .ok_or(ReadError::InconsistentQueue)?;
+        records.commit_all();
+        release_normal(self.read, self.consumed, queued.record);
+        Ok(Some(raw))
+    }
+
+    /// Sample raw slot lifecycle counts in the management path.
+    pub fn raw_snapshot(&self) -> Option<PoolSnapshot> {
+        self.raw.map(RawPool::snapshot)
+    }
+
+    /// Inspect at most limit raw slots, advancing a fair round-robin cursor.
+    /// Notification absence/fullness never prevents the authoritative scan.
+    pub fn reclaim_raw(&mut self, limit: usize) -> ReclaimReport {
+        self.raw
+            .map(|pool| pool.reclaim(limit, &mut self.read.reclaim_cursor))
+            .unwrap_or_default()
+    }
+}
+
+fn queued_head(
+    records: &rtrb::chunks::ReadChunk<'_, QueuedRecord>,
+) -> Result<QueuedRecord, ReadError> {
+    let (first, second) = records.as_slices();
+    first
+        .iter()
+        .chain(second)
+        .next()
+        .copied()
+        .ok_or(ReadError::InconsistentQueue)
+}
+
+fn release_normal(read: &mut ReadState, consumed: &AtomicUsize, record: CapturedRecord) {
+    if record.metadata.importance == Some(Importance::Normal) {
+        read.normal_consumed = read.normal_consumed.wrapping_add(1);
+        consumed.store(read.normal_consumed, Ordering::Release);
     }
 }

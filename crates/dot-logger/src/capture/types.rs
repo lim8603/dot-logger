@@ -131,7 +131,7 @@ pub enum RecordOutcome {
 /// Fixed error codes for small capture and general waiting.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CaptureError {
-    /// The input channel was not registered.
+    /// Channel, producer/pool, or acquired importance does not match the input.
     InvalidInput,
     /// The channel's schema identifier or version does not match.
     SchemaMismatch,
@@ -143,6 +143,10 @@ pub enum CaptureError {
     Closing,
     /// No more sequence identifiers can be issued.
     SequenceExhausted,
+    /// Every eligible raw slot exhausted its generation; no identifier wraps.
+    GenerationExhausted,
+    /// This producer has no original-payload pool.
+    Unsupported,
     /// The general producer's monotonic deadline has elapsed.
     DeadlineExceeded,
 }
@@ -167,6 +171,8 @@ pub enum ReadError {
     BufferTooSmall(usize),
     /// Internal publication invariant failed; no record is consumed.
     InconsistentQueue,
+    /// The head is a small record; consume it before taking a raw original.
+    PayloadKindMismatch,
 }
 
 /// Error detected before allocating ingress queues.

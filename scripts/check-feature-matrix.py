@@ -43,6 +43,7 @@ def main():
         raise SystemExit(f"core consumer unexpectedly requires: {sorted(unexpected)}")
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer"], check=True)
     subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation"], check=True)
+    subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger", "--example", "scoped_capture"], check=True)
     print("TC-001: all 16 feature combinations and independent core consumer passed", flush=True)
 
 

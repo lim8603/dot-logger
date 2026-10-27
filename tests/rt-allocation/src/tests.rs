@@ -204,3 +204,115 @@ fn small_capture_success_skip_errors_and_last_borrow_drop_never_call_allocator()
     );
     assert!(allocator::observe(|| drop(owner)).1 > 0);
 }
+
+#[test]
+fn raw_loan_rejection_coalesced_return_and_last_handle_drop_never_allocate_or_free() {
+    use dot_logger::pool::RawRecordOutcome;
+    let config = SessionConfig {
+        memory: MemoryBudget {
+            total_bytes: 1024 * 1024,
+            input_bytes: 256 * 1024,
+            raw_bytes: 256 * 1024,
+            output_bytes: 256 * 1024,
+            external_bytes: 0,
+            control_bytes: 128 * 1024,
+            worker_bytes: 128 * 1024,
+        },
+        producers: vec![ProducerQuota {
+            small: PoolQuota {
+                slots: 8,
+                slot_bytes: 16,
+                important_slots: 2,
+            },
+            raw: Some(PoolQuota {
+                slots: 4,
+                slot_bytes: 4096,
+                important_slots: 1,
+            }),
+        }],
+        importance: ImportancePolicy::PrioritizeImportant,
+        workers: WorkerThreadingConfig {
+            count: 1,
+            stack_bytes: 4096,
+            cpu_ids: vec![],
+            affinity: Requirement::Optional,
+        },
+        capabilities: vec![],
+    };
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let mut channel = ChannelConfig::new(7, 99, 1);
+    channel.minimum_level = Level::Info;
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[channel]).unwrap();
+    let mut meta = RecordMetadata {
+        channel_id: 7,
+        schema_id: 99,
+        schema_version: 1,
+        mono_ns: 123,
+        real_ns: 456,
+        source_time: None,
+        level: Level::Info,
+        importance: None,
+    };
+    assert_eq!(
+        allocator::observe(|| {
+            owner.scope(|mut scope| {
+                let control = scope.control();
+                let (mut producer, mut consumer) = scope.next().unwrap();
+                // Saturate the one-slot return hint. The slot states retain all
+                // returns, including rejections and the last loan's RT Drop.
+                let a = producer.try_acquire(4096, Importance::Normal).unwrap();
+                let b = producer.try_acquire(4096, Importance::Normal).unwrap();
+                let c = producer.try_acquire(4096, Importance::Normal).unwrap();
+                let d = producer.try_acquire(4096, Importance::Important).unwrap();
+                meta.schema_id = 0;
+                let error = producer.try_record_raw(meta, a).unwrap_err();
+                assert_eq!(error.reason, CaptureError::SchemaMismatch);
+                drop(error.loan);
+                drop(b);
+                drop(c);
+                drop(d);
+                assert_eq!(consumer.raw_snapshot().unwrap().return_pending, 4);
+                assert_eq!(consumer.reclaim_raw(4).reclaimed, 4);
+                meta.schema_id = 99;
+                for _ in 0..10 {
+                    let mut loan = producer.try_acquire(4096, Importance::Normal).unwrap();
+                    loan.payload_mut().fill(7);
+                    assert!(matches!(
+                        producer.try_record_raw(meta, loan),
+                        Ok(RawRecordOutcome::Accepted(_))
+                    ));
+                    let record = consumer.try_take_raw().unwrap().unwrap();
+                    assert_eq!(record.payload()[0], 7);
+                    assert_eq!(consumer.reclaim_raw(4).reclaimed, 0);
+                    drop(record);
+                    assert_eq!(consumer.reclaim_raw(4).reclaimed, 1);
+                }
+                let loan = producer.try_acquire(64, Importance::Normal).unwrap();
+                meta.level = Level::Debug;
+                let RawRecordOutcome::Skipped(loan) = producer.try_record_raw(meta, loan).unwrap()
+                else {
+                    panic!("unexpected acceptance")
+                };
+                drop(loan);
+                consumer.reclaim_raw(4);
+                meta.level = Level::Info;
+                for _ in 0..6 {
+                    producer.try_record_small(meta, b"fill").unwrap();
+                }
+                let loan = producer.try_acquire(4096, Importance::Normal).unwrap();
+                let error = producer.try_record_raw(meta, loan).unwrap_err();
+                assert_eq!(error.reason, CaptureError::Capacity);
+                drop(error.loan);
+                let loan = producer.try_acquire(4096, Importance::Important).unwrap();
+                control.close();
+                let error = producer.try_record_raw(meta, loan).unwrap_err();
+                assert_eq!(error.reason, CaptureError::Closing);
+                drop(error.loan);
+            });
+        }),
+        (0, 0)
+    );
+    assert!(allocator::observe(|| drop(owner)).1 > 0);
+}

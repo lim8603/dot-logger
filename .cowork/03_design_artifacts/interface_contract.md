@@ -380,7 +380,7 @@ TASK-002 구현 범위: `crates/dot-logger/src/config.rs`의 `SessionBuilder::ne
 
 TASK-003 구현 범위(2026-10-27): `capture::CaptureOwner::new(&ValidatedConfig, session_id, revision, channels)`와 `scope`는 소형 ingress만 구성한다. owner가 owning endpoint를 보유하고 `Producer::try_record_small`/`GeneralProducer::record_until`은 빌린 핸들이다. `CaptureConsumer::try_read`는 일반 경로의 대역 소비 API다. payload·봉투·endpoint/rtrb descriptor를 input, owner·고정 채널 metadata를 control 예산에 검사한 뒤 사전 할당·예열한다. 중요 예약은 생산자별 미소비 Normal 슬롯 수를 제한하고, 각 record의 최대 크기로 Important bytes도 보호한다. `ChannelConfig`의 전체 6레벨 mapping은 불완전한 매핑을 타입으로 배제한다. channel/schema/크기 오류는 필터보다 먼저 반환한다. 수락 sequence는 owner의 scope 재진입에도 유지하고 소진 시 거절한다.
 
-`CaptureReceipt`는 소형 ingress 식별자이며 전체 출력 계획/완료 추적 예산을 인수하는 최종 세션 API의 완료를 뜻하지 않는다. 현재 `Capacity`는 소형 ingress에 한정된 오류다. 초기 revision은 고정이며 설정 변경은 후속 Task다. ingress `control.close`는 신규 입력을 닫고 수락 기록을 읽을 수 있게 남긴다. 이는 drain/sync/worker join을 수행하는 최종 shutdown이 아니다. 제품 코드 unsafe 금지·무할당/무해제 로컬 검증은 [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)에 기록했다. Human 리뷰는 2026-10-27 승인됐으며 변경분 native CI와 실제 RT/장비 판정은 남아 있다.
+`CaptureReceipt`는 소형 ingress 식별자이며 전체 출력 계획/완료 추적 예산을 인수하는 최종 세션 API의 완료를 뜻하지 않는다. 현재 `Capacity`는 소형 ingress에 한정된 오류다. 초기 revision은 고정이며 설정 변경은 후속 Task다. ingress `control.close`는 신규 입력을 닫고 수락 기록을 읽을 수 있게 남긴다. 이는 drain/sync/worker join을 수행하는 최종 shutdown이 아니다. 제품 코드 unsafe 금지·무할당/무해제 로컬 검증은 [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)에 기록했다. Human 리뷰와 변경분 3 OS × 2 Rust native CI는 2026-10-27 완료됐다. 실제 RT/장비 판정은 남아 있다.
 
 ### 13.1 완료 추적의 실제 상한
 

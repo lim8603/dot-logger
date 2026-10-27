@@ -6,16 +6,16 @@
 |---|---|
 | 프로젝트 | dot-logger — 소형 수집 ingress 구현·로컬 검증, 원본/분배/완료/저장 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-003 구현·로컬 검증 완료, Human 리뷰 승인·native CI 대기 |
+| 현재 Phase | Build — TASK-003 Done(구현·Human 리뷰·로컬/native CI 완료) |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
-| 활성 Task | TASK-003 In Progress — 소형 RT 수집과 중요 예약 |
-| 상태 | Yellow — TASK-003 EV-002 로컬 Pass; Human 리뷰 승인·변경분 native CI·후속 런타임/실장비 검증 잔여 |
+| 활성 Task | TASK-003 Done / 다음 TASK-004 Planned(미착수) |
+| 상태 | Yellow — TASK-003 EV-002 로컬/native CI Pass·Human 리뷰 승인; 원본/분배/완료/저장·실장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 생성·수정 파일과 클래스·타입 이름/설명을 표로 포함 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-27 / AI |
-| 최근 세션 | [2026-10-27 #002](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md) — TASK-003 구현·EV-002, Human 리뷰 승인·native CI 대기 |
+| 최근 세션 | [2026-10-27 #002](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md) — TASK-003 Done·EV-002 native CI 확인 완료 |
 
 ## 현재 결정과 제약
 
@@ -35,27 +35,27 @@
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-003 | 소형 RT 수집과 중요 예약 | AI | In Progress | 2026-10-27 | 구현·EV-002 로컬 Pass; Human 리뷰 승인·변경분 native CI 대기 |
+| TASK-003 | 소형 RT 수집과 중요 예약 | AI | Done | 2026-10-27 | EV-002 로컬/native CI Pass·Human 리뷰 승인; 다음 TASK-004(미착수) |
 
 ## 다음 시작점
 
-1. TASK-003 Human 리뷰는 2026-10-27 「승인」으로 완료됐다. [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)의 소스 SHA-256과 현재 파일이 일치한다.
-2. 코드·문서를 분리해 커밋·게시하고 변경분 3 OS × 2 Rust native CI와 audit를 확인한다(GAP-004 Open). 기존 TASK-002의 Pass를 새 변경분 결과로 사용하지 않는다.
-3. TASK-003 Done 판단 후 TASK-004의 원본 풀·수명·무해제 반환으로 이어간다. 실제 장비/OS/UPS는 TASK-022, FR-015/TASK-018은 별도 범위 승인 전 미착수다.
+1. [TASK-004](../04_implementation/tasks/TASK-004.md) 원본 풀·수명·무해제 반환부터 재개한다(Planned·미착수). Task → 인터페이스 §13·도메인 §4~5를 읽고 거절 loan/마지막 RT 핸들 Drop의 allocator 호출 0과 반환 알림 포화 후 전량 회수의 첫 실패 테스트를 작성한다.
+2. 선행 TASK-003은 Human 리뷰 승인·[EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기) 로컬/native CI Pass로 Done이다. 코드 `39f9c72`, CI 대상 `902043b`, [run 40512793054](https://github.com/lim8603/dot-logger/actions/runs/40512793054)의 7개 작업 Pass와 소스 hash 일치를 이어받는다.
+3. 실제 장비/OS/UPS는 TASK-022, GAP-001·002·005는 잔여다. FR-015/TASK-018은 별도 범위 승인 전 미착수다. TASK-004 이후 TASK-005 순서다.
 
 ## 새 세션 재개 메모
 
-- 이 문서 → TASK-003·EV-002를 읽는다. 구현 확인은 `capture/mod.rs`·`types.rs`·`tc_002_capture.rs`, 등록/대기 계약은 인터페이스 §13이다. 원본 착수 시 TASK-004 → 도메인 §4~5를 추가로 읽는다.
-- `rust-toolchain.toml` 개발 1.96.0·Cargo MSRV 1.85/외부 dependency pin을 유지한다. 전역 default는 변경하지 않고 프로젝트 pin을 사용한다. 현재 로컬 환경은 Ubuntu 26.04.1 x86_64이며 실제 R1이 아니다.
-- `CaptureOwner`는 소형 ingress만 사전 할당·예열한다. owning endpoint는 owner가 보유하며 scope 핸들은 빌린다. `CaptureReceipt`는 입력 인수만 의미한다. 최종 SessionOwner/build·원본 loan·worker·fanout·완료 window·파일·durability·실제 shutdown은 후속 Task다.
-- 제품 코드는 `unsafe_code = forbid` 유지. allocator instrumentation만 독립 test-only package `tests/rt-allocation`의 좁은 모듈에서 unsafe를 사용한다. 외부 의존성은 추가하지 않았다.
-- 기존 설계·TDD·MCAP 0.26 승인은 재질문하지 않는다. 실제 장비 미확정·TASK-002 native Pass 이력·TASK-003 Human 리뷰 승인/native 대기·나머지 제품 TC Not Run·FR-015 별도 제안·T1 미도래를 유지한다.
+- 이 문서 → TASK-004 → 인터페이스 §13·도메인 §4~5를 읽는다. 기존 소형 수집 API/구성 확인이 필요할 때만 TASK-003·EV-002·capture 코드를 추가로 확인한다.
+- `rust-toolchain.toml` 개발 1.96.0·Cargo MSRV 1.85/외부 dependency pin을 유지한다. 전역 default는 변경하지 않고 프로젝트 pin을 사용한다. 로컬 Ubuntu 26.04.1 x86_64와 hosted CI는 실제 R1/PREEMPT_RT 장비가 아니다.
+- `CaptureOwner`는 소형 ingress만 사전 할당·예열한다. owning endpoint는 owner가 보유하고 scope 핸들은 빌린다. `CaptureReceipt`는 입력 인수다. 최종 SessionOwner/build·원본 loan·worker·fanout·완료 window·파일·durability·실제 shutdown은 후속 Task다.
+- 제품 `unsafe_code = forbid` 유지. allocator instrumentation만 독립 test-only package의 좁은 모듈에 unsafe를 둔다. 원본 접근에 unsafe가 필요하면 TASK-004에서 불변식·메모리 순서·수명 증명을 별도로 검증한다.
+- 기존 설계·TDD·MCAP 0.26·TASK-003 Human 리뷰 승인은 재질문하지 않는다. 실제 장비 미확정·TC-002 전체 미완료·FR-015 별도 제안·T1 미도래를 유지한다.
 
 ## 선택 로딩
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
 - [MS 목록](../04_implementation/milestone_registry.md): 7개 MS, [Task 목록](../04_implementation/task_registry.md): 26개 Task(1개 선택). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
-- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 ingress EV-002 로컬 Pass; 원본/후속·장비 시험 잔여.
+- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 ingress EV-002 로컬/native Pass; 원본/후속·장비 시험 잔여.
 - [2026-10-26 조사](imported_context/research_2026-10-26_detailed_design.md): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
 
@@ -74,17 +74,17 @@
 | ID | 상태/현재 제약 | 다음 행동 |
 |---|---|---|
 | OQ-002 | 실제 장비·제어 주기/부하·UPS 미정. 초기 정량 목표 승인 | TASK-022에서 환경·수락 프로필 확보, TC-011·012 실물 검증 |
-| OQ-003 | 계약/US-002 AC6~10 승인. 장비별 보호량·수명/동시성 증명은 미검증 | TASK-003~009·021·022 및 장비 검증 |
+| OQ-003 | 계약/US-002 AC6~10 승인. 장비별 보호량·수명/동시성 증명은 미검증 | TASK-004~009·021·022 및 장비 검증 |
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-003 native CI·paste 유지보수 경고. GAP-003 로컬 toolchain Closed, TASK-002 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·005 | 장비·후속 제품 TC·paste 유지보수 경고. GAP-003 로컬 toolchain·GAP-004 hosted native CI Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
 
-- 2026-10-27 #002: TASK-003 소형 ingress·예약·FIFO·일반 대기 구현, EV-002 로컬 Pass·Human 리뷰 승인·native CI 대기·GAP-004 변경분 재개 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md).
+- 2026-10-27 #002: TASK-003 소형 ingress 구현·Human 리뷰 승인·EV-002 로컬/native CI Pass·Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md).
 - 2026-10-27 #001: Human 리뷰 승인, lim8603/dot-logger 비공개 생성·기존 main 게시, native CI 6조합+audit Pass·TASK-002 Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md).
 - 2026-10-26 #002: TASK-002 구성/API 구현·두 Rust 버전 각 16 feature·EV-001, MCAP 보안 수정 ADR-010 승인. 코드 커밋·세션 마감, Human 구현 리뷰·native CI는 다음 세션 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_002.md).
 

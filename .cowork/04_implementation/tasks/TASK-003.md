@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-10-27 |
-| 다음 액션 | 구현·로컬 검증 완료(EV-002), Human 리뷰 승인·변경분 native CI 대기 |
+| 다음 액션 | 없음 — Human 리뷰 승인·로컬/native CI Pass(EV-002), 다음 TASK-004 |
 | 의존 | TASK-002 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -49,6 +49,6 @@
 
 검증: 수집 통합 16개 + private 경계 2개 + 신규 수명 compile-fail 4개 + allocator guard 1개 Pass. 두 Rust 각 16 feature 조합·독립 공개 consumer·clippy·rustdoc, 개발 fmt Pass. guard 보정에서 실제 할당/해제를 먼저 감지한 뒤 RT 관측 구간 0/0을 확인했다. allocator 관측용 unsafe는 독립 test-only package `tests/rt-allocation`의 좁은 모듈에만 둔다.
 
-상태는 **In Progress — Human 리뷰 승인·native CI 대기**다. TASK-002의 native CI Pass는 이 변경분의 결과가 아니며 GAP-004를 재개했다. Human 리뷰는 2026-10-27 승인됐다. 변경분 native CI 확인 뒤 Done을 판단하고 TASK-004로 이어간다.
+상태는 **Done**이다. Human 리뷰는 2026-10-27 승인됐고, 변경분 [native CI](https://github.com/lim8603/dot-logger/actions/runs/40512793054)의 6개 OS/Rust 조합과 audit 모두 Pass다. GAP-004를 hosted native CI 범위에서 Closed로 갱신했다. 다음은 TASK-004다.
 
-Human 리뷰 승인: 2026-10-27 / 코드 `39f9c72` / 다음 native CI 실행·결과 확인.
+Human 리뷰 승인: 2026-10-27 / 코드 `39f9c72` / CI 대상 `902043b`와 검증 소스 hash 일치. 원본/분배/완료·실장비 검증은 후속 Task다.

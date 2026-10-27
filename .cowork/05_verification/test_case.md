@@ -32,7 +32,7 @@ TASK-002 하위 실행: 구성 경계 13개·전체 feature 의존 probe 6개·�
 ### TC-002 — RT 수집·포화·원본 수명
 
 - 관련: MS-002 / FR-002·007·008·009·012 / NFR-001·005
-- 상태: 부분 실행 — TASK-003 소형 ingress 로컬/native CI Pass, TASK-004 원본/반환 로컬 Pass(2026-10-27), Human 리뷰/native·후속/실장비 잔여 / EV: [EV-002](verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)
+- 상태: 부분 실행 — TASK-003 소형 ingress 로컬/native CI Pass, TASK-004 원본/반환 로컬 Pass(2026-10-27), Human 리뷰 승인·TASK-004 native 계정 사유 실행 전 차단·후속/실장비 잔여 / EV: [EV-002](verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -44,7 +44,7 @@ FIFO·중요도 매핑·동일 취급 모드(예약 0)·일반 deadline·owner�
 
 TASK-003 하위 결과: 소형 통합 16개·경계 2개·수명 compile-fail 4개·allocator guard 1개 Pass. 두 생산자 동시 FIFO/고정 복사·예약 0/전체·513 B·예산 경계·sequence 소진·카운터 wrap·일반 대기 재개/close를 검증했다. guard의 소형 수락/거절/생략/마지막 핸들 Drop 구간 allocator 호출 0/0. 원본 loan/회수·원본 메모리 순서 모델은 TASK-004, p99·실제 RT는 TC-012다. 이 결과로 TC-002 전체 Pass를 표시하지 않는다.
 
-TASK-004 하위 결과: [EV-003](verification_evidence.md#ev-003--task-004-원본-풀수명반환) 로컬 Pass. 원본 통합 17개·신규 private 경계 4개·신규 수명 compile-fail 7개·원본 allocator guard 1개, Miri(strict provenance, 8 seeds, lib 6개+원본 17개) Pass. 동일 loan 반환/생략·pool/producer/class 불일치·원본 예약 bytes·small/raw FIFO·no-copy 원본 reader·pin 중 재사용 금지·포화/coalescing 알림 이후 한정 스캔·stale/중복/최종 generation·동시 Drop/읽기·관리 host 예제를 검증했다. Human 리뷰 승인·변경분 native CI·실제 dot-probe 연결·p99/장비 시험은 잔여이며 TC-002 전체 Pass가 아니다.
+TASK-004 하위 결과: [EV-003](verification_evidence.md#ev-003--task-004-원본-풀수명반환) 로컬 Pass. 원본 통합 17개·신규 private 경계 4개·신규 수명 compile-fail 7개·원본 allocator guard 1개, Miri(strict provenance, 8 seeds, lib 6개+원본 17개) Pass. 동일 loan 반환/생략·pool/producer/class 불일치·원본 예약 bytes·small/raw FIFO·no-copy 원본 reader·pin 중 재사용 금지·포화/coalescing 알림 이후 한정 스캔·stale/중복/최종 generation·동시 Drop/읽기·관리 host 예제를 검증했다. Human 리뷰 승인·변경분 native CI(계정 사유 차단)·실제 dot-probe 연결·p99/장비 시험은 잔여이며 TC-002 전체 Pass가 아니다.
 
 <a id="tc-003"></a>
 ### TC-003 — fanout·완료·설정과 종료 경합

@@ -46,4 +46,4 @@ TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다
 
 ## TASK-004 검증 도구 구체화 — 2026-10-27
 
-ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그대로이고 검증 전용 `nightly-2026-10-26`(Miri 포함)을 추가 설치했다. strict provenance·8개 seed의 raw 수명/반환 해석 검사는 EV-003 로컬 Pass이며 CI에 동일 명령의 raw-memory job을 추가했다. 해당 변경분 native CI는 미실행이다. 제품 workspace forbid는 유지하고 dot-logger package deny/private pool-storage allow로 원본 UnsafeCell 접근을 한 모듈에 격리했다. 외부 dependency/lock 변경은 없다. Miri의 공식 사용법·coverage 한계는 [공식 문서](https://github.com/rust-lang/miri#using-miri)를 따르며 실제 장비 성능 수락을 대체하지 않는다.
+ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그대로이고 검증 전용 `nightly-2026-10-26`(Miri 포함)을 추가 설치했다. strict provenance·8개 seed의 raw 수명/반환 해석 검사는 EV-003 로컬 Pass이며 CI에 동일 명령의 raw-memory job을 추가했다. 해당 변경분 native CI는 게시 후 시도했으나 GitHub 계정 결제/지출 한도로 runner 시작 전에 차단돼 시험은 미실행이다(EV-003/GAP-004 Open). 제품 workspace forbid는 유지하고 dot-logger package deny/private pool-storage allow로 원본 UnsafeCell 접근을 한 모듈에 격리했다. 외부 dependency/lock 변경은 없다. Miri의 공식 사용법·coverage 한계는 [공식 문서](https://github.com/rust-lang/miri#using-miri)를 따르며 실제 장비 성능 수락을 대체하지 않는다.

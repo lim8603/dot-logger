@@ -82,3 +82,5 @@ TASK-002에서 프로젝트 toolchain 1.96.0과 MSRV 1.85.0의 로컬 실행을 
 
 
 TASK-004는 ADR-009의 Miri 선택 검증을 nightly-2026-10-26으로 구체화했다. `MIRIFLAGS="-Zmiri-strict-provenance -Zmiri-many-seeds=0..8" cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --locked`로 private 경계/원본 통합을 검사한다. 해석한 seed/입력 밖의 모든 동시 실행이나 soundness를 증명한 것으로 표시하지 않는다. 생산자별 원본/소형 FIFO·거절/생략 동일 loan·포화된 반환 알림·한정 스캔·읽는 중 재사용 금지·관리 host 수명 예제는 EV-003으로 추적한다. 새 native CI에는 기존 6개 OS/Rust·audit 외에 raw-memory job을 포함한다.
+
+2026-10-27 TASK-004 게시 후 [native CI](https://github.com/lim8603/dot-logger/actions/runs/40520558735)는 계정 결제 실패 또는 spending limit 문제로 8개 job 모두 실행 전에 차단됐다. Human 리뷰 승인·로컬 Pass는 유지하고 native 제품 시험은 Not Run으로 기록한다. 계정 조건 해결 후 동일 source에서 8개 job을 재실행한다.

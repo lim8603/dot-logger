@@ -382,7 +382,7 @@ TASK-003 구현 범위(2026-10-27): `capture::CaptureOwner::new(&ValidatedConfig
 
 `CaptureReceipt`는 소형 ingress 식별자이며 전체 출력 계획/완료 추적 예산을 인수하는 최종 세션 API의 완료를 뜻하지 않는다. 현재 `Capacity`는 소형/원본 ingress에 한정된 오류이며 최종 완료 추적 예산 오류는 후속 Task다. 초기 revision은 고정이며 설정 변경은 후속 Task다. ingress `control.close`는 신규 입력을 닫고 수락 기록을 읽을 수 있게 남긴다. 이는 drain/sync/worker join을 수행하는 최종 shutdown이 아니다. 제품 코드 unsafe 금지·무할당/무해제 로컬 검증은 [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)에 기록했다. Human 리뷰와 변경분 3 OS × 2 Rust native CI는 2026-10-27 완료됐다. 실제 RT/장비 판정은 남아 있다.
 
-TASK-004 구현 범위(2026-10-27, Human 구현 리뷰 대기): `CaptureOwner`가 선택 원본 풀까지 할당한다. `Producer::try_acquire(length, importance)`는 producer별 고정 크기 등급에서 유효 길이를 고정한 `pool::Loan`을 반환한다. 대여 단계부터 중요 예약 bytes/slots를 보호한다. `try_record_raw`는 pool/producer/중요도 불일치도 필터보다 먼저 검사하며, 거절은 `RawRecordError { reason, loan }`, 생략은 `RawRecordOutcome::Skipped(loan)`, 수락은 `Accepted(CaptureReceipt)`다. 수락은 payload 복사 없이 같은 producer FIFO에 들어간다. 소형/원본 수락 sequence는 하나이며 ingress 인수만 뜻한다.
+TASK-004 구현 범위(2026-10-27, Human 구현 리뷰 승인): `CaptureOwner`가 선택 원본 풀까지 할당한다. `Producer::try_acquire(length, importance)`는 producer별 고정 크기 등급에서 유효 길이를 고정한 `pool::Loan`을 반환한다. 대여 단계부터 중요 예약 bytes/slots를 보호한다. `try_record_raw`는 pool/producer/중요도 불일치도 필터보다 먼저 검사하며, 거절은 `RawRecordError { reason, loan }`, 생략은 `RawRecordOutcome::Skipped(loan)`, 수락은 `Accepted(CaptureReceipt)`다. 수락은 payload 복사 없이 같은 producer FIFO에 들어간다. 소형/원본 수락 sequence는 하나이며 ingress 인수만 뜻한다.
 
 `CaptureConsumer::try_take_raw`는 불변 `RawRecord`를 반환한다. 선두가 소형이면 `PayloadKindMismatch`로 남겨 FIFO를 유지한다. 일반 복사가 필요한 소비자는 `try_read`로 두 payload 종류를 읽을 수 있다. 짧은 버퍼는 원본 상태/큐를 바꾸지 않는다. `RawRecord`의 마지막 borrow/guard 종료 뒤 ReturnPending으로 게시하며, `reclaim_raw(limit)`가 유한 스캔으로 Free로 바꾼다. 알림은 1슬롯 coalescing mailbox이며 권위 있는 반환 상태는 슬롯에 있다. 원본 generation은 61 bits·소진 시 Retired/GenerationExhausted이며 식별자를 재사용하지 않는다. 풀 미설정은 Unsupported다. 예산/수명/Miri/allocator 검증은 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)이며 제품 unsafe 예외는 private pool/storage 한 모듈로 제한한다. 완료 window·출력 성공·fanout·실제 shutdown·장비 성능 판정은 후속 범위다.
 
@@ -440,3 +440,5 @@ FR-018 활성화는 재시작 때만 허용하는 안이다. 시작 전에 중�
 - 활용: Rust API + CLI 범위는 승인. query/subscribe/replay·DB/gRPC 상세도 기준선 채택 완료.
 - 관측/계측의 승인된 합격선: 안정 합성 입력에서 카운터 정합성은 배출 후 정확 일치, 안정 추세의 포화/소진 시간 추정 오차 ≤20%(5초 이상 예측 구간), 기본 계측 활성/비활성 완료 처리량 차이 ≤5%. RT 호출 목표는 계측 포함해서 기존 §12 목표로 판정한다. 이 추가 목표는 2026-10-26 Human 승인, 실제 달성은 미검증이다.
 - 실장비 미확정: R1 조건은 유지하고 OS/CPU/SSD/UPS·제어 주기·deadline의 대응은 TASK-022에서 수집한다. 해당 정보 없이 실물 수락·Gate 4/5 통과로 표시하지 않는다.
+
+TASK-004 게시 후 native CI는 GitHub 계정 결제/지출 한도로 8개 job 모두 실행 전 차단됐다. 해당 revision의 제품/native 시험은 Not Run이며 재실행 조건은 EV-003·GAP-004에서 추적한다.

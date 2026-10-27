@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. TASK-002 구성/의존성 EV-001 로컬/native CI·Human 리뷰 Pass 이력을 유지한다. TASK-003 소형 ingress는 EV-002 로컬/native CI Pass·Human 리뷰 승인으로 Done이다. TASK-004 원본 풀·반환은 EV-003 로컬 Pass, Human 리뷰 승인·변경분 native CI 대기다. 원본/분배/완료/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
+INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. TASK-002 구성/의존성 EV-001 로컬/native CI·Human 리뷰 Pass 이력을 유지한다. TASK-003 소형 ingress는 EV-002 로컬/native CI Pass·Human 리뷰 승인으로 Done이다. TASK-004 원본 풀·반환은 EV-003 로컬 Pass·Human 리뷰 승인·게시 완료이며 native CI는 계정 결제/한도로 실행 전 차단됐다. 원본/분배/완료/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
 
 ## Evidence Index
 
@@ -161,6 +161,13 @@ Miri는 [공식 사용법](https://github.com/rust-lang/miri#using-miri)과 [다
 
 유효 범위는 원본 풀·입력 수집·수명/반환과 수명 prototype이다. fanout·대상별 완료/이력·파일/durability·실제 shutdown·실제 dot-probe 어댑터·p99/장비/전원 수락은 미실행이다. Human 리뷰 승인·native CI 대기·변경분 native CI 대기(기존 6개 OS/Rust + audit + raw-memory = 8개 job)이며 TC-002 전체·MS-002·Gate 4/5를 Pass로 바꾸지 않는다. 새 RustSec audit은 미실행이고 외부 dependency pin은 동일하다.
 
+### TASK-004 native CI 시도·계정 사유 차단 — 2026-10-27
+
+- 코드 `9a4f34cbfc540d69aee0e8504238bf53760ec925`·승인 문서 `f0ce6eea84004bf32d2a73c675b919bfa0507ad8` 게시 후 [run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735), attempt 1, push 이벤트 / GitHub 결론 failure.
+- 6개 OS/Rust + audit + raw-memory 총 **8개 job 모두 runner_name 비어 있음·steps 0개**다. 공통 failure annotation은 최근 account payments 실패 또는 spending limit 증액 필요를 안내한다. 둘 중 실제 계정 원인은 확정하지 않았다. [원본 run/job/check annotations](../06_evolution/imported_context/task_004_native_ci_2026-10-27/failure.json)·[분류/24개 source hash/다음 조건](../06_evolution/imported_context/task_004_native_ci_2026-10-27/results.json)을 보존했다.
+- CI 대상과 EV-003 source/manifest 24개 hash 일치. 시험 실행 전 인프라 차단이므로 제품/native 시험·fresh audit·CI Miri는 **Not Run / Not Verified**다. 첫 job 로그 API는 404(blob 없음)였고 실행 로그를 생성하지 않는다. 기존 로컬/Miri Pass·Human 승인은 유지한다.
+- TASK-004는 In Progress·GAP-004 Open으로 남긴다. Human이 GitHub Billing & plans의 결제/한도 조건을 확인한 뒤 동일 workflow를 재실행해 8개 job을 확인한다. 계정/과금 설정을 변경하지 않았고 원인이 그대로인 재시도는 하지 않았다. TASK-003의 마지막 native Pass는 기존 revision의 이력이다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -172,5 +179,5 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
 | GAP-002 | TASK-002 EV-001·TASK-003 EV-002 로컬/native Pass, TASK-004 원본 EV-003 로컬 Pass. 분배/완료·저장·클라이언트·실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 EV-003 dirty tree는 native CI 미실행. 마지막 native Pass는 TASK-003 `902043b`, run `40512793054` | AI, TASK-004 Human 리뷰 후 코드 게시·기존 6 OS/Rust+audit+신규 raw-memory 총 8 job 확인. 실제 Windows 11/PREEMPT_RT·장비는 GAP-001 | Open — TASK-004 변경분; TASK-003 Pass 이력 유지 |
+| GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 계정 결제/한도 사유로 runner/steps 시작 전 차단. native 제품 시험 Not Run. 마지막 Pass는 TASK-003 `902043b` | Human 계정 조건 확인 후 AI가 동일 source의 6 contracts+audit+raw-memory 재실행. 실제 장비는 GAP-001 | Open — 계정 사유 native 실행 대기 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

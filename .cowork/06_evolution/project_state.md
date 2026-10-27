@@ -6,16 +6,16 @@
 |---|---|
 | 프로젝트 | dot-logger — 소형·원본 ingress 구현·로컬 검증, 분배/완료/저장 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-004 구현·로컬 검증 완료, Human 리뷰 승인·native CI 대기 |
+| 현재 Phase | Build — TASK-004 구현·로컬 Pass·Human 승인·게시 완료, native CI 계정 사유 대기 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
 | 활성 Task | TASK-004 In Progress — 원본 풀·수명·무해제 반환 |
-| 상태 | Yellow — TASK-004 EV-003 로컬 Pass; Human 리뷰 승인·변경분 native CI·후속 런타임/실장비 검증 잔여 |
+| 상태 | Yellow — TASK-004 native CI는 GitHub 결제/한도로 실행 전 차단; 후속 런타임/실장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-27 / AI |
-| 최근 세션 | [2026-10-27 #003](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md) — TASK-004 원본 풀·EV-003, Human 리뷰 승인·native CI 대기 |
+| 최근 세션 | [2026-10-27 #003](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md) 종료 — TASK-004 승인·게시 완료, native CI 계정 사유 대기 |
 
 ## 현재 결정과 제약
 
@@ -35,22 +35,21 @@
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-004 | 원본 풀·수명·무해제 반환 | AI | In Progress | 2026-10-27 | 구현·EV-003 로컬 Pass; Human 리뷰 승인·변경분 native CI 대기 |
+| TASK-004 | 원본 풀·수명·무해제 반환 | AI | In Progress | 2026-10-27 | 구현·Human 승인·게시 완료; 계정 조건 해결 후 native CI 재실행 |
 
 ## 다음 시작점
 
-1. TASK-004 Human 구현 리뷰는 2026-10-27 「승인하고, 커밋 푸쉬하구 오늘 세션은 여기서 마무리하자」로 승인됐다. EV-003의 24개 source/manifest hash와 현재 파일이 일치한다.
-2. 승인된 코드·문서를 분리 커밋·게시하고 변경분 native CI(기존6 OS/Rust + audit + raw-memory =8 job)를 확인한다. GAP-004는 해당 결과까지 Open이다.
-3. CI 완료 결과·미완료를 동기화하고 세션을 마감한다. 다음 작업은 TASK-005이며 오늘 착수하지 않는다. 실제 dot-probe adapter는 TASK-026, 장비는 TASK-022, FR-015는 별도 범위다.
+1. Human이 GitHub Billing & plans의 결제/지출 한도 조건을 확인한다. [TASK-004 CI run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735)은 8개 job 모두 runner/steps 시작 전 차단됐다. 제품/native 시험은 Not Run이며 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)·GAP-004에 annotations와 재실행 조건을 보존했다.
+2. 계정 조건 해결 후 동일 workflow를 재실행한다. 코드 `9a4f34c`·CI 대상 `f0ce6ee`와 EV-003의24개 source hash가 일치한다. 6 OS/Rust + audit + raw-memory 총8 job 확인 뒤 TASK-004 Done을 판단한다. 구현 리뷰는 2026-10-27 승인됐고 재승인받지 않는다.
+3. TASK-004 종료 후 TASK-005 분배·출력 격리·예산으로 이어간다(Planned·미착수). 오늘은 세션 종료 요청에 따라 착수하지 않았다. 실제 앱 연결 TASK-026·장비 TASK-022·FR-015 별도 제안은 유지한다.
 
 ## 새 세션 재개 메모
 
-- 이 문서 → TASK-004·EV-003을 읽는다. 구현 검토는 pool/mod.rs·storage.rs·capture/mod.rs, 수명 예제는 examples/scoped_capture.rs다. 공개 실패/소유권 계약은 인터페이스 §13·도메인 §4~5를 따른다.
-- 개발 1.96.0·MSRV 1.85·외부 dependency/lock 유지. Miri nightly-2026-10-26은 검증 전용 추가이며 전역 default는 변경하지 않았다. Ubuntu 로컬·Miri는 PREEMPT_RT/실장비 판정이 아니다.
-- CaptureOwner는 소형/원본 ingress만 구성한다. borrowed Loan·RawRecord는 owner보다 오래 살 수 없고 bytes borrow는 guard에 묶인다. generation/state atomic·슬롯 ReturnPending이 반환의 기준이며 capacity1 알림 포화에도 한정 스캔으로 회수한다. receipt는 입력 인수다. fanout·완료 window·파일·durability·실제 shutdown은 후속 Task다.
-- workspace unsafe forbid 유지, dot-logger package만 deny/private pool-storage allow로 좁은 예외를 둔다. Sync·UnsafeCell Safety 경계와 Miri/allocator 검증은 Human 리뷰 대상이다.
-- dot-probe의 현재 static spawn에는 borrowed 핸들 직접 주입이 불가하다. owner를 가진 관리 host+scoped RT worker 수명 prototype은 두 Rust에서 실행했다. 실제 run entry point/생성부 조정과 연결 검증은 TASK-026이며 dot-probe 파일은 수정하지 않았다. T1 미도래다.
-- 기존 설계·TDD·MCAP 0.26·TASK-003 승인은 재질문하지 않는다. TASK-004는 리뷰/native 대기, TC-002 전체 미완료·실제 장비 미확정·FR-015 별도 제안을 유지한다.
+- 이 문서 → TASK-004·EV-003 native 차단 기록을 읽는다. 코드/문서 게시와 세션 마감은 완료, 미완료는 GitHub 계정 조건 해결 후 CI 재실행이다. 소스/테스트를 변경하지 않으면 동일 로컬 시험을 반복하지 않는다.
+- 개발 1.96.0·MSRV1.85·외부 dependency/lock 유지. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. 원본 통합17·경계4·신규 compile-fail7·원본 allocator guard1, Miri8 seeds·두 Rust 각16 feature/consumer/예제/clippy/rustdoc/fmt 로컬 Pass다. CI에서는 어떤 제품 시험도 실행되지 않았다.
+- CaptureOwner는 소형/원본 ingress를 구성한다. Loan·RawRecord는 owner보다 오래 살 수 없고 bytes borrow는 guard에 묶인다. generation/state atomic·슬롯 ReturnPending이 반환의 기준이며 포화된 1슬롯 알림과 무관하게 한정 스캔으로 회수한다. receipt는 입력 인수다. 분배·완료·파일·실제 shutdown은 후속 Task다.
+- workspace forbid·dot-logger package deny/private pool-storage allow와 Safety 경계는 TASK-004 Human 승인 범위다. 기존 설계·TDD·MCAP0.26·TASK-003·TASK-004 승인은 재질문하지 않는다.
+- dot-probe의 static spawn에는 직접 borrowed 주입이 불가하다. 관리 host+scoped RT 수명 예제는 두 Rust에서 실행했고 실제 생성부/run entry point 연결은 TASK-026이다. dot-probe 파일은 수정하지 않았고 T1 미도래다. TC-002 전체·실장비·Gate4/5는 미완료다.
 
 ## 선택 로딩
 
@@ -79,13 +78,13 @@
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-004 native CI·paste 경고. GAP-003 Closed, TASK-003 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-004 CI 계정 사유 차단·paste 경고. GAP-003 Closed, TASK-003 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
 
-- 2026-10-27 #003: TASK-004 원본 풀·반환 구현·EV-003 로컬/Miri Pass·Human 리뷰 승인/native 대기·GAP-004 변경분 재개 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
+- 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
 - 2026-10-27 #002: TASK-003 소형 ingress 구현·Human 리뷰 승인·EV-002 로컬/native CI Pass·Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md).
 - 2026-10-27 #001: Human 리뷰 승인, lim8603/dot-logger 비공개 생성·기존 main 게시, native CI 6조합+audit Pass·TASK-002 Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md).
 

@@ -1,6 +1,6 @@
 # Milestone 목록과 승인된 실행 계획
 
-- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, MS-002 In Progress — TASK-002 구성 구현/로컬 검증 완료(EV-001), Human 리뷰·native CI 잔여.
+- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, MS-002 In Progress — TASK-002 구성 구현/로컬 검증 완료(EV-001), Human 리뷰 승인(2026-10-27)·native CI 잔여.
 - 1인 순차 진행 기준의 상대 일정이다. 시작일·가용 시간·검증 장비가 미정이므로 달력 날짜/납기를 확정하지 않는다.
 - 인일은 설계 추정치이며 TASK-004 수명·MCAP 복구·실제 장비 검증 후 재산정한다. 소요 범위에 리뷰/장비 대기·실제 24시간 경과 대기는 별도다.
 

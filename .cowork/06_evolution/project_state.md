@@ -6,15 +6,15 @@
 |---|---|
 | 프로젝트 | dot-logger — TASK-002 구성 코드·테스트 구현, 수집/저장 런타임 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-002 구현·로컬 검증 완료, 리뷰/CI 잔여 |
+| 현재 Phase | Build — TASK-002 구현·로컬 검증 완료, Human 리뷰 승인·CI 잔여 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
 | 활성 Task | TASK-002 In Progress / 담당 AI(TASK-001 Done) |
-| 상태 | Yellow — TASK-002 로컬 검증 Pass. Human 구현 리뷰·native CI·런타임/장비 검증 잔여 |
+| 상태 | Yellow — TASK-002 로컬 검증 Pass. Human 구현 리뷰 승인(2026-10-27). native CI·런타임/장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
-| 갱신 | 2026-10-26 / AI |
-| 최근 세션 | [2026-10-26 #002](../members/lim8603/workspace/session_logs/session_2026-10-26_002.md) 종료 — 코드 커밋·검증 근거 보존, 2026-10-27 재개 예정 |
+| 갱신 | 2026-10-27 / AI |
+| 최근 세션 | [2026-10-27 #001](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md) 진행 — TASK-002 Human 리뷰 승인, GitHub 연결·게시 준비 |
 
 ## 현재 결정과 제약
 
@@ -34,14 +34,14 @@
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-002 | workspace와 플랫폼·설정 계약 | AI | In Progress | 2026-10-26 | 구현 Human 리뷰·native CI 확인(EV-001/GAP-004) |
+| TASK-002 | workspace와 플랫폼·설정 계약 | AI | In Progress | 2026-10-27 | GitHub 연결·저장소 생성/push·native CI 확인(EV-001/GAP-004) |
 
 ## 다음 시작점
 
-재개 예정: **2026-10-27(한국 시간)**. 새 세션에서 「TASK-002 이어서 하자」로 시작한다.
+**2026-10-27 진행:** Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정 저장소 생성·업로드를 요청했다. GitHub 플러그인 설치/연결은 사용자 인증 대기다. `dot-logger` 비공개 저장소로 준비한다.
 
-1. [TASK-002](../04_implementation/tasks/TASK-002.md) 구현과 [EV-001](../05_verification/verification_evidence.md)을 Human 리뷰한다. Rust 1.96.0/1.85.0 각 16 feature 조합·consumer·정적 검사·보안 검사 로컬 Pass. Human 리뷰 미완료로 Task는 In Progress다.
-2. `.github/workflows/ci.yml`은 Ubuntu 24.04·Windows Server 2025·macOS 14 및 두 Rust 버전으로 구성했다. 현재 Git remote가 없어 원격 CI를 실행하지 않았다(GAP-004). 실행 환경과 실제 Windows 11/PREEMPT_RT 수락을 구분한다.
+1. [TASK-002](../04_implementation/tasks/TASK-002.md) Human 구현 리뷰는 승인 완료. [EV-001](../05_verification/verification_evidence.md)의 로컬 Pass는 유지하고 GitHub 연결 확인 → 본인 계정 저장소 생성 → 기존 main 이력 push → native CI 결과 확인을 진행한다. CI 실행 전까지 Task는 In Progress다.
+2. `.github/workflows/ci.yml`은 Ubuntu 24.04·Windows Server 2025·macOS 14 및 두 Rust 버전으로 구성했다. 현재 Git remote가 없어 원격 CI를 실행하지 않았다(GAP-004). 사용자 연결 후 생성·게시가 승인된 상태다. 실행 환경과 실제 Windows 11/PREEMPT_RT 수락을 구분한다.
 3. TASK-002 완료 조건 확인 후 TASK-003 소형 수집·중요 예약 → TASK-004 원본 수명 순서다. TASK-022 장비/OS/UPS 프로필은 계속 미확정이며 실제 성능·24h·차단·OS 교환은 MS-007에서 검증한다. FR-015/TASK-018은 별도 제안이다.
 
 ## 새 세션 재개 메모
@@ -89,4 +89,4 @@
 - 2026-10-26 #001: 상세설계·33행 요구 추적·7MS/26Task·공식 조사 작성, ADR-007~009·클라이언트/상세 기준선·계획 승인, Gate 3 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-26_001.md).
 - 2026-10-25 #003: Tier 1/2·코어 배치·6대 설계 고려사항·cpp-logger 생성·Git 초기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md).
 
-이전 공유 상태 원문은 [상태 아카이브](state_archive.md)에 이관했다. 현재 Git 저장소이며 이 세션 시작 HEAD는 `23a499c`다. TASK-002 구성 구현/로컬 검증과 코드 커밋 `2f9015d`를 완료했다. 실제 성능·장비 검증·배포는 미실행이다. 사용자 요청에 따라 2026-10-26 세션을 종료하고 다음 날 재개한다.
+이전 공유 상태 원문은 [상태 아카이브](state_archive.md)에 이관했다. 현재 Git 저장소이며 2026-10-27 세션 시작 HEAD는 `37e4e9e`다. TASK-002 구성 구현/로컬 검증과 코드 커밋 `2f9015d`를 완료했다. 실제 성능·장비 검증·배포는 미실행이다. 2026-10-27 재개해 Human 구현 리뷰 승인을 기록했으며 GitHub 연결·게시를 진행한다.

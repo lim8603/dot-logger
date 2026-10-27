@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-26 / Build, MS-002·TASK-002 In Progress. 시작 전 구성 검증과 로컬 의존성 검증 EV-001을 확보했다. Human 구현 리뷰·native CI와 수집/저장 런타임·장비 검증은 남아 있다.
+INT-001 / 2026-10-26 / Build, MS-002·TASK-002 In Progress. 시작 전 구성 검증과 로컬 의존성 검증 EV-001을 확보했다. Human 구현 리뷰는 2026-10-27 승인됐다. native CI와 수집/저장 런타임·장비 검증은 남아 있다.
 
 ## Evidence Index
 
@@ -69,6 +69,10 @@ INT-001 / 2026-10-26 / Build, MS-002·TASK-002 In Progress. 시작 전 구성 �
 MCAP 0.25.0 선택 zstd 경로의 취약점 3·zstd-safe unsound 10건은 Human 승인 ADR-010의 MCAP 0.26.0 적용 후 해소됐다. Tokio unsound 1건은 1.51.6 patch로 해소했다. 과거 선택 기준과 변경 근거는 ADR-009·010/세션 로그에 보존한다.
 
 유효 범위는 TASK-002의 시작 전 구성/API·의존성 호환뿐이다. runtime `build`·수집·worker 적용·실제 파일 API·실제 할당 상한·내구성·종료는 후속 Task다. TC-001의 CLI 대조/실행 자원 정리와 다른 TC·native OS·실장비는 이 결과로 Pass 처리하지 않는다.
+
+### Human 구현 리뷰 — 2026-10-27
+
+사용자가 TASK-002 요약보고 후 「승인하고」로 구현 리뷰를 승인했다. 대상 구현은 `2f9015d`, 로컬 검증은 위 EV-001이다. GitHub MCP 연결·본인 계정 저장소 생성·업로드도 요청했다. native CI(GAP-004)는 미실행이며 연결·push 후 실행 결과로 별도 갱신한다.
 
 ## Gate 판정 메모
 

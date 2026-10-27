@@ -5,7 +5,7 @@
 - 해석 우선순위: §13~17과 ADR-008·009가 현재 상세 계약이다. §1~12의 초기 제안/미정 표현은 여기서 구체화한 범위에서 대체된다. 장비별 수치·알고리즘 증명은 미검증이다.
 - 승인 기준선: ADR-003~009, US-001~005(US-002 AC6~10 포함)
 - 후속 요구: FR-018 — 선택 옵션·기본 비활성은 Human 확정. 활성 시 전원 예고 전체 약 3초·중요 파일 우선 기록, §12·16의 상세 동작도 기준선 채택 완료, 실제 차단 검증 전.
-- 갱신: 2026-10-26 / AI
+- 갱신: 2026-10-27 / AI
 
 ## 1. 제공자·소비자와 실행 경계
 
@@ -377,6 +377,10 @@ US-002 AC-6~10의 승인된 추가 수락 기준을 따른다. 기본 비활성�
 고정 오류 코드는 `InvalidInput`, `SchemaMismatch`, `TooLarge`, `Capacity(resource)`, `RevisionBusy`, `Closing`, `EmergencyPowerOff`, `Unsupported`, `IoFailure`, `DeadlineExceeded`를 포함한다. 동적 진단은 일반 경로의 별도 리포트다. no-op tracing 어댑터도 RT 안전하다고 자동 선언하지 않는다.
 
 TASK-002 구현 범위: `crates/dot-logger/src/config.rs`의 `SessionBuilder::new(config).validate(&PlatformCapabilities)`가 총 메모리·생산자별 소형/원본 고정 slot·중요 예약·worker stack·CPU 목록·required capability를 검증하고 읽기 전용 `ValidatedConfig`를 반환한다. quota/slot 크기는 명시 설정이며 R1 수치를 기본값으로 쓰지 않는다. 지원 미확인·실패·미지원은 구분하고 optional 상태도 결과에 보존한다. 이 API는 worker/IO를 시작하지 않는다. `build`·예열·실제 플랫폼 탐색/적용·target/schema/durability와 실제 metadata 할당 예산 검사는 해당 자원을 구현하는 후속 Task에서 확장한다. 위 표의 owner/수집/완료/종료 API는 설계 계약이며 아직 구현하지 않았다. 로컬 검증은 EV-001, native CI는 GAP-004다.
+
+TASK-003 구현 범위(2026-10-27): `capture::CaptureOwner::new(&ValidatedConfig, session_id, revision, channels)`와 `scope`는 소형 ingress만 구성한다. owner가 owning endpoint를 보유하고 `Producer::try_record_small`/`GeneralProducer::record_until`은 빌린 핸들이다. `CaptureConsumer::try_read`는 일반 경로의 대역 소비 API다. payload·봉투·endpoint/rtrb descriptor를 input, owner·고정 채널 metadata를 control 예산에 검사한 뒤 사전 할당·예열한다. 중요 예약은 생산자별 미소비 Normal 슬롯 수를 제한하고, 각 record의 최대 크기로 Important bytes도 보호한다. `ChannelConfig`의 전체 6레벨 mapping은 불완전한 매핑을 타입으로 배제한다. channel/schema/크기 오류는 필터보다 먼저 반환한다. 수락 sequence는 owner의 scope 재진입에도 유지하고 소진 시 거절한다.
+
+`CaptureReceipt`는 소형 ingress 식별자이며 전체 출력 계획/완료 추적 예산을 인수하는 최종 세션 API의 완료를 뜻하지 않는다. 현재 `Capacity`는 소형 ingress에 한정된 오류다. 초기 revision은 고정이며 설정 변경은 후속 Task다. ingress `control.close`는 신규 입력을 닫고 수락 기록을 읽을 수 있게 남긴다. 이는 drain/sync/worker join을 수행하는 최종 shutdown이 아니다. 제품 코드 unsafe 금지·무할당/무해제 로컬 검증은 [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기)에 기록했다. Human 리뷰는 2026-10-27 승인됐으며 변경분 native CI와 실제 RT/장비 판정은 남아 있다.
 
 ### 13.1 완료 추적의 실제 상한
 

@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-10-27 / EV-001 |
+| 버전 | 2026-10-27 / EV-001·002 |
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. 시작 전 구성/API·로컬 및 3 OS × 2 Rust native CI·audit의 EV-001을 확보했다. Human 구현 리뷰는 2026-10-27 승인됐다. 수집/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
+INT-001 / 2026-10-27 / Build, MS-002 In Progress·TASK-002 Done. TASK-002 구성/의존성 EV-001 로컬/native CI·Human 리뷰 Pass 이력을 유지한다. TASK-003 소형 ingress는 EV-002 로컬 Pass, Human 리뷰 승인·변경분 native CI 대기다. 원본/분배/완료/저장 런타임·실제 Windows 11/PREEMPT_RT·장비 검증은 남아 있다.
 
 ## Evidence Index
 
@@ -94,6 +94,28 @@ MCAP 0.25.0 선택 zstd 경로의 취약점 3·zstd-safe unsound 10건은 Human 
 
 사용자가 TASK-002 요약보고 후 「승인하고」로 구현 리뷰를 승인했다. 대상 구현은 `2f9015d`, 로컬 검증은 위 EV-001이다. GitHub MCP 연결·본인 계정 저장소 생성·업로드도 요청했다. native CI는 같은 날 위 7개 작업 Pass로 완료했고 GAP-004를 hosted native CI 범위에서 Closed로 갱신했다.
 
+### EV-002 — TASK-003 소형 수집·예약·일반 대기
+
+- 대상: base `ebb3819524b379d43767ef2caa0f58e693546adb` 위 dirty 작업 트리. capture 모듈/통합 시험·고정 오류 resource·공개 consumer·test-only allocator guard·workspace/lock/script 변경. [결과·20개 소스/manifest SHA-256](../06_evolution/imported_context/task_003_2026-10-27/results.json)으로 검증 내용을 고정했다. 외부 의존성 pin은 변경하지 않았다.
+- 코드 커밋: `39f9c728f8c0bcfc433f86c0b97c609caf98d494`. EV-002의 20개 소스/manifest SHA-256과 commit blob 일치를 확인했다. Human 구현 리뷰는 2026-10-27 「승인」으로 완료됐다.
+- 실행: 2026-10-27 / AI / Ubuntu 26.04.1 x86_64 / Rust 1.96.0·MSRV 1.85.0. 실제 R1·PREEMPT_RT 환경이 아니다.
+- TDD: [capture API 부재 Red](../06_evolution/imported_context/task_003_2026-10-27/red-missing-api.log), [포화/deadline 잘못된 수락 Red](../06_evolution/imported_context/task_003_2026-10-27/red-behavior.log), [확장 동작 Red](../06_evolution/imported_context/task_003_2026-10-27/red-extended.log) → 최소 구현·리팩토링 → [최종 workspace all-features Green](../06_evolution/imported_context/task_003_2026-10-27/green-final.log).
+- 제품 코드: [`capture`](../../crates/dot-logger/src/capture/mod.rs), [고정 입력/결과 타입](../../crates/dot-logger/src/capture/types.rs). [소형 통합 시험](../../crates/dot-logger/tests/tc_002_capture.rs) 16개, [private 경계](../../crates/dot-logger/src/capture/tests.rs) 2개, 신규 수명 compile-fail 4개, [allocator guard](../../tests/rt-allocation/src/tests.rs) 1개 Pass. 기존 구성·의존성 회귀도 통과했다.
+
+| 범위·명령 | 결과·원문 |
+|---|---|
+| `python3 scripts/check-feature-matrix.py --toolchain 1.96.0` | 16 feature·독립 public consumer 수집 왕복·core 의존 격리·allocator guard Pass / [로그](../06_evolution/imported_context/task_003_2026-10-27/features-1.96.0.log) |
+| 같은 script `--toolchain 1.85.0` | 같은 범위 Pass / [로그](../06_evolution/imported_context/task_003_2026-10-27/features-1.85.0.log) |
+| `cargo fmt --all --check`, `git diff --check` | Pass / [fmt](../06_evolution/imported_context/task_003_2026-10-27/fmt.log) |
+| `cargo +<version> clippy --workspace --all-targets --all-features --locked -- -D warnings` | [1.96.0 Pass](../06_evolution/imported_context/task_003_2026-10-27/clippy-1.96.0.log), [1.85.0 Pass](../06_evolution/imported_context/task_003_2026-10-27/clippy-1.85.0.log) |
+| `RUSTDOCFLAGS='-D warnings' cargo +<version> doc --workspace --all-features --no-deps --locked` | [1.96.0 Pass](../06_evolution/imported_context/task_003_2026-10-27/rustdoc-1.96.0.log), [1.85.0 Pass](../06_evolution/imported_context/task_003_2026-10-27/rustdoc-1.85.0.log) |
+
+수락/포화·동등 취급·명시/채널/레벨 중요도·입력 mutation 불영향·생산자별 FIFO·2생산자 8,000건 동시 수집·고정 metadata·채널/schema/크기 오류·필터 생략·일반 deadline/재개/close·예산 경계·sequence 소진/카운터 wrap을 검증했다. Important bytes는 Normal 미소비 슬롯 수 × 최대 슬롯 bytes를 제한해 보호한다. envelope/bytes는 safe rtrb chunk API로만 접근하며 bytes 게시 후 envelope 게시, bytes 반환 후 envelope 반환 순서를 유지한다.
+
+allocator guard는 TLS의 실제 할당/해제 감지 보정 후 소형 수락·거절·생략·close·마지막 borrowed 핸들 소멸 구간 **0 allocation / 0 deallocation**을 확인했다. owner 최종 해제는 일반 경로에서 실제 deallocation을 확인했다. instrumentation의 `GlobalAlloc` unsafe는 독립 test-only package의 해당 모듈에 한정하며 제품 crate의 `unsafe_code = forbid`는 그대로다. 저장소 예열은 메모리 잠금/실제 RT 지연 합격을 뜻하지 않는다.
+
+유효 범위는 소형 ingress다. `CaptureReceipt`는 입력 인수만 나타내며 최종 SessionOwner/build·원본 pool/loan·fanout·완료 window·sync/실제 shutdown·파일 API·p99·장비/전원 검증은 미실행이다. TC-002 전체와 Gate 4/5를 Pass로 바꾸지 않는다. 원본 메모리 순서 모델은 TASK-004다. 이번 변경분 native CI와 새 RustSec audit은 실행하지 않았다(외부 dependency pin 동일). Human 리뷰는 2026-10-27 「승인」으로 완료됐다. TASK-002의 기존 native Pass는 해당 revision의 이력으로 유지하며 GAP-004는 현재 변경분에 대해 재개한다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -103,7 +125,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | TASK-002 구성/의존성만 EV-001 로컬/native CI Pass; 수집·저장·클라이언트·실장비 TC는 미실행 | AI, TASK-003 이후 TDD와 각 MS 인수 | Open |
+| GAP-002 | TASK-002 EV-001 로컬/native, TASK-003 소형 ingress EV-002 로컬 Pass. 원본/회수·분배/완료·저장·클라이언트·실장비 TC 잔여 | AI, TASK-003 이후 TDD와 각 MS 인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | Ubuntu 24.04/Windows Server 2025/macOS 14 × Rust 1.85.0/1.96.0 native CI 및 audit Pass, revision `f9894f2`, run `40504484501` | AI, 코드·의존성·CI 변경 시 재검증. 실제 Windows 11/PREEMPT_RT·장비 수락은 GAP-001/TASK-022·024 | Closed — hosted native CI 범위 |
+| GAP-004 | TASK-003 변경분(EV-002 dirty tree)은 native CI 미실행. 마지막 native CI/audit Pass는 TASK-002의 `f9894f2`, run `40504484501` | AI, TASK-003 리뷰 후 해당 코드 revision 게시·3 OS × 2 Rust 및 audit 재검증. 실제 Windows 11/PREEMPT_RT·장비 수락은 GAP-001/TASK-022·024 | Open — TASK-003 변경분; TASK-002 Pass 이력 유지 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

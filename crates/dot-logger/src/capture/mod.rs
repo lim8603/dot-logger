@@ -2,13 +2,16 @@
 //!
 //! The owner retains both rtrb endpoints. RT handles only borrow them, so even
 //! the last handle's Drop cannot free queue memory. No worker is started here.
-//! A capture receipt acknowledges ingress only; it cannot be used as evidence
-//! of dispatch, completion tracking, file writes, or durability.
+//! A receipt acknowledges admission. Tracked construction reserves completion
+//! metadata before admission; neither form acknowledges dispatch/write/durability.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 
-use crate::config::{ConfigError, ImportancePolicy, Resource, ValidatedConfig};
+use crate::completion::{Completion, CompletionConfig, CompletionError, Registry};
+use crate::routing::RoutingConfig;
+
+use crate::config::{ConfigError, ImportancePolicy, MemoryBudget, Resource, ValidatedConfig};
 use crate::pool::{
     Loan, PoolSnapshot, RawPool, RawRecord, RawRecordError, RawRecordOutcome, ReclaimReport,
     SlotIdentity,
@@ -58,7 +61,7 @@ struct Entry {
 ///
 /// Allocate and drop on a management thread. The application must supply a new
 /// session ID on restart. Targets, completion windows, workers, and
-/// durability are not instantiated by this stage-specific constructor.
+/// durability are not instantiated by `new`; `new_tracked` adds completion metadata.
 pub struct CaptureOwner {
     entries: Box<[Entry]>,
     channels: Box<[ChannelConfig]>,
@@ -68,6 +71,8 @@ pub struct CaptureOwner {
     input_reserved_bytes: usize,
     raw_reserved_bytes: usize,
     control_reserved_bytes: usize,
+    completion: Option<Box<Registry>>,
+    memory: MemoryBudget,
 }
 
 impl CaptureOwner {
@@ -223,7 +228,47 @@ impl CaptureOwner {
             input_reserved_bytes,
             raw_reserved_bytes,
             control_reserved_bytes: control_bytes,
+            completion: None,
+            memory: config.memory.clone(),
         })
+    }
+
+    /// Construct ingress with preallocated completion admission windows and a
+    /// frozen target/route contract. All allocation occurs before producer use.
+    /// Completion metadata shares the control partition with capture metadata.
+    pub fn new_tracked(
+        plan: &ValidatedConfig,
+        session_id: u128,
+        revision: u64,
+        channels: &[ChannelConfig],
+        routing: &RoutingConfig,
+        config: CompletionConfig,
+    ) -> Result<Self, CaptureBuildError> {
+        let mut owner = Self::new(plan, session_id, revision, channels)?;
+        let available = plan.config().memory.control_bytes - owner.control_reserved_bytes;
+        let registry = Registry::new(
+            session_id,
+            revision,
+            plan.config().producers.len(),
+            channels,
+            routing,
+            config,
+            available,
+        )
+        .map_err(|error| match error {
+            CompletionError::Config(error) => CaptureBuildError::Config(error),
+            _ => CaptureBuildError::InvalidCompletion,
+        })?;
+        owner.control_reserved_bytes += registry.reserved();
+        owner.completion = Some(Box::new(registry));
+        Ok(owner)
+    }
+
+    /// Borrow management completion metadata; absent for untracked ingress.
+    pub fn completion(&self) -> Option<Completion<'_>> {
+        self.completion
+            .as_ref()
+            .map(|registry| Completion { registry })
     }
 
     /// Bytes reserved for concrete input arrays, queue descriptors, and endpoints.
@@ -271,6 +316,12 @@ impl CaptureOwner {
             closing: &self.closing,
             session_id: self.session_id,
             revision: self.revision,
+            completion: self
+                .completion
+                .as_ref()
+                .map(|registry| Completion { registry }),
+            control_reserved_bytes: self.control_reserved_bytes,
+            memory: &self.memory,
         })
     }
 }
@@ -298,13 +349,24 @@ pub struct CaptureScope<'owner> {
     closing: &'owner AtomicBool,
     session_id: u128,
     revision: u64,
+    completion: Option<Completion<'owner>>,
+    control_reserved_bytes: usize,
+    memory: &'owner MemoryBudget,
 }
 
 impl<'owner> CaptureScope<'owner> {
+    /// Management completion handle sharing the fixed capture registration.
+    pub fn completion(&self) -> Option<Completion<'owner>> {
+        self.completion
+    }
+
     /// Borrow the ingress close flag for a management thread.
     pub fn control(&self) -> CaptureControl<'owner> {
         CaptureControl {
             closing: self.closing,
+            completion: self.completion,
+            reserved: self.control_reserved_bytes,
+            memory: self.memory,
         }
     }
 }
@@ -326,11 +388,19 @@ impl<'owner> Iterator for CaptureScope<'owner> {
                     producer_id: id as u32,
                     revision: self.revision,
                     raw: entry.raw.as_ref(),
+                    completion: self.completion,
                 },
                 CaptureConsumer {
                     read: &mut entry.read,
                     consumed: &entry.consumed,
                     raw: entry.raw.as_ref(),
+                    completion: self.completion,
+                    memory: self.memory,
+                    slot_bytes: entry.slot_bytes,
+                    channels: self.channels,
+                    session_id: self.session_id,
+                    producer_id: id as u32,
+                    revision: self.revision,
                 },
             )
         })
@@ -341,13 +411,16 @@ impl<'owner> Iterator for CaptureScope<'owner> {
 #[derive(Clone, Copy)]
 pub struct CaptureControl<'owner> {
     closing: &'owner AtomicBool,
+    pub(crate) completion: Option<Completion<'owner>>,
+    pub(crate) reserved: usize,
+    pub(crate) memory: &'owner MemoryBudget,
 }
 
 impl CaptureControl<'_> {
     /// Close new admission. An overlapping call may already have been admitted.
-    /// Existing records stay readable. Full shutdown/join belongs to TASK-006.
+    /// Existing records stay readable. Use ControlOwner for tracked drain/sync/closure.
     pub fn close(&self) {
-        self.closing.store(true, Ordering::Release);
+        self.closing.store(true, Ordering::SeqCst);
     }
 }
 
@@ -374,6 +447,7 @@ pub struct Producer<'owner> {
     producer_id: u32,
     revision: u64,
     raw: Option<&'owner RawPool>,
+    completion: Option<Completion<'owner>>,
 }
 
 impl<'owner> Producer<'owner> {
@@ -386,6 +460,9 @@ impl<'owner> Producer<'owner> {
         mut metadata: RecordMetadata,
         payload: &[u8],
     ) -> Result<RecordOutcome, CaptureError> {
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
         let (importance, skip) = self.classify(&metadata, payload.len(), self.slot_bytes)?;
         if skip {
             return Ok(RecordOutcome::Skipped);
@@ -416,6 +493,11 @@ impl<'owner> Producer<'owner> {
             .bytes
             .write_chunk_uninit(payload.len())
             .map_err(|_| CaptureError::Capacity)?;
+        let tracking = self
+            .completion
+            .map(|completion| completion.reserve(self.producer_id, sequence, metadata.channel_id))
+            .transpose()
+            .map_err(|_| CaptureError::CompletionCapacity)?;
         let receipt = CaptureReceipt {
             session_id: self.session_id,
             producer_id: self.producer_id,
@@ -423,6 +505,9 @@ impl<'owner> Producer<'owner> {
         };
         metadata.importance = Some(importance);
         bytes.fill_from_iter(payload.iter().copied());
+        if let Some(tracking) = tracking {
+            tracking.commit();
+        }
         self.write.sequence = sequence;
         if importance == Importance::Normal {
             self.write.normal_accepted = self.write.normal_accepted.wrapping_add(1);
@@ -447,7 +532,7 @@ impl<'owner> Producer<'owner> {
         length: usize,
         maximum: usize,
     ) -> Result<(Importance, bool), CaptureError> {
-        if self.closing.load(Ordering::Acquire) {
+        if self.closing.load(Ordering::SeqCst) {
             return Err(CaptureError::Closing);
         }
         let channel = self
@@ -476,7 +561,12 @@ impl<'owner> Producer<'owner> {
         length: usize,
         importance: Importance,
     ) -> Result<Loan<'owner>, CaptureError> {
-        if self.closing.load(Ordering::Acquire) {
+        // Loan acquisition can overlap closure just like record publication.
+        // Quiescent shutdown must observe its final Loaned/return state too.
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
+        if self.closing.load(Ordering::SeqCst) {
             return Err(CaptureError::Closing);
         }
         self.raw.ok_or(CaptureError::Unsupported)?.acquire(
@@ -494,6 +584,9 @@ impl<'owner> Producer<'owner> {
         mut metadata: RecordMetadata,
         loan: Loan<'owner>,
     ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
         let classify = (|| {
             let (importance, skip) = self.classify(&metadata, loan.len(), usize::MAX)?;
             let pool = self.raw.ok_or(CaptureError::Unsupported)?;
@@ -533,6 +626,19 @@ impl<'owner> Producer<'owner> {
                 loan,
             });
         };
+        let tracking = match self
+            .completion
+            .map(|completion| completion.reserve(self.producer_id, sequence, metadata.channel_id))
+            .transpose()
+        {
+            Ok(tracking) => tracking,
+            Err(_) => {
+                return Err(RawRecordError {
+                    reason: CaptureError::CompletionCapacity,
+                    loan,
+                });
+            }
+        };
         let receipt = CaptureReceipt {
             session_id: self.session_id,
             producer_id: self.producer_id,
@@ -543,6 +649,9 @@ impl<'owner> Producer<'owner> {
         // All fallible reservations finished. Publish ownership before the FIFO
         // envelope; there is no further failure path or payload copy here.
         let identity = loan.publish();
+        if let Some(tracking) = tracking {
+            tracking.commit();
+        }
         self.write.sequence = sequence;
         if importance == Importance::Normal {
             self.write.normal_accepted = self.write.normal_accepted.wrapping_add(1);
@@ -587,7 +696,9 @@ impl GeneralProducer<'_> {
                 return Err(CaptureError::DeadlineExceeded);
             }
             match self.producer.try_record_small(metadata, payload) {
-                Err(CaptureError::Capacity) => std::thread::yield_now(),
+                Err(CaptureError::Capacity | CaptureError::CompletionCapacity) => {
+                    std::thread::yield_now()
+                }
                 result => return result,
             }
         }
@@ -599,9 +710,49 @@ pub struct CaptureConsumer<'owner> {
     read: &'owner mut ReadState,
     consumed: &'owner AtomicUsize,
     raw: Option<&'owner RawPool>,
+    completion: Option<Completion<'owner>>,
+    memory: &'owner MemoryBudget,
+    slot_bytes: usize,
+    channels: &'owner [ChannelConfig],
+    session_id: u128,
+    producer_id: u32,
+    revision: u64,
+}
+
+pub(crate) struct CaptureRegistration<'owner> {
+    pub(crate) session_id: u128,
+    pub(crate) producer_id: u32,
+    pub(crate) revision: u64,
+    pub(crate) channels: &'owner [ChannelConfig],
+    pub(crate) small_layout: (usize, usize),
+    pub(crate) raw_layout: Option<(usize, usize)>,
+    pub(crate) completion: Option<Completion<'owner>>,
+    pub(crate) memory: &'owner MemoryBudget,
 }
 
 impl<'owner> CaptureConsumer<'owner> {
+    /// Inspect the FIFO head without copying payloads or releasing ingress quota.
+    /// Used by the management scheduler to check its record and byte budgets.
+    pub fn peek(&mut self) -> Result<Option<CapturedRecord>, ReadError> {
+        let Ok(records) = self.read.records.read_chunk(1) else {
+            return Ok(None);
+        };
+        Ok(Some(queued_head(&records)?.record))
+    }
+
+    pub(crate) fn registration(&self) -> CaptureRegistration<'owner> {
+        CaptureRegistration {
+            session_id: self.session_id,
+            producer_id: self.producer_id,
+            revision: self.revision,
+            channels: self.channels,
+            small_layout: (self.read.records.buffer().capacity(), self.slot_bytes),
+            raw_layout: self.raw.map(RawPool::layout),
+            completion: self.completion,
+            memory: self.memory,
+        }
+    }
+
     /// Copy the next small or raw payload into caller-owned management storage.
     /// A short destination consumes nothing. For raw no-copy access, use try_take_raw.
     pub fn try_read(
@@ -654,6 +805,10 @@ impl<'owner> CaptureConsumer<'owner> {
         records.commit_all();
         release_normal(self.read, self.consumed, queued.record);
         Ok(Some(raw))
+    }
+
+    pub(crate) fn pending_len(&mut self) -> usize {
+        self.read.records.slots()
     }
 
     /// Sample raw slot lifecycle counts in the management path.

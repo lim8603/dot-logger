@@ -139,6 +139,8 @@ pub enum CaptureError {
     TooLarge,
     /// The producer's slots or bytes cannot admit this record.
     Capacity,
+    /// The producer completion window has no reusable tracking slot.
+    CompletionCapacity,
     /// Ingress was closed; already accepted records remain readable.
     Closing,
     /// No more sequence identifiers can be issued.
@@ -182,6 +184,8 @@ pub enum CaptureBuildError {
     Config(ConfigError),
     /// Register at least one channel, without duplicate identifiers.
     InvalidChannels,
+    /// Completion limits or initial route/target contracts are inconsistent.
+    InvalidCompletion,
     /// The number of producers exceeds the receipt identifier space.
     TooManyProducers,
     /// A newly created queue could not be warmed before use.
@@ -192,6 +196,7 @@ impl fmt::Display for CaptureBuildError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Config(error) => error.fmt(f),
+            Self::InvalidCompletion => f.write_str("invalid completion plan"),
             Self::InvalidChannels => f.write_str("channels must be nonempty and unique"),
             Self::TooManyProducers => f.write_str("too many producers for capture identifiers"),
             Self::InitializationFailed => f.write_str("capture queue initialization failed"),

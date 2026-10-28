@@ -51,6 +51,16 @@ fn owner(entry: Entry) -> CaptureOwner {
         input_reserved_bytes: 0,
         raw_reserved_bytes: 0,
         control_reserved_bytes: 0,
+        completion: None,
+        memory: crate::config::MemoryBudget {
+            total_bytes: 0,
+            input_bytes: 0,
+            raw_bytes: 0,
+            output_bytes: 0,
+            external_bytes: 0,
+            control_bytes: 0,
+            worker_bytes: 0,
+        },
     }
 }
 

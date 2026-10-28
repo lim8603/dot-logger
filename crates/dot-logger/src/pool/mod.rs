@@ -236,6 +236,10 @@ pub(crate) struct RawPool {
 }
 
 impl RawPool {
+    pub(crate) fn layout(&self) -> (usize, usize) {
+        (self.slots.len(), self.slot_bytes)
+    }
+
     pub(crate) fn metadata_bytes(quota: &PoolQuota) -> Option<usize> {
         quota.slots.checked_mul(size_of::<storage::Slot>())
     }

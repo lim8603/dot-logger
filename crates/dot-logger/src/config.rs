@@ -109,6 +109,10 @@ pub enum Resource {
     Control,
     /// Original payload storage.
     Raw,
+    /// Output queues, shared metadata, and small-payload copies.
+    Output,
+    /// Completion metadata within the control partition.
+    Completion,
     /// Background worker reservations.
     Workers,
 }

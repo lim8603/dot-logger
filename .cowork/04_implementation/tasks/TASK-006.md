@@ -106,4 +106,4 @@
 
 ## 승인·커밋·세션 마감 — 2026-10-28
 
-Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006 코드/테스트/CI를 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`에 함께 커밋했고 EV-005의36 source hash와 commit blob이 일치한다. 기존 CI 사용량 소진 지시에 따라 커밋에 `[skip ci]`를 사용하고 CI를 조회/재시도하지 않는다. 원격 fetch는 HTTPS 인증 부재로 실패했으며 SSH agent에도 identity가 없어 push는 인증 대기다. 승인/검증/마감 문서는 별도 docs(cowork) 커밋으로 정리한다. TASK-004/005/006 native는 Not Run, 세션은 로컬 마감하며 원격 게시 완료를 주장하지 않는다.
+Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006 코드/테스트/CI를 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`에 함께 커밋했고 EV-005의36 source hash와 commit blob이 일치한다. 기존 CI 사용량 소진 지시에 따라 커밋에 `[skip ci]`를 사용하고 CI를 조회/재시도하지 않는다. 초기 HTTPS 인증 차단은 gh 브라우저 인증과 Git credential helper 연결로 해소했다. pull --ff-only 후 코드·승인 문서 `136fe96`의 origin/main push를 완료했고 원격 ref 일치를 확인했다. 승인/검증/마감 문서는 별도 docs(cowork) 커밋으로 정리했다. TASK-004/005/006 native는 Not Run을 유지하며 세션을 마감한다.

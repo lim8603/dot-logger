@@ -47,7 +47,7 @@
 - 통합 19개·신규 compile-fail 3개, Rust 두 버전 각16 feature·독립 consumer·기존 RT allocation guard·clippy·rustdoc·fmt Pass. 원본 cross-thread IO guard 수명 포함 통합19 × Miri8 seeds Pass.
 - allocator 계측: 초기 구성/Router 생성부터 256회 큐 포화(512 records)·scope/owner 해제까지 요청 bytes peak2368 / output 예약2816 / 잔여0. 시스템 allocator 내부 metadata/rounding·RSS·OS page cache·실제 worker 비용은 이 계측의 범위가 아니다.
 - 수락 경계/완료 window·sync·실제 shutdown·파일 IO/OS별 native·장비 처리량/RT는 미검증 또는 후속 범위다. queue expiry/cancel은 reader/turn 구동이 필요하고 진행 IO guard는 강제 무효화하지 않는다. shared 전역 예산 포화는 입력을 지연할 수 있다.
-- Human 구현 리뷰는 2026-10-28 「승인」으로 완료됐다. native CI 후속 검증이 남아 In Progress를 유지한다. 구현 검증 당시 공개 전환/과금 설정 변경/게시/커밋은 수행하지 않았다. 이후 승인된 TASK-005/006 소스는 2026-10-28 코드 `c98b7fa`에 함께 커밋됐으며 현재 push는 원격 인증 대기다.
+- Human 구현 리뷰는 2026-10-28 「승인」으로 완료됐다. native CI 후속 검증이 남아 In Progress를 유지한다. 구현 검증 당시 공개 전환/과금 설정 변경/게시/커밋은 수행하지 않았다. 이후 승인된 TASK-005/006 소스는 2026-10-28 코드 `c98b7fa`에 함께 커밋됐으며 gh/Git HTTPS 인증 연결 후 코드·승인 문서 `136fe96`의 origin/main push와 원격 ref 일치 확인을 완료했다.
 
 ## 파일 변경표
 

@@ -212,7 +212,7 @@ Human 구현 리뷰는 2026-10-28 「승인」으로 완료됐다. native CI/fre
 
 물리 원본은 기존 raw 예약 한 번이며 completion/control metadata는 승인된 control 분할, routing refs/copies/feedback은 output 분할에 들어간다. controller 연결은 유일하고 metadata allocations 해제 후 lease를 반환한다. allocator 결과는 해당 시험의 요청 bytes이며 allocator 내부 metadata/rounding·RSS·OS caches·실제 worker 비용의 증거가 아니다. Miri도 실행한 입력/seed의 해석 검사이며 모든 interleaving이나 soundness의 완전한 증명이 아니다.
 
-미실행: 실제 파일 IO/OS sync/rename·backend worker 기동·기록/복구·장비 durability/지연/처리량·Windows/macOS/PREEMPT_RT native·fresh audit. actual file adapter는 TASK-007 이후다. TC-003의 runtime 설정 변경/실제 worker/장비 경합, TC 전체·MS-002·Gate4/5 Pass로 승격하지 않는다. Human 리뷰는 2026-10-28 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 승인됐다. native CI Not Run(사용량 소진·재확인 불필요 지시 유지). 동일 차단 재시도·계정/공개 변경은 하지 않았다. 승인 후 코드 커밋과 게시 인증 차단은 아래 게시 준비 기록에 보존한다. TASK-004/005 기존 구현 승인은 유지한다.
+미실행: 실제 파일 IO/OS sync/rename·backend worker 기동·기록/복구·장비 durability/지연/처리량·Windows/macOS/PREEMPT_RT native·fresh audit. actual file adapter는 TASK-007 이후다. TC-003의 runtime 설정 변경/실제 worker/장비 경합, TC 전체·MS-002·Gate4/5 Pass로 승격하지 않는다. Human 리뷰는 2026-10-28 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 승인됐다. native CI Not Run(사용량 소진·재확인 불필요 지시 유지). 동일 차단 재시도·계정/공개 변경은 하지 않았다. 승인 후 코드 커밋·초기 인증 차단과 해소·게시 완료는 아래 게시 기록에 보존한다. TASK-004/005 기존 구현 승인은 유지한다.
 
 ## Gate 판정 메모
 
@@ -229,9 +229,9 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 
 
-## TASK-005/006 승인·게시 준비 — 2026-10-28
+## TASK-005/006 승인·게시 완료 — 2026-10-28
 
-Human 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 TASK-006 구현 리뷰·게시·세션 종료를 승인했다. 코드 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`의36개 source/manifest blob은 EV-005와 일치한다. TASK-005 승인은 앞선 요청으로 유지한다. `.cowork/`는 소스와 분리 커밋하며 `[skip ci]`로 CI 자동 실행을 피한다. HTTPS fetch는 GitHub 인증 부재로 실패했고 사용할 SSH identity도 없어 push는 대기다. 계정/과금/visibility/CI 조회나 재시도는 하지 않았다. 이 게시 인증 차단은 native 검증 Pass/면제의 근거가 아니며 GAP-004는 유지한다.
+Human 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 TASK-006 구현 리뷰·게시·세션 종료를 승인했다. 코드 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`의36개 source/manifest blob은 EV-005와 일치한다. TASK-005 승인은 앞선 요청으로 유지한다. `.cowork/`는 소스와 분리 커밋하며 `[skip ci]`로 CI 자동 실행을 피한다. 초기 HTTPS 인증 차단은 Human의 gh 설치·브라우저 승인 후 OS keyring 인증과 Git credential helper 연결로 해소했다. `git pull --ff-only origin main` 성공 후 코드·승인 문서 `136fe96800c52c1ff31150e75fc23eeba5d6ed4b`를 push했고 `git ls-remote origin refs/heads/main`으로 같은 원격 HEAD를 확인했다. 인증 상태 확인은 게시를 위한 것이며 사용량/과금/visibility/CI 조회나 차단 재시도는 하지 않았다. 원격 게시 성공은 native 검증 Pass/면제의 근거가 아니며 GAP-004는 유지한다.
 
 
 게시 전 형식 검사(2026-10-28): 새 EV-004/005 `.log`는 줄 끝 공백/EOF 빈 줄만 정규화한 읽기용 뷰다. 정확한 실행 원본은 인접 `.log.gz`에 byte-for-byte 보존했고 각 results.json의 raw_log_archives에 원본/압축 hash를 기록했다. source/시험 의미·결과는 바꾸지 않았다.

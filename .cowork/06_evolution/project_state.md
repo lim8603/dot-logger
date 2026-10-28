@@ -6,20 +6,20 @@
 |---|---|
 | 프로젝트 | dot-logger — 수집·분배·완료/제어 coordinator 구현·로컬 검증, 실제 파일/worker 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-006 구현·EV-005 로컬 Pass·Human 승인·로컬 커밋, 원격 인증 대기 |
+| 현재 Phase | Build — TASK-006 구현·EV-005 로컬 Pass·Human 승인·원격 게시 완료 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
-| 활성 Task | TASK-006 In Progress — 완료/제어 구현·로컬 Pass·Human 승인·로컬 커밋; 원격 인증/native 후속 검증 |
-| 상태 | Yellow — Human 확인: GitHub 사용량 전량 소진으로 CI 차단; TASK-006 진행 승인, native/장비 검증 및 원격 인증 잔여 |
+| 활성 Task | TASK-006 In Progress — 완료/제어 구현·로컬 Pass·Human 승인·원격 게시; native 후속 검증 |
+| 상태 | Yellow — Human 확인: GitHub 사용량 전량 소진으로 CI 차단; TASK-006 진행 승인, native/장비 검증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-28 / AI |
-| 최근 세션 | [2026-10-28 #002](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) 종료 — TASK-005/006 승인·로컬 커밋, push 인증 대기 |
+| 최근 세션 | [2026-10-28 #002](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) 종료 — TASK-005/006 승인·커밋·push 완료, native 이월 |
 
 ## 현재 결정과 제약
 
-- **2026-10-28 마감:** TASK-006 Human 승인·commit/push·세션 종료 요청. 코드 `c98b7fa`는 검증 source36개와 일치한다. source 변경 없는 승인/마감 문서는 분리 커밋한다. 현재 push는 원격 인증 부재로 미완료다.
+- **2026-10-28 마감:** TASK-006 Human 승인·commit/push·세션 종료 요청. 코드 `c98b7fa`는 검증 source36개와 일치한다. source 변경 없는 승인/마감 문서는 분리 커밋했다. gh 브라우저 인증·Git credential helper 연결 후 pull --ff-only 및 push를 완료했고 원격 main `136fe96`과 일치함을 확인했다. 인증 정보는 OS keyring에 보관되며 저장소에 넣지 않는다.
 
 - **2026-10-26 Human 승인:** 「권고 기준선 채택 — 장비·호환 검증은 계획대로 진행」. 상세설계·ADR-008/009·추가 시험 목표·MS 계획을 채택했다. 검증 이월은 면제가 아니다.
 
@@ -43,7 +43,7 @@
 
 ## 다음 시작점
 
-0. **게시 미완료:** 셸 GitHub HTTPS 인증이 없고 SSH agent identity도 없어 fetch/push가 차단됐다. GitHub 플러그인 설치/계정 연결 또는 셸 Git 인증을 확보한 뒤 로컬 main의 코드/문서 커밋을 origin/main과 동기화(pull --ff-only 사전 확인)하고 push한다. 게시 승인은 이미 받았으며 재승인은 필요 없다. `[skip ci]`를 유지하고 CI/과금 상태는 재확인하지 않는다.
+0. **게시 완료:** TASK-005/006 코드 `c98b7fa`·승인 문서 `136fe96`을 origin/main에 push하고 원격 ref 일치를 확인했다. gh와 Git HTTPS 인증을 연결했다. `[skip ci]`를 유지하고 CI/과금 상태는 재확인하지 않는다. 다음 개발 후보 TASK-007은 미착수다.
 
 1. TASK-006 구현·[EV-005](../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료)는 2026-10-28 Human 승인 완료다. 완료/제어 통합26·private 경계2·신규 compile-fail2, 두 Rust 각16 feature/consumer/clippy/rustdoc·tracked RT0/0·Miri70×8 seeds·query/sync128회 계측 Pass. 실제 파일/OS sync/worker·native·장비 검증으로 승격하지 않는다.
 2. TASK-004/005는 구현·로컬 Pass·Human 승인 완료, native 미검증으로 In Progress다. Human이 사용량 전량 소진·계정 재확인 불필요를 확인했고 TASK-005/006 개발 진행을 지시했다. 검증 면제가 아니며 CI 여건 확보 후 current source를 고정해 6 contracts+audit+raw-memory8 job을 확인한다. 계정 조회·차단 재시도는 하지 않는다.
@@ -51,7 +51,7 @@
 
 ## 새 세션 재개 메모
 
-- 이 문서 → TASK-006 상세·EV-005·TC-003 → 필요한 completion/control/capture/routing 코드를 읽는다. 구현/로컬 Pass·Human 승인·코드/문서 로컬 커밋은 완료, 원격 인증/native 대기다. 소스가 바뀌지 않으면 같은 로컬 시험을 반복하지 않는다. TASK-004/005 승인은 유지한다.
+- 이 문서 → TASK-006 상세·EV-005·TC-003 → 필요한 completion/control/capture/routing 코드를 읽는다. 구현/로컬 Pass·Human 승인·코드/문서 원격 게시는 완료, native 대기다. 소스가 바뀌지 않으면 같은 로컬 시험을 반복하지 않는다. TASK-004/005 승인은 유지한다.
 - 개발1.96.0·MSRV1.85·dependency/lock 유지. private pool/storage unsafe 경계 유지. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. source36개 hash·환경/명령/log 근거는 EV-005다.
 - `new_tracked`는 producer별 completion window를 입력 수락 전에 단발 예약한다. pending/Updating slot을 덮지 않고 CompletionCapacity로 무대기 거절한다. raw 거절/생략은 같은 loan이며 admission/loan call의 SeqCst 표시가 close/cutoff 동결을 순서화한다.
 - Completion은 boundary 확인과 failed/dropped/unknown/expired를 분리한다. 고정 range/page/query permit·deadline/cancel wait와 완료 이력 age/window, retired terminal counters를 제공한다. query는 sync/출력 취소를 실행하지 않는다.
@@ -93,7 +93,7 @@
 
 ## 최근 작업·이력
 
-- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·로컬 커밋·세션 종료, push 인증/native 대기 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
+- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
 - 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md).
 - 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
 

@@ -21,3 +21,5 @@
 Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모두 추적한다. 장비 미확정 상태를 완료로 체크하지 않는다. dot-probe 첫 적용 완료가 확인되면 project_state T1(ROS 2 검토)을 알린다.
 
 2026-10-28 TASK-006: 고정 완료 window·유한 query/history·명시 sync barrier·deadline shutdown coordinator를 구현하고 로컬 검증했다. 실제 파일/worker/장비 보장은 후속이며 MS-002는 native 검증 잔여로 In Progress다.
+
+후속 자가 리뷰 EV-006의 P1 3건과 README 불일치는 EV-007에서 수정·로컬 회귀 Pass했다. 수정분 Human 리뷰와 native/실장비 검증은 남아 MS-002 In Progress를 유지한다.

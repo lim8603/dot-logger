@@ -93,6 +93,8 @@ tracked Router는 유한 dispatcher/reader feedback으로 Busy 결과를 보존�
 
 `ControlOwner`는 ordinary slots와 독립 shutdown slot을 예약하고 한 capture에 한 controller 연결만 허용한다. session/epoch/slot/generation으로 토큰 재사용을 차단하며 allocator 해제 후 연결 lease를 반환한다. 명시 sync는 writer가 이전 입력/대상 IO/feedback을 배출한 뒤 barrier cutoffs를 전달하고 실제 결과를 확인받는다. 같은 target의 sync IO는 직렬화한다. 종료는 close→quiescence/cutoff 동결→drain/선언 sync→실제 guard/loan/반납 및 feedback 정리다. deadline의 Incomplete는 같은 owner로 cleanup을 이어가며 Closed에도 실패/불명/시간 초과가 남을 수 있다. 앱 thread join은 scoped host 책임이고 실제 파일/OS sync는 TASK-007 이후다. [EV-005](../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료)에 실제 시험 범위·미실행을 기록한다.
 
+2026-10-28 후속 수정([EV-007](../05_verification/verification_evidence.md#ev-007)): Normal 완료 예약은 다음 R개 cyclic slot을 보호한다(R=소형/원본 Important 예약 중 큰 값, W≥R). producer별 정수 하나가 concrete control 예약에 포함되며 sequence mod window·단발 CAS·private unsafe 경계는 유지한다. writer 실패보다 늦은 Enqueued 사실은 terminal 결과와 병합한다. 시작 전 만료된 shutdown sync는 실제 자원과 선행 sync가 끝난 후 유한 metadata application으로 미확인 Synced를 Unknown으로 정리한다. 일반 sync 요청의 만료는 기록을 바꾸지 않는다. 기존 설계의 예약 보호·실패 관측·같은 owner의 cleanup을 충족하는 수정이며 실제 장비 수락은 추가하지 않는다.
+
 ## 5. 자원 예산과 설정
 
 전역 승인 예산은 `입력 봉투 + 전체 원본 풀 + 출력 참조/복사 + 인코딩/인덱스 + 완료 추적 + 조회/원격/DB + 설정/계측 + 스레드 스택/기타 예약`의 합이다. 원본은 물리 bytes로 한 번, 출력 보유 원인은 별도로 집계한다. 미대여 풀·회수 대기·열린 파일 인덱스도 빠뜨리지 않는다. OS page cache·앱 메모리·커널 소켓 메모리는 별도 보고하며 전체 시스템 메모리 상한이라고 주장하지 않는다.

@@ -15,7 +15,7 @@
 | TASK-003 | 소형 RT 수집과 중요 예약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | EV-002 로컬/native CI Pass·Human 리뷰 승인; 다음 TASK-004 | TASK-002 | [상세](tasks/TASK-003.md) | 2~3 |
 | TASK-004 | 원본 풀·수명·무해제 반환 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | EV-003 로컬 Pass·Human 승인·게시 완료; 사용량 소진에 따른 native 후속 검증 | TASK-003 | [상세](tasks/TASK-004.md) | 2~4 |
 | TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | Human 지시로 선행 CI 대기 중 착수; EV-004 구현·로컬 Pass; Human 리뷰 승인/native 대기 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |
-| TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | 구현·EV-005 로컬 Pass; Human 리뷰 승인/native 대기 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
+| TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | EV-007 자가 리뷰 결함 수정·로컬 회귀 Pass; 수정분 Human 리뷰/native 대기 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | u64 receipt 왕복·벽시계 역행·unknown schema와 8 MiB 단일 record 경계 | TASK-006 | [상세](tasks/TASK-007.md) | 2~3 |
 | TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | bytes/time/count/index 한계별 회전·겹친 이벤트와 읽기 핀으로 삭제 불가 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | chunk 중간 절단·CRC 손상·ENOSPC·sync/rename 실패 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |

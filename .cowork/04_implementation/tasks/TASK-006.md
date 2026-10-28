@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-28 |
-| 다음 액션 | 구현·EV-005 로컬 Pass 완료; Human 리뷰/native 후속 검증 |
+| 다음 액션 | EV-007 RV-001~004 수정·로컬 회귀 Pass; 수정분 Human 리뷰·native 후속 검증 |
 | 의존 | TASK-005 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -52,6 +52,22 @@
 - sync는 fixed scope/target/deadline 명시 요청이다. concrete dispatcher의 이전 입력/대상 IO/feedback 배출을 확인한 후 `SyncWork`를 writer 대역에 넘긴다. 같은 target의 sync IO를 직렬화하고 실제 확인 뒤 유한 metadata application을 수행한다. 기한 초과 중인 guard는 무효화하거나 slot 재사용하지 않는다. 이후 수락 기록을 과거 barrier로 Synced 처리하지 않고, 실패/Unknown이어도 Written을 보존한다.
 - 정상 shutdown은 신규 입력 close → pre-close call quiescence → cutoff 동결 → drain/선언한 sync → 실제 guard/loan/회수·feedback 정리로 진행한다. deadline의 Incomplete는 owner를 소비하지 않으며 같은 owner로 이후 cleanup을 이어간다. Closed도 실패/폐기/불명과 deadline 준수 여부를 보고한다. borrowed producer/query/IO guard의 owner 수명은 유지되고 앱 thread join은 애플리케이션 scoped host 책임이다.
 - 실제 파일 생성·OS sync/rename·writer thread 기동·장비 durability/RT/throughput은 TASK-007 이후다. 여기의 sync 확인은 테스트/예제 writer 대역이며 디스크 영속 성공 근거가 아니다. 후속 입력이 계속되면 범위보다 넓은 대상 drain 대기가 생길 수 있고 deadline으로 제한된다.
+
+## 후속 자가 리뷰 — 2026-10-28
+
+Human 요청으로 TASK-001~006 설계/구현을 대조했다. 현 source36개는 EV-005와 일치하나, [EV-006](../../05_verification/verification_evidence.md#ev-006)의 신규 반례가 Rust1.85/1.96 각각3개 실패했다. RV-001(writer 실패가 Enqueued feedback보다 빠르면 분배 정지), RV-002(Normal 완료창 점유로 Important 예약 우회), RV-003(필수 sync가 시작 전 만료되면 같은 owner의 cleanup 정체)는 P1 미수정이다. README 구현 단계 불일치 RV-004도 기록했다.
+
+기존 로컬 Pass·Human 승인·게시 사실은 이력으로 유지하고, 현 구현의 설계 충족 판정은 보류한다. 제품 코드·기존 제품 테스트는 수정하지 않았으며 격리 복사본의 재현 코드/실행 로그를 EV-006에 보존했다. TASK-007보다 이 결함들의 수정안·회귀 검증을 먼저 진행하도록 권고한다. native/장비 미검증과 사용량 조회/차단 재시도 금지는 그대로다.
+
+## 자가 리뷰 후속 수정·회귀 — 2026-10-28
+
+Human 「지금 수정과 회기 검증 진행해도 되겠어?」로 수정/검증 착수. 위 EV-006의 판정은 수정 전 이력이며, 현 결과는 [EV-007](../../05_verification/verification_evidence.md#ev-007)을 따른다. RV-001~003의 정식 재현 시험을 먼저 실패시킨 뒤 구현했고 README RV-004도 정렬했다. 완료 예약은 기존 sequence mod window를 유지한 유한 lookahead·단발 CAS이며, 만료 shutdown sync는 실제 자원/선행 sync 종료 뒤 유한 cursor로 Unknown을 적용한다. 일반 sync 만료·진행 IO 수명·Written 확인은 유지한다.
+
+신규9개(완료 private1·완료 통합3·제어 통합4·RT guard1), 두 Rust 각16 features/독립 consumer/예제/clippy/rustdoc/allocator·fmt Pass. Miri lib9+raw17+routing19+completion15+control18=78×8 seeds(624) Pass. Important small/raw 경로 allocation/deallocation0/0, query/sync128회 requested peak11586 / concrete14978 / 최종 잔여0. 전체 검증 중 기존 consumer의 Important16 대비 완료창8 오류를 발견해 window32/work_per_poll32로 정렬하고 재검증했다.
+
+수정분 Human 구현 리뷰·native/실제 파일/worker/장비 검증은 잔여다. 기존 승인 이력과 별개이며 TASK-006/MS-002 In Progress, Gate4/5 Not Ready를 유지한다. commit/push·CI 조회/재시도·fresh audit는 하지 않았다. 새 source37개(README 포함)와 명령/로그는 EV-007에 고정한다.
+
+후속 마감: Human 「커밋 푸쉬하고 세션 마무리」에 따라 수정 코드 `d57c2e3`을 `[skip ci]`로 커밋·origin/main push했고 원격 ref와 EV-007 source37개 blob 일치를 확인했다. 검증/상태/마감 문서는 별도 docs(cowork) 커밋이다. 커밋 요청을 수정분 구현 리뷰 승인으로 대신하지 않으며 native/장비 이월과 사용량 조회/재시도 금지는 유지한다. 다음은 EV-007 수정분 리뷰이며 TASK-007은 미착수다.
 
 ## 파일 변경표
 

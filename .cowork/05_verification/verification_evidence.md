@@ -214,6 +214,67 @@ Human 구현 리뷰는 2026-10-28 「승인」으로 완료됐다. native CI/fre
 
 미실행: 실제 파일 IO/OS sync/rename·backend worker 기동·기록/복구·장비 durability/지연/처리량·Windows/macOS/PREEMPT_RT native·fresh audit. actual file adapter는 TASK-007 이후다. TC-003의 runtime 설정 변경/실제 worker/장비 경합, TC 전체·MS-002·Gate4/5 Pass로 승격하지 않는다. Human 리뷰는 2026-10-28 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 승인됐다. native CI Not Run(사용량 소진·재확인 불필요 지시 유지). 동일 차단 재시도·계정/공개 변경은 하지 않았다. 승인 후 코드 커밋·초기 인증 차단과 해소·게시 완료는 아래 게시 기록에 보존한다. TASK-004/005 기존 구현 승인은 유지한다.
 
+<a id="ev-006"></a>
+### EV-006 — TASK-001~006 설계 대조·자가 리뷰
+
+- 요청: 2026-10-28 Human 「이번 세션은 TASK-006까지 설계된대로 구현되었는지 체크 및 자가 리뷰」. 수정 구현·commit/push는 수행하지 않았다.
+- 대상: `011d6f17ee9d34e604087de3cbfd82ca9c0b7e48`. EV-005의 36개 source/manifest SHA-256이 현재 작업 트리와 전부 일치한다. 기존 EV-001~005의 실행 이력과 Human 승인은 보존하며, 새로 발견한 반례를 현 구현의 미해결 결함으로 추가한다.
+- 방법: TASK-001~006·ADR-008·도메인/데이터/인터페이스 계약을 구성·수집·풀·분배·완료·제어 코드와 대조했다. 기존 feature/Miri 시험은 소스가 같아 반복하지 않았다. 신규 반례 3개만 격리한 git archive 복사본에서 Rust 1.85.0/1.96.0으로 실행했다. 원본 제품 코드·기존 제품 테스트·의존성·CI는 변경하지 않았다.
+- 근거: [실행 요약·hash](../06_evolution/imported_context/self_review_task_001_006_2026-10-28/results.json), [재현 실행기](../06_evolution/imported_context/self_review_task_001_006_2026-10-28/reproduce.py), [공개 API 반례](../06_evolution/imported_context/self_review_task_001_006_2026-10-28/review_regressions.rs), [분배 interleaving 반례](../06_evolution/imported_context/self_review_task_001_006_2026-10-28/review_routing.rs). 실행 결과는 **두 Rust 각각 3개 계약 assertion 실패**이며, 제품 합격 시험으로 집계하지 않는다.
+
+| 범위 | 대조 결과 |
+|---|---|
+| TASK-001 | 승인된 설계·ADR·실행 Task/검증 범위 연결 확인. 설계 기준선은 유지한다. |
+| TASK-002 | 예산 합·overflow·quota·required capability·CPU 검증과 구현 경계 일치. 기존 EV-001 유지. |
+| TASK-003 | 소형 복사·FIFO·중요 예약·레벨 매핑·일반 deadline 경로 확인. tracked 통합에서는 RV-002로 예약 보호가 깨진다. |
+| TASK-004 | 동일 loan 반환·borrowed owner·generation/state·무해제 반환/유한 reclaim·private unsafe 경계 확인. 추가 결함은 확인하지 못했으며 기존 Miri는 모든 interleaving의 증명이 아니다. |
+| TASK-005 | 유한 스케줄/출력/retry·공유 원본과 복사 예산 확인. TASK-006에서 연결한 completion feedback에 RV-001이 존재한다. |
+| TASK-006 | bounded query/history·명시 sync·guard 유지·전용 shutdown slot 구현 확인. 아래 P1 3건으로 설계 충족 판정 보류. |
+
+| ID / 우선순위 | 위치·계약 | 재현·영향·수정 검토 방향 |
+|---|---|---|
+| RV-001 / P1 | `completion/mod.rs:422` terminal 전이 검사, `routing/mod.rs:252` feedback; 인터페이스 §3.3·4.2·13.2 | 대상 FIFO 게시 후 `finish`의 Enqueued 반영 전에 writer가 IoFailure를 보고하면, 뒤늦은 Enqueued 확인이 InvalidTransition이 된다. feedback head가 남아 다음 turn도 같은 fault로 신규 분배를 중단한다. private 재현은 실제 submit→writer report→finish helper를 순서대로 구동해 가능한 동시 실행을 결정적으로 선택한다. 생산 코드 함수는 바꾸지 않았다. 실패 사실을 보존하면서 앞선 enqueue 확인의 역전 도착을 처리해야 한다. |
+| RV-002 / P1 | `completion/mod.rs:572`, `capture/mod.rs:519`; 인터페이스 §9.2(모든 병목 자원의 Important 예약 보호) | PrioritizeImportant·input slots=8·Important reserve=2·completion window=2 구성을 허용한다. Normal 2개 수락 뒤 입력 예약이 남아 있어도 Important가 CompletionCapacity로 거절된다. 완료 예약에 중요도 분할/Normal 제한도, 이를 보장하는 구성 검사도 없다. 같은 producer의 미완료 Normal이 중요 완료 공간을 소진하지 못하도록 구성·수락 알고리즘을 검토해야 한다. |
+| RV-003 / P1 | `control/mod.rs:479` queued sync 만료, `:334` Closing 거절, `:705` 종료 조건; 인터페이스 §10·13.2 | completion=Synced인 필수 대상에 Written 후 shutdown을 시작하고 sync가 시작되기 전에 deadline에 도달한다. 명령은 EXPIRED지만 receipt는 Pending이다. ingress/output/IO/loan/feedback 모두 0이어도 반복 cleanup은 Incomplete이고 next_sync는 None, 새 request_sync는 Closing이다. 같은 owner에서 후속 정리할 상태 전이가 없다. 성공을 꾸미지 않고 미완료 sync를 실패/불명으로 종결하거나, 안전한 후속 sync/cleanup 경로를 제공해야 한다. |
+| RV-004 / P2(문서) | `README.md:4` | 현재 구현 설명이 TASK-002 구성 검증 단계에 머물러 TASK-003~006과 다르다. 현재 범위·미구현 파일/worker를 구분해 후속 문서 정렬이 필요하다. 이번 리뷰에서는 원문을 수정하지 않았다. |
+
+판정: **설계대로 구현 완료라고 볼 수 없음 — P1 3건 미수정**. TASK-006 및 MS-002는 In Progress 유지, TASK-007 신규 개발 전에 결함 수정/회귀 검증을 권고한다. 기존 Human 승인을 취소하거나 설계를 변경한 것은 아니다. RV-002의 공개 구성/수락 의미, RV-003의 종료 결과 전이는 승인된 계약을 지키는 수정안을 먼저 구체화한다. 새 범위/계약 변경이 필요하면 H/J 기준을 적용한다.
+
+미검증: 실제 파일/OS sync/worker·Windows/macOS/PREEMPT_RT native·실장비 성능/장애/전원 차단은 종전과 같다. GitHub 계정/사용량 조회·CI 실행/재시도·fresh audit는 수행하지 않았다. T1/T2 미도래, Gate 4/5 Not Ready 유지.
+
+후속: 위 EV-006은 수정 전 `011d6f1`의 리뷰 이력이다. Human 수정/회귀 착수 지시 후 RV-001~004를 수정했고 현 결과는 EV-007을 따른다.
+
+<a id="ev-007"></a>
+### EV-007 — TASK-006 자가 리뷰 결함 수정·회귀
+
+- 승인 범위: 2026-10-28 Human 「지금 수정과 회기 검증 진행해도 되겠어?」에 따른 RV-001~004 수정·회귀 착수. 수정분 Human 구현 리뷰·commit/push 승인을 대신하지 않는다.
+- 대상: `011d6f1` 위 dirty worktree. [37개 source/manifest SHA-256·환경·명령·결과](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/results.json)로 고정한다(기존 EV-005의36개+README). completion/capture/control·회귀 시험·consumer·README가 변경됐으며 private pool/storage unsafe·dependency/lock·CI는 유지한다. EV-005/006의 과거 hash/판정은 보존한다.
+- TDD: 정식 회귀 시험에서 [feedback Red](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/red-feedback.log), [Important Red](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/red-priority.log), [shutdown Red](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/red-shutdown.log)를 먼저 확인했다. 환경/컴파일 실패가 아닌 계약 assertion 실패다. 수정 후 각 시험과 영향 회귀가 Pass했다.
+
+| 결함 | 수정·회귀 결과 |
+|---|---|
+| RV-001 | 실패/폐기/불명을 유지하면서 늦게 도착한 Enqueued 사실만 병합한다. paused metadata→writer 실패→feedback 배출→다음 기록 분배까지 확인. 이후 Written/Synced의 terminal 덮어쓰기는 계속 거절한다. |
+| RV-002 | producer별 R=max(small Important slots, raw Important slots), W≥R 검사. Normal은 다음 R개 cyclic slot의 재사용 가능성을 확인한 뒤 기존 단발 CAS로 수락한다. W=R은 Important 전용, TreatEqually의 R=0 유지. 원형 빈 hole/32회 wrap·소형/원본·동일 loan 반환·RT0/0을 확인했다. |
+| RV-003 | 시작 전 만료된 전용 shutdown sync만 실제 자원/feedback·선행 일반 sync 정리 후 유한 cursor로 미확인 Synced를 Unknown 처리한다. Written·Expired·deadline 실패를 보존하고 같은 owner로 실패 Closed에 도달한다. 늦은 raw write/일반 sync 성공과 일반 요청 expiry 후 재요청을 검증했다. |
+| RV-004 | README를 현재 코어/대역 writer와 실제 파일/worker 미구현 범위에 맞췄다. 오래된 audit 결과도 날짜를 명시했다. |
+
+신규9개 = 완료 private1·완료 통합3·제어 통합4·allocator1. 현재 완료 통합15·제어18·lib9다. 전체 소비자 검증 중 기존 독립 consumer의 Important16/완료창8 불일치를 새 구성 검사에서 발견했다. [초기 실패](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/features-1.85.0-initial.log)를 보존하고 예제 window32/work_per_poll32로 정렬한 뒤 전체 검사했다.
+
+| 명령·범위 | 결과·근거 |
+|---|---|
+| `python3 scripts/check-feature-matrix.py --toolchain <version>` | Rust1.85.0/1.96.0 각각16 feature·독립 consumer·scoped 예제·allocator 회귀 Pass / [1.85](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/features-1.85.0.log), [1.96](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/features-1.96.0.log) |
+| `cargo +<version> clippy --workspace --all-targets --all-features --locked -- -D warnings` | 두 Rust Pass / [1.85](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/clippy-1.85.0.log), [1.96](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/clippy-1.96.0.log) |
+| `RUSTDOCFLAGS='-D warnings' cargo +<version> doc --workspace --all-features --no-deps --locked` | 두 Rust Pass / [1.85](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/rustdoc-1.85.0.log), [1.96](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/rustdoc-1.96.0.log) |
+| `cargo +<version> test -p dot-logger-rt-allocation --locked -- --nocapture` | 두 Rust6개 Pass. 기존/신규 Important small/raw admission·거절·마지막 RT handle Drop allocation/deallocation0/0. query/sync128회 requested peak11586 / concrete14978 / 최종 잔여0, routing512 records peak2656/output3168/잔여0 / [1.85](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/allocator-1.85.0.log), [1.96](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/allocator-1.96.0.log) |
+| `MIRIFLAGS='-Zmiri-strict-provenance -Zmiri-many-seeds=0..8' cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --test tc_003_routing --test tc_003_completion --test tc_003_control --locked` | lib9+raw17+routing19+completion15+control18 =78×8 seeds(624) Pass / [Miri](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/miri.log) |
+| `cargo +1.96.0 fmt --all --check`, `git diff --check` | Pass / [fmt](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/fmt.log), source/문서 diff 검사 |
+
+유효 범위: 로컬의 선언된 코어/대역 경로이며 RV-001~004 수정·회귀를 확인했다. Normal RT 경로에는 R개 상태 조회가 추가됐고 실제 p99는 미검증이다. 만료 shutdown의 Unknown은 실제 접근이 모두 끝난 뒤의 최종 정리 결과이며 성공 sync가 아니다. allocator 수치는 요청 bytes이며 allocator 내부/RSS/OS cache를 포함하지 않는다. Miri는 실행한 경로/seed의 해석 검사이며 모든 interleaving 증명이 아니다.
+
+미실행/잔여: 수정분 Human 리뷰·native CI·fresh audit·실제 파일/OS sync/rename·worker·장비 RT/throughput/전원 차단. 사용량/과금 조회·차단 재시도·commit/push는 하지 않았다. GAP-006은 로컬 수정/회귀 범위에서 Closed, GAP-004 및 TASK-006/MS-002 In Progress·Gate4/5 Not Ready는 유지한다.
+
+후속 게시·마감: Human 「커밋 푸쉬하고 세션 마무리」에 따라 코드 `d57c2e3`을 origin/main에 push하고 원격 ref를 확인했다. EV-007의37개 source/manifest hash는 commit blob과 일치한다. [코드 게시 기록](../06_evolution/imported_context/task_006_review_fixes_2026-10-28/publication.json)에 관측 ref와 범위를 남겼으며 `.cowork` 문서는 별도 마감 커밋으로 관리한다. `[skip ci]`를 사용했고 검증 소스가 같아 제품 시험은 반복하지 않았다. 커밋/push 승인은 수정분 Human 구현 리뷰나 native Pass를 대신하지 않는다. `.agents/skills/code-review/SKILL.md`는 별도 추가된 사용자 파일로 이번 작업에서 제외·보존했다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -223,10 +284,11 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | TASK-002 EV-001·TASK-003 EV-002 로컬/native Pass, TASK-004 원본 EV-003·TASK-005 분배 EV-004·TASK-006 완료/제어 EV-005 로컬 Pass. 실제 저장·클라이언트·실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
+| GAP-002 | TASK-002 EV-001·TASK-003 EV-002 로컬/native Pass, TASK-004/005/006 코어 로컬 Pass. EV-007 자가 리뷰 결함 수정·회귀 Pass, 수정분 리뷰·실제 저장·클라이언트·실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 실행 전 차단. Human 2026-10-28 사용량 전량 소진 확인, 계정 재확인 불필요. TASK-005 EV-004·TASK-006 EV-005도 native Not Run. 마지막 native Pass는 TASK-003 `902043b` | CI 실행 여건 확보 뒤 source hash를 고정해 6 contracts+audit+raw-memory(분배 Miri 포함)를 AI가 확인. Human의 TASK-005/006 착수 지시는 개발 진행 예외이며 검증 면제가 아님 | Open — native 후속 검증 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
+| GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 
 
 ## TASK-005/006 승인·게시 완료 — 2026-10-28

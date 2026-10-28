@@ -1,6 +1,6 @@
 # 테스트 케이스와 요구사항 추적
 
-- INT-001 / 2026-10-27 / 상세 시험계획 Approved, **TASK-002의 TC-001 하위 시험 로컬/native CI Pass(EV-001), 나머지 미실행**.
+- INT-001 / 2026-10-28 / 상세 시험계획 Approved. **TASK-002/003 하위 로컬/native Pass, TASK-004~006 코어·EV-007 수정 회귀 로컬 Pass. 수정분 리뷰/native 및 후속 제품·실장비 검증 잔여**.
 - TDD 방식은 승인됨. 아래 세부 기대값은 ADR-008·009/추가 AC와 함께 기준선으로 승인됐다. FR-015 관련 시험은 별도 범위 승인 후 활성화한다.
 - TC는 12개 검증 묶음이며 각 파라미터·실패 시나리오는 실행 때 독립 결과를 남긴다. 한 하위 시험 Pass를 TC 전체나 요구 전체 Pass로 표시하지 않는다.
 
@@ -50,7 +50,7 @@ TASK-004 하위 결과: [EV-003](verification_evidence.md#ev-003--task-004-원�
 ### TC-003 — fanout·완료·설정과 종료 경합
 
 - 관련: MS-002 / FR-003·007·012·013 / NFR-003·005
-- 상태: 부분 실행 — TASK-005 분배 하위 로컬 Pass(2026-10-28), TASK-005 Human 리뷰 승인·TASK-006 완료/제어 로컬 Pass(Human 리뷰 승인/native 대기), runtime 설정/실제 writer·장비 경합 잔여 / EV: [EV-004](verification_evidence.md#ev-004--task-005-분배출력-격리예산)
+- 상태: 부분 실행 — 기존 로컬 Pass·Human 승인 이력 유지. EV-006 P1 3건은 EV-007 수정·로컬 회귀 Pass, 수정분 Human 리뷰·native·runtime 설정/실제 writer·장비 경합 잔여 / EV: [EV-004](verification_evidence.md#ev-004--task-005-분배출력-격리예산), [EV-006](verification_evidence.md#ev-006), [EV-007](verification_evidence.md#ev-007)
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -63,6 +63,10 @@ TASK-004 하위 결과: [EV-003](verification_evidence.md#ev-003--task-004-원�
 TASK-005 하위 결과: 분배 통합19·신규 compile-fail3, 두 Rust 각16 feature·독립 consumer·clippy/rustdoc/fmt·allocator 포화256회/512건·Miri8 seeds Pass. A 정지/B 지속, record/byte 공정성·혼합 FIFO·0-byte·startup 예산 경계, pending/queued/진행 IO 보유 한도·raw 최종 guard 회수·retry/expiry/cancel/close·event buffer 포화를 검사했다. 물리 원본은 한 번, 대상별 보유 원인/복사는 별도다. 완료 window·seq 공백/완료·sync 실패·이력/실제 shutdown 경합은 TASK-006 이후이며 TC-003 전체 Pass가 아니다. CI는 Human 확인 사용량 소진으로 미실행이다.
 
 TASK-006 하위 결과: [EV-005](verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료) 로컬 Pass. 완료 통합12·제어14·private publication 경계2·신규 lifetime compile-fail2, tracked RT 0/0·query/sync128회·두 Rust16 features/consumer/clippy/rustdoc·Miri70×8 seeds Pass. seq 공백/추적 포화/동일 loan 반환·단계별 확인/실패/Unknown·bounded page/scope/wait·retention age/Expired/retired 대조·유한 feedback Busy·stale generation/세션·동일 target sync 직렬화·기한 중 IO/loan 유지·전용 shutdown slot·수락/close 경합을 검사했다. 실제 파일 writer/OS sync/앱 thread join·runtime 설정 변경 경합·native/실장비는 남아 있어 TC-003 전체 Pass가 아니다.
+
+TASK-001~006 후속 자가 리뷰: [EV-006](verification_evidence.md#ev-006). source36개가 EV-005와 같음을 확인했고, 두 Rust에서 신규 반례 3개가 각각 실패했다. writer 실패→뒤늦은 Enqueued feedback의 영구 fault, Normal의 완료창 점유에 따른 Important 예약 미보호, 필수 shutdown sync의 시작 전 만료 후 cleanup 정체다. 기존 성공 시나리오의 Pass는 보존하되 현 구현의 계약 충족으로 확대하지 않는다. 제품 테스트 파일은 변경하지 않았고 재현은 격리 복사본에서 수행했다. 수정 후 해당 반례를 회귀 시험에 포함해야 한다.
+
+후속 수정 [EV-007](verification_evidence.md#ev-007): 정식 재현3개 Red 후 수정·통과, 추가 경계/allocator 포함 신규9개다. 완료 통합15·제어18·lib9, 두 Rust16 features/consumer/예제/clippy/rustdoc/fmt·RT allocation/deallocation0/0·Miri78×8 seeds Pass. Normal의 예약 소진/빈 cyclic hole/반복 wrap·소형/원본 예약 및 W<R/W=R, 지연 실패 feedback 이후 다음 입력 진행, 만료 shutdown의 유한 cleanup·늦은 raw write와 일반 sync 성공 보존·일반 request 만료 후 재요청을 검증했다. 수정분 리뷰/native·실장비는 잔여이며 TC-003 전체 Pass로 승격하지 않는다.
 
 <a id="tc-004"></a>
 ### TC-004 — MCAP·시각·스키마·인덱스

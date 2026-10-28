@@ -5,6 +5,181 @@ use dot_logger::completion::{Boundaries, Boundary, QueryOutcome, Update};
 use std::time::Duration;
 mod support;
 use support::*;
+
+#[test]
+fn tracked_normal_pressure_preserves_important_completion_slots() {
+    use dot_logger::capture::Importance;
+    use dot_logger::config::{ImportancePolicy, SessionBuilder};
+    use dot_logger::platform::PlatformCapabilities;
+    let mut config = plan().config().clone();
+    config.importance = ImportancePolicy::PrioritizeImportant;
+    config.producers[0].small.important_slots = 2;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routing(),
+        tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion = scope.completion().unwrap();
+        let (mut producer, mut consumer) = scope.next().unwrap();
+        let first = accepted(producer.try_record_small(meta(), &[1]).unwrap());
+        let second = accepted(producer.try_record_small(meta(), &[2]).unwrap());
+        consumer.try_read(&mut [0; 16]).unwrap();
+        consumer.try_read(&mut [0; 16]).unwrap();
+        assert_eq!(
+            producer.try_record_small(meta(), &[3]),
+            Err(CaptureError::CompletionCapacity)
+        );
+        let mut important = meta();
+        important.importance = Some(Importance::Important);
+        let third = accepted(producer.try_record_small(important, &[3]).unwrap());
+        let fourth = accepted(producer.try_record_small(important, &[4]).unwrap());
+        assert_eq!((third.accepted_seq, fourth.accepted_seq), (3, 4));
+        assert_eq!(
+            producer.try_record_small(important, &[5]),
+            Err(CaptureError::CompletionCapacity)
+        );
+        for receipt in [first, second, third, fourth] {
+            for target in [10, 20] {
+                completion
+                    .report(receipt, target, Update::Confirmed(Boundary::Written))
+                    .unwrap();
+            }
+        }
+    });
+}
+
+#[test]
+fn important_completion_reservation_survives_wraps_and_a_pending_cyclic_hole() {
+    use dot_logger::capture::Importance;
+    use dot_logger::config::{ImportancePolicy, SessionBuilder};
+    use dot_logger::platform::PlatformCapabilities;
+    let mut config = plan().config().clone();
+    config.importance = ImportancePolicy::PrioritizeImportant;
+    config.producers[0].small.important_slots = 2;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routing(),
+        tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let mut important = meta();
+        important.importance = Some(Importance::Important);
+        let mut previous = 0;
+        for _ in 0..32 {
+            let a = accepted(p.try_record_small(meta(), &[1]).unwrap());
+            let b = accepted(p.try_record_small(meta(), &[2]).unwrap());
+            assert_eq!(
+                p.try_record_small(meta(), &[0]),
+                Err(CaptureError::CompletionCapacity)
+            );
+            let c = accepted(p.try_record_small(important, &[3]).unwrap());
+            let d = accepted(p.try_record_small(important, &[4]).unwrap());
+            for _ in 0..4 {
+                reader.try_read(&mut [0; 16]).unwrap().unwrap();
+            }
+            for target in [10, 20] {
+                completion
+                    .report(a, target, Update::Confirmed(Boundary::Written))
+                    .unwrap();
+            }
+            // The next physical slot is free, but an older pending sequence
+            // blocks the following reserve. Normal must leave this hole usable
+            // by Important rather than consume the last priority opportunity.
+            assert_eq!(
+                p.try_record_small(meta(), &[0]),
+                Err(CaptureError::CompletionCapacity)
+            );
+            let e = accepted(p.try_record_small(important, &[5]).unwrap());
+            reader.try_read(&mut [0; 16]).unwrap().unwrap();
+            assert_eq!(a.accepted_seq, previous + 1);
+            assert_eq!(e.accepted_seq, previous + 5);
+            for receipt in [b, c, d, e] {
+                for target in [10, 20] {
+                    completion
+                        .report(receipt, target, Update::Confirmed(Boundary::Written))
+                        .unwrap();
+                }
+            }
+            previous = e.accepted_seq;
+        }
+        let totals = completion.totals(false);
+        assert_eq!(
+            (
+                totals.records,
+                totals.assigned,
+                totals.complete,
+                totals.pending
+            ),
+            (160, 320, 320, 0)
+        );
+    });
+}
+
+#[test]
+fn completion_window_validates_small_and_raw_priority_reservations() {
+    use dot_logger::capture::{CaptureBuildError, Importance};
+    use dot_logger::config::{ImportancePolicy, SessionBuilder};
+    use dot_logger::platform::PlatformCapabilities;
+    for (small, raw, window) in [(1, 0, 1), (0, 2, 2), (1, 2, 3), (2, 0, 1)] {
+        let mut config = plan().config().clone();
+        config.importance = ImportancePolicy::PrioritizeImportant;
+        config.producers[0].small.important_slots = small;
+        config.producers[0].raw.as_mut().unwrap().important_slots = raw;
+        let plan = SessionBuilder::new(config)
+            .validate(&PlatformCapabilities::default())
+            .unwrap();
+        let result = CaptureOwner::new_tracked(
+            &plan,
+            42,
+            1,
+            &[ChannelConfig::new(7, 99, 1)],
+            &routing(),
+            tracking(window),
+        );
+        let reserve = small.max(raw);
+        if window < reserve {
+            assert!(matches!(result, Err(CaptureBuildError::InvalidCompletion)));
+            continue;
+        }
+        let mut owner = result.unwrap();
+        owner.scope(|mut scope| {
+            let (mut p, _) = scope.next().unwrap();
+            for _ in 0..window - reserve {
+                accepted(p.try_record_small(meta(), &[1]).unwrap());
+            }
+            assert_eq!(
+                p.try_record_small(meta(), &[0]),
+                Err(CaptureError::CompletionCapacity)
+            );
+            let mut important = meta();
+            important.importance = Some(Importance::Important);
+            for _ in 0..reserve {
+                accepted(p.try_record_small(important, &[2]).unwrap());
+            }
+            assert_eq!(
+                p.try_record_small(important, &[0]),
+                Err(CaptureError::CompletionCapacity)
+            );
+        });
+    }
+}
 #[test]
 fn seq_two_complete_does_not_hide_seq_one_pending() {
     let plan = plan();

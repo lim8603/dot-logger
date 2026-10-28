@@ -73,7 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let tracking = CompletionConfig {
         history_retention: Duration::from_secs(60),
-        window_records: 8,
+        // Preserve sixteen Important opportunities while admitting Normal input.
+        window_records: 32,
         max_queries: 2,
         page_items: 8,
         feedback_events: 8,
@@ -104,7 +105,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             scope.control(),
             ControlConfig {
                 sync_slots: 1,
-                work_per_poll: 8,
+                work_per_poll: 32,
             },
             now,
         )?;

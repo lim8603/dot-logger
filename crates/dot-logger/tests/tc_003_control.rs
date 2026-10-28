@@ -7,6 +7,159 @@ use dot_logger::control::{ControlConfig, ControlOwner, ShutdownPlan, ShutdownPol
 use dot_logger::routing::Router;
 use std::time::{Duration, Instant};
 use support::*;
+
+#[test]
+fn expired_unstarted_required_shutdown_sync_finishes_cleanup_on_the_same_owner() {
+    let plan = plan();
+    let route = routing();
+    let mut config = tracking(4);
+    config.targets[0].completion = Boundary::Synced;
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        config,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion=scope.completion().unwrap(); let now=Instant::now();
+        let end=now+Duration::from_secs(1);
+        let control=ControlOwner::new(&plan,scope.control(),ControlConfig{sync_slots:1,work_per_poll:1},now).unwrap();
+        let (mut producer,a)=scope.next().unwrap(); let (_,b)=scope.next().unwrap();
+        let mut router=Router::new(&plan,vec![a,b],route).unwrap();
+        router.scope(|mut dispatch,mut outputs| {
+            let receipt=written(&mut producer,&mut dispatch,&mut outputs,now);
+            control.begin_shutdown(ShutdownPlan{sync_files:true},now,end,&mut dispatch).unwrap();
+            let token=control.shutdown_sync().unwrap();
+            let mut last=control.poll_shutdown(end,&mut dispatch).unwrap();
+            for _ in 0..20 {last=control.poll_shutdown(end,&mut dispatch).unwrap();}
+            assert!(matches!(last,ShutdownPoll::Closed(report) if report.deadline_elapsed && report.sync_failed && !report.is_success()));
+            assert_eq!(completion.poll(receipt,10,Boundary::Written).unwrap().outcome,QueryOutcome::Complete);
+            assert_eq!(completion.poll(receipt,10,Boundary::Synced).unwrap().outcome,QueryOutcome::Unknown);
+            let snapshot=control.sync_snapshot(token,end).unwrap();
+            assert_eq!(snapshot.expired,2); assert!(snapshot.finished); assert!(!snapshot.barriers_succeeded());
+            let mut ranges=[ProducerRange::default();2];
+            assert!(control.next_sync(token,10,end,&mut dispatch,&mut ranges).unwrap().is_none());
+        });
+    });
+}
+
+#[test]
+fn expired_shutdown_sync_waits_for_late_raw_writes_before_settling_unknown() {
+    let plan = plan();
+    let route = routing();
+    let mut config = tracking(4);
+    config.targets[0].completion = Boundary::Synced;
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        config,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion=scope.completion().unwrap(); let now=Instant::now(); let end=now+Duration::from_secs(1);
+        let control=ControlOwner::new(&plan,scope.control(),ControlConfig{sync_slots:1,work_per_poll:2},now).unwrap();
+        let (mut p,a)=scope.next().unwrap(); let (_,b)=scope.next().unwrap();
+        let mut loan=p.try_acquire(64,Importance::Normal).unwrap(); loan.payload_mut().fill(81);
+        let dot_logger::pool::RawRecordOutcome::Accepted(receipt)=p.try_record_raw(meta(),loan).unwrap() else {panic!()};
+        let mut router=Router::new(&plan,vec![a,b],route).unwrap();
+        router.scope(|mut d,mut outputs| {
+            d.turn(now,&mut[None;16]).unwrap();
+            let a=outputs[0].try_next(now).unwrap().unwrap(); let b=outputs[1].try_next(now).unwrap().unwrap();
+            control.begin_shutdown(ShutdownPlan{sync_files:true},now,end,&mut d).unwrap();
+            assert!(matches!(control.poll_shutdown(end,&mut d).unwrap(),ShutdownPoll::Incomplete(report) if report.in_flight==2));
+            assert_eq!(a.payload(),&[81;64]);
+            assert_eq!(completion.poll(receipt,10,Boundary::Synced).unwrap().outcome,QueryOutcome::Pending);
+            a.report(Update::Confirmed(Boundary::Written)).unwrap(); b.report(Update::Confirmed(Boundary::Written)).unwrap();
+            drop(a);drop(b);
+            let mut last=control.poll_shutdown(end,&mut d).unwrap();
+            for _ in 0..16 {d.turn(end,&mut[None;16]).unwrap();last=control.poll_shutdown(end,&mut d).unwrap();}
+            assert!(matches!(last,ShutdownPoll::Closed(report) if !report.is_success() && report.raw_in_use==0 && report.raw_return_pending==0));
+            assert_eq!(completion.poll(receipt,10,Boundary::Written).unwrap().outcome,QueryOutcome::Complete);
+            assert_eq!(completion.poll(receipt,10,Boundary::Synced).unwrap().outcome,QueryOutcome::Unknown);
+        });
+    });
+}
+
+#[test]
+fn expired_shutdown_cleanup_preserves_a_late_successful_ordinary_sync() {
+    let plan = plan();
+    let route = routing();
+    let mut config = tracking(4);
+    config.targets[0].completion = Boundary::Synced;
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        config,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion=scope.completion().unwrap(); let now=Instant::now();let end=now+Duration::from_secs(1);
+        let control=ControlOwner::new(&plan,scope.control(),ControlConfig{sync_slots:1,work_per_poll:16},now).unwrap();
+        let (mut p,a)=scope.next().unwrap();let (_,b)=scope.next().unwrap();let mut router=Router::new(&plan,vec![a,b],route).unwrap();
+        router.scope(|mut d,mut outputs| {
+            let receipt=written(&mut p,&mut d,&mut outputs,now);
+            let mut ranges=[ProducerRange::default();2];let scope=completion.capture_scope(&mut ranges).unwrap();
+            let token=control.request_sync(scope,&[10],now,end).unwrap(); let mut cutoffs=[ProducerRange::default();2];
+            let work=control.next_sync(token,10,now,&mut d,&mut cutoffs).unwrap().unwrap();
+            control.begin_shutdown(ShutdownPlan{sync_files:true},now,end,&mut d).unwrap();
+            for _ in 0..3 {assert!(matches!(control.poll_shutdown(end,&mut d).unwrap(),ShutdownPoll::Incomplete(report) if report.sync_in_flight==1));}
+            assert_eq!(completion.poll(receipt,10,Boundary::Synced).unwrap().outcome,QueryOutcome::Pending);
+            work.complete(SyncResult::Synced);
+            let mut last=control.poll_shutdown(end,&mut d).unwrap();
+            for _ in 0..4 {last=control.poll_shutdown(end,&mut d).unwrap();}
+            assert!(matches!(last,ShutdownPoll::Closed(report) if !report.is_success() && report.sync_failed));
+            assert_eq!(completion.poll(receipt,10,Boundary::Synced).unwrap().outcome,QueryOutcome::Complete);
+        });
+    });
+}
+
+#[test]
+fn ordinary_sync_expiry_leaves_receipts_pending_and_allows_a_new_request() {
+    session(|c, mut p, mut router, control, now| {
+        router.scope(|mut d, mut outputs| {
+            let receipt = written(&mut p, &mut d, &mut outputs, now);
+            let end = now + Duration::from_secs(1);
+            let mut ranges = [ProducerRange::default(); 2];
+            let scope = c.capture_scope(&mut ranges).unwrap();
+            let old = control.request_sync(scope, &[10], now, end).unwrap();
+            control.poll(end).unwrap();
+            assert_eq!(
+                c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                QueryOutcome::Pending
+            );
+            control.release_sync(old).unwrap();
+            let next = control
+                .request_sync(scope, &[10], end, end + Duration::from_secs(1))
+                .unwrap();
+            let mut cutoffs = [ProducerRange::default(); 2];
+            control
+                .next_sync(next, 10, end, &mut d, &mut cutoffs)
+                .unwrap()
+                .unwrap()
+                .complete(SyncResult::Synced);
+            control.poll(end).unwrap();
+            assert!(
+                control
+                    .sync_snapshot(next, end)
+                    .unwrap()
+                    .barriers_succeeded()
+            );
+            assert_eq!(
+                c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                QueryOutcome::Complete
+            );
+        });
+    });
+}
 #[test]
 fn polling_never_syncs_and_only_an_explicit_barrier_ack_confirms_synced() {
     let plan = plan();

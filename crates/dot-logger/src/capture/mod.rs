@@ -249,7 +249,7 @@ impl CaptureOwner {
         let registry = Registry::new(
             session_id,
             revision,
-            plan.config().producers.len(),
+            &plan.config().producers,
             channels,
             routing,
             config,
@@ -495,7 +495,9 @@ impl<'owner> Producer<'owner> {
             .map_err(|_| CaptureError::Capacity)?;
         let tracking = self
             .completion
-            .map(|completion| completion.reserve(self.producer_id, sequence, metadata.channel_id))
+            .map(|completion| {
+                completion.reserve(self.producer_id, sequence, metadata.channel_id, importance)
+            })
             .transpose()
             .map_err(|_| CaptureError::CompletionCapacity)?;
         let receipt = CaptureReceipt {
@@ -628,7 +630,9 @@ impl<'owner> Producer<'owner> {
         };
         let tracking = match self
             .completion
-            .map(|completion| completion.reserve(self.producer_id, sequence, metadata.channel_id))
+            .map(|completion| {
+                completion.reserve(self.producer_id, sequence, metadata.channel_id, importance)
+            })
             .transpose()
         {
             Ok(tracking) => tracking,

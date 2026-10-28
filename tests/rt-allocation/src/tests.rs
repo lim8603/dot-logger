@@ -516,6 +516,55 @@ fn tracked_rt_admission_full_window_raw_rejection_skip_and_last_drop_never_alloc
 }
 
 #[test]
+fn important_completion_protection_small_and_raw_paths_never_allocate_or_free() {
+    let mut config = tracked_fixtures::plan().config().clone();
+    config.importance = ImportancePolicy::PrioritizeImportant;
+    config.producers[0].small.important_slots = 1;
+    config.producers[0].raw.as_mut().unwrap().important_slots = 1;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &tracked_fixtures::routing(),
+        tracked_fixtures::tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let (mut p, _) = scope.next().unwrap();
+        let calls = allocator::observe(|| {
+            for _ in 0..3 {
+                p.try_record_small(tracked_fixtures::meta(), &[1]).unwrap();
+            }
+            assert_eq!(
+                p.try_record_small(tracked_fixtures::meta(), &[0]),
+                Err(CaptureError::CompletionCapacity)
+            );
+            let mut important = tracked_fixtures::meta();
+            important.importance = Some(Importance::Important);
+            let loan = p.try_acquire(64, Importance::Important).unwrap();
+            assert!(matches!(
+                p.try_record_raw(important, loan).unwrap(),
+                dot_logger::pool::RawRecordOutcome::Accepted(_)
+            ));
+            let loan = p.try_acquire(64, Importance::Important).unwrap();
+            let identity = loan.identity();
+            let pointer = loan.payload().as_ptr();
+            let error = p.try_record_raw(important, loan).unwrap_err();
+            assert_eq!(error.reason, CaptureError::CompletionCapacity);
+            assert_eq!(error.loan.identity(), identity);
+            assert_eq!(error.loan.payload().as_ptr(), pointer);
+            drop(error.loan);
+            let _last_producer = p;
+        });
+        assert_eq!(calls, (0, 0));
+    });
+}
+
+#[test]
 fn tracked_session_repeated_query_sync_and_shutdown_stay_within_concrete_reservations() {
     use dot_logger::completion::{Boundary, ProducerRange, TargetRequest, Update};
     use dot_logger::control::{

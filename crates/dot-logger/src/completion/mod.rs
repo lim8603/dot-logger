@@ -6,8 +6,8 @@
 //! metadata publication state and return Busy on contention. Sequence and state
 //! checks prevent stale updates from mutating a reused slot. Queries are readers
 //! with bounded pages and never start IO. Confirmed boundaries survive later errors.
-use crate::capture::{CaptureReceipt, ChannelConfig};
-use crate::config::{ConfigError, Resource};
+use crate::capture::{CaptureReceipt, ChannelConfig, Importance};
+use crate::config::{ConfigError, ProducerQuota, Resource};
 use crate::routing::{DispatchEvent, DispatchOutcome, DropReason, RoutingConfig};
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::time::Instant;
@@ -42,6 +42,7 @@ pub(crate) struct ProducerState {
     pub(crate) active: AtomicBool,
     pub(crate) accepted: AtomicU64,
     pub(crate) slots: Box<[RecordSlot]>,
+    important_reserve: usize,
     retired: Box<[Retired]>,
     retired_records: AtomicU64,
 }
@@ -88,7 +89,7 @@ impl Registry {
     pub(crate) fn new(
         session_id: u128,
         revision: u64,
-        producer_count: usize,
+        quotas: &[ProducerQuota],
         channels: &[ChannelConfig],
         routing: &RoutingConfig,
         config: CompletionConfig,
@@ -106,6 +107,19 @@ impl Registry {
             || config.targets.is_empty()
             || config.targets.len() != routing.targets.len()
             || routing.routes.len() != channels.len()
+        {
+            return Err(CompletionError::InvalidConfig);
+        }
+        let producer_count = quotas.len();
+        let important_reserve = |quota: &ProducerQuota| {
+            quota
+                .small
+                .important_slots
+                .max(quota.raw.as_ref().map_or(0, |raw| raw.important_slots))
+        };
+        if quotas
+            .iter()
+            .any(|quota| important_reserve(quota) > config.window_records)
         {
             return Err(CompletionError::InvalidConfig);
         }
@@ -184,10 +198,12 @@ impl Registry {
                     .collect(),
             })
             .collect();
-        let producers = (0..producer_count)
-            .map(|_| ProducerState {
+        let producers = quotas
+            .iter()
+            .map(|quota| ProducerState {
                 active: AtomicBool::new(false),
                 accepted: AtomicU64::new(0),
+                important_reserve: important_reserve(quota),
                 slots: (0..config.window_records)
                     .map(|_| RecordSlot {
                         phase: AtomicU8::new(EMPTY),
@@ -419,8 +435,14 @@ impl<'owner> Completion<'owner> {
             return Err(CompletionError::NotRouted);
         }
         let outcome = terminal(update);
+        // FIFO publication happens before the dispatcher can publish Enqueued.
+        // A fast writer can already have reported failure in that interval.
+        // Preserve that terminal outcome while admitting the earlier queue fact;
+        // later success boundaries still cannot replace a terminal failure.
+        let late_enqueue = update == Update::Confirmed(Boundary::Enqueued);
         if value & TERM_MASK != 0
-            && ((outcome != 0 && outcome != value & TERM_MASK) || (confirmed & !value != 0))
+            && ((outcome != 0 && outcome != value & TERM_MASK)
+                || (confirmed & !value != 0 && !late_enqueue))
         {
             return Err(CompletionError::InvalidTransition);
         }
@@ -574,9 +596,35 @@ impl<'owner> Completion<'owner> {
         producer: u32,
         sequence: u64,
         channel: u32,
+        importance: Importance,
     ) -> Result<Reservation<'owner>, CompletionError> {
         let state = &self.registry.producers[producer as usize];
-        let slot = &state.slots[(sequence % self.registry.limits.window as u64) as usize];
+        let index = (sequence % self.registry.limits.window as u64) as usize;
+        let slot = &state.slots[index];
+        if importance == Importance::Normal {
+            if state.important_reserve == self.registry.limits.window {
+                return Err(CompletionError::Busy);
+            }
+            // Keep a contiguous runway after this sequence for Important input.
+            // Counting free slots alone fails when a pending cyclic slot blocks
+            // the next sequence despite holes elsewhere. Only this producer can
+            // turn reusable slots into pending records; reports never erase a
+            // confirmed boundary. Updating slots conservatively reject admission.
+            let mut next = index;
+            for _ in 0..state.important_reserve {
+                next = if next + 1 == state.slots.len() {
+                    0
+                } else {
+                    next + 1
+                };
+                if !matches!(
+                    state.slots[next].phase.load(Ordering::Acquire),
+                    EMPTY | TERMINAL
+                ) {
+                    return Err(CompletionError::Busy);
+                }
+            }
+        }
         let phase = slot.phase.load(Ordering::Acquire);
         if phase != EMPTY && phase != TERMINAL {
             return Err(CompletionError::Busy);

@@ -178,3 +178,54 @@ fn a_stale_drop_marker_cannot_overwrite_the_new_generations_unknown_outcome() {
         assert_eq!(c.totals(false).unknown, 1);
     });
 }
+
+#[test]
+fn delayed_enqueue_feedback_after_writer_failure_does_not_stall_dispatch() {
+    let (mut owner, plan, routing) = setup();
+    owner.scope(|mut scope| {
+        let completion = scope.completion().unwrap();
+        let (mut producer, consumer) = scope.next().unwrap();
+        producer.try_record_small(metadata(), &[1]).unwrap();
+        producer.try_record_small(metadata(), &[2]).unwrap();
+        let slot = &completion.registry.producers[0].slots[1];
+        // Hold only metadata publication; the output FIFO remains readable.
+        slot.phase.store(UPDATING, Ordering::Release);
+        let mut router = Router::new(&plan, vec![consumer], routing).unwrap();
+        router.scope(|mut dispatch, mut outputs| {
+            let now = Instant::now();
+            let mut events = [None; 4];
+            assert_eq!(dispatch.turn(now, &mut events).unwrap().records, 1);
+            assert_eq!(dispatch.drain_state().feedback, 1);
+            let first = outputs[0].try_next(now).unwrap().unwrap();
+            let receipt = first.record().receipt;
+            slot.phase.store(ACTIVE, Ordering::Release);
+            first
+                .report(Update::Failed(FailureReason::IoFailure))
+                .unwrap();
+            drop(first);
+            let report = dispatch.turn(now, &mut events).unwrap();
+            assert_eq!(report.fault, None);
+            assert_eq!(report.records, 1);
+            assert_eq!(dispatch.drain_state().feedback, 0);
+            assert_eq!(
+                completion
+                    .poll(receipt, 10, Boundary::Written)
+                    .unwrap()
+                    .outcome,
+                QueryOutcome::Failed(FailureReason::IoFailure)
+            );
+            assert_eq!(
+                completion
+                    .poll(receipt, 10, Boundary::Enqueued)
+                    .unwrap()
+                    .outcome,
+                QueryOutcome::Complete
+            );
+            let second = outputs[0].try_next(now).unwrap().unwrap();
+            second.report(Update::Confirmed(Boundary::Written)).unwrap();
+            drop(second);
+            let totals = completion.totals(false);
+            assert_eq!((totals.complete, totals.failed, totals.pending), (1, 1, 0));
+        });
+    });
+}

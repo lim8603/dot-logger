@@ -60,7 +60,10 @@ pub struct CompletionConfig {
     /// Maximum terminal-detail age; capacity reuse may retire detail earlier.
     /// Pending records never expire merely because this interval elapsed.
     pub history_retention: std::time::Duration,
-    /// Fixed slots per producer; pending slots are never overwritten.
+    /// Fixed slots per producer; pending slots are never overwritten. Must fit
+    /// the larger of that producer's small/raw Important slot reservations.
+    /// Normal admission leaves that many following cyclic slots reusable;
+    /// reserving the whole window admits Important records only.
     pub window_records: usize,
     /// Concurrent borrowed query handles, including waiters.
     pub max_queries: usize,

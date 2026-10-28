@@ -30,6 +30,9 @@ const DONE_OK: u8 = 6;
 const DONE_FAILED: u8 = 7;
 const DONE_UNKNOWN: u8 = 8;
 const EXPIRED: u8 = 9;
+// Shutdown-only metadata cleanup after all preceding IO has actually ended.
+// This is not an adapter acknowledgment and never creates a SyncWork guard.
+const APPLY_EXPIRED: u8 = 10;
 struct AtomicRange {
     first: AtomicU64,
     last: AtomicU64,
@@ -430,7 +433,7 @@ impl<'owner> ControlOwner<'owner> {
             match target.state.load(Ordering::Acquire) {
                 QUEUED => out.queued += 1,
                 IN_FLIGHT => out.in_flight += 1,
-                ACK_OK | ACK_FAILED | ACK_UNKNOWN => out.applying += 1,
+                ACK_OK | ACK_FAILED | ACK_UNKNOWN | APPLY_EXPIRED => out.applying += 1,
                 DONE_OK => out.succeeded += 1,
                 DONE_FAILED => out.failed += 1,
                 DONE_UNKNOWN => out.unknown += 1,
@@ -452,7 +455,7 @@ impl<'owner> ControlOwner<'owner> {
         if slot.targets.iter().any(|target| {
             matches!(
                 target.state.load(Ordering::Acquire),
-                QUEUED | IN_FLIGHT | ACK_OK | ACK_FAILED | ACK_UNKNOWN
+                QUEUED | IN_FLIGHT | ACK_OK | ACK_FAILED | ACK_UNKNOWN | APPLY_EXPIRED
             )
         }) {
             return Err(ControlError::InFlight);
@@ -480,7 +483,7 @@ impl<'owner> ControlOwner<'owner> {
                     target.state.store(EXPIRED, Ordering::Release);
                     continue;
                 }
-                if !matches!(state, ACK_OK | ACK_FAILED | ACK_UNKNOWN) {
+                if !matches!(state, ACK_OK | ACK_FAILED | ACK_UNKNOWN | APPLY_EXPIRED) {
                     continue;
                 }
                 while target.cursor.load(Ordering::Relaxed) < total
@@ -532,6 +535,7 @@ impl<'owner> ControlOwner<'owner> {
                         match state {
                             ACK_OK => DONE_OK,
                             ACK_FAILED => DONE_FAILED,
+                            APPLY_EXPIRED => EXPIRED,
                             _ => DONE_UNKNOWN,
                         },
                         Ordering::Release,
@@ -553,6 +557,22 @@ impl<'owner> ControlOwner<'owner> {
             }
         }
         Ok(out)
+    }
+    fn settle_expired_shutdown(&self) -> Result<usize, ControlError> {
+        let slot = &self.slots[self.config.sync_slots];
+        let _publication = slot.claim(1)?;
+        let total =
+            self.completion.registry.producers.len() * self.completion.registry.limits.window;
+        let mut applying = 0;
+        for target in &slot.targets {
+            if target.state.load(Ordering::Acquire) == EXPIRED
+                && target.cursor.load(Ordering::Acquire) < total
+            {
+                target.state.store(APPLY_EXPIRED, Ordering::Release);
+                applying += 1;
+            }
+        }
+        Ok(applying)
     }
     /// Close admission and begin the declared drain/sync plan. A pre-close producer
     /// call must finish publication before acceptance cutoffs can be frozen.
@@ -685,7 +705,7 @@ impl<'owner> ControlOwner<'owner> {
             for target in &slot.targets {
                 match target.state.load(Ordering::Acquire) {
                     IN_FLIGHT => sync_in_flight += 1,
-                    QUEUED | ACK_OK | ACK_FAILED | ACK_UNKNOWN => sync_pending += 1,
+                    QUEUED | ACK_OK | ACK_FAILED | ACK_UNKNOWN | APPLY_EXPIRED => sync_pending += 1,
                     DONE_FAILED | DONE_UNKNOWN | EXPIRED => sync_failed = true,
                     _ => {}
                 }
@@ -702,6 +722,19 @@ impl<'owner> ControlOwner<'owner> {
             }
         }
         let producer_calls = self.completion.active_calls();
+        if self.shutdown.load(Ordering::Acquire) >= 2
+            && producer_calls == 0
+            && drain.is_empty()
+            && sync_in_flight == 0
+            && sync_pending == 0
+        {
+            // A shutdown barrier that never started cannot later acknowledge its
+            // records. Settle its unconfirmed sync facts as Unknown, preserving
+            // Written, only after writer guards, feedback and ordinary barriers
+            // have finished. Ordinary request expiry never changes record state.
+            // The cursor makes this cleanup bounded and schedules it exactly once.
+            sync_pending += self.settle_expired_shutdown()?;
+        }
         if self.shutdown.load(Ordering::Acquire) >= 2
             && producer_calls == 0
             && drain.is_empty()

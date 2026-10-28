@@ -15,7 +15,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-28 / AI |
-| 최근 세션 | [2026-10-28 #003](../members/lim8603/workspace/session_logs/session_2026-10-28_003.md) 종료 — 자가 리뷰 수정·회귀·코드 게시 완료, 수정분 리뷰/native 이월 |
+| 최근 세션 | [2026-10-28 #004](../members/lim8603/workspace/session_logs/session_2026-10-28_004.md) 종료 — 심층 코드리뷰·개선 제안(채널LUT·캐시라인·에러세분화) 기록 및 마감 |
 
 ## 현재 결정과 제약
 
@@ -49,7 +49,7 @@
 
 0. **게시 완료:** TASK-006 후속 수정 코드 `d57c2e3`을 origin/main에 push하고 원격 ref·EV-007 source37개 blob 일치를 확인했다. 코드와 `.cowork` 마감 기록은 분리 커밋한다. `[skip ci]`를 유지하고 CI/과금 상태는 재확인하지 않는다. 별도 추가된 `.agents/skills/code-review/SKILL.md`는 이번 작업 커밋에서 제외·보존했다.
 
-1. **수정분 리뷰:** [EV-007](../05_verification/verification_evidence.md#ev-007)의 RV-001~004 수정과 local regression 결과를 Human이 리뷰한다. 정식 Red3개 후 수정·신규9개/기존 경로 Pass, 코드 `d57c2e3`의 source37개 hash가 검증 대상이다. EV-005/수정 전 EV-006은 이력으로 보존한다. 소스가 같으면 같은 시험은 반복하지 않는다.
+1. **수정분 리뷰 및 심층 피드백 브리핑:** [EV-007](../05_verification/verification_evidence.md#ev-007) 수정분과 [세션 #004](../members/lim8603/workspace/session_logs/session_2026-10-28_004.md)의 심층 코드리뷰 피드백(① RT 경로 채널 라우팅 $O(N)$ 선형 탐색의 고정 크기 LUT 전환 검토, ② `RecordSlot` 캐시 라인 False Sharing 방지 정렬 검토, ③ `CaptureError` 에러 세분화, ④ `poll_shutdown` 2-phase 폴링 계약)을 다음 세션 시작 시 브리핑에 포함하여 Human 최종 구현 승인을 확인한다. 소스가 같으면 같은 시험은 반복하지 않는다.
 2. TASK-004/005는 구현·로컬 Pass·Human 승인 완료, native 미검증으로 In Progress다. Human이 사용량 전량 소진·계정 재확인 불필요를 확인했고 TASK-005/006 개발 진행을 지시했다. 검증 면제가 아니며 CI 여건 확보 후 current source를 고정해 6 contracts+audit+raw-memory8 job을 확인한다. 계정 조회·차단 재시도는 하지 않는다.
 3. 다음 신규 개발 후보는 TASK-007 MCAP 봉투·writer·인덱스(Planned·미착수)다. TASK-006 수정분 리뷰 후 진행할 수 있으며 writer 대역을 실제 파일 IO/명시 sync·회전/복구 단계와 연결한다. 공개 전환·라이선스·GitHub 운영정책은 T2로 별도 판단한다.
 

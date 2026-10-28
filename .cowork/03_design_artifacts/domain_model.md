@@ -63,6 +63,12 @@ R1의 첫 비교안은 dispatcher 1, 파일 writer 최대 16(파일별 1), 관�
 
 분배는 생산자별 record 수와 bytes를 함께 제한한 deficit round-robin을 후보로 한다. 수집 시의 `Important` 예약과 출력 스케줄링은 구분한다. 하나의 생산자 큐는 FIFO로 소비해 수락 순서를 유지하며 이미 수락된 큰 원본을 RT에서 축출하지 않는다. 우선 수락은 즉시 출력 우선권·무손실 보장이 아니다. 긴급 파일 순위는 별도 프로토콜로 처리한다.
 
+TASK-005 로컬 구현(2026-10-28, Human 리뷰 승인): `routing::Router`가 초기 revision의 채널별 대상 집합과 대상별 필수/선택 역할을 고정한다. `Dispatcher::turn`은 생산자별 FIFO 선두를 `CaptureConsumer::peek`로 확인하고 record quantum·byte deficit·전체 turn records/bytes 한도를 함께 적용한다. 큰 원본은 여러 방문에서 credit을 쌓고, credit은 최대 record 크기+byte quantum 이내로 제한한다. 0-byte record도 record/credit 한도를 소비한다. 대상별 사전 할당 SPSC FIFO와 별도 유한 retry FIFO를 사용하며, 재시도 시도/age·슬롯/논리 bytes 한계를 넘으면 대상/receipt/revision/필수 여부와 이유를 명시한다. 출력 큐·retry·진행 IO 보유량을 함께 제한한다. 호출자가 제공한 event 버퍼가 부족하면 해당 입력/재시도를 남겨 결과를 유실하지 않는다.
+
+원본 `RawRecord` 하나를 일반 경로의 `Arc`로 공유해 unsafe 경계를 바꾸지 않고 마지막 출력 guard 종료까지 보유한다. 소형 출력 복사는 일반 경로에서 하나만 만들고 공유 header·복사 bytes·대상별 참조/큐/retry/metadata를 output 예약에서 검사한다. 원본 풀은 미사용·ReturnPending을 포함해 raw 물리 예약으로 한 번만 센다. `Arc` 생성/최종 해제와 소형 복사는 일반 경로이며 RT API로 제공하지 않는다. allocator bookkeeping/rounding은 기존 worker headroom, 호출자 event 버퍼는 호출자 메모리다. 전역 shared records/copy 예산 소진은 입력을 지연할 수 있어 완전한 성능 격리를 뜻하지 않는다.
+
+대상 취소/age 만료는 retry turn·target reader를 구동해 명시 결과로 배출한다. 정지한 reader의 큐는 유한 예약 안에 남으며, 이미 reader가 취한 IO guard는 기한/취소 뒤에도 실제 접근 종료까지 유효하다. `Dispatcher::close`는 새 분배만 멈추고 입력/출력의 미처리 상태를 유지한다. 전체 completion window·sync·shutdown은 TASK-006 범위다. 로컬 시험·Miri·할당 계측 근거는 [EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산)이며 native/장비 성능 판정은 남아 있다.
+
 RT 생산자가 syscall로 worker를 깨우지 않는다. Tier 1은 설정한 비-RT 코어에서 dispatcher polling/짧은 backoff를 비교하고 CPU 비용을 공개한다. Tier 2는 sleep 기반 polling을 허용하되 같은 기능 계약을 유지한다. 깨우기 간격은 파일 최신성·CPU 예산 시험으로 정한다.
 
 ## 4. 수집·소유권·회수의 상세안
@@ -76,6 +82,16 @@ RT 생산자가 syscall로 worker를 깨우지 않는다. Tier 1은 설정한 �
 예약은 생산자별 사전 할당 quota로 시작해 전역 경쟁을 피한다. Normal의 slots·풀 bytes 상한을 전체 quota보다 작게 두고 Important 예약분을 보호한다. 사용하지 않는 다른 생산자의 quota를 RT에서 빌리지 않는다. 사용률 손해는 구성/재시작으로 재분배하고, 동적 공유 예산은 측정 필요가 생기면 검토한다. 대여 단계부터 중요도·크기 등급을 고정해 일반 원본이 중요 bytes를 먼저 점유하는 우회를 막는다.
 
 TASK-004 로컬 구현·검증(2026-10-27): `CaptureOwner`가 원본 allocation을 보유하고 `Loan`/`RawRecord`는 borrowed guard다. 세부 상태·generation을 하나의 64-bit atomic에 넣어 stale generation과 상태를 함께 비교한다. 마지막 generation은 재사용하지 않는다. 반환 알림은 capacity 1의 atomic coalescing mailbox로 구현했고, 포화/알림 소모 뒤에도 슬롯별 ReturnPending 순환 스캔으로 전량 회수했다. mutable/immutable bytes borrow는 guard에 묶여 해제 뒤 접근을 금지한다. UnsafeCell과 Sync의 Safety 경계는 private `pool/storage.rs`이며 Miri 8개 seed·할당 감시·동시 수집/반환 시험을 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)에 기록했다. 실행한 경로 밖의 모든 interleaving 또는 실제 RT 지연을 증명한 것은 아니다. Human 리뷰는 2026-10-27 승인됐고 변경분 native CI는 GitHub 계정 결제/한도로 실행 전에 차단돼 미검증이다.
+
+### TASK-006 완료·제어 구현 — 2026-10-28, Human 리뷰 승인
+
+`CaptureOwner::new_tracked`는 producer별 fixed window와 초기 route/target 완료 계약을 소유한다. 추적 slot은 Empty/Initializing/Active/Updating/Terminal lifecycle로 게시하고 RT는 단발 CAS로 재사용 가능한 slot만 예약한다. 일반 게시 소유권이 있거나 pending이면 CompletionCapacity로 무대기 거절하며, filter/입력 거절/추적 거절은 sequence나 부분 소유권을 게시하지 않는다. 원본 loan 동일 반환·기존 private unsafe 경계는 유지한다. admission과 loan 대여의 call 표시를 close와 SeqCst로 순서화해 pre-close publication 종료 후에만 shutdown cutoff를 동결한다.
+
+확인 경계(Written/Synced/DB API/수신 앱)와 terminal failure/drop/unknown을 별도로 보존한다. record의 모든 대상 시도가 settled일 때만 window slot을 재사용하며, 완료 이력은 최대 보존 시간 또는 slot 재사용 중 먼저 온 경계에서 Expired다. pending을 나이만으로 버리지 않는다. retired 결과는 producer/target별 고정 counter로 집계하고 전체/필수 대상 수량을 구분한다. bounded page·query permit·고정 범위 wait는 부가 IO나 sync를 시작하지 않는다.
+
+tracked Router는 유한 dispatcher/reader feedback으로 Busy 결과를 보존한다. Delivery의 명시 보고 없이 해제되면 Unknown으로 관측하며, 오래된 guard Drop이 새 generation 표시를 덮지 못하도록 sequence를 단조 갱신한다. 완료 표시와 실제 payload guard/loan 수명은 분리한다. source의 원래 memory 분할·pool layout·initial route를 후속 생성부에서 대조한다.
+
+`ControlOwner`는 ordinary slots와 독립 shutdown slot을 예약하고 한 capture에 한 controller 연결만 허용한다. session/epoch/slot/generation으로 토큰 재사용을 차단하며 allocator 해제 후 연결 lease를 반환한다. 명시 sync는 writer가 이전 입력/대상 IO/feedback을 배출한 뒤 barrier cutoffs를 전달하고 실제 결과를 확인받는다. 같은 target의 sync IO는 직렬화한다. 종료는 close→quiescence/cutoff 동결→drain/선언 sync→실제 guard/loan/반납 및 feedback 정리다. deadline의 Incomplete는 같은 owner로 cleanup을 이어가며 Closed에도 실패/불명/시간 초과가 남을 수 있다. 앱 thread join은 scoped host 책임이고 실제 파일/OS sync는 TASK-007 이후다. [EV-005](../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료)에 실제 시험 범위·미실행을 기록한다.
 
 ## 5. 자원 예산과 설정
 

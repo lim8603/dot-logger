@@ -386,11 +386,27 @@ TASK-004 구현 범위(2026-10-27, Human 구현 리뷰 승인): `CaptureOwner`�
 
 `CaptureConsumer::try_take_raw`는 불변 `RawRecord`를 반환한다. 선두가 소형이면 `PayloadKindMismatch`로 남겨 FIFO를 유지한다. 일반 복사가 필요한 소비자는 `try_read`로 두 payload 종류를 읽을 수 있다. 짧은 버퍼는 원본 상태/큐를 바꾸지 않는다. `RawRecord`의 마지막 borrow/guard 종료 뒤 ReturnPending으로 게시하며, `reclaim_raw(limit)`가 유한 스캔으로 Free로 바꾼다. 알림은 1슬롯 coalescing mailbox이며 권위 있는 반환 상태는 슬롯에 있다. 원본 generation은 61 bits·소진 시 Retired/GenerationExhausted이며 식별자를 재사용하지 않는다. 풀 미설정은 Unsupported다. 예산/수명/Miri/allocator 검증은 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)이며 제품 unsafe 예외는 private pool/storage 한 모듈로 제한한다. 완료 window·출력 성공·fanout·실제 shutdown·장비 성능 판정은 후속 범위다.
 
+TASK-005 구현 범위(2026-10-28, Human 리뷰 승인): `routing::Router::new(plan, ordered_consumers, RoutingConfig)`는 같은 capture 세션의 모든 producer·실제 small/raw slots/slot bytes·초기 revision·채널 route·대상 ID와 concrete output 예약을 검증한다. `Router::scope`에서 유일 `Dispatcher`와 대상별 `TargetConsumer`를 빌린다. `Dispatcher::turn(now, events)`은 비감소 단조시간·유한 retry/회수/공정 순회를 사용하고, `TurnReport.events` 길이의 event prefix와 `fault`를 보고한다. 실패 head는 ingress에 남고, 이전에 처리한 기록의 event도 report에서 보존한다. `Enqueued`는 출력 FIFO 진입이며 쓰기/완료/영속 보장이 아니다. 필수 대상 drop을 전체 성공으로 바꾸지 않는다. 빈 route는 명시 `Unrouted`다.
+
+`TargetConsumer::try_next(now)`는 불변 `Delivery` 또는 해당 queued 항목의 `Cancelled`/`Expired` event를 한 건 반환한다. 출력이 끝날 때까지 guard를 유지해야 하며 사용자 복제 API는 없다. raw fanout은 같은 원본 pointer를 공유하고, 소형 fanout은 별도의 일반 경로 복사 한 건을 공유한다. pending/queued/진행 IO의 대상별 보유 slots/bytes와 distinct 공유 header/copy bytes를 분리 집계한다. 이벤트 버퍼/공유 예산 포화는 신규 분배를 유예하고, 대상 포화·시도/기한 소진은 `DispatchEvent`로 명시한다. 취소 후 reader를 구동하지 않으면 유한 큐 보유가 남는다. `cancel_target`은 실제 진행 IO를 무효화하지 않고, `close`/owner Drop은 성공한 shutdown을 뜻하지 않는다. 초기 route만 구현하며 설정 변경·완료 추적/수락 예산 통합은 후속 Task다. [EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산)에서 실행 범위를 확인한다.
+
 ### 13.1 완료 추적의 실제 상한
 
 생산자별 `accepted_seq mod window_size` 슬롯에 sequence generation과 대상별 bitset/상태를 저장한다. 모든 필수 추적 예산을 먼저 확보한 뒤 수락한다. 미완료 슬롯을 재사용하지 않는다. window가 가득 차면 `Capacity(Completion)`으로 거절한다. 완료 뒤 상세 이력의 보존 한도에 따라 축출하고 그 이전 receipt는 `Expired`다. 최고 sequence만으로 완료 공백을 지우지 않는다.
 
 범위 결과는 bounded page로 반환한다. 각 페이지의 complete/failed/dropped/pending/unknown/expired 구간을 구분하며 상세 구간 개수가 응답 상한을 넘으면 cursor를 제공한다. 전체 성공 판정에는 모든 요청 범위의 결과가 필요하다. 수락 토큰은 원본 메모리를 소유하지 않는다.
+
+### 13.2 TASK-006 실제 API와 완료/종료 경계 — 2026-10-28
+
+Human 리뷰 승인. `CaptureOwner::new_tracked(plan, session_id, revision, channels, routing, CompletionConfig)`는 초기 route와 producer별 완료 window·control bytes를 검증한다. 같은 source memory 분할을 Router/ControlOwner 생성 때 대조하고 pool layout mismatch도 거절한다. `CaptureScope::completion`/`control`로 borrowed 관리 핸들을 얻는다. `try_record_small/raw`는 수락 전에 completion slot을 단발 예약하고 부족/게시 중이면 `CompletionCapacity`로 거절한다. raw 거절은 같은 loan이며 일반 `record_until`은 이 포화도 deadline 안에서 재시도한다. 실제 RT 지연은 미검증이다.
+
+`Completion::poll(receipt,target,boundary)`는 `RecordStatus { confirmed, outcome }`를 반환한다. 지원되지 않는 경계·잘못된 receipt/session/target은 오류다. Outcome은 Complete/Pending/Failed/Dropped/Unknown/Expired/NotRouted/Busy다. Synced 확인은 Written/Enqueued를 포함하고, 후속 실패는 이미 확인한 경계를 지우지 않는다. `Delivery::report(update)`는 guard를 유지한 채 구체 결과를 보고하며 Busy면 같은 guard로 재시도한다. 보고 없는 guard Drop은 Unknown으로 관측한다. 원본/소형 payload 접근 종료와 최종 완료 경계는 동일하지 않다.
+
+`Completion::capture_scope(caller_ranges)`는 producer별 상한을 고정하고 `scope(first/last ranges)`는 명시 부분 범위를 검증한다. `query(scope,requests)`는 동시 query permit을 얻고 `page(caller_items)`가 설정한 page_items 이내 prefix와 누적 summary를 반환한다. 전 page를 읽기 전 is_complete는 false다. `wait(deadline,cancel,buffer)`는 페이지 사이마다 기한/취소를 확인하고 마지막 유한 page·summary를 반환하며 기록 처리나 sync를 바꾸지 않는다. clock 기반 최대 history_retention 또는 window 재사용으로 상세 결과가 Expired가 되며 terminal 집계는 남는다. `poll_at`의 caller 시간은 같은 단조 도메인의 시간 순서로 제공한다.
+
+`ControlOwner::new(plan,capture_control,ControlConfig,origin)`은 별도 controller metadata를 남은 control 예산에서 예약한다. 명시 `request_sync(frozen_scope,targets,now,deadline)`는 명령 인수일 뿐이다. `next_sync(token,target,now,dispatcher,caller_cutoffs)`는 구체 입력/대상 IO/feedback의 배출을 확인한 뒤 유일 `SyncWork`를 준다. writer가 실제 동기화한 후 complete(Synced/Failed/Unknown)하고 `poll(now)`가 유한 receipt metadata에 결과를 적용한다. 이후 수락 기록을 과거 barrier로 Synced 처리하지 않으며 이미 만료된 detail을 성공으로 복원하지 않는다. barrier 결과와 범위 내 과거 실패/이력 만료는 별도로 조회한다. 진행 IO는 deadline 후에도 유지하며 live/queued/applying 상태에서 request slot 재사용을 거절한다.
+
+`begin_shutdown(ShutdownPlan{sync_files},now,deadline,dispatcher)`는 신규 입력을 close하고, pre-close admission/loan publication이 끝난 뒤 cutoffs를 동결한다. Synced가 설정된 계약에서 sync_files=false는 close 전에 거절한다. `shutdown_ranges`와 전용 `shutdown_sync`로 동결 범위와 실제 sync 작업을 구동한다. `poll_shutdown`은 Closing/Incomplete(report)/Closed(report)이며 owner를 소비하지 않는다. 실제 IO guard/loan·queued/retry·feedback·회수 잔여 또는 pre-close call이 있으면 Closed 성공을 반환하지 않는다. deadline 이후에도 같은 owner로 cleanup하고 결과의 deadline 준수 여부를 보존한다. Closed의 is_success는 필수 대상 실패/불명과 sync 실패를 검사하며 optional 실패는 전체 totals에 남는다. 앱 worker/thread join은 애플리케이션 scoped host가 수행한다. 실제 파일/OS primitive·장비 durability·처리량 보장은 [EV-005](../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료)의 대역 결과로 승격하지 않는다.
 
 ## 14. 조회·재생·원격 계약안
 

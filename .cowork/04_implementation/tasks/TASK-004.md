@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-27 |
-| 다음 액션 | Human 리뷰 승인·게시 완료; GitHub 계정 결제/한도 해결 후 native CI 재실행(GAP-004) |
+| 마지막 갱신일 | 2026-10-28 |
+| 다음 액션 | Human 리뷰 승인·게시 완료; 사용량 소진으로 native CI 후속 검증(GAP-004), 계정 재확인 불필요 |
 | 의존 | TASK-003 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -56,3 +56,5 @@
 상태: **In Progress — 구현·Human 리뷰 승인·게시 완료, native CI 계정 사유 대기**. 코드 `9a4f34c`·문서 `f0ce6ee`를 게시했고 [CI run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735)을 시도했다. GitHub 결제 실패 또는 spending limit 안내로 8개 job 모두 runner/step 실행 전에 차단됐다. 제품 시험은 Not Run이며 GAP-004 Open이다. 계정 조건 해결 후 같은 source의 CI를 재실행해 Done을 판단한다. 원본 fanout·완료·파일·실장비 수락은 후속 Task다.
 
 Human 구현 리뷰 승인: 2026-10-27 / 게시·CI 확인 후 오늘 세션 종료 요청. private unsafe 경계와 dot-probe 생성부 조건을 포함한 보고 범위를 승인받았다.
+
+2026-10-28 Human 확인: CI 차단은 GitHub 사용량 전량 소진이며 계정 재확인은 불필요하다. TASK-005 착수 지시로 native CI 후속 검증을 유지한 채 개발을 진행한다. TASK-004 In Progress·GAP-004 Open·기존 구현 승인은 유지한다.

@@ -4,20 +4,22 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger — 소형·원본 ingress 구현·로컬 검증, 분배/완료/저장 미구현 |
+| 프로젝트 | dot-logger — 수집·분배·완료/제어 coordinator 구현·로컬 검증, 실제 파일/worker 미구현 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-004 구현·로컬 Pass·Human 승인·게시 완료, native CI 계정 사유 대기 |
+| 현재 Phase | Build — TASK-006 구현·EV-005 로컬 Pass·Human 승인·로컬 커밋, 원격 인증 대기 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
-| 활성 Task | TASK-004 In Progress — 원본 풀·수명·무해제 반환 |
-| 상태 | Yellow — TASK-004 native CI는 GitHub 결제/한도로 실행 전 차단; 후속 런타임/실장비 검증 잔여 |
+| 활성 Task | TASK-006 In Progress — 완료/제어 구현·로컬 Pass·Human 승인·로컬 커밋; 원격 인증/native 후속 검증 |
+| 상태 | Yellow — Human 확인: GitHub 사용량 전량 소진으로 CI 차단; TASK-006 진행 승인, native/장비 검증 및 원격 인증 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-10-27 / AI |
-| 최근 세션 | [2026-10-27 #003](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md) 종료 — TASK-004 승인·게시 완료, native CI 계정 사유 대기 |
+| 갱신 | 2026-10-28 / AI |
+| 최근 세션 | [2026-10-28 #002](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) 종료 — TASK-005/006 승인·로컬 커밋, push 인증 대기 |
 
 ## 현재 결정과 제약
+
+- **2026-10-28 마감:** TASK-006 Human 승인·commit/push·세션 종료 요청. 코드 `c98b7fa`는 검증 source36개와 일치한다. source 변경 없는 승인/마감 문서는 분리 커밋한다. 현재 push는 원격 인증 부재로 미완료다.
 
 - **2026-10-26 Human 승인:** 「권고 기준선 채택 — 장비·호환 검증은 계획대로 진행」. 상세설계·ADR-008/009·추가 시험 목표·MS 계획을 채택했다. 검증 이월은 면제가 아니다.
 
@@ -35,39 +37,46 @@
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-004 | 원본 풀·수명·무해제 반환 | AI | In Progress | 2026-10-27 | 구현·Human 승인·게시 완료; 계정 조건 해결 후 native CI 재실행 |
+| TASK-004 | 원본 풀·수명·무해제 반환 | AI | In Progress | 2026-10-28 | 로컬/승인 유지, 사용량 소진으로 native CI 후속 검증 |
+| TASK-005 | 분배·출력 격리·예산 | AI | In Progress | 2026-10-28 | 선행 CI 대기 중 개발 진행 승인; EV-004 로컬 Pass·Human 리뷰 승인 |
+| TASK-006 | 완료 추적·명시 sync·종료 | AI | In Progress | 2026-10-28 | EV-005 로컬 Pass·Human 리뷰 승인/native 대기 |
 
 ## 다음 시작점
 
-1. Human이 GitHub Billing & plans의 결제/지출 한도 조건을 확인한다. [TASK-004 CI run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735)은 8개 job 모두 runner/steps 시작 전 차단됐다. 제품/native 시험은 Not Run이며 [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명반환)·GAP-004에 annotations와 재실행 조건을 보존했다.
-2. 계정 조건 해결 후 동일 workflow를 재실행한다. 코드 `9a4f34c`·CI 대상 `f0ce6ee`와 EV-003의24개 source hash가 일치한다. 6 OS/Rust + audit + raw-memory 총8 job 확인 뒤 TASK-004 Done을 판단한다. 구현 리뷰는 2026-10-27 승인됐고 재승인받지 않는다.
-3. TASK-004 종료 후 TASK-005 분배·출력 격리·예산으로 이어간다(Planned·미착수). 오늘은 세션 종료 요청에 따라 착수하지 않았다. 실제 앱 연결 TASK-026·장비 TASK-022·FR-015 별도 제안은 유지한다.
+0. **게시 미완료:** 셸 GitHub HTTPS 인증이 없고 SSH agent identity도 없어 fetch/push가 차단됐다. GitHub 플러그인 설치/계정 연결 또는 셸 Git 인증을 확보한 뒤 로컬 main의 코드/문서 커밋을 origin/main과 동기화(pull --ff-only 사전 확인)하고 push한다. 게시 승인은 이미 받았으며 재승인은 필요 없다. `[skip ci]`를 유지하고 CI/과금 상태는 재확인하지 않는다.
+
+1. TASK-006 구현·[EV-005](../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료)는 2026-10-28 Human 승인 완료다. 완료/제어 통합26·private 경계2·신규 compile-fail2, 두 Rust 각16 feature/consumer/clippy/rustdoc·tracked RT0/0·Miri70×8 seeds·query/sync128회 계측 Pass. 실제 파일/OS sync/worker·native·장비 검증으로 승격하지 않는다.
+2. TASK-004/005는 구현·로컬 Pass·Human 승인 완료, native 미검증으로 In Progress다. Human이 사용량 전량 소진·계정 재확인 불필요를 확인했고 TASK-005/006 개발 진행을 지시했다. 검증 면제가 아니며 CI 여건 확보 후 current source를 고정해 6 contracts+audit+raw-memory8 job을 확인한다. 계정 조회·차단 재시도는 하지 않는다.
+3. 다음 개발 후보는 TASK-007 MCAP 봉투·writer·인덱스(Planned·미착수)다. TASK-006 writer 대역을 실제 파일 IO/명시 sync·회전/복구 단계와 연결한다. 공개 전환·라이선스·GitHub 운영정책은 T2로 별도 판단한다.
 
 ## 새 세션 재개 메모
 
-- 이 문서 → TASK-004·EV-003 native 차단 기록을 읽는다. 코드/문서 게시와 세션 마감은 완료, 미완료는 GitHub 계정 조건 해결 후 CI 재실행이다. 소스/테스트를 변경하지 않으면 동일 로컬 시험을 반복하지 않는다.
-- 개발 1.96.0·MSRV1.85·외부 dependency/lock 유지. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. 원본 통합17·경계4·신규 compile-fail7·원본 allocator guard1, Miri8 seeds·두 Rust 각16 feature/consumer/예제/clippy/rustdoc/fmt 로컬 Pass다. CI에서는 어떤 제품 시험도 실행되지 않았다.
-- CaptureOwner는 소형/원본 ingress를 구성한다. Loan·RawRecord는 owner보다 오래 살 수 없고 bytes borrow는 guard에 묶인다. generation/state atomic·슬롯 ReturnPending이 반환의 기준이며 포화된 1슬롯 알림과 무관하게 한정 스캔으로 회수한다. receipt는 입력 인수다. 분배·완료·파일·실제 shutdown은 후속 Task다.
-- workspace forbid·dot-logger package deny/private pool-storage allow와 Safety 경계는 TASK-004 Human 승인 범위다. 기존 설계·TDD·MCAP0.26·TASK-003·TASK-004 승인은 재질문하지 않는다.
-- dot-probe의 static spawn에는 직접 borrowed 주입이 불가하다. 관리 host+scoped RT 수명 예제는 두 Rust에서 실행했고 실제 생성부/run entry point 연결은 TASK-026이다. dot-probe 파일은 수정하지 않았고 T1 미도래다. TC-002 전체·실장비·Gate4/5는 미완료다.
+- 이 문서 → TASK-006 상세·EV-005·TC-003 → 필요한 completion/control/capture/routing 코드를 읽는다. 구현/로컬 Pass·Human 승인·코드/문서 로컬 커밋은 완료, 원격 인증/native 대기다. 소스가 바뀌지 않으면 같은 로컬 시험을 반복하지 않는다. TASK-004/005 승인은 유지한다.
+- 개발1.96.0·MSRV1.85·dependency/lock 유지. private pool/storage unsafe 경계 유지. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. source36개 hash·환경/명령/log 근거는 EV-005다.
+- `new_tracked`는 producer별 completion window를 입력 수락 전에 단발 예약한다. pending/Updating slot을 덮지 않고 CompletionCapacity로 무대기 거절한다. raw 거절/생략은 같은 loan이며 admission/loan call의 SeqCst 표시가 close/cutoff 동결을 순서화한다.
+- Completion은 boundary 확인과 failed/dropped/unknown/expired를 분리한다. 고정 range/page/query permit·deadline/cancel wait와 완료 이력 age/window, retired terminal counters를 제공한다. query는 sync/출력 취소를 실행하지 않는다.
+- Router는 유한 feedback으로 Busy 결과를 보존하고 source memory 분할·pool layout·초기 completion route를 대조한다. 원본은 기존 guard 하나를 공유하며 distinct raw 물리 예약·output 보유 원인/복사·completion/control metadata를 분리한다. 일반 guard 무보고 Drop은 Unknown, 오래된 Drop은 새 generation을 덮지 않는다.
+- ControlOwner는 유일 controller lease·session/epoch/slot/generation·ordinary/전용 shutdown slots를 가진다. 명시 barrier만 writer 대역에 넘기고 같은 target의 sync IO를 직렬화한다. 기한 초과 중 IO/loan/feedback/reclaim를 강제 무효화하지 않는다. Incomplete 후 같은 owner로 cleanup한다. Closed의 is_success와 실패/불명/기한 보고를 별도로 확인한다.
+- 실제 파일/OS sync·backend worker 기동은 TASK-007 이후다. 앱 thread join은 scoped host 책임이다. 실제 dot-probe static spawn 연결은 TASK-026, 장비 프로필은 TASK-022이며 T1은 미도래다. TC 전체·MS-002·Gate4/5 완료를 선언하지 않는다.
 
 ## 선택 로딩
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
 - [MS 목록](../04_implementation/milestone_registry.md): 7개 MS, [Task 목록](../04_implementation/task_registry.md): 26개 Task(1개 선택). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
-- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬 Pass; 후속/장비 시험 잔여.
+- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 7 + CON 7 = 33행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
 - [2026-10-26 조사](imported_context/research_2026-10-26_detailed_design.md): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
 
 ## 이월 백로그
 
-다음 T = T2 / 다음 B = B1. 트리거 감시는 AI 책임이다.
+다음 T = T3 / 다음 B = B1. 트리거 감시는 AI 책임이다.
 
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
+| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토 | 공개 전환 또는 첫 외부 배포를 요청할 때 | INT-001 / 공개 준비 | 2026-10-28 Human 논의 |
 
-범위 밖 백로그 B: 없음. 현재 T1은 미도래. OQ를 T/B에 중복 등록하지 않는다.
+범위 밖 백로그 B: 없음. 현재 T1/T2는 미도래. OQ를 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -78,14 +87,14 @@
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-004 CI 계정 사유 차단·paste 경고. GAP-003 Closed, TASK-003 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-004/005/006 CI 사용량 소진에 따른 미검증·paste 경고. GAP-003 Closed, TASK-003 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
 
+- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·로컬 커밋·세션 종료, push 인증/native 대기 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
+- 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md).
 - 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
-- 2026-10-27 #002: TASK-003 소형 ingress 구현·Human 리뷰 승인·EV-002 로컬/native CI Pass·Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_002.md).
-- 2026-10-27 #001: Human 리뷰 승인, lim8603/dot-logger 비공개 생성·기존 main 게시, native CI 6조합+audit Pass·TASK-002 Done·GAP-004 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_001.md).
 
 이전 완료 이력은 [상태 아카이브](state_archive.md)에 보존했다.

@@ -1,7 +1,9 @@
 # Task 목록과 실행 계획
 
-- INT-001 / 2026-10-27 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
+- INT-001 / 2026-10-28 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
 - 담당 AI는 승인된 실행 담당이며 Human이 H/J 결정·리뷰를 맡는다. solo 모드를 유지한다.
+- 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
+- TASK-006도 2026-10-28 Human 「다음 진행하자」로 착수. 선행 TASK-004/005 구현·로컬 Pass·Human 승인을 근거로 native 후속 검증 상태에서 개발을 진행했다. 완료/제어 EV-005 로컬 Pass, Human 리뷰 승인다.
 - 모든 Build Task는 TASK-001의 Gate 3와 관련 ADR/계약 합의가 선행한다. 의존 Task의 완료가 추가 진입 조건이다.
 - TDD: 해당 상세 문서의 실패 동작부터 Red → Green → Refactor. 구현/테스트/근거는 서로 별도 체크한다.
 - TASK-018은 FR-015 범위 승인이 추가로 필요하며 Must 완료의 필수 의존에 포함하지 않는다.
@@ -11,9 +13,9 @@
 | TASK-001 | 상세설계 합의와 Gate 3 정렬 | MS-001 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-10-26 | 없음 — 설계 기준선 승인·Gate 3 Pass | 없음 | [상세](tasks/TASK-001.md) | 1~2 |
 | TASK-002 | workspace와 플랫폼·설정 계약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | 완료 — EV-001·Human 리뷰·native CI Pass | TASK-001 | [상세](tasks/TASK-002.md) | 1~2 |
 | TASK-003 | 소형 RT 수집과 중요 예약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | EV-002 로컬/native CI Pass·Human 리뷰 승인; 다음 TASK-004 | TASK-002 | [상세](tasks/TASK-003.md) | 2~3 |
-| TASK-004 | 원본 풀·수명·무해제 반환 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-27 | EV-003 로컬 Pass·Human 승인·게시 완료; 계정 조건 해결 후 CI 재실행 | TASK-003 | [상세](tasks/TASK-004.md) | 2~4 |
-| TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | Planned | 2026-10-26 | 파일 A 큐 정지에도 B enqueue 지속, 물리 bytes 중복 계상/누락 없음 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |
-| TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | Planned | 2026-10-26 | seq1 pending·seq2 done이면 전체 완료 아님, window 포화 수락 거절 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
+| TASK-004 | 원본 풀·수명·무해제 반환 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | EV-003 로컬 Pass·Human 승인·게시 완료; 사용량 소진에 따른 native 후속 검증 | TASK-003 | [상세](tasks/TASK-004.md) | 2~4 |
+| TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | Human 지시로 선행 CI 대기 중 착수; EV-004 구현·로컬 Pass; Human 리뷰 승인/native 대기 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |
+| TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | 구현·EV-005 로컬 Pass; Human 리뷰 승인/native 대기 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | u64 receipt 왕복·벽시계 역행·unknown schema와 8 MiB 단일 record 경계 | TASK-006 | [상세](tasks/TASK-007.md) | 2~3 |
 | TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | bytes/time/count/index 한계별 회전·겹친 이벤트와 읽기 핀으로 삭제 불가 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | chunk 중간 절단·CRC 손상·ENOSPC·sync/rename 실패 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |

@@ -10,8 +10,8 @@
 | 관련 Milestone / Task | MS-001~007 / TASK-001~026(계획 승인) |
 | 상태 | TDD 개발 방식 Approved — 2026-10-25 Human 「응 그렇게 하는 것으로, 최종 승인」 |
 | 승인 범위 | 실패 테스트 → 최소 구현 → 리팩토링. 실제 장비의 통합·성능·전원 차단 검증 병행 |
-| 현재 단계 | Design. 테스트/제품 코드 작성·실행 전 |
-| 갱신 | 2026-10-26 / AI |
+| 현재 단계 | Build — TASK-006 완료/제어 로컬 Pass, 실제 저장/worker/native·장비 검증 잔여 |
+| 갱신 | 2026-10-28 / AI |
 
 ## 1. TDD 개발 순서
 
@@ -84,3 +84,9 @@ TASK-002에서 프로젝트 toolchain 1.96.0과 MSRV 1.85.0의 로컬 실행을 
 TASK-004는 ADR-009의 Miri 선택 검증을 nightly-2026-10-26으로 구체화했다. `MIRIFLAGS="-Zmiri-strict-provenance -Zmiri-many-seeds=0..8" cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --locked`로 private 경계/원본 통합을 검사한다. 해석한 seed/입력 밖의 모든 동시 실행이나 soundness를 증명한 것으로 표시하지 않는다. 생산자별 원본/소형 FIFO·거절/생략 동일 loan·포화된 반환 알림·한정 스캔·읽는 중 재사용 금지·관리 host 수명 예제는 EV-003으로 추적한다. 새 native CI에는 기존 6개 OS/Rust·audit 외에 raw-memory job을 포함한다.
 
 2026-10-27 TASK-004 게시 후 [native CI](https://github.com/lim8603/dot-logger/actions/runs/40520558735)는 계정 결제 실패 또는 spending limit 문제로 8개 job 모두 실행 전에 차단됐다. Human 리뷰 승인·로컬 Pass는 유지하고 native 제품 시험은 Not Run으로 기록한다. 계정 조건 해결 후 동일 source에서 8개 job을 재실행한다.
+
+
+TASK-005의 TC-003 하위 결과는 [EV-004](verification_evidence.md#ev-004--task-005-분배출력-격리예산)다. 정지한 필수 A/정상 B의 격리, record/byte 공정성·FIFO·0-byte, 대상별 queued/pending/진행 IO slots/bytes, shared 한도·원본 최종 guard와 회수, event buffer 포화·retry/expiry/cancel/close, startup exact-fit/1-byte 부족/overflow를 검증했다. 독립 consumer로 capture→routing→target guard를 실행했다. allocator 시험은 구성/Router 생성부터 256회 포화/512 records·최종 해제의 요청 bytes를 계측하며 allocator 내부/RSS·실물 IO 비용의 증거로 확대하지 않는다. 기존 RT guard는 계속 0/0이다. `--test tc_003_routing`의 Miri8 seeds를 추가했고 CI recipe도 같은 대상을 포함한다. Human 확인 원인은 사용량 전량 소진이며 native는 Not Run으로 유지한다. 계정 재확인/차단 재시도는 하지 않고, CI 실행 여건 확보 뒤 해당 revision을 고정해 검증한다. TASK-005 착수 지시는 선행 CI 대기 중 개발 진행 예외이며 검증 면제가 아니다.
+
+
+TASK-006 [EV-005](verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료): tracked 수락→분배→대상별 Written/오류→명시 sync 대역 확인→deadline shutdown을 독립 consumer로 실행했다. tracking slot은 입력 수락 전 예약하고, query는 불변 producer range/page/permit·이력 age/Expired·timeout/cancel을 관측한다. 실제 sync는 query가 아니라 writer guard의 acknowledgment로 분리한다. close/record 경합·loan/진행 IO·피드백/반납이 남는 Incomplete 후 같은 owner로 cleanup을 시험했다. 기존 RT guard에 tracked 수락/추적 포화/raw 거절/skip/마지막 핸들 guard를 추가(0/0)했고 query/sync128회 초기 생성~종료의 요청 bytes를 계측했다. Miri 범위를 lib8+raw17+routing19+completion12+control14, 총70×8 seeds로 확장했다. 실제 파일/OS primitive·backend worker/thread join·장비 latency/durability·runtime 설정 변경·native/fresh audit는 이 근거에 포함하지 않는다. CI 사용량 소진은 유지하며 계정 재확인/차단 재시도를 하지 않는다.

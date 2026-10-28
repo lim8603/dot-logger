@@ -1,6 +1,6 @@
 # Milestone 목록과 승인된 실행 계획
 
-- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, MS-002 In Progress — TASK-002 Done(구성 구현·Human 리뷰·로컬/native CI Pass, EV-001). TASK-003 Done(구현·Human 리뷰·로컬/native EV-002 Pass), TASK-004 In Progress(원본 풀·EV-003 로컬 Pass·Human 승인·게시 완료, native CI 계정 사유 대기), TASK-005~006은 Planned.
+- 상위 Intent: INT-001(Approved). 하위 MS 계획 Approved(2026-10-26), MS-001 Done, MS-002 In Progress — TASK-002 Done(구성 구현·Human 리뷰·로컬/native CI Pass, EV-001). TASK-003 Done(구현·Human 리뷰·로컬/native EV-002 Pass), TASK-004 In Progress(원본 풀·EV-003 로컬 Pass·Human 승인·게시 완료, native CI 계정 사유 대기), TASK-005는 구현·EV-004 로컬 Pass·Human 리뷰 승인/native 대기, TASK-006은 완료/제어 구현·EV-005 로컬 Pass·Human 리뷰 승인/native 대기.
 - 1인 순차 진행 기준의 상대 일정이다. 시작일·가용 시간·검증 장비가 미정이므로 달력 날짜/납기를 확정하지 않는다.
 - 인일은 설계 추정치이며 TASK-004 수명·MCAP 복구·실제 장비 검증 후 재산정한다. 소요 범위에 리뷰/장비 대기·실제 24시간 경과 대기는 별도다.
 
@@ -19,3 +19,5 @@
 첫 구현 진입점은 **TASK-002 → TASK-003 → TASK-004**다. 원본 수명/메모리 안전성과 작은 종단 기록을 먼저 검증한다. 계측 TASK-014는 코어 이후 조기 구현할 수 있고, 장비 프로필 TASK-022는 설계 합의 직후 수집 가능하다. 각 의존의 단일 기준은 task_registry다.
 
 Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모두 추적한다. 장비 미확정 상태를 완료로 체크하지 않는다. dot-probe 첫 적용 완료가 확인되면 project_state T1(ROS 2 검토)을 알린다.
+
+2026-10-28 TASK-006: 고정 완료 window·유한 query/history·명시 sync barrier·deadline shutdown coordinator를 구현하고 로컬 검증했다. 실제 파일/worker/장비 보장은 후속이며 MS-002는 native 검증 잔여로 In Progress다.

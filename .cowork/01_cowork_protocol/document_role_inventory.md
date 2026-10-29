@@ -152,6 +152,7 @@
 | `05_verification/test_case.md` | 기준 본문 | 높음 | 실질 `TC-*` 12개 초과, 최근 실행 요약 15행 초과, 최근 3세션 편중 참조 시 분할 검토 |
 | `05_verification/test_strategy.md` | 기준 본문 | 중간 | 케이스보다 상위 정책 문서 |
 | `05_verification/verification_evidence.md` | 기준 본문 | 중간~높음 | 테스트 / 리뷰 / NFR / release evidence 인덱스 |
+| `05_verification/reviews/REV-*.md` | 기준 본문 / 작업 산출물 | 중간 | 리뷰 세션별 코드리뷰 지적/제안 및 개발 세션 처리 내역 (자산화) |
 
 ### 06_evolution
 

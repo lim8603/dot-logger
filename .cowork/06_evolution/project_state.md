@@ -11,14 +11,17 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-003 In Progress — 파일 저장(MS-002 native 검증 이월) |
 | 활성 Task | TASK-007 In Progress — RV-006~010 로컬 수정·EV-011 Pass, 최신 Human 구현 리뷰/native 대기 |
+| 미처리 리뷰 | [REV-003](../05_verification/reviews/REV-003_TASK-007.md) Resolved — P2 3건, P3 2건 로컬 수정/EV-011 Pass, 최신 구현 Human 승인 대기 |
 | 상태 | Yellow — TASK-007 로컬 Pass, Human 리뷰·native CI 차단·실장비/후속 파일 기능 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-29 / AI |
-| 세션 상태 | 종료 — EV-011 로컬 Pass, 소스 71b3e2c 게시 완료·마감 문서 별도 커밋, Human 리뷰/native 이월 |
-| 최근 세션 | [2026-10-29 #003](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md) 종료 — RV-006~010 수정·EV-011 로컬 Pass·소스 게시 |
+| 세션 상태 | 종료 — 코드리뷰 처리 절차 공식화·과거 이력(REV-001~003) 복원 완료 및 게시, REV-003 Human 리뷰 승인 대기 |
+| 최근 세션 | [2026-10-29 #004](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md) 종료 — 코드리뷰 절차 공식화·REV-001~003 복원·문서 게시 |
 
 ## 현재 결정과 제약
+
+- **2026-10-29 리뷰 절차 공식화:** Human 「프로젝트 리뷰처리 절차를 공식화 하려고해... 승인」에 따라 `05_verification/reviews/` 디렉터리를 신설하고 과거 리뷰 내역(REV-001~003)을 복원했다. 리뷰 세션의 코드 수정 금지(Read-Only), REV 문서 자산화, 리뷰 상태 추적(`Open` → `In Progress` → `Resolved` → `Closed`), 브리핑 시 미처리 리뷰 상시 보고 규칙을 프로토콜 및 진입점(AGENTS/GEMINI)에 공식 반영했다.
 
 - **2026-10-29 게시·마감:** Human 「커밋 푸쉬하고 세션 마감해줘」에 따라 소스 `71b3e2c`를 origin/main에 게시했다. EV-011 source46개와 해당 commit blob의 SHA-256이 전부 일치한다. 소스/문서는 분리 커밋·[skip ci]로 관리하며 마감 문서를 별도 게시한다. 이 요청을 TASK-007 최신 구현 Human 리뷰 승인으로 확대하지 않는다.
 
@@ -54,6 +57,14 @@
 | TASK-005 | 분배·출력 격리·예산 | AI | In Progress | 2026-10-28 | 선행 CI 대기 중 개발 진행 승인; EV-004 로컬 Pass·Human 리뷰 승인 |
 | TASK-006 | 완료 추적·명시 sync·종료 | AI | In Progress | 2026-10-29 | EV-009 RV-001~005 Human 승인·로컬 Pass; native 후속 검증 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | AI | In Progress | 2026-10-29 | EV-011 RV-006~010 수정·로컬 Pass → 최신 구현 Human 리뷰/native 대기 |
+
+## 코드리뷰 현황 (Reviews)
+
+| ID | 대상 | 일자 | 판정 | 상태 | 요약 및 다음 액션 |
+|---|---|---|---|---|---|
+| [REV-001](../05_verification/reviews/REV-001_TASK-006.md) | TASK-006 | 2026-10-28 | 보류 (P1 3, P2 1) | Closed | RV-001~004 EV-007 수정·로컬 Pass, commit `d57c2e3`, Human 승인 완료 |
+| [REV-002](../05_verification/reviews/REV-002_TASK-006_RV-005.md) | TASK-006 | 2026-10-29 | Conditional (P1 1) | Closed | RV-005 EV-009 수정·로컬 Pass, Human 승인 완료 |
+| [REV-003](../05_verification/reviews/REV-003_TASK-007.md) | TASK-007 | 2026-10-29 | Conditional (P2 3, P3 2) | Resolved | RV-006~010 EV-011 로컬 수정 Pass, commit `71b3e2c`, 최신 구현 Human 승인 대기 |
 
 ## 다음 시작점
 
@@ -116,8 +127,8 @@
 
 ## 최근 작업·이력
 
+- 2026-10-29 #004: 리뷰 절차 공식화·`reviews/` 신설·REV-001~003 복원·문서/진입점 갱신 및 커밋 푸시 마감 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md).
 - 2026-10-29 #003: RV-006~010 수정·EV-011 로컬 회귀 Pass·소스 71b3e2c 게시·세션 종료, 최신 구현 Human 리뷰/native·장비 이월 — [수정 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md).
 - 2026-10-29 #002: 진행현황 점검·TASK-007 AI 코드리뷰 Conditional(P1 없음). RV-006~010 문제/해결책 제안을 기록했고 제품 코드는 미수정이다 — [리뷰 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_002.md).
-- 2026-10-29 #001: 개선 검토·EV-008 RV-005 발견 후 Human 수정 지시로 해결·EV-009 회귀 Pass·GAP-007 로컬 Closed. TASK-006 Human 승인·TASK-007 EV-010 로컬 Pass/Human 리뷰·native 대기 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_001.md).
 
 이전 완료 이력은 [상태 아카이브](state_archive.md)에 보존했다.

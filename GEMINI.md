@@ -1,11 +1,12 @@
-# [프로젝트명] — GEMINI.md
+# dot-logger — GEMINI.md
 
 Gemini Code Assist가 사용하는 프로젝트 진입점이다. 현재 사용자의 요청을 우선하고, 필요한 `.cowork/` 문서만 읽어 작업한다. 다른 도구의 진입점과 사용법은 `.cowork/README.md`를 참조한다.
 
 ## 시작과 재개
 
 - 요청한 작업이 명확하면 `.cowork/06_evolution/project_state.md`에서 활성 작업과 제약을 확인하고, 해당 작업의 목록 문서·기준 본문·상세 문서만 추가로 읽어 바로 진행한다. 일반 브리핑이나 작업 재선택을 요구하지 않는다. 단, 트리거가 도래한 이월 항목(`T*`)은 현재 작업과 무관해도 한 줄로 먼저 알린다(이월 트리거 감시는 AI의 책임이다).
-- 작업이 지정되지 않았으면 `project_state.md`의 활성 Intent·Milestone·Task, 다음 시작점, 이월 항목을 짧게 브리핑하고 작업을 선택받는다.
+- "리뷰세션 시작해줘" 또는 "코드리뷰 해줘" 요청 시에는 `.cowork/01_cowork_protocol/session_protocol.md` §1E에 따라 제품 코드 수정 없이 `.agents/skills/code-review` 스킬을 실행하여 `.cowork/05_verification/reviews/REV-*.md` 문서를 생성(`Open`)하고 보고한다.
+- 작업이 지정되지 않았거나 "프로젝트 브리핑해줘" 요청 시에는 `project_state.md`의 활성 Intent·Milestone·Task, **미처리 리뷰 내역(Open/Resolved 상태)**, 다음 시작점, 이월 항목을 브리핑하고 작업을 선택받는다.
 - 프로젝트 시작·재개 작업에서 상태가 비어 있거나 핵심 정보가 모순될 때만 `.cowork/01_cowork_protocol/session_protocol.md` §1A에 따라 필요한 사항을 묻는다. 읽기 전용 요청에는 온보딩을 적용하지 않는다.
 - 이전 결정이나 미완료 작업의 근거가 필요할 때만 관련 개인 `my_state.md`, 최신 세션 로그, 승인된 ADR을 읽는다. 자세한 로딩 기준은 `project_state.md`의 컨텍스트 로딩 가이드를 따른다.
 
@@ -20,6 +21,7 @@ Gemini Code Assist가 사용하는 프로젝트 진입점이다. 현재 사용�
 ## 문서와 기록
 
 - `.cowork/`의 문서 역할은 `.cowork/01_cowork_protocol/document_role_inventory.md`를 따른다. 목록 문서·기준 본문을 우선 읽고 템플릿·로그·아카이브는 필요할 때만 연다.
+- 코드리뷰 지적/제안 및 개발 세션의 처리 내역은 `.cowork/05_verification/reviews/REV-*.md`에 기록하여 자산화하고, 상태(`Open` → `In Progress` → `Resolved` → `Closed`)를 추적한다.
 - 실제 작업에서 상태나 결정이 바뀌면 해당 기준 문서와 `project_state.md`를 갱신한다. 세션 로그는 작업 연속성에 필요한 결정·변경·미완료 사항을 기록할 때 사용한다. 읽기 전용 요청만으로 로그나 멤버 파일을 만들지 않는다.
 - 첫 세션 로그를 만들 때 필요한 `.gitignore` 규칙을 확인한다. 세션 종료 요청 또는 작업 인계 시에는 다음 시작점과 미완료 사항을 동기화한다.
 - 문서 체계의 새 기준 문서나 목록 문서 승격은 Human 승인 사항이다. 기존 문서의 일반적인 내용 수정과 작업 파일 생성은 권한 매트릭스에 따른다.
@@ -27,7 +29,7 @@ Gemini Code Assist가 사용하는 프로젝트 진입점이다. 현재 사용�
 
 ## 프로젝트 기준 위치
 
-- **프로젝트:** [프로젝트명]
+- **프로젝트:** dot-logger
 - **현재 상태·다음 행동:** `.cowork/06_evolution/project_state.md`
 - **기술 스택:** `.cowork/03_design_artifacts/tech_stack.md`
 - **산출물 범위:** `.cowork/02_project_definition/deliverable_plan.md`

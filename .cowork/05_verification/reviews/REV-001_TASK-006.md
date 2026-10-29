@@ -1,0 +1,76 @@
+# [REV-001] TASK-006 완료 추적·명시 sync·종료 코드리뷰
+
+## 1. 리뷰 개요
+* **일자 / 리뷰어:** 2026-10-28 / AI (자율 코드리뷰)
+* **대상 Task / 기준 커밋:** [TASK-006](../04_implementation/tasks/TASK-006.md) / commit `011d6f1` (EV-005 기준 소스 36개)
+* **종합 판정:** 설계 충족 보류 (P1 3건, P2 1건)
+* **진행 상태:** Closed (EV-007 결함 수정 및 로컬 회귀 Pass, commit `d57c2e3`, Human 승인 완료)
+
+---
+
+## 2. 리뷰 항목 요약표
+
+| ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
+|---|---|---|---|---|---|---|
+| RV-001 | P1 | `completion/mod.rs:422`<br>`routing/mod.rs:252` | FIFO 공개 직후 finish Enqueued 반영 전 writer IoFailure 시 InvalidTransition 발생 | 선행 Enqueued 사실을 terminal 실패와 안전하게 병합 | 수용 (Accept) | Closed |
+| RV-002 | P1 | `completion/mod.rs:572`<br>`capture/mod.rs:519` | Normal 요청이 완료 윈도우를 소진하여 Important 예약이 보호되지 않음 | producer별 보호량 R 검증 및 다음 R개 연속 빈 슬롯 확인 | 수용 (Accept) | Closed |
+| RV-003 | P1 | `control/mod.rs:479, 334, 705` | 시작 전 만료된 shutdown sync가 Incomplete 상태로 고착되어 cleanup 불가 | 유한 cursor로 미확인 Synced를 Unknown으로 종결 | 수용 (Accept) | Closed |
+| RV-004 | P2 | `README.md:4` | README 설명이 TASK-002 단계에 머물러 실제 구현과 불일치 | 현재 구현 범위와 후속 미구현 구분 정렬 | 수용 (Accept) | Closed |
+
+---
+
+## 3. 상세 리뷰 및 처리 내역
+
+### RV-001: FIFO 공개 후 finish Enqueued 전 IoFailure 도착 시 상태 전이 오류
+
+#### [리뷰어]
+* **발견한 문제:** 대상 FIFO에 게시된 직후 `finish`의 Enqueued가 반영되기 전에 writer가 IoFailure를 보고하면, 뒤늦게 도착한 Enqueued 확인이 `InvalidTransition`을 유발함. feedback queue의 head가 남아 다음 turn에서도 동일 fault로 분배가 중단됨.
+* **처리 제안:** 실패 사실(terminal 실패)을 보존하면서 앞선 enqueue 확인의 역전 도착을 허용하도록 전이 로직 개선.
+* **심각도:** P1 (Critical)
+
+#### [처리담당 (개발 세션 — 2026-10-28 #003)]
+* **판정 결과:** 수용 (Accept)
+* **처리 내용:** terminal 실패 상태를 유지하면서 선행 Enqueued 사실의 지연 도착을 허용하도록 전이 허용. 뒤늦은 Written/Synced가 terminal 실패를 덮는 전이는 계속 거절.
+* **검증 근거:** [EV-007](../05_verification/verification_evidence.md#ev-007), 신규 회귀 테스트 Pass, commit `d57c2e3`.
+
+---
+
+### RV-002: 완료 추적 윈도우에서 Important 예약 공간 미보호
+
+#### [리뷰어]
+* **발견한 문제:** PrioritizeImportant 구성 시 Normal 요청 수락 후 입력 슬롯이 남아 있어도 미완료 Normal이 완료 윈도우를 차지해 Important가 `CompletionCapacity`로 거절됨.
+* **처리 제안:** producer별 Important 예약 슬롯을 완료 보호량 $R$로 검증하고, Normal 수락 시 $R$개 이상의 재사용 가능 슬롯이 확보되어 있는지 검사하는 알고리즘 도입.
+* **심각도:** P1 (Critical)
+
+#### [처리담당 (개발 세션 — 2026-10-28 #003)]
+* **판정 결과:** 수용 (Accept)
+* **처리 내용:** producer별 완료 보호량 $R = \max(\text{small/raw Important slots})$ 계산, window $W < R$ 사전 거절, $W = R$ 시 Normal 수락 금지. Normal은 자기 슬롯 외 다음 $R$개 cyclic slot이 Empty/Terminal일 때만 수락하도록 검증 강화.
+* **검증 근거:** [EV-007](../05_verification/verification_evidence.md#ev-007), RT 경로 할당/해제 0/0 확인, consumer Important16 window32 정렬, commit `d57c2e3`.
+
+---
+
+### RV-003: shutdown sync 시작 전 만료 시 정리 고착
+
+#### [리뷰어]
+* **발견한 문제:** Synced 필수 대상에 Written 후 shutdown 시작 전 deadline에 도달하면 명령은 EXPIRED이지만 receipt는 Pending으로 남아 Incomplete 상태로 고착됨. 후속 sync/cleanup 전이 경로가 차단됨.
+* **처리 제안:** 미완료 sync를 안전하게 실패/불명(Unknown)으로 종결하고 자원을 정상 회수하는 경로 마련.
+* **심각도:** P1 (Critical)
+
+#### [처리담당 (개발 세션 — 2026-10-28 #003)]
+* **판정 결과:** 수용 (Accept)
+* **처리 내용:** shutdown sync 시작 전 만료 시 실제 입력/출력/IO/loan/feedback을 먼저 배출한 뒤, 전용 shutdown slot의 유한 cursor로 Written 이후 미확인 Synced를 Unknown으로 종결 처리.
+* **검증 근거:** [EV-007](../05_verification/verification_evidence.md#ev-007), control 통합 테스트 4개 추가 Pass, commit `d57c2e3`.
+
+---
+
+### RV-004: README 구현 현황 불일치
+
+#### [리뷰어]
+* **발견한 문제:** `README.md`가 TASK-002 구성 검증 단계에 머물러 있어 TASK-003~006 구현 내용과 불일치.
+* **처리 제안:** 현재 구현 범위와 미구현 worker/파일 기능을 구분하여 README 최신화.
+* **심각도:** P2 (Warning — 문서)
+
+#### [처리담당 (개발 세션 — 2026-10-28 #003)]
+* **판정 결과:** 수용 (Accept)
+* **처리 내용:** README.md의 구현 범위 및 미구현 항목을 TASK-006 기준으로 동기화.
+* **검증 근거:** README.md 수정 반영 완료.

@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-003 In Progress — 파일 저장(MS-002 native 검증 이월) |
 | 활성 Task | TASK-007 In Progress — RV-006~010 로컬 수정·EV-011 Pass, 최신 Human 구현 리뷰/native 대기 |
-| 미처리 리뷰 | [REV-003](../05_verification/reviews/REV-003_TASK-007.md) Resolved — P2 3건, P3 2건 로컬 수정/EV-011 Pass, 최신 구현 Human 승인 대기 |
+| 미처리 리뷰 | [REV-008](../05_verification/reviews/REV-008_TASK-007_RV-006-010.md) Resolved — P2 3건, P3 2건 로컬 수정/EV-011 Pass, 최신 구현 Human 승인 대기 |
 | 상태 | Yellow — TASK-007 로컬 Pass, Human 리뷰·native CI 차단·실장비/후속 파일 기능 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-29 / AI |
-| 세션 상태 | 종료 — 코드리뷰 처리 절차 공식화·과거 이력(REV-001~003) 복원 완료 및 게시, REV-003 Human 리뷰 승인 대기 |
-| 최근 세션 | [2026-10-29 #004](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md) 종료 — 코드리뷰 절차 공식화·REV-001~003 복원·문서 게시 |
+| 세션 상태 | 종료 — 리뷰 절차 공식화·전체 리뷰 이력(REV-001~008) 복원 완료, REV-008 Human 승인 대기 |
+| 최근 세션 | [2026-10-29 #004](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md) 종료 — 코드리뷰 절차 공식화·REV-001~008 복원·문서 게시 |
 
 ## 현재 결정과 제약
 
@@ -60,11 +60,16 @@
 
 ## 코드리뷰 현황 (Reviews)
 
-| ID | 대상 | 일자 | 판정 | 상태 | 요약 및 다음 액션 |
+| ID | 대상 | 일자 | 성격/판정 | 상태 | 요약 및 다음 액션 |
 |---|---|---|---|---|---|
-| [REV-001](../05_verification/reviews/REV-001_TASK-006.md) | TASK-006 | 2026-10-28 | 보류 (P1 3, P2 1) | Closed | RV-001~004 EV-007 수정·로컬 Pass, commit `d57c2e3`, Human 승인 완료 |
-| [REV-002](../05_verification/reviews/REV-002_TASK-006_RV-005.md) | TASK-006 | 2026-10-29 | Conditional (P1 1) | Closed | RV-005 EV-009 수정·로컬 Pass, Human 승인 완료 |
-| [REV-003](../05_verification/reviews/REV-003_TASK-007.md) | TASK-007 | 2026-10-29 | Conditional (P2 3, P3 2) | Resolved | RV-006~010 EV-011 로컬 수정 Pass, commit `71b3e2c`, 최신 구현 Human 승인 대기 |
+| [REV-001](../05_verification/reviews/REV-001_TASK-002.md) | TASK-002 | 2026-10-27 | 구성·파이프라인 구현 / Pass | Closed | EV-001 로컬/native CI 7개 Pass, Human 승인 완료 |
+| [REV-002](../05_verification/reviews/REV-002_TASK-003.md) | TASK-003 | 2026-10-27 | 소형 수집·중요 예약 / Pass | Closed | EV-002 RT 무할당/무대기, native CI 7개 Pass, Human 승인 완료 |
+| [REV-003](../05_verification/reviews/REV-003_TASK-004.md) | TASK-004 | 2026-10-27 | 원본 풀·수명·안전성 / Pass | Closed | EV-003 generation/state, Miri 8 seeds Pass, Human 승인 (native 대기) |
+| [REV-004](../05_verification/reviews/REV-004_TASK-005.md) | TASK-005 | 2026-10-28 | 분배·출력 격리·예산 / Pass | Closed | EV-004 공정 순회/가드 공유, Miri 19×8 Pass, Human 승인 (native 대기) |
+| [REV-005](../05_verification/reviews/REV-005_TASK-006_RV-001-004.md) | TASK-006 | 2026-10-28 | 설계 대조 자가리뷰 / 보류 (P1 3, P2 1) | Closed | RV-001~004 EV-007 수정·로컬 Pass, commit `d57c2e3`, Human 승인 완료 |
+| [REV-006](../05_verification/reviews/REV-006_TASK-006_DEEP_REVIEW.md) | TASK-006 | 2026-10-28 | 제미나이 심층 코드리뷰 / Note/Suggestion | Closed | False Sharing·O(N) 선형탐색 등 5건 분석, rustdoc 보강/장비 과제 연결 |
+| [REV-007](../05_verification/reviews/REV-007_TASK-006_RV-005.md) | TASK-006 | 2026-10-29 | 종료 경합 자가리뷰 / Conditional (P1 1) | Closed | RV-005 EV-009 수정·로컬 Pass, Human 승인 완료 |
+| [REV-008](../05_verification/reviews/REV-008_TASK-007_RV-006-010.md) | TASK-007 | 2026-10-29 | MCAP 저장 구현 리뷰 / Conditional (P2 3, P3 2) | Resolved | RV-006~010 EV-011 로컬 수정 Pass, commit `71b3e2c`, 최신 구현 Human 승인 대기 |
 
 ## 다음 시작점
 

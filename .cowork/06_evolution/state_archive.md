@@ -246,3 +246,13 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 ## 2026-10-28 #003 상태 인덱스 이관
 
 - 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
+
+## 2026-10-29 #001 세션 마감 상태 인덱스 이관
+
+- 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md).
+- 이전 개인 상태의 TASK-005/006 목표·결과는 [2026-10-28 #001](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md), [#002](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md), [#003](../members/lim8603/workspace/session_logs/session_2026-10-28_003.md) 및 TASK-006/EV-007에 있다. 현재 my_state는 활성 MS-003/TASK-007과 최신 로그만 유지한다.
+
+## 2026-10-29 #002 세션 마감 상태 인덱스 이관
+
+- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
+- 이전 개인 상태의 2026-10-29 #001 세션 Intent: INT-001 / MS-002·003 / TASK-006·007 — 개선 검토·종료 경합 수정·MCAP 파일 구현/검증. 결과 TASK-006 Human 승인, TASK-007 EV-010 로컬 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-29_001.md).

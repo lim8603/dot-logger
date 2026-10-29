@@ -4,26 +4,35 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger — 수집·분배·완료/제어 coordinator 구현·로컬 검증, 실제 파일/worker 미구현 |
+| 프로젝트 | dot-logger — 수집·분배·완료/제어·MCAP 파일 writer 구현·로컬 검증, 회전/복구·worker 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-006 자가 리뷰 결함 수정·EV-007 로컬 회귀 Pass |
+| 현재 Phase | Build — TASK-007 리뷰 RV-006~010 수정·EV-011 로컬 Pass |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-002 In Progress — 제한된 수집 코어(MS-001 Done) |
-| 활성 Task | TASK-006 In Progress — RV-001~004 수정·로컬 회귀 Pass, 수정분 Human 리뷰/native 대기 |
-| 상태 | Yellow — 로컬 수정/회귀 완료, 수정분 리뷰·사용량 소진에 따른 native CI 차단·장비 검증 잔여 |
+| 활성 Milestone | MS-003 In Progress — 파일 저장(MS-002 native 검증 이월) |
+| 활성 Task | TASK-007 In Progress — RV-006~010 로컬 수정·EV-011 Pass, 최신 Human 구현 리뷰/native 대기 |
+| 상태 | Yellow — TASK-007 로컬 Pass, Human 리뷰·native CI 차단·실장비/후속 파일 기능 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-10-28 / AI |
-| 최근 세션 | [2026-10-28 #004](../members/lim8603/workspace/session_logs/session_2026-10-28_004.md) 종료 — 심층 코드리뷰·개선 제안(채널LUT·캐시라인·에러세분화) 기록 및 마감 |
+| 갱신 | 2026-10-29 / AI |
+| 세션 상태 | 종료 — EV-011 로컬 Pass, 소스 71b3e2c 게시 완료·마감 문서 별도 커밋, Human 리뷰/native 이월 |
+| 최근 세션 | [2026-10-29 #003](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md) 종료 — RV-006~010 수정·EV-011 로컬 Pass·소스 게시 |
 
 ## 현재 결정과 제약
 
-- **2026-10-28 후속 수정·마감:** Human의 수정/회귀 지시 후 RV-001~004를 수정했다. [EV-007](../05_verification/verification_evidence.md#ev-007): 신규9개·두 Rust 각16 features/consumer/예제/clippy/rustdoc/fmt·RT0/0·Miri78×8 seeds Pass, source37개(README 포함) 고정. 이어 Human 「커밋 푸쉬하고 세션 마무리」로 코드 `d57c2e3`을 origin/main에 게시하고 원격 ref·검증37개 blob 일치를 확인했다. 세션 마감 문서는 별도 커밋으로 관리한다. GAP-006 로컬 Closed, 수정분 Human 구현 리뷰/native는 이월하며 CI/과금 조회는 하지 않았다. 커밋 요청을 구현 리뷰 승인으로 대신하지 않는다.
+- **2026-10-29 게시·마감:** Human 「커밋 푸쉬하고 세션 마감해줘」에 따라 소스 `71b3e2c`를 origin/main에 게시했다. EV-011 source46개와 해당 commit blob의 SHA-256이 전부 일치한다. 소스/문서는 분리 커밋·[skip ci]로 관리하며 마감 문서를 별도 게시한다. 이 요청을 TASK-007 최신 구현 Human 리뷰 승인으로 확대하지 않는다.
 
-- **자가 리뷰 이력:** [EV-006](../05_verification/verification_evidence.md#ev-006)은 source36개가 EV-005와 일치하는 수정 전 대상에서 P1 반례3개를 확인한 기록이다. 과거 실패/승인 이력은 보존하고 현 구현의 근거는 EV-007을 사용한다.
+- **2026-10-29 리뷰 수정:** Human 「코드리뷰 받은 내역을 확인하고 수정하자는 말이였어」로 RV-006~010 수정 범위·방향을 승인했다. 배치 Written·진행 prefix, pre-IO SyncWork 반환·공통 Busy 매핑, 예산 내 쓰기 버퍼와 report-only 재시도를 구현했다. [EV-011](../05_verification/verification_evidence.md#ev-011) 로컬 Pass이며 최신 구현 Human 리뷰/native·장비는 대기다.
 
-- **2026-10-28 마감:** TASK-006 Human 승인·commit/push·세션 종료 요청. 코드 `c98b7fa`는 검증 source36개와 일치한다. source 변경 없는 승인/마감 문서는 분리 커밋했다. gh 브라우저 인증·Git credential helper 연결 후 pull --ff-only 및 push를 완료했고 원격 main `136fe96`과 일치함을 확인했다. 인증 정보는 OS keyring에 보관되며 저장소에 넣지 않는다.
+- **2026-10-29 승인·착수:** Human 「승인」으로 TASK-006 RV-001~005 최신 수정분을 승인하고 native 이월 상태의 TASK-007 진행을 승인했다. TASK-006/EV-009 로컬 Pass·native GAP-004는 유지하며 MCAP 봉투/writer/인덱스를 구현하고 EV-010 로컬 검증을 마쳤다. TASK-007 Human 리뷰/native는 대기이며 당시 착수 승인은 commit/push 지시가 아니었다.
+
+- **2026-10-29 후속 수정:** [EV-008](../05_verification/verification_evidence.md#ev-008)의 RV-005 P1을 Human 수정 지시 후 [EV-009](../05_verification/verification_evidence.md#ev-009)에서 해결했다. 일반 sync 진입/게시와 shutdown을 단발 원자적 표시·RAII·SeqCst로 순서화했다. 정식 반례2개 Red 후 수정·private3개, 두 Rust 각16 features/consumer/예제/clippy/rustdoc/fmt·Miri81×8·RT0/0 Pass, source38개 고정이다. GAP-007 로컬 Closed, 최신 수정분 Human 승인은 완료됐고 native는 잔여다. TASK-006 보고에 RV-001~005 수정 반영사항을 함께 정리한다. commit/push·CI/과금 조회는 하지 않았다.
+
+- **이전 수정/게시 이력:** RV-001~004의 EV-007 로컬 회귀와 코드 d57c2e3 게시 이력은 [TASK-006](../04_implementation/tasks/TASK-006.md)에 보존했다. GAP-006/007은 로컬 수정 범위에서 Closed, TASK-006 최신 수정분 Human 승인은 완료됐고 native GAP-004는 잔여다. 현재 게시 소스 `71b3e2c`는 EV-011을 기준으로 검토한다.
+
+- **자가 리뷰 이력:** [EV-006](../05_verification/verification_evidence.md#ev-006)은 source36개에서 P1 반례3개, EV-008은 EV-007과 같던 source37개에서 RV-005를 확인한 수정 전 기록이다. 실패/승인 이력은 보존하고 TASK-006 수정 근거는 EV-009, TASK-007 현재 근거는 EV-011을 사용한다.
+
+- **형상관리 제약:** 소스와 `.cowork` 문서는 별도 커밋으로 관리한다. 이번 commit/push는 Human의 명시 지시로 수행했고, 세션 종료만으로 다른 게시나 구현 승인을 추정하지 않는다. 인증 정보는 OS keyring에 두고 저장소에 넣지 않는다.
 
 - **2026-10-26 Human 승인:** 「권고 기준선 채택 — 장비·호환 검증은 계획대로 진행」. 상세설계·ADR-008/009·추가 시험 목표·MS 계획을 채택했다. 검증 이월은 면제가 아니다.
 
@@ -43,26 +52,32 @@
 |---|---|---|---|---|---|
 | TASK-004 | 원본 풀·수명·무해제 반환 | AI | In Progress | 2026-10-28 | 로컬/승인 유지, 사용량 소진으로 native CI 후속 검증 |
 | TASK-005 | 분배·출력 격리·예산 | AI | In Progress | 2026-10-28 | 선행 CI 대기 중 개발 진행 승인; EV-004 로컬 Pass·Human 리뷰 승인 |
-| TASK-006 | 완료 추적·명시 sync·종료 | AI | In Progress | 2026-10-28 | EV-007 수정·로컬 회귀 Pass; 수정분 Human 리뷰/native 대기 |
+| TASK-006 | 완료 추적·명시 sync·종료 | AI | In Progress | 2026-10-29 | EV-009 RV-001~005 Human 승인·로컬 Pass; native 후속 검증 |
+| TASK-007 | MCAP 봉투·writer·인덱스 | AI | In Progress | 2026-10-29 | EV-011 RV-006~010 수정·로컬 Pass → 최신 구현 Human 리뷰/native 대기 |
 
 ## 다음 시작점
 
-0. **게시 완료:** TASK-006 후속 수정 코드 `d57c2e3`을 origin/main에 push하고 원격 ref·EV-007 source37개 blob 일치를 확인했다. 코드와 `.cowork` 마감 기록은 분리 커밋한다. `[skip ci]`를 유지하고 CI/과금 상태는 재확인하지 않는다. 별도 추가된 `.agents/skills/code-review/SKILL.md`는 이번 작업 커밋에서 제외·보존했다.
+0. **현재 게시 기준:** TASK-006 RV-005와 TASK-007/리뷰 수정 소스는 `71b3e2c`로 origin/main에 게시했다. EV-011 source46개와 commit blob이 일치하며 마감/근거 문서는 별도 docs(cowork) 커밋으로 관리한다. native CI는 [skip ci]로 자동 실행하지 않았고 CI/계정/과금 조회·차단 재시도를 하지 않는다.
 
-1. **수정분 리뷰 및 심층 피드백 브리핑:** [EV-007](../05_verification/verification_evidence.md#ev-007) 수정분과 [세션 #004](../members/lim8603/workspace/session_logs/session_2026-10-28_004.md)의 심층 코드리뷰 피드백(① RT 경로 채널 라우팅 $O(N)$ 선형 탐색의 고정 크기 LUT 전환 검토, ② `RecordSlot` 캐시 라인 False Sharing 방지 정렬 검토, ③ `CaptureError` 에러 세분화, ④ `poll_shutdown` 2-phase 폴링 계약)을 다음 세션 시작 시 브리핑에 포함하여 Human 최종 구현 승인을 확인한다. 소스가 같으면 같은 시험은 반복하지 않는다.
-2. TASK-004/005는 구현·로컬 Pass·Human 승인 완료, native 미검증으로 In Progress다. Human이 사용량 전량 소진·계정 재확인 불필요를 확인했고 TASK-005/006 개발 진행을 지시했다. 검증 면제가 아니며 CI 여건 확보 후 current source를 고정해 6 contracts+audit+raw-memory8 job을 확인한다. 계정 조회·차단 재시도는 하지 않는다.
-3. 다음 신규 개발 후보는 TASK-007 MCAP 봉투·writer·인덱스(Planned·미착수)다. TASK-006 수정분 리뷰 후 진행할 수 있으며 writer 대역을 실제 파일 IO/명시 sync·회전/복구 단계와 연결한다. 공개 전환·라이선스·GitHub 운영정책은 T2로 별도 판단한다.
+1. **TASK-007 최신 수정분 Human 구현 리뷰:** [TASK-007](../04_implementation/tasks/TASK-007.md)·[EV-011](../05_verification/verification_evidence.md#ev-011)·[#003 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md)를 확인한다. RV-006~010 로컬 수정은 완료했고 최신 구현 승인은 아직 받지 않았다. 저장 통합21개·private Busy2개, 두 Rust 각16 features/2-record consumer→finish→sync→shutdown/예제·clippy/rustdoc/fmt·allocator7, Miri83×8=664 Pass다. source46개 hash/명령/로그는 EV-011에 고정했으므로 소스가 같으면 같은 시험을 반복하지 않는다.
+
+2. TASK-004~006은 구현·로컬 Pass·Human 승인 완료, native 미검증으로 In Progress다. TASK-007 개발 진행도 native 이월 상태로 Human 승인됐다. GAP-004는 면제가 아니며 여건 확보 후 current source로 6 contracts+audit+raw-memory를 확인한다. 계정 조회/차단 재시도는 하지 않는다.
+3. 다음 신규 개발 후보는 TASK-008 회전·순환·이벤트 보호(Planned·미착수)다. TASK-007 리뷰 후 NeedRotation을 실제 회전/보존·다중 세그먼트 sync·directory metadata sync와 연결한다. TASK-009 복구/장애·TASK-010 active reader·TASK-022 장비 검증은 후속이다.
+
+심층 제안은 EV-008 판단을 유지한다. 채널 탐색/LUT·RecordSlot 정렬은 장비 측정 후 비교하고, 미등록 채널은 이미 InvalidInput이므로 그 사례에 근거한 CaptureError 확대는 보류한다. poll_shutdown 반복 구동은 rustdoc에 보강했다.
 
 ## 새 세션 재개 메모
 
-- 이 문서 → TASK-006 상세·EV-007·TC-003 → 필요한 completion/control/capture 코드를 읽는다. RV-001~004 수정·로컬 회귀 완료, 수정분 Human 리뷰와 native가 남았다. TASK-004/005 및 이전 TASK-006 승인은 이력으로 유지한다.
-- 개발1.96.0·MSRV1.85·dependency/lock 유지. private pool/storage unsafe 경계 유지. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. 현 source37개 hash·환경/명령/log 근거는 EV-007이다.
+- 이 문서 → [#003 수정 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md) → TASK-007 상세·EV-011·TC-004를 읽는다. TASK-006 RV-001~005는 Human 승인, TASK-007 RV-006~010 로컬 수정은 완료됐고 최신 구현 리뷰/native·장비가 잔여다.
+- 개발1.96.0·MSRV1.85·dependency/lock·private unsafe 경계를 유지한다. Miri nightly-2026-10-26은 검증 전용이며 전역 default는 변경하지 않았다. 현 source46개 hash·명령/log 근거는 EV-011이다.
 - producer별 완료 보호량 R=max(small/raw Important slots), W≥R다. Normal은 다음 R개 cyclic slot의 Empty/Terminal 상태를 확인해 보호하며 W=R은 Important 전용이다. 기존 consumer 예제는 Important16에 맞춰 window32/work_per_poll32로 정렬했다. 실제 RT p99는 미검증이다.
 - `new_tracked`는 producer별 completion window를 입력 수락 전에 단발 예약한다. pending/Updating slot을 덮지 않고 CompletionCapacity로 무대기 거절한다. raw 거절/생략은 같은 loan이며 admission/loan call의 SeqCst 표시가 close/cutoff 동결을 순서화한다.
 - Completion은 boundary 확인과 failed/dropped/unknown/expired를 분리한다. 고정 range/page/query permit·deadline/cancel wait와 완료 이력 age/window, retired terminal counters를 제공한다. query는 sync/출력 취소를 실행하지 않는다.
 - Router는 유한 feedback으로 Busy 결과를 보존하고 source memory 분할·pool layout·초기 completion route를 대조한다. 원본은 기존 guard 하나를 공유하며 distinct raw 물리 예약·output 보유 원인/복사·completion/control metadata를 분리한다. 일반 guard 무보고 Drop은 Unknown, 오래된 Drop은 새 generation을 덮지 않는다.
 - ControlOwner는 유일 controller lease·session/epoch/slot/generation·ordinary/전용 shutdown slots를 가진다. 명시 barrier만 writer 대역에 넘기고 같은 target의 sync IO를 직렬화한다. 만료 shutdown sync는 실제 IO/loan/feedback와 선행 일반 sync 종료 후 유한 cursor로 미확인 Synced를 Unknown으로 정리한다. 일반 요청 만료는 기록을 바꾸지 않는다. Closed의 is_success와 실패/불명/기한 보고를 별도로 확인한다.
-- 실제 파일/OS sync·backend worker 기동은 TASK-007 이후다. 앱 thread join은 scoped host 책임이다. 실제 dot-probe static spawn 연결은 TASK-026, 장비 프로필은 TASK-022이며 T1은 미도래다. TC 전체·MS-002·Gate4/5 완료를 선언하지 않는다.
+- SyncSubmission은 일반 sync의 진입~게시/오류 반환을 단발 CAS·RAII로 표시한다. close 전 열림을 본 요청이 끝나기 전에는 cutoff 동결/Closed를 확정하지 않는다. 동시 일반 요청 Busy·close 이후 Closing, 실제 guard/만료 정리 계약은 유지한다. test-only 스케줄러는 스레드별 cfg(test)다.
+- TASK-007은 empty File/SyncSink를 일반 경로에서 구동한다. write_batch는 호출자 guard를 chunk target에 따라 묶고 완전 flush 뒤 Written을 보고한다. BatchWriteError의 appended/written/reported prefix로 중복 쓰기를 피하고 report만 재시도한다. write_buffer_bytes(0=direct)는 공유 예산에 포함하고 seek/flush 때 배출, Drop은 IO 없이 폐기한다. 인덱스 쌍은 min(records,chunks×channels)로 제한한다. sync 거절/Busy는 원래 work를 반환하고 실제 IO 실패만 Failed다. 다른 세그먼트의 pending/만료 범위를 새 파일 sync로 확인하지 않는다.
+- worker 기동/앱 thread join은 scoped host·TASK-026 후속이다. 장비 프로필은 TASK-022이며 T1 미도래, 회전/복구/active reader·제품 압축·OS 교환은 후속이다. TC 전체·MS-002/003·Gate4/5 완료를 선언하지 않는다.
 
 ## 선택 로딩
 
@@ -93,14 +108,16 @@
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
 | GAP-001·002·004·005 | 장비·후속 제품 TC·TASK-004/005/006 CI 사용량 소진에 따른 미검증·paste 경고. GAP-003 Closed, TASK-003 native Pass 이력 유지 | [검증 근거](../05_verification/verification_evidence.md) 참조 |
-| GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | 수정분 Human 리뷰·native GAP-004 후속, 기존 이력 보존 |
+| GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
+| GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
+| RV-006~010 | EV-011 수정·로컬 회귀 Pass, 로컬 범위 해결 | [TASK-007](../04_implementation/tasks/TASK-007.md)의 최신 구현 Human 리뷰/native·TASK-022 장비 성능은 잔여 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
 
-- 2026-10-28 #003: 자가 리뷰 RV-001~004 수정·EV-007 회귀·코드 d57c2e3 게시·세션 종료, 수정분 Human 리뷰/native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_003.md).
-- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
-- 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md).
+- 2026-10-29 #003: RV-006~010 수정·EV-011 로컬 회귀 Pass·소스 71b3e2c 게시·세션 종료, 최신 구현 Human 리뷰/native·장비 이월 — [수정 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md).
+- 2026-10-29 #002: 진행현황 점검·TASK-007 AI 코드리뷰 Conditional(P1 없음). RV-006~010 문제/해결책 제안을 기록했고 제품 코드는 미수정이다 — [리뷰 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_002.md).
+- 2026-10-29 #001: 개선 검토·EV-008 RV-005 발견 후 Human 수정 지시로 해결·EV-009 회귀 Pass·GAP-007 로컬 Closed. TASK-006 Human 승인·TASK-007 EV-010 로컬 Pass/Human 리뷰·native 대기 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_001.md).
 
 이전 완료 이력은 [상태 아카이브](state_archive.md)에 보존했다.

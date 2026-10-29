@@ -50,6 +50,18 @@ active writer는 **완전한 chunk와 필수 schema/channel을 OS 쓰기 경계�
 
 회전 순서는 chunk 마감 → footer/summary 작성 → 파일 sync → 이름 확정 → 필요한 directory metadata sync → catalog 공개다. OS별 보장 차이는 capability로 나타내고 지원되지 않는 directory 내구성을 자동 성공 처리하지 않는다. 조회가 파일을 pin하면 유지 기한/읽기 bytes를 제한하고 삭제는 마지막 핀 이후 수행한다. 디스크 한계까지 삭제가 불가하면 쓰기를 멈추고 실패를 보고한다.
 
+### TASK-007 로컬 구현 — 2026-10-29
+
+`storage` 모듈의 버전1 Protobuf 봉투는 session/schema128·sequence64·producer/channel/revision·mono/real/source/domain·level/importance·payload 길이를 보존한다. `envelope.proto`와 protoc 생성 FileDescriptorSet(`envelope.bin`)을 고정했고 payload는 별도 복제 Vec 없이 encoder scratch에 한 번 복사한다. 음수 real time·잘못된 길이/major/식별자·초과 payload는 거절한다. source time은 원본 도메인으로 보존하고 UTC 변환 계약이 없어 publish_time은 real time을 사용한다.
+
+파일-local channel ID는 등록 순서의 u16이며 MCAP sequence는0이다. 제품의 전체 receipt는 봉투에서 읽는다. 각 파일에 envelope descriptor·채널·session/revision·사용자 schema ID/version/encoding 및 선택 descriptor를 반복한다. 알 수 없는 사용자 encoding은 opaque payload다. 사용자 descriptor의 재생성/변환은 수행하지 않는다.
+
+`SegmentWriter`는 direct-seek·무압축·명시 chunk 마감을 사용한다. chunk/data/summary CRC 및 표준 message/chunk index를 활성화했다. `(channel,mono/real min/max,chunk_offset,count)` 보조 인덱스는 성공한 flush 후에만 공개한다. 마지막 safe offset은 OS write 경계이며 디스크 영속 확인이 아니다. Drop은 upstream의 자동 footer 쓰기를 억제하고 명시 finish만 summary/footer를 쓴다.
+
+writer/finished index가 보유하는 공유 예산 lease는 Router의 구체 output 예약을 뺀 잔여분에서 차감한다. 여러 대상/세그먼트의 예약 합계를 제한하고 대상별 활성 writer는 하나다. max_record+encoder·message/chunk index와 Vec 성장·summary clone·명시 쓰기 버퍼를 MCAP0.26의 수량 기반 보수적 예약에 포함한다. 비어 있지 않은 channel/chunk 쌍은 각각 레코드 하나 이상이 필요하므로 상한은 `min(max_records, max_chunks × channels)`이며 보조 인덱스 선할당과 upstream 채널별 chunk 인덱스 예약에 함께 적용한다. `write_batch`는 호출자 보유 guard를 누적해 chunk 목표를 사용하고 완전 flush 뒤 Written을 보고한다. `write_buffer_bytes`(0=direct)는 seek/flush 전에 배출하고 Drop은 IO 없이 폐기한다. requested-byte peak·128채널 sparse/dense index와 File write 호출 비교는 [EV-011](../05_verification/verification_evidence.md#ev-011)에서 대조한다. 어댑터 자체 추가 버퍼·allocator 내부·OS cache는 이 값 밖이다.
+
+명시 `sync_work`는 받은 guard의 session/target과 파일의 producer별 receipt 범위를 대조하고 실제 sink sync 뒤에만 결과를 확인한다. 다른 세그먼트 범위는 bounded completion 이력에서 이미 완료/미라우팅/terminal임을 확인할 수 있을 때만 허용한다. 이력이 만료됐거나 미확인 범위면 IO 전에 원래 SyncWork를 반환해 거절한다. 일시 metadata Busy도 guard를 보존하고, 반환된 guard를 재시도하지 않고 버릴 때에만 Unknown이 된다. 실제 IO 실패는 Failed이며, 새 파일 sync로 이전 미확인 기록을 Synced 처리하지 않는다. 완성 파일도 `FinishedSegment::sync_work`로 footer 포함 sync한다. 자동 회전·directory sync·복구·active reader 및 OS 교환은 후속 Task다.
+
 ## 4. 보존과 복구
 
 | 모드 | 동작 | 한계 시 동작 |

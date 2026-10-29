@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-28 |
-| 다음 액션 | EV-007 RV-001~004 수정·로컬 회귀 Pass; 수정분 Human 리뷰·native 후속 검증 |
+| 마지막 갱신일 | 2026-10-29 |
+| 다음 액션 | EV-009 RV-005 수정·로컬 회귀 Pass; RV-001~005 반영사항 포함 최종 Human 리뷰·native 후속 검증 |
 | 의존 | TASK-005 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -36,7 +36,7 @@
 - [x] 대상별 partial/expired/unknown·deadline snapshot, shutdown incomplete에서 owner 유지.
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [x] Human 리뷰 완료(2026-10-28 승인). 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] 최신 수정분 Human 리뷰 완료 — 2026-10-29 Human 「승인」으로 RV-001~005 최종 수정분 승인. native/실장비 이월은 유지한다.
 
 테스트 정의: [TC-003](../../05_verification/test_case.md#tc-003). 제품 코드·테스트 실행 결과: [EV-005](../../05_verification/verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -69,12 +69,53 @@ Human 「지금 수정과 회기 검증 진행해도 되겠어?」로 수정/검
 
 후속 마감: Human 「커밋 푸쉬하고 세션 마무리」에 따라 수정 코드 `d57c2e3`을 `[skip ci]`로 커밋·origin/main push했고 원격 ref와 EV-007 source37개 blob 일치를 확인했다. 검증/상태/마감 문서는 별도 docs(cowork) 커밋이다. 커밋 요청을 수정분 구현 리뷰 승인으로 대신하지 않으며 native/장비 이월과 사용량 조회/재시도 금지는 유지한다. 다음은 EV-007 수정분 리뷰이며 TASK-007은 미착수다.
 
+## 후속 개선 검토·종료 경합 리뷰 — 2026-10-29
+
+Human 「리뷰 개선 검토부터 하고 TASK-006 검토 진행하자」에 따라 지난 제안과 수정 코드를 검토했다. EV-007 source37개는 현재 파일과 모두 같아 기존 전체 시험은 반복하지 않았다. RV-001~004 수정·과거 Pass/승인 이력은 유지한다.
+
+[EV-008](../../05_verification/verification_evidence.md#ev-008)에서 **RV-005 / P1**을 확인했다. 다른 스레드의 일반 `request_sync`가 shutdown 열림 검사 뒤 정지하면 그 미게시 호출을 추적하지 않은 shutdown이 Closed 성공을 반환한다. 이후 요청이 게시되어 새 SyncWork를 발급할 수 있으며, IO가 진행 중인데도 Closed가 유지된다. 실제 공개 API를 두 scoped thread에서 호출하고 격리 복사본의 test-only hook으로 스케줄만 고정했다. Rust1.85/1.96 각각 새 계약 assertion1개 실패, 순차 거절·레이아웃 관측2개 Pass다. 원본 제품 코드는 수정하지 않았다.
+
+최종 구현 승인 권고는 **Reject / 보류**다. 일반 sync 요청의 진입·게시와 shutdown 전환/최종 정리를 함께 순서화하고 이 경합의 정식 회귀를 먼저 추가해야 한다. 단순 사후 검사만 추가하면 검사와 게시 사이의 공백이 남는다. GAP-007 Open, TASK-006/MS-002 In Progress·TASK-007 미착수·native/장비 이월을 유지한다.
+
+이전 제안은 다음과 같이 정리했다. 채널 선형 탐색은 capture/completion에 중복되지만 유한 탐색 자체는 무대기 위반이 아니므로 인덱스 재사용/LUT를 측정 후 비교한다. RecordSlot(size40/align8)의 정렬은 별도 TargetCell 배열·메모리 증가도 포함해 장비에서 비교한다. 미등록 채널은 이미 InvalidInput으로 거절하므로 그 사례에 근거한 CaptureError enum 확대는 보류한다. poll_shutdown은 bool이 아닌 ShutdownPoll이고 기존 문서에 진행 계약이 있으므로 반복 구동 예제 보강은 P3 후보다. 세부 근거는 EV-008에 둔다.
+
+## RV-005 수정·회귀 및 수정 반영 총괄 — 2026-10-29
+
+Human 「수정 진행하고, TASK-006 변경사항 보고할때 수정반영사항 같이 보고하자」에 따라 [EV-009](../../05_verification/verification_evidence.md#ev-009)를 실행했다. 신규 정식 반례2개를 두 Rust에서 먼저 실패시킨 뒤 수정했고, 오류 반환 보강까지 private3개를 추가했다. 제품 변경은 control/mod.rs와 새 control/tests.rs다.
+
+- `SyncSubmission` RAII·단발 CAS로 일반 sync 진입~게시/오류 반환을 표시한다. SeqCst 진입 표시·열림 확인·shutdown close·정지 확인으로 pre-close 호출을 빠짐없이 종료 추적에 포함한다.
+- 요청 게시 중에는 Closing/Incomplete를 유지한다. 게시 후 실제 sync가 끝나야 성공 Closed, 게시 전 기한 도달이면 만료/실패 Closed, 검증 오류면 표시가 풀려 IO 없이 Closed에 도달한다. 동시 요청은 기존 Busy, close 이후는 Closing이다.
+- RT 경로·private unsafe·dependency/lock·공개 오류 enum은 유지했다. poll_shutdown rustdoc에 Closing/Incomplete 이후 반복 구동과 Closed 성공 여부의 별도 확인도 명시했다.
+- 두 Rust 각16 features·독립 consumer·scoped 예제·clippy/rustdoc/fmt·기존 완료15/제어18·allocator6 Pass. Miri lib12+raw17+routing19+completion15+control18=81×8(648) Pass. tracked/Important RT0/0, query/sync128회 peak11586/concrete14978/최종 잔여0이다. F-11 소비자별 종단 검증과 명령/환경/source38개 hash는 EV-009에 연결했다.
+
+| 수정 ID | 현재 반영사항 | 이번 작업에서의 구분 |
+|---|---|---|
+| RV-001 | writer 실패 뒤 늦은 Enqueued 확인을 병합하고 terminal 실패·분배 진행 보존 | EV-007 기존 수정 유지·회귀 |
+| RV-002 | producer별 Important 완료 보호량 및 Normal cyclic runway 검사·W≥R 검증 | EV-007 기존 수정 유지·회귀 |
+| RV-003 | 시작 전 만료 shutdown sync를 실제 IO/선행 sync 종료 뒤 유한 cursor로 Unknown 정리 | EV-007 기존 수정 유지·회귀 |
+| RV-004 | README를 현재 코어/대역과 실제 파일·worker 미구현 범위에 정렬 | 기존 반영 유지 |
+| RV-005 | 일반 sync 진입/게시와 shutdown 순서화로 Closed 후 새 sync IO 발급 차단 | 이번 수정·정식 회귀3개 |
+
+자가 리뷰 **Conditional — 로컬 수정/회귀 Pass**, GAP-007 로컬 Closed다. TASK-006/MS-002는 최종 수정분 Human 리뷰·native 미검증으로 In Progress이며 TASK-007은 미착수다. LUT/정렬의 장비 측정과 공개 오류 enum 보류 판단은 유지한다. 구현 승인·native/장비 검증을 완료로 대신하지 않고 commit/push·CI 조회/재시도도 수행하지 않았다.
+
+## 최종 AI 검토 — 2026-10-29
+
+Human 「다음단계로」에 따라 앞서 안내한 최종 리뷰를 진행했다. EV-009의 source38개·검증 artifact·원본 압축 로그 hash가 현재 파일과 모두 일치하며, 기록된10개 검사 명령의 exit0을 확인했다. 소스 변경이 없어 같은 시험은 반복하지 않았다.
+
+- RV-001의 terminal 보존/늦은 Enqueued, RV-002의 producer별 cyclic 보호, RV-003의 실제 자원/선행 sync 종료 후 정리 및 RV-004 README 범위를 재확인했다.
+- RV-005는 진입 CAS→열림 확인→close→정지 확인의 SC 순서로 pre-close 일반 sync 게시를 추적한다. close 이후 호출은 게시 전에 거절하고, 요청 실패·포화도 RAII로 표시를 해제한다. 실제 guard/명령 metadata application은 기존 종료 조건이 계속 검사한다.
+- test-only 중단은 스레드별 cfg(test)에 한정된다. RT 경로·private unsafe·dependency/lock은 그대로이며 공개 오류 enum 확대가 없다. 동시 요청 Busy는 일반 호출자가 재시도할 기존 오류다.
+- 추가 P1/P2 결함은 확인하지 못했다. 판정은 **Conditional — 로컬 구현 범위의 승인 권고**, 최종 Human 승인/native·실장비 완료를 대신하지 않는다.
+
+다음 개발 준비: TASK-007의 승인된 계획에서 u64 receipt 왕복·벽시계 역행·unknown schema·8 MiB 단일 record 경계를 첫 실패 시험으로 시작한다. 이후 독립 MCAP reader·CRC/index 및 encoder/index 메모리 예산을 대조한다. TASK-007은 아직 Planned이며, 최종 수정분 Human 승인과 native 이월 상태의 개발 진행 확인 뒤 착수한다.
+
 ## 파일 변경표
 
 | 구분 | 파일 | 목적·변경 |
 |---|---|---|
 | 생성 | [completion/mod.rs](../../../crates/dot-logger/src/completion/mod.rs), [types.rs](../../../crates/dot-logger/src/completion/types.rs), [query.rs](../../../crates/dot-logger/src/completion/query.rs), [tests.rs](../../../crates/dot-logger/src/completion/tests.rs) | 추적 예약·대상별 결과·이력/집계·유한 조회/대기·publication 경계 검증 |
 | 생성 | [control/mod.rs](../../../crates/dot-logger/src/control/mod.rs), [types.rs](../../../crates/dot-logger/src/control/types.rs) | 명시 barrier·기한·guard·정상 종료 coordinator |
+| 생성 | [control/tests.rs](../../../crates/dot-logger/src/control/tests.rs) | RV-005 결정적 게시/종료 경합3개·스레드별 test-only scheduler |
 | 생성 | [tc_003_completion.rs](../../../crates/dot-logger/tests/tc_003_completion.rs), [tc_003_control.rs](../../../crates/dot-logger/tests/tc_003_control.rs), [support/mod.rs](../../../crates/dot-logger/tests/support/mod.rs) | 완료/제어 통합26개와 공통 구성 |
 | 수정 | [capture/mod.rs](../../../crates/dot-logger/src/capture/mod.rs), [types.rs](../../../crates/dot-logger/src/capture/types.rs), [tests.rs](../../../crates/dot-logger/src/capture/tests.rs) | completion 연결·정확한 거절/게시·close 경합·메모리 원본 분할 전달·기존 경계 fixture |
 | 수정 | [routing/mod.rs](../../../crates/dot-logger/src/routing/mod.rs), [types.rs](../../../crates/dot-logger/src/routing/types.rs) | 유한 feedback·delivery 보고/Unknown·실제 drain 검사 |
@@ -96,6 +137,8 @@ Human 「지금 수정과 회기 검증 진행해도 되겠어?」로 수정/검
 | 생성 | completion/types.rs | FailureReason, Update, QueryOutcome, RecordStatus, CompletionError | 확인 사실과 오류/폐기/불명/만료 분리 |
 | 생성 | completion/types.rs | ProducerRange, TargetRequest, CompletionItem, QuerySummary, PageReport, WaitOutcome, WaitReport, CompletionTotals | bounded query DTO·wait snapshot·retired/live 대조 수량 |
 | 생성 | control/mod.rs | ControlOwner, SyncWork, ControllerLease | 명시 제어 소유자·실제 IO 수명 guard·controller 연결/해제 소유권 |
+| 생성 | control/mod.rs | SyncSubmission | RV-005 일반 sync 진입~게시/오류 반환의 단발 CAS·RAII 표시와 종료 정지 확인 |
+| 생성 | control/tests.rs | SubmissionPause | test-only 스레드별 게시 중단/재개 barrier, cfg(test) 밖에서는 제거 |
 | 생성 | control/mod.rs | AtomicRange, SyncTarget, SyncSlot, SlotPublication | 고정 sync cutoffs·target/operation lifecycle·일반 게시 소유권 |
 | 생성 | control/types.rs | ControlConfig, SyncToken, SyncResult, SyncSnapshot, ControlProgress | 제한된 명령·session/epoch/generation·barrier 결과/진행 |
 | 생성 | control/types.rs | ShutdownPhase, ShutdownPlan, ShutdownReport, ShutdownPoll, ControlError | 정상 종료 계획·불완전/실패/기한·구체 자원 보고 |
@@ -123,3 +166,7 @@ Human 「지금 수정과 회기 검증 진행해도 되겠어?」로 수정/검
 ## 승인·커밋·세션 마감 — 2026-10-28
 
 Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006 코드/테스트/CI를 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`에 함께 커밋했고 EV-005의36 source hash와 commit blob이 일치한다. 기존 CI 사용량 소진 지시에 따라 커밋에 `[skip ci]`를 사용하고 CI를 조회/재시도하지 않는다. 초기 HTTPS 인증 차단은 gh 브라우저 인증과 Git credential helper 연결로 해소했다. pull --ff-only 후 코드·승인 문서 `136fe96`의 origin/main push를 완료했고 원격 ref 일치를 확인했다. 승인/검증/마감 문서는 별도 docs(cowork) 커밋으로 정리했다. TASK-004/005/006 native는 Not Run을 유지하며 세션을 마감한다.
+
+## 최종 승인 — 2026-10-29
+
+Human 「승인」은 직전 질문의 TASK-006 수정분 승인과 native 검증 이월 상태의 TASK-007 개발 진행 승인이다. EV-009 source38개/로컬 Pass를 유지하며 TASK-006은 native 후속 검증으로 In Progress다. commit/push 승인은 포함하지 않는다.

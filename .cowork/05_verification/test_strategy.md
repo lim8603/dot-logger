@@ -10,8 +10,8 @@
 | 관련 Milestone / Task | MS-001~007 / TASK-001~026(계획 승인) |
 | 상태 | TDD 개발 방식 Approved — 2026-10-25 Human 「응 그렇게 하는 것으로, 최종 승인」 |
 | 승인 범위 | 실패 테스트 → 최소 구현 → 리팩토링. 실제 장비의 통합·성능·전원 차단 검증 병행 |
-| 현재 단계 | Build — TASK-006 EV-007 자가 리뷰 결함 수정·로컬 회귀 Pass, 수정분 리뷰·실제 저장/worker/native·장비 검증 잔여 |
-| 갱신 | 2026-10-28 / AI |
+| 현재 단계 | Build — TASK-006 최신 수정분 Human 승인, TASK-007 RV-006~010 수정·EV-011 로컬 Pass. TASK-007 리뷰/worker/native·장비 검증 잔여 |
+| 갱신 | 2026-10-29 / AI |
 
 ## 1. TDD 개발 순서
 
@@ -90,3 +90,10 @@ TASK-005의 TC-003 하위 결과는 [EV-004](verification_evidence.md#ev-004--ta
 
 
 TASK-006 [EV-005](verification_evidence.md#ev-005--task-006-완료-추적명시-sync종료): tracked 수락→분배→대상별 Written/오류→명시 sync 대역 확인→deadline shutdown을 독립 consumer로 실행했다. tracking slot은 입력 수락 전 예약하고, query는 불변 producer range/page/permit·이력 age/Expired·timeout/cancel을 관측한다. 실제 sync는 query가 아니라 writer guard의 acknowledgment로 분리한다. close/record 경합·loan/진행 IO·피드백/반납이 남는 Incomplete 후 같은 owner로 cleanup을 시험했다. 기존 RT guard에 tracked 수락/추적 포화/raw 거절/skip/마지막 핸들 guard를 추가(0/0)했고 query/sync128회 초기 생성~종료의 요청 bytes를 계측했다. Miri 범위를 lib8+raw17+routing19+completion12+control14, 총70×8 seeds로 확장했다. 실제 파일/OS primitive·backend worker/thread join·장비 latency/durability·runtime 설정 변경·native/fresh audit는 이 근거에 포함하지 않는다. CI 사용량 소진은 유지하며 계정 재확인/차단 재시도를 하지 않는다.
+
+TASK-006 최신 수정 근거는 [EV-009](verification_evidence.md#ev-009)다. RV-005 일반 sync 게시/종료 경합의 결정적 private3개(실제 IO 종료 후 Closed·게시 중 deadline·검증 오류 반환/표시 해제)를 추가하고, 기존 EV-007 RV-001~004 회귀를 유지했다. 스레드별 cfg(test) scheduler로 검사 직후 중단만 제어하고 실제 공개 API를 두 scoped thread에서 호출한다. 진입 표시는 단발 CAS와 SeqCst 순서화이며 RT 경로는 유지한다. request/next_sync/poll/snapshot/release·일반/전용 shutdown·deadline/IO/loan/feedback·독립 consumer/예제·exact-fit 예산/allocator를 종단 회귀했다. 두 Rust 각16 features·clippy/rustdoc/fmt·RT0/0·Miri81×8(648) Pass, source38개를 고정했다. 최종 Human 리뷰/native·장비 검증은 별개이며 TC-003 전체 완료로 승격하지 않는다.
+
+TASK-007 [EV-010](verification_evidence.md#ev-010): 프로토콜/소유권 반례 Red 후 수정, 실제 파일과 독립 scanner/protoc golden·자원 계측을 결합했다. File::sync_all 이후에만 guard를 확인하고 footer·완전 chunk safe offset·다른 세그먼트 coverage·오류 관측을 분리한다. TC-004 하위13개·두 Rust 기능 조합/독립 파일 consumer·기존 RT/메모리 회귀를 검증했다. Miri의 새 범위는 봉투2개뿐이며 파일 IO/8MiB/독립 CRC는 일반 실행이다. 제품 압축/회전·복구·OS 교환·실물 장비 보장을 이 근거에 포함하지 않는다.
+
+
+TASK-007 리뷰 수정 [EV-011](verification_evidence.md#ev-011)은 배치 Written/진행 prefix·pre-IO SyncWork 반환·공통 Busy 매핑·유한 쓰기 버퍼·report-only 재시도를 검증한다. 실제 File write 호출과 독립 파일 바이트를 대조하고 allocator는128채널4096레코드의 sparse/dense 인덱스를 포함한다. private metadata contention 시험2개는 메모리 sink로 active/finished sync와 단일/배치 report Busy를 결정적으로 재현하며 현재 core83×8 Miri에 포함한다. query permit 포화를 coverage Busy 원인으로 해석하지 않는다. 단일 즉시 Written과 배치 지연 설정은 별개이며 장비 기본값은 TASK-022에서 측정한다.

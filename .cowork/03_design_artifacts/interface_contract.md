@@ -414,6 +414,22 @@ RV-001 수정: FIFO 공개 직후 writer가 실패를 보고하고 Enqueued feed
 
 RV-003 수정: shutdown sync가 시작 전에 만료되면 실제 입력/출력/IO/loan/feedback 및 선행 일반 sync application을 먼저 배출한다. 그 뒤 전용 shutdown slot의 유한 application cursor로 Written 이후 미확인 Synced를 Unknown으로 종결한다. 명령 snapshot의 Expired·deadline 미준수·Written 확인은 보존하고 Closed도 실패 보고다. 일반 sync 요청만의 만료는 이 처리를 실행하지 않으며 이후 새 요청으로 동기화할 수 있다. 진행 중 guard를 무효화하거나 뒤늦은 실제 성공을 Unknown으로 선점하지 않는다. 수정 근거는 [EV-007](../05_verification/verification_evidence.md#ev-007)이다.
 
+RV-005 수정 — 2026-10-29: 일반 `request_sync`의 진입부터 슬롯 게시/오류 반환까지 단발 원자적 진입 표시로 추적한다. 동시에 게시 중인 일반 요청이 있으면 기존 `Busy`로 무대기 반환하며, close 이후 요청은 `Closing`으로 거절한다. 진입 표시·열림 확인·shutdown close·정지 확인을 SeqCst로 순서화해, close 전 열림을 확인한 요청이 게시/반환되기 전에는 shutdown 범위 동결과 최종 정리를 확정하지 않는다. 이미 진입한 요청의 게시 이후에는 기존 명령/IO/metadata 수명과 deadline 계약을 따른다. 요청이 검증 오류/포화로 끝나도 RAII가 표시를 해제한다. `Closing`/`Incomplete`에서 dispatcher/readers/writers와 같은 owner를 계속 구동하고 `Closed`가 반환되면 보고의 `is_success`를 별도로 확인한다. 새 오류 enum·RT 수집 연산은 추가하지 않는다.
+
+### 13.3 TASK-007 실제 파일 API — 2026-10-29
+
+`Router::writer_budget(target)`은 source session/revision·target 및 같은 Router의 실제 잔여 output 예산을 묶은 opaque `WriterBudget`을 반환한다. 같은 target의 활성 `SegmentWriter`는 하나이고 여러 대상/finished index의 예약을 공유 합계로 검사한다. startup 경합은 Busy, 잔여 부족은 Budget이다. `WriterConfig`의 max payload·record·chunk·metadata 상한과 명시 `write_buffer_bytes` 및 보수적 reservation을 IO 전에 검증한다. 쓰기 버퍼는 logger 공유 예산에 포함하며 0이면 직접 쓴다. seek/flush 전에 버퍼를 배출하고 position 조회는 논리 위치를 반환한다. Drop은 버퍼를 재시도하거나 배출하지 않는다. 호출자가 제공하는 empty seekable `SyncSink`만 사용하며 path 생성이나 worker 시작은 하지 않는다. 표준 File 구현은 명시 sync_all을 호출한다.
+
+`append(record,payload)`는 frozen session/revision/channel/schema·producer별 sequence·길이/시각을 검증하고 봉투를 기록한다. 인코딩과 file IO는 일반 경로다. 레코드/chunk 한계는 NeedRotation으로 거절하고 자동 삭제/회전은 수행하지 않는다. `flush_chunk` 성공 뒤에만 safe offset과 보조 인덱스를 공개한다. IO 실패 뒤에는 Poisoned이며 이전 safe offset은 유지한다. `finish`는 footer/summary까지 쓰고 `FinishedSegment`에 index/예산 소유권을 옮기며, finish/Drop을 Synced로 간주하지 않는다.
+
+`write_batch(&[&Delivery])`는 호출자가 보유한 유한 guard 묶음을 chunk target에 따라 누적하고 마지막 chunk를 한 번 flush한 후 Written을 순서대로 보고한다. 배치 크기/최대 보유 지연은 호스트가 정하며 제품 기본값은 가정하지 않는다. 빈 묶음은 IO를 하지 않는다. `BatchWriteError`는 append 수락 prefix(`appended`), 마지막 batch flush 성공으로 보장하는 prefix(`written`), 성공한 보고 prefix(`reported`)를 보존한다. append/flush 실패에서는 Written을 보고하지 않는다(`written=reported=0`, 앞서 자동 마감된 chunk도 보수적으로 별도 확인). append 거절 뒤의 수락 prefix는 명시 flush 후 report할 수 있고, IO 실패는 Poisoned다. 성공한 batch flush 뒤 보고 Busy이면 `[reported..written]`의 같은 guard로 `Delivery::report(Update::Confirmed(Boundary::Written))`만 재시도한다. append된 prefix를 다시 쓰지 않는다.
+
+`write_delivery(&Delivery)`는 단일 guard의 append/완전 chunk flush 뒤 Written을 보고하는 저지연 경로다. Busy 뒤에는 위와 같이 report만 재시도한다. Expired 등 그 외 완료 오류는 StorageError::Completion으로 보존한다.
+
+`SegmentWriter::sync_work`와 `FinishedSegment::sync_work`는 같은 private 검증/오류 매핑으로 session/target·파일 coverage를 확인한 뒤 실제 sync를 수행하고 Synced/Failed를 보고한다. IO 전 검증 거절·metadata Busy·기존 Poisoned는 `SyncWorkError { error, work: Some(work) }`로 guard를 반환하므로 올바른 파일/시점에 재시도할 수 있다. 실제 flush/sync 실패는 Failed를 보고하고 `work: None`이다. 반환한 work를 버리면 기존 Drop 계약대로 Unknown이다. query permit은 coverage의 직접 poll 경로를 제한하지 않는다. 다른 세그먼트의 pending/만료 범위를 단일 새 파일 sync로 확인하지 않는다. 다중 세그먼트 조정은 TASK-008 후속이다.
+
+제품 타입은 외부 MCAP/prost wire 타입을 공개 API에 노출하지 않는다. `encode_record`/`decode_record`는 버전 봉투·입력/해독 길이 상한을 검사하고 사용자 payload는 opaque bytes로 유지한다. 현재 압축은 off, CRC/index는 on이다. 초기 파일/독립 판독·golden 근거는 [EV-010](../05_verification/verification_evidence.md#ev-010), 리뷰 수정·배치/재시도·버퍼/할당 회귀는 [EV-011](../05_verification/verification_evidence.md#ev-011), 실제 OS/장비 내구성과 성능은 미검증이다.
+
 ## 14. 조회·재생·원격 계약안
 
 | 작업 | 계약 |

@@ -679,3 +679,93 @@ fn tracked_session_repeated_query_sync_and_shutdown_stay_within_concrete_reserva
         "tracked session: 128 query/sync cycles, requested-byte peak={peak}, concrete reservation={concrete}, final delta={remaining}"
     );
 }
+
+#[test]
+fn storage_encoder_indexes_and_finish_remain_within_shared_output_reservations() {
+    use dot_logger::{
+        capture::{CaptureReceipt, CapturedRecord},
+        routing::Router,
+        storage::{SegmentWriter, StorageChannel, WriterConfig},
+    };
+    use std::time::{SystemTime, UNIX_EPOCH};
+    for (max, channel_count, records, flush_each) in [
+        (256usize, 1, 129usize, true),
+        (8 * 1024 * 1024, 1, 129, true),
+        (256, 128, 4096, true),
+        (256, 128, 4096, false),
+    ] {
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 128 * 1024 * 1024,
+                input_bytes: 128 * 1024,
+                raw_bytes: 0,
+                output_bytes: 64 * 1024 * 1024,
+                external_bytes: 0,
+                control_bytes: 256 * 1024,
+                worker_bytes: 256 * 1024,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 8,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let registrations: Vec<_> = (0..channel_count)
+            .map(|id| ChannelConfig::new(7 + id, 99, 1))
+            .collect();
+        let mut owner = CaptureOwner::new(&plan, 42, 1, &registrations).unwrap();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "dot-logger-memory-{}-{stamp}.mcap",
+            std::process::id()
+        ));
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        let payload = vec![81; max];
+        owner.scope(|scope| {
+            use dot_logger::routing::{RoutingConfig,TargetConfig,Route,Schedule};
+            let route=RoutingConfig{targets:vec![TargetConfig{id:10,required:true,queue_slots:2,pending_slots:0,retained_bytes:512,max_attempts:1,max_age:std::time::Duration::from_secs(1)}],
+                routes:registrations.iter().map(|c|Route{channel_id:c.channel_id,targets:vec![10]}).collect(),shared_records:2,small_copy_bytes:512,
+                schedule:Schedule{record_quantum:1,byte_quantum:256,records_per_turn:1,bytes_per_turn:256,retries_per_target:1,reclaim_slots_per_producer:1}};
+            let router=Router::new(&plan,scope.map(|(_,r)|r).collect(),route).unwrap();
+            let budget=router.writer_budget(10).unwrap();let mut concrete=0;let mut returned=None;
+            let (remaining,peak)=allocator::observe_memory(|| {
+                let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:records,max_chunks:records,max_metadata_bytes:(128*channel_count as usize).max(1024)};
+                let channels:Vec<_>=registrations.iter().map(|&channel|StorageChannel{channel,topic:format!("opaque/{}",channel.channel_id),payload_encoding:"application/octet-stream".into(),schema:None}).collect();
+                let mut writer=SegmentWriter::new(budget.clone(),config,channels,file).unwrap();concrete=writer.reserved_bytes();
+                for sequence in 1..=records as u64 {
+                    let bytes=if sequence==1{&payload[..]}else{&payload[..1]};
+                    let record=CapturedRecord{receipt:CaptureReceipt{session_id:42,producer_id:0,accepted_seq:sequence},
+                        metadata:RecordMetadata{channel_id:7+(sequence as u32-1)%channel_count,schema_id:99,schema_version:1,mono_ns:sequence,real_ns:sequence as i64,source_time:None,level:Level::Info,importance:Some(Importance::Normal)},revision:1,payload_len:bytes.len()};
+                    writer.append(record,bytes).unwrap();if flush_each{writer.flush_chunk().unwrap();}
+                }
+                let finished=writer.finish().unwrap();assert_eq!(finished.index().iter().map(|e|e.record_count).sum::<u64>(),records as u64);
+                if flush_each{assert_eq!(finished.index().len(),records);}
+                returned=Some(finished.into_inner());
+            });
+            drop(returned);assert_eq!(remaining,0);assert_eq!(budget.used_bytes(),0);assert!(peak>0 && peak<=concrete as i128);
+            println!("storage max_payload={max}, channels={channel_count}, records={records}, flush_each={flush_each}: requested peak={peak}, reservation={concrete}, final delta={remaining}");
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+}

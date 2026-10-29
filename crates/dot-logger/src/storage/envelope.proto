@@ -1,0 +1,23 @@
+syntax = "proto3";
+package dot_logger;
+message Source {
+  sint64 ticks = 1;
+  uint64 clock_domain = 2;
+}
+message Envelope {
+  uint32 major = 1;
+  bytes session = 2;
+  uint32 producer = 3;
+  uint64 sequence = 4;
+  uint32 channel = 5;
+  bytes schema = 6;
+  uint32 schema_version = 7;
+  uint64 revision = 8;
+  uint64 mono = 9;
+  sint64 real = 10;
+  Source source = 11;
+  uint32 level = 12;
+  uint32 importance = 13;
+  uint64 payload_length = 14;
+  bytes payload = 20;
+}

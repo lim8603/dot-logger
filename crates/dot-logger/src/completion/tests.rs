@@ -104,6 +104,195 @@ fn metadata() -> RecordMetadata {
         importance: None,
     }
 }
+
+// In-memory storage exercises the public writer paths under deterministic
+// metadata-publication contention, including under Miri without filesystem IO.
+struct MemorySink(std::io::Cursor<Vec<u8>>);
+impl std::io::Write for MemorySink {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        std::io::Write::write(&mut self.0, bytes)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+impl std::io::Seek for MemorySink {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        std::io::Seek::seek(&mut self.0, pos)
+    }
+}
+impl crate::storage::SyncSink for MemorySink {
+    fn sync_all(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+fn storage_config() -> crate::storage::WriterConfig {
+    crate::storage::WriterConfig {
+        max_payload_bytes: 16,
+        write_buffer_bytes: 256,
+        chunk_target_bytes: 1024,
+        max_records: 2,
+        max_chunks: 2,
+        max_metadata_bytes: 64,
+    }
+}
+fn storage_channels() -> Vec<crate::storage::StorageChannel> {
+    vec![crate::storage::StorageChannel {
+        channel: ChannelConfig::new(7, 99, 1),
+        topic: "test".into(),
+        payload_encoding: "bytes".into(),
+        schema: None,
+    }]
+}
+
+#[test]
+fn storage_written_busy_retries_reports_without_appending_again() {
+    use crate::storage::{SegmentWriter, StorageError};
+    for batch in [false, true] {
+        let (mut owner, plan, routing) = setup();
+        owner.scope(|mut scope| {
+            let completion = scope.completion().unwrap();
+            let (mut producer, reader) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![reader], routing).unwrap();
+            let mut writer = SegmentWriter::new(
+                router.writer_budget(10).unwrap(),
+                storage_config(),
+                storage_channels(),
+                MemorySink(std::io::Cursor::new(Vec::new())),
+            )
+            .unwrap();
+            router.scope(|mut dispatcher, mut outputs| {
+                let now = Instant::now();
+                producer.try_record_small(metadata(), &[1]).unwrap();
+                dispatcher.turn(now, &mut [None; 4]).unwrap();
+                let first = outputs[0].try_next(now).unwrap().unwrap();
+                producer.try_record_small(metadata(), &[2]).unwrap();
+                dispatcher.turn(now, &mut [None; 4]).unwrap();
+                let second = outputs[0].try_next(now).unwrap().unwrap();
+                let slot = completion.registry.locate(second.record().receipt).unwrap();
+                let phase = slot.phase.swap(UPDATING, Ordering::AcqRel);
+                if batch {
+                    let error = writer.write_batch(&[&first, &second]).unwrap_err();
+                    assert!(matches!(error.error, StorageError::Busy));
+                    assert_eq!((error.appended, error.written, error.reported), (2, 2, 1));
+                } else {
+                    writer.write_delivery(&first).unwrap();
+                    assert!(matches!(
+                        writer.write_delivery(&second),
+                        Err(StorageError::Busy)
+                    ));
+                }
+                let safe = writer.safe_offset();
+                slot.phase.store(phase, Ordering::Release);
+                second.report(Update::Confirmed(Boundary::Written)).unwrap();
+                assert_eq!(writer.safe_offset(), safe);
+                assert_eq!(
+                    completion
+                        .poll(second.record().receipt, 10, Boundary::Written)
+                        .unwrap()
+                        .outcome,
+                    QueryOutcome::Complete
+                );
+                drop((first, second));
+                let bytes = writer.finish().unwrap().into_inner().0.into_inner();
+                assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+            });
+        });
+    }
+}
+
+#[test]
+fn storage_sync_busy_returns_work_for_active_and_finished_files() {
+    use crate::{
+        control::{ControlConfig, ControlOwner},
+        storage::{SegmentWriter, StorageError},
+    };
+    for finished in [false, true] {
+        let (mut owner, plan, routing) = setup();
+        owner.scope(|mut scope| {
+            let completion = scope.completion().unwrap();
+            let now = Instant::now();
+            let control = ControlOwner::new(
+                &plan,
+                scope.control(),
+                ControlConfig {
+                    sync_slots: 1,
+                    work_per_poll: 8,
+                },
+                now,
+            )
+            .unwrap();
+            let (mut producer, reader) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![reader], routing).unwrap();
+            let budget = router.writer_budget(10).unwrap();
+            let mut writer = SegmentWriter::new(
+                budget.clone(),
+                storage_config(),
+                storage_channels(),
+                MemorySink(std::io::Cursor::new(Vec::new())),
+            )
+            .unwrap();
+            router.scope(|mut dispatcher, mut outputs| {
+                producer.try_record_small(metadata(), &[1]).unwrap();
+                dispatcher.turn(now, &mut [None; 4]).unwrap();
+                let delivery = outputs[0].try_next(now).unwrap().unwrap();
+                let receipt = delivery.record().receipt;
+                writer.write_delivery(&delivery).unwrap();
+                delivery
+                    .report(Update::Confirmed(Boundary::Synced))
+                    .unwrap();
+                drop(delivery);
+                drop(writer.finish().unwrap());
+                let mut next = SegmentWriter::new(
+                    budget,
+                    storage_config(),
+                    storage_channels(),
+                    MemorySink(std::io::Cursor::new(Vec::new())),
+                )
+                .unwrap();
+                let mut ranges = [ProducerRange::default(); 1];
+                let frozen = completion.capture_scope(&mut ranges).unwrap();
+                let token = control
+                    .request_sync(frozen, &[10], now, now + Duration::from_secs(1))
+                    .unwrap();
+                let work = control
+                    .next_sync(
+                        token,
+                        10,
+                        now,
+                        &mut dispatcher,
+                        &mut [ProducerRange::default(); 1],
+                    )
+                    .unwrap()
+                    .unwrap();
+                let slot = completion.registry.locate(receipt).unwrap();
+                let phase = slot.phase.swap(UPDATING, Ordering::AcqRel);
+                if finished {
+                    let mut next = next.finish().unwrap();
+                    let error = next.sync_work(work).unwrap_err();
+                    assert!(matches!(error.error, StorageError::Busy));
+                    let work = error.work.unwrap();
+                    slot.phase.store(phase, Ordering::Release);
+                    next.sync_work(work).unwrap();
+                } else {
+                    let error = next.sync_work(work).unwrap_err();
+                    assert!(matches!(error.error, StorageError::Busy));
+                    let work = error.work.unwrap();
+                    slot.phase.store(phase, Ordering::Release);
+                    next.sync_work(work).unwrap();
+                }
+                control.poll(now).unwrap();
+                assert_eq!(
+                    completion
+                        .poll(receipt, 10, Boundary::Synced)
+                        .unwrap()
+                        .outcome,
+                    QueryOutcome::Complete
+                );
+            });
+        });
+    }
+}
 #[test]
 fn busy_report_publication_preserves_feedback_and_backpressures_without_losing_an_event() {
     let (mut owner, plan, routing) = setup();

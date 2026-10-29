@@ -100,6 +100,20 @@ impl Drop for ControllerLease<'_> {
         self.0.control_attached.store(false, Ordering::Release);
     }
 }
+struct SyncSubmission<'a>(&'a AtomicBool);
+impl<'a> SyncSubmission<'a> {
+    fn enter(active: &'a AtomicBool) -> Result<Self, ControlError> {
+        active
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+            .map_err(|_| ControlError::Busy)?;
+        Ok(Self(active))
+    }
+}
+impl Drop for SyncSubmission<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
 /// Owns preallocated command/range/application state on the general path. Borrowed
 /// SyncWork guards prevent this owner from being dropped while an operation lives.
 /// An incomplete shutdown leaves this same owner, dispatcher, and capture owner
@@ -115,6 +129,7 @@ pub struct ControlOwner<'owner> {
     clock: AtomicU64,
     reserved: usize,
     shutdown: AtomicU8,
+    sync_submitting: AtomicBool,
     shutdown_deadline: AtomicU64,
     shutdown_finished_at: AtomicU64,
     sync_files: AtomicBool,
@@ -230,6 +245,7 @@ impl<'owner> ControlOwner<'owner> {
             clock: AtomicU64::new(0),
             reserved,
             shutdown: AtomicU8::new(0),
+            sync_submitting: AtomicBool::new(false),
             shutdown_deadline: AtomicU64::new(0),
             shutdown_finished_at: AtomicU64::new(0),
             sync_files: AtomicBool::new(false),
@@ -324,7 +340,9 @@ impl<'owner> ControlOwner<'owner> {
         })
     }
     /// Explicitly request synchronization for frozen cutoffs. This only queues work;
-    /// completion polling never calls it. All capabilities are checked before mutation.
+    /// completion polling never calls it. All capabilities are checked before queuing.
+    /// Concurrent submissions return Busy without waiting. Shutdown includes any
+    /// admitted submission before it can finish freezing and drain its requests.
     pub fn request_sync(
         &self,
         scope: CompletionScope<'_>,
@@ -334,9 +352,22 @@ impl<'owner> ControlOwner<'owner> {
     ) -> Result<SyncToken, ControlError> {
         let tick = self.now(now)?;
         let end = self.tick(deadline)?;
-        if self.shutdown.load(Ordering::Acquire) != 0 {
+        let _submission = SyncSubmission::enter(&self.sync_submitting).map_err(|error| {
+            if self.shutdown.load(Ordering::SeqCst) != 0 {
+                ControlError::Closing
+            } else {
+                error
+            }
+        })?;
+        // SC admission < open check < shutdown close < quiescence observation.
+        // If this call saw Running, shutdown must see its live submission until
+        // the slot is published (or every error path returns via the RAII guard).
+        // A call entering after shutdown observes Closing before touching a slot.
+        if self.shutdown.load(Ordering::SeqCst) != 0 {
             return Err(ControlError::Closing);
         }
+        #[cfg(test)]
+        tests::pause_sync_submission();
         if tick >= end {
             return Err(ControlError::DeadlineExceeded);
         }
@@ -575,7 +606,8 @@ impl<'owner> ControlOwner<'owner> {
         Ok(applying)
     }
     /// Close admission and begin the declared drain/sync plan. A pre-close producer
-    /// call must finish publication before acceptance cutoffs can be frozen.
+    /// call and ordinary sync submission must finish publication before cutoffs
+    /// can be frozen and final cleanup can complete.
     pub fn begin_shutdown(
         &self,
         plan: ShutdownPlan,
@@ -601,7 +633,7 @@ impl<'owner> ControlOwner<'owner> {
             return Err(ControlError::InvalidConfig);
         }
         self.shutdown
-            .compare_exchange(0, 4, Ordering::AcqRel, Ordering::Relaxed)
+            .compare_exchange(0, 4, Ordering::SeqCst, Ordering::Relaxed)
             .map_err(|_| ControlError::Closing)?;
         self.shutdown_deadline.store(end, Ordering::Relaxed);
         self.sync_files.store(plan.sync_files, Ordering::Relaxed);
@@ -621,7 +653,8 @@ impl<'owner> ControlOwner<'owner> {
         })
     }
     /// Copy the exact producer cutoffs frozen after admission closed and all
-    /// pre-close publications finished. Busy means freezing has not completed.
+    /// pre-close producer/sync publications finished. Busy means freezing has
+    /// not completed.
     pub fn shutdown_ranges(&self, buffer: &mut [ProducerRange]) -> Result<usize, ControlError> {
         let token = self.shutdown_sync().ok_or(ControlError::Busy)?;
         let slot = self.slot(token)?;
@@ -630,6 +663,8 @@ impl<'owner> ControlOwner<'owner> {
     }
     /// Poll safe cleanup on the same owner after any timeout. This does not perform
     /// writer IO or forcibly cancel IO guards. Drive dispatcher/readers/writers too.
+    /// Keep polling after Closing or Incomplete until Closed; inspect its report
+    /// for failure, since Closed alone does not mean synchronization succeeded.
     pub fn poll_shutdown(
         &self,
         now: Instant,
@@ -649,7 +684,10 @@ impl<'owner> ControlOwner<'owner> {
         if phase == 4 {
             return Err(ControlError::Busy);
         }
-        if phase == 1 && self.completion.active_calls() == 0 {
+        if phase == 1
+            && !self.sync_submitting.load(Ordering::SeqCst)
+            && self.completion.active_calls() == 0
+        {
             self.shutdown
                 .compare_exchange(1, 4, Ordering::AcqRel, Ordering::Relaxed)
                 .map_err(|_| ControlError::Busy)?;
@@ -809,6 +847,64 @@ pub struct SyncWork<'control, 'owner> {
     armed: bool,
 }
 impl SyncWork<'_, '_> {
+    pub(crate) fn covers_file(&self, first: &[u64], last: &[u64]) -> Result<bool, ControlError> {
+        let completion = self.owner.completion;
+        let slot = &self.owner.slots[self.token.slot];
+        if first.len() != slot.ranges.len() || last.len() != slot.ranges.len() {
+            return Ok(false);
+        }
+        for (p, range) in slot.ranges.iter().enumerate() {
+            let start = range.first.load(Ordering::Acquire);
+            let end = range.last.load(Ordering::Acquire);
+            if start == 0 || end < start {
+                continue;
+            }
+            // A new segment cannot stand in for a previous segment's unsynced
+            // writes. Check only the portions outside this file's known range;
+            // an older range beyond retained metadata is conservatively rejected.
+            let mut outside = [(1, 0); 2];
+            if first[p] == 0 {
+                outside[0] = (start, end);
+            } else {
+                if start < first[p] {
+                    outside[0] = (start, end.min(first[p] - 1));
+                }
+                if end > last[p] {
+                    outside[1] = (start.max(last[p] + 1), end);
+                }
+            }
+            for (mut seq, end) in outside {
+                if end < seq {
+                    continue;
+                }
+                if end - seq >= completion.registry.limits.window as u64 {
+                    return Ok(false);
+                }
+                loop {
+                    let receipt = crate::capture::CaptureReceipt {
+                        session_id: self.token.session_id,
+                        producer_id: p as u32,
+                        accepted_seq: seq,
+                    };
+                    let status = completion.poll(receipt, self.target, Boundary::Synced)?;
+                    if status.outcome == QueryOutcome::Busy {
+                        return Err(ControlError::Busy);
+                    }
+                    if matches!(
+                        status.outcome,
+                        QueryOutcome::Pending | QueryOutcome::Expired
+                    ) {
+                        return Ok(false);
+                    }
+                    if seq == end {
+                        break;
+                    }
+                    seq += 1;
+                }
+            }
+        }
+        Ok(true)
+    }
     /// Frozen request identity.
     pub fn token(&self) -> SyncToken {
         self.token
@@ -848,3 +944,6 @@ impl Drop for SyncWork<'_, '_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

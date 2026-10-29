@@ -1,0 +1,656 @@
+use super::*;
+use crate::capture::CapturedRecord;
+use crate::completion::{Boundary, Update};
+use crate::control::{SyncResult, SyncWork};
+use crate::routing::Delivery;
+use std::collections::BTreeMap;
+use std::io::{Seek, SeekFrom, Write};
+use std::sync::atomic::{AtomicBool, AtomicU64};
+
+/// A seekable OS/adapter sink with explicit synchronization.
+pub trait SyncSink: Write + Seek {
+    /// Confirm an actual adapter synchronization, separate from Write::flush.
+    fn sync_all(&mut self) -> std::io::Result<()>;
+}
+impl SyncSink for std::fs::File {
+    fn sync_all(&mut self) -> std::io::Result<()> {
+        std::fs::File::sync_all(self)
+    }
+}
+struct Signals {
+    position: AtomicU64,
+    sync: AtomicBool,
+}
+struct Sink<W> {
+    inner: W,
+    buffer: Vec<u8>,
+    sent: usize,
+    signals: Arc<Signals>,
+}
+impl<W: SyncSink> Sink<W> {
+    fn drain_buffer(&mut self) -> std::io::Result<()> {
+        // Preserve partial progress on an IO error. Drop only releases memory;
+        // it never retries a write or flushes abandoned bytes.
+        while self.sent < self.buffer.len() {
+            match self.inner.write(&self.buffer[self.sent..]) {
+                Ok(0) => return Err(std::io::ErrorKind::WriteZero.into()),
+                Ok(n) => self.sent += n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        self.buffer.clear();
+        self.sent = 0;
+        Ok(())
+    }
+}
+impl<W: SyncSink> Write for Sink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let count = if bytes.len() >= self.buffer.capacity() {
+            self.drain_buffer()?;
+            self.inner.write(bytes)?
+        } else {
+            if self.buffer.len() + bytes.len() > self.buffer.capacity() {
+                self.drain_buffer()?;
+            }
+            self.buffer.extend_from_slice(bytes);
+            bytes.len()
+        };
+        let pos = self
+            .signals
+            .position
+            .load(Ordering::Relaxed)
+            .checked_add(count as u64)
+            .ok_or_else(|| std::io::Error::other("file offset overflow"))?;
+        self.signals.position.store(pos, Ordering::Release);
+        Ok(count)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        let sync = self.signals.sync.swap(false, Ordering::AcqRel);
+        self.drain_buffer()?;
+        self.inner.flush()?;
+        if sync {
+            self.inner.sync_all()?;
+        }
+        Ok(())
+    }
+}
+impl<W: SyncSink> Seek for Sink<W> {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.drain_buffer()?;
+        let pos = self.inner.seek(pos)?;
+        self.signals.position.store(pos, Ordering::Release);
+        Ok(pos)
+    }
+    fn stream_position(&mut self) -> std::io::Result<u64> {
+        // Includes accepted buffered bytes, so position probes need no IO.
+        Ok(self.signals.position.load(Ordering::Acquire))
+    }
+}
+fn check_sync(
+    budget: &WriterBudget,
+    work: &SyncWork<'_, '_>,
+    first: &[u64],
+    last: &[u64],
+) -> Result<(), StorageError> {
+    if work.target_id() != budget.target || work.token().session_id != budget.session {
+        return Err(StorageError::InvalidRecord);
+    }
+    match work.covers_file(first, last) {
+        Ok(true) => Ok(()),
+        Err(
+            crate::control::ControlError::Busy
+            | crate::control::ControlError::Completion(crate::completion::CompletionError::Busy),
+        ) => Err(StorageError::Busy),
+        _ => Err(StorageError::InvalidRecord),
+    }
+}
+fn report_written(delivery: &Delivery<'_>) -> Result<(), StorageError> {
+    delivery
+        .report(Update::Confirmed(Boundary::Written))
+        .map_err(|e| match e {
+            crate::completion::CompletionError::Busy => StorageError::Busy,
+            _ => StorageError::Completion(e),
+        })
+}
+impl WriterConfig {
+    fn index_entries(&self, channels: usize) -> usize {
+        // Each nonempty channel/chunk pair requires at least one message.
+        self.max_chunks
+            .saturating_mul(channels)
+            .min(self.max_records)
+    }
+    /// Conservative requested-byte reservation for the pinned uncompressed MCAP
+    /// implementation, including encoder, maps, Vec growth and summary clones.
+    /// Sink-owned buffers, allocator bookkeeping and OS page cache are separate.
+    pub fn reservation(
+        &self,
+        channels: &[StorageChannel],
+        producers: usize,
+    ) -> Result<usize, StorageError> {
+        if self.max_payload_bytes == 0
+            || self.chunk_target_bytes == 0
+            || self.max_records == 0
+            || self.max_chunks == 0
+            || self.max_records > u32::MAX as usize
+            || self.max_chunks > u32::MAX as usize
+            || channels.is_empty()
+            || channels.len() > u16::MAX as usize - 2
+            || self.max_metadata_bytes == 0
+            || self.max_metadata_bytes > u32::MAX as usize
+            || producers == 0
+        {
+            return Err(StorageError::InvalidConfig);
+        }
+        let mut metadata = 0usize;
+        for (i, c) in channels.iter().enumerate() {
+            if c.topic.len() > 256
+                || c.payload_encoding.len() > 64
+                || c.topic.is_empty()
+                || channels[..i]
+                    .iter()
+                    .any(|p| p.channel.channel_id == c.channel.channel_id)
+            {
+                return Err(StorageError::InvalidConfig);
+            }
+            if c.schema
+                .as_ref()
+                .is_some_and(|s| s.encoding.is_empty() || s.encoding.len() > 64)
+            {
+                return Err(StorageError::InvalidConfig);
+            }
+            if channels[..i].iter().any(|p| {
+                p.channel.schema_id == c.channel.schema_id
+                    && p.channel.schema_version == c.channel.schema_version
+                    && p.schema != c.schema
+            }) {
+                return Err(StorageError::InvalidConfig);
+            }
+            for bytes in [
+                c.topic.len(),
+                c.payload_encoding.len(),
+                c.schema.as_ref().map_or(0, |s| s.encoding.len()),
+                c.schema.as_ref().map_or(0, |s| s.descriptor.len()),
+            ] {
+                metadata = metadata
+                    .checked_add(bytes)
+                    .ok_or(StorageError::InvalidConfig)?;
+            }
+        }
+        if metadata > self.max_metadata_bytes {
+            return Err(StorageError::InvalidConfig);
+        }
+        let max = self
+            .max_payload_bytes
+            .checked_add(codec::OVERHEAD)
+            .ok_or(StorageError::InvalidConfig)?;
+        let mut total = 65536usize;
+        // Direct seeking avoids an accumulating chunk payload buffer. Reserve an
+        // extra max-record allowance; chunk target is not a hard memory cap.
+        for (n, size) in [
+            (2, max),
+            (self.write_buffer_bytes, 1),
+            (self.max_records, 64),
+            (self.max_chunks, 512),
+            (self.index_entries(channels.len()), 512),
+            (channels.len(), 8192),
+            (self.max_metadata_bytes, 16),
+            (producers, 64),
+        ] {
+            total = total
+                .checked_add(n.checked_mul(size).ok_or(StorageError::InvalidConfig)?)
+                .ok_or(StorageError::InvalidConfig)?;
+        }
+        if total > isize::MAX as usize {
+            return Err(StorageError::InvalidConfig);
+        }
+        Ok(total)
+    }
+}
+/// Exclusive general-path owner of one bounded uncompressed segment.
+/// Drop releases resources without claiming write/sync success or writing a footer.
+pub struct SegmentWriter<W: SyncSink> {
+    writer: Option<mcap::Writer<Sink<W>>>,
+    signals: Arc<Signals>,
+    config: WriterConfig,
+    channels: Box<[StorageChannel]>,
+    current: Box<[Option<ChunkIndexEntry>]>,
+    index: Vec<ChunkIndexEntry>,
+    last: Box<[u64]>,
+    first: Box<[u64]>,
+    encoder: Vec<u8>,
+    records: usize,
+    chunks: usize,
+    pending_records: usize,
+    pending_bytes: usize,
+    chunk_start: u64,
+    open: bool,
+    safe: u64,
+    poisoned: bool,
+    _target: TargetLease,
+    // Last: allocations are released before the budget lease.
+    lease: Option<Lease>,
+}
+/// Closed container; its index reservation remains live until this owner is dropped.
+pub struct FinishedSegment<W: SyncSink> {
+    sink: W,
+    index: Vec<ChunkIndexEntry>,
+    safe: u64,
+    first: Box<[u64]>,
+    last: Box<[u64]>,
+    _lease: Lease,
+}
+impl<W: SyncSink> FinishedSegment<W> {
+    /// Retained auxiliary index.
+    pub fn index(&self) -> &[ChunkIndexEntry] {
+        &self.index
+    }
+    /// End of the complete file, without an implicit durability acknowledgment.
+    pub fn safe_offset(&self) -> u64 {
+        self.safe
+    }
+    /// Return the sink, releasing logger-owned metadata reservations.
+    pub fn into_inner(self) -> W {
+        self.sink
+    }
+    /// Synchronize the closed file including its summary/footer for a matching
+    /// admitted barrier. Other segments require separate coordinated handling.
+    /// Validation/Busy returns the original work in SyncWorkError::work; retry
+    /// that guard on the correct file. An IO failure acknowledges Failed and
+    /// returns no work. Discarding returned work records Unknown.
+    pub fn sync_work<'c, 'o>(
+        &mut self,
+        work: SyncWork<'c, 'o>,
+    ) -> Result<(), SyncWorkError<'c, 'o>> {
+        if let Err(error) = check_sync(&self._lease.budget, &work, &self.first, &self.last) {
+            return Err(SyncWorkError {
+                error,
+                work: Some(work),
+            });
+        }
+        let result = self.sink.flush().and_then(|()| self.sink.sync_all());
+        work.complete(if result.is_ok() {
+            SyncResult::Synced
+        } else {
+            SyncResult::Failed
+        });
+        result.map_err(|e| SyncWorkError {
+            error: StorageError::Io(e),
+            work: None,
+        })
+    }
+}
+impl<W: SyncSink> SegmentWriter<W> {
+    /// Validate and reserve before emitting any file bytes. The sink must be empty
+    /// and positioned at zero. Custom sink buffering is the adapter's own budget.
+    pub fn new(
+        budget: WriterBudget,
+        config: WriterConfig,
+        channels: Vec<StorageChannel>,
+        mut sink: W,
+    ) -> Result<Self, StorageError> {
+        let bytes = config.reservation(&channels, budget.producers)?;
+        let target_lease = TargetLease::enter(&budget)?;
+        let lease = budget.reserve(bytes)?;
+        if sink.stream_position().map_err(StorageError::Io)? != 0
+            || sink.seek(SeekFrom::End(0)).map_err(StorageError::Io)? != 0
+        {
+            return Err(StorageError::InvalidConfig);
+        }
+        sink.seek(SeekFrom::Start(0)).map_err(StorageError::Io)?;
+        // Normalize caller spare capacities before retaining the registrations.
+        let channels: Box<[_]> = channels
+            .into_iter()
+            .map(|mut c| {
+                c.topic = c.topic.into_boxed_str().into_string();
+                c.payload_encoding = c.payload_encoding.into_boxed_str().into_string();
+                if let Some(s) = &mut c.schema {
+                    s.encoding = std::mem::take(&mut s.encoding)
+                        .into_boxed_str()
+                        .into_string();
+                    s.descriptor = std::mem::take(&mut s.descriptor)
+                        .into_boxed_slice()
+                        .into_vec();
+                }
+                c
+            })
+            .collect();
+        let signals = Arc::new(Signals {
+            position: AtomicU64::new(0),
+            sync: AtomicBool::new(false),
+        });
+        let mut writer = mcap::WriteOptions::new()
+            .compression(None)
+            .disable_seeking(false)
+            .chunk_size(None)
+            .profile("dot-logger/1")
+            .library("dot-logger/0.1.0")
+            .calculate_chunk_crcs(true)
+            .calculate_data_section_crc(true)
+            .calculate_summary_section_crc(true)
+            .emit_message_indexes(true)
+            .emit_chunk_indexes(true)
+            .create(Sink {
+                inner: sink,
+                buffer: Vec::with_capacity(config.write_buffer_bytes),
+                sent: 0,
+                signals: Arc::clone(&signals),
+            })?;
+        let chunk_start = signals.position.load(Ordering::Acquire);
+        let schema = writer.add_schema(
+            "dot_logger.Envelope",
+            "protobuf",
+            include_bytes!("envelope.bin"),
+        )?;
+        for (i, c) in channels.iter().enumerate() {
+            let mut metadata = BTreeMap::from([
+                ("session_id".into(), format!("{:032x}", budget.session)),
+                ("revision".into(), budget.revision.to_string()),
+                ("product_channel".into(), c.channel.channel_id.to_string()),
+                (
+                    "payload_schema_id".into(),
+                    format!("{:032x}", c.channel.schema_id),
+                ),
+                (
+                    "payload_schema_version".into(),
+                    c.channel.schema_version.to_string(),
+                ),
+                ("payload_encoding".into(), c.payload_encoding.clone()),
+            ]);
+            if let Some(s) = &c.schema {
+                let id = writer.add_schema(
+                    &format!(
+                        "payload.{:032x}.v{}",
+                        c.channel.schema_id, c.channel.schema_version
+                    ),
+                    &s.encoding,
+                    &s.descriptor,
+                )?;
+                metadata.insert("payload_schema_file_id".into(), id.to_string());
+            }
+            writer.add_channel_with_id((i + 1) as u16, schema, &c.topic, "protobuf", &metadata)?;
+        }
+        let count = channels.len();
+        Ok(Self {
+            writer: Some(writer),
+            signals,
+            config,
+            channels,
+            current: vec![None; count].into_boxed_slice(),
+            index: Vec::with_capacity(config.index_entries(count)),
+            last: vec![0; budget.producers].into_boxed_slice(),
+            first: vec![0; budget.producers].into_boxed_slice(),
+            encoder: Vec::with_capacity(config.max_payload_bytes + codec::OVERHEAD),
+            records: 0,
+            chunks: 0,
+            pending_records: 0,
+            pending_bytes: 0,
+            chunk_start,
+            open: true,
+            safe: 0,
+            poisoned: false,
+            _target: target_lease,
+            lease: Some(lease),
+        })
+    }
+    /// Conservative bytes reserved until this writer or its finished index is dropped.
+    pub fn reserved_bytes(&self) -> usize {
+        self.lease.as_ref().map_or(0, |l| l.bytes)
+    }
+    /// Encode and append without reporting durability. Invalid input and capacity
+    /// rejection leave the file untouched; an IO failure poisons further appends.
+    pub fn append(&mut self, record: CapturedRecord, payload: &[u8]) -> Result<(), StorageError> {
+        if self.poisoned {
+            return Err(StorageError::Poisoned);
+        }
+        let budget = &self.lease.as_ref().ok_or(StorageError::Poisoned)?.budget;
+        let p = record.receipt.producer_id as usize;
+        let channel = self
+            .channels
+            .iter()
+            .position(|c| c.channel.channel_id == record.metadata.channel_id)
+            .ok_or(StorageError::InvalidRecord)?;
+        let c = &self.channels[channel].channel;
+        if record.receipt.session_id != budget.session
+            || record.revision != budget.revision
+            || p >= self.last.len()
+            || record.receipt.accepted_seq <= self.last[p]
+            || record.metadata.schema_id != c.schema_id
+            || record.metadata.schema_version != c.schema_version
+        {
+            return Err(StorageError::InvalidRecord);
+        }
+        if self.records == self.config.max_records
+            || (!self.open && self.chunks == self.config.max_chunks)
+        {
+            return Err(StorageError::NeedRotation);
+        }
+        encode_record(
+            record,
+            payload,
+            &mut self.encoder,
+            self.config.max_payload_bytes,
+        )?;
+        let bytes = self.encoder.len() + 31;
+        let split = self.pending_records > 0
+            && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
+        if split && self.chunks + 1 >= self.config.max_chunks {
+            return Err(StorageError::NeedRotation);
+        }
+        if split {
+            self.flush_chunk()?;
+        }
+        if !self.open {
+            self.chunk_start = self.signals.position.load(Ordering::Acquire);
+        }
+        let header = mcap::records::MessageHeader {
+            channel_id: (channel + 1) as u16,
+            sequence: 0,
+            log_time: record.metadata.real_ns as u64,
+            publish_time: record.metadata.real_ns as u64,
+        };
+        let result = self
+            .writer
+            .as_mut()
+            .ok_or(StorageError::Poisoned)?
+            .write_to_known_channel(&header, &self.encoder);
+        if let Err(e) = result {
+            self.poisoned = true;
+            return Err(e.into());
+        }
+        self.open = true;
+        self.records += 1;
+        self.pending_records += 1;
+        self.pending_bytes += bytes;
+        self.last[p] = record.receipt.accepted_seq;
+        if self.first[p] == 0 {
+            self.first[p] = record.receipt.accepted_seq;
+        }
+        let entry = self.current[channel].get_or_insert(ChunkIndexEntry {
+            channel_id: record.metadata.channel_id,
+            mono_min: record.metadata.mono_ns,
+            mono_max: record.metadata.mono_ns,
+            real_min: record.metadata.real_ns,
+            real_max: record.metadata.real_ns,
+            chunk_offset: self.chunk_start,
+            record_count: 0,
+        });
+        entry.mono_min = entry.mono_min.min(record.metadata.mono_ns);
+        entry.mono_max = entry.mono_max.max(record.metadata.mono_ns);
+        entry.real_min = entry.real_min.min(record.metadata.real_ns);
+        entry.real_max = entry.real_max.max(record.metadata.real_ns);
+        entry.record_count += 1;
+        Ok(())
+    }
+    /// Last complete chunk flushed to the adapter write boundary, not disk durability.
+    pub fn safe_offset(&self) -> u64 {
+        self.safe
+    }
+    /// Complete-chunk auxiliary entries; open-chunk bounds are never exposed.
+    pub fn index(&self) -> &[ChunkIndexEntry] {
+        &self.index
+    }
+    /// Finish the current chunk and publish its safe offset only after flush succeeds.
+    pub fn flush_chunk(&mut self) -> Result<u64, StorageError> {
+        if self.poisoned {
+            return Err(StorageError::Poisoned);
+        }
+        let result = self.writer.as_mut().ok_or(StorageError::Poisoned)?.flush();
+        if let Err(e) = result {
+            self.poisoned = true;
+            return Err(e.into());
+        }
+        if self.open {
+            for entry in &mut self.current {
+                if let Some(entry) = entry.take() {
+                    self.index.push(entry);
+                }
+            }
+            self.chunks += 1;
+            self.open = false;
+            self.pending_records = 0;
+            self.pending_bytes = 0;
+        }
+        self.safe = self.signals.position.load(Ordering::Acquire);
+        Ok(self.safe)
+    }
+    /// Write a routing guard and flush its complete chunk before reporting Written.
+    /// Prefer write_batch for throughput; this method explicitly flushes one record.
+    /// On Busy the bytes are already written: retry only
+    /// `delivery.report(Update::Confirmed(Boundary::Written))` with the same guard.
+    /// Calling write_delivery again would append twice and is rejected by sequence.
+    pub fn write_delivery(&mut self, delivery: &Delivery<'_>) -> Result<(), StorageError> {
+        if delivery.target_id()
+            != self
+                .lease
+                .as_ref()
+                .ok_or(StorageError::Poisoned)?
+                .budget
+                .target
+        {
+            return Err(StorageError::InvalidRecord);
+        }
+        self.append(delivery.record(), delivery.payload())?;
+        self.flush_chunk()?;
+        report_written(delivery)
+    }
+    /// Append caller-owned guards using the chunk target, flush the final chunk
+    /// once, then report Written in slice order. An empty batch performs no IO.
+    /// The caller bounds batch size/latency and retains guards through reporting.
+    ///
+    /// On append failure, no reports are made: `error.appended` records were
+    /// accepted and must not be appended again. Flush explicitly before reporting
+    /// that prefix. IO failure poisons the writer; never claim Written for it.
+    /// After a successful flush, `written` equals the batch length; on report Busy,
+    /// retry only `Delivery::report(Update::Confirmed(Boundary::Written))` for
+    /// `deliveries[error.reported..error.written]`. Do not retry file writes.
+    pub fn write_batch(&mut self, deliveries: &[&Delivery<'_>]) -> Result<(), BatchWriteError> {
+        if deliveries.is_empty() {
+            return Ok(());
+        }
+        let mut progress = BatchWriteError {
+            error: StorageError::Poisoned,
+            appended: 0,
+            written: 0,
+            reported: 0,
+        };
+        let target = self.lease.as_ref().ok_or(progress)?.budget.target;
+        progress = BatchWriteError {
+            error: StorageError::InvalidRecord,
+            appended: 0,
+            written: 0,
+            reported: 0,
+        };
+        for (i, delivery) in deliveries.iter().enumerate() {
+            if delivery.target_id() != target {
+                return Err(progress);
+            }
+            if let Err(error) = self.append(delivery.record(), delivery.payload()) {
+                progress.error = error;
+                return Err(progress);
+            }
+            progress.appended = i + 1;
+        }
+        if let Err(error) = self.flush_chunk() {
+            progress.error = error;
+            return Err(progress);
+        }
+        progress.written = deliveries.len();
+        for (i, delivery) in deliveries.iter().enumerate() {
+            if let Err(error) = report_written(delivery) {
+                progress.error = error;
+                return Err(progress);
+            }
+            progress.reported = i + 1;
+        }
+        Ok(())
+    }
+    /// Synchronize the actual sink for an admitted control barrier and acknowledge
+    /// its result. ControlOwner validates preceding guards and cutoffs first.
+    /// Pre-IO validation/Busy/Poisoned returns ownership in SyncWorkError::work.
+    /// Retry that work on a matching healthy segment. Actual flush/sync failure
+    /// acknowledges Failed and returns no work; dropping rejected work is Unknown.
+    pub fn sync_work<'c, 'o>(
+        &mut self,
+        work: SyncWork<'c, 'o>,
+    ) -> Result<(), SyncWorkError<'c, 'o>> {
+        let check = self
+            .lease
+            .as_ref()
+            .ok_or(StorageError::Poisoned)
+            .and_then(|lease| check_sync(&lease.budget, &work, &self.first, &self.last))
+            .and({
+                if self.poisoned {
+                    Err(StorageError::Poisoned)
+                } else {
+                    Ok(())
+                }
+            });
+        if let Err(error) = check {
+            return Err(SyncWorkError {
+                error,
+                work: Some(work),
+            });
+        }
+        self.signals.sync.store(true, Ordering::Release);
+        let result = self.flush_chunk();
+        self.signals.sync.store(false, Ordering::Release);
+        work.complete(if result.is_ok() {
+            SyncResult::Synced
+        } else {
+            SyncResult::Failed
+        });
+        result
+            .map(|_| ())
+            .map_err(|error| SyncWorkError { error, work: None })
+    }
+    /// Write the standard summary/footer; finish alone does not synchronize storage.
+    pub fn finish(mut self) -> Result<FinishedSegment<W>, StorageError> {
+        self.flush_chunk()?;
+        let mut writer = self.writer.take().ok_or(StorageError::Poisoned)?;
+        if let Err(e) = writer.finish() {
+            drop(writer.into_inner());
+            return Err(e.into());
+        }
+        let mut sink = writer.into_inner();
+        sink.flush().map_err(StorageError::Io)?;
+        let safe = self.signals.position.load(Ordering::Acquire);
+        Ok(FinishedSegment {
+            sink: sink.inner,
+            index: std::mem::take(&mut self.index),
+            safe,
+            first: std::mem::take(&mut self.first),
+            last: std::mem::take(&mut self.last),
+            _lease: self.lease.take().ok_or(StorageError::Poisoned)?,
+        })
+    }
+}
+impl<W: SyncSink> Drop for SegmentWriter<W> {
+    fn drop(&mut self) {
+        // Extracting suppresses MCAP's usual Drop-time footer IO. Only explicit
+        // finish/sync methods produce completion observations.
+        if let Some(writer) = self.writer.take() {
+            drop(writer.into_inner());
+        }
+    }
+}

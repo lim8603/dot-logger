@@ -2,16 +2,24 @@
 
 use dot_logger::capture::{CaptureOwner, ChannelConfig, Level, RecordMetadata, RecordOutcome};
 use dot_logger::completion::{
-    Boundaries, Boundary, CompletionConfig, ProducerRange, QueryOutcome, TargetContract, Update,
+    Boundaries, Boundary, CompletionConfig, ProducerRange, QueryOutcome, TargetContract,
 };
 use dot_logger::config::{
     ImportancePolicy, MemoryBudget, PoolQuota, ProducerQuota, SessionBuilder, SessionConfig,
     WorkerThreadingConfig,
 };
-use dot_logger::control::{ControlConfig, ControlOwner, ShutdownPlan, ShutdownPoll, SyncResult};
+use dot_logger::control::{ControlConfig, ControlOwner, ShutdownPlan, ShutdownPoll};
 use dot_logger::platform::{PlatformCapabilities, Requirement};
 use dot_logger::routing::{Route, Router, RoutingConfig, Schedule, TargetConfig};
+use dot_logger::storage::{SegmentWriter, StorageChannel, WriterConfig};
 use std::time::{Duration, Instant};
+
+struct TempPath(std::path::PathBuf);
+impl Drop for TempPath {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     const MIB: usize = 1024 * 1024;
@@ -87,8 +95,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             completion: Boundary::Written,
         }],
     };
-    // Allocate/register before RT use. Writer acknowledgments below are a test
-    // adapter; this example does not create a file or prove disk durability.
+    // This consumer writes and syncs a local file. Device/power-loss durability
+    // remains a separate hardware test.
     let mut ingress = CaptureOwner::new_tracked(
         &plan,
         1,
@@ -126,19 +134,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         else {
             panic!("example admission must fit");
         };
+        let Ok(RecordOutcome::Accepted(second)) = producer.try_record_small(metadata, b"batch")
+        else {
+            panic!("second example admission must fit");
+        };
         let mut router = Router::new(&plan, vec![consumer], routing)?;
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos();
+        let path = TempPath(std::env::temp_dir().join(format!(
+            "dot-logger-consumer-{}-{stamp}.mcap",
+            std::process::id()
+        )));
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create_new(true)
+            .open(&path.0)?;
+        let mut writer = SegmentWriter::new(
+            router.writer_budget(1)?,
+            WriterConfig {
+                max_payload_bytes: 256,
+                write_buffer_bytes: 4096,
+                chunk_target_bytes: 1024,
+                max_records: 4,
+                max_chunks: 4,
+                max_metadata_bytes: 1024,
+            },
+            vec![StorageChannel {
+                channel: ChannelConfig::new(7, 99, 1),
+                topic: "example".into(),
+                payload_encoding: "application/octet-stream".into(),
+                schema: None,
+            }],
+            file,
+        )?;
         router.scope(
             |mut dispatch, mut outputs| -> Result<(), Box<dyn std::error::Error>> {
                 let mut events = [None; 4];
                 let report = dispatch.turn(now, &mut events)?;
-                assert_eq!(report.records, 1);
+                assert_eq!(report.records, 2);
                 assert!(report.fault.is_none());
                 let Some(Ok(delivery)) = outputs[0].try_next(now) else {
                     panic!("expected output guard");
                 };
                 assert_eq!(delivery.payload(), b"example");
-                delivery.report(Update::Confirmed(Boundary::Written))?;
-                drop(delivery);
+                let Some(Ok(other)) = outputs[0].try_next(now) else {
+                    panic!("expected second output guard");
+                };
+                writer.write_batch(&[&delivery, &other])?;
+                assert_eq!(writer.index().len(), 1);
+                assert_eq!(writer.index()[0].record_count, 2);
+                drop((delivery, other));
                 assert_eq!(
                     completion.poll(receipt, 1, Boundary::Synced)?.outcome,
                     QueryOutcome::Pending
@@ -151,11 +198,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let io = control
                     .next_sync(token, 1, now, &mut dispatch, &mut barrier)?
                     .ok_or("barrier not ready")?;
-                assert_eq!(barrier[0].last, receipt.accepted_seq);
-                io.complete(SyncResult::Synced);
+                assert_eq!(barrier[0].last, second.accepted_seq);
+                let mut finished = writer.finish()?;
+                // This example ends on rejection; a live host can retry the
+                // returned error.work on the correct segment before dropping it.
+                finished.sync_work(io).map_err(|error| error.error)?;
                 control.poll(now)?;
                 assert_eq!(
                     completion.poll(receipt, 1, Boundary::Synced)?.outcome,
+                    QueryOutcome::Complete
+                );
+                assert_eq!(
+                    completion.poll(second, 1, Boundary::Synced)?.outcome,
                     QueryOutcome::Complete
                 );
                 control.release_sync(token)?;
@@ -172,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
     })?;
     println!(
-        "tracked admission/routing/sync/shutdown passed; {} bytes reserved",
+        "tracked admission/routing/MCAP file sync/shutdown passed; {} bytes reserved",
         plan.reserved_bytes()
     );
     Ok(())

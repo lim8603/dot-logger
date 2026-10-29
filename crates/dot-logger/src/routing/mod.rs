@@ -20,18 +20,21 @@ mod types;
 pub use types::*;
 
 #[derive(Default)]
-struct SharedLedger {
+pub(crate) struct SharedLedger {
     records: AtomicUsize,
     small: AtomicUsize,
     raw: AtomicUsize,
+    pub(crate) storage_limit: usize,
+    pub(crate) storage_used: AtomicUsize,
 }
 #[derive(Default)]
-struct TargetLedger {
+pub(crate) struct TargetLedger {
     records: AtomicUsize,
     bytes: AtomicUsize,
     queued: AtomicUsize,
     pending: AtomicUsize,
     cancelled: AtomicBool,
+    pub(crate) writer_active: AtomicBool,
 }
 impl TargetLedger {
     fn snapshot(&self) -> TargetSnapshot {
@@ -563,7 +566,10 @@ impl<'owner> Router<'owner> {
                 shared_records: config.shared_records,
                 small_copy_bytes: config.small_copy_bytes,
             },
-            ledger: Arc::new(SharedLedger::default()),
+            ledger: Arc::new(SharedLedger {
+                storage_limit: plan.config().memory.output_bytes - reserved,
+                ..SharedLedger::default()
+            }),
             cursor: Cursor::default(),
             output_reserved_bytes: reserved,
             raw_reserved_bytes: plan.raw_pool_bytes(),
@@ -574,6 +580,23 @@ impl<'owner> Router<'owner> {
         })
     }
 
+    /// Share the output bytes remaining after concrete routing reservations.
+    /// All writers created from this router compete for the same finite budget.
+    pub fn writer_budget(&self, target: u32) -> Result<crate::storage::WriterBudget, RoutingError> {
+        let target_state = self
+            .targets
+            .iter()
+            .find(|t| t.config.id == target)
+            .ok_or(RoutingError::InputsMismatch)?;
+        Ok(crate::storage::WriterBudget {
+            ledger: Arc::clone(&self.ledger),
+            session: self.session_id,
+            revision: self.revision,
+            target,
+            producers: self.inputs.len(),
+            target_state: Arc::clone(&target_state.ledger),
+        })
+    }
     /// Lend a unique dispatcher and independent target FIFO readers. Reader IO can
     /// run on scoped threads; dispatcher operations never invoke a reader callback.
     pub fn scope<R>(

@@ -17,3 +17,6 @@ pub mod completion;
 
 /// Explicit synchronization and deadline-based normal shutdown coordination.
 pub mod control;
+
+/// Bounded general-path MCAP envelopes, file writers and chunk indexes.
+pub mod storage;

@@ -5,6 +5,7 @@
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
 - TASK-006도 2026-10-28 Human 「다음 진행하자」로 착수. 선행 TASK-004/005 구현·로컬 Pass·Human 승인을 근거로 native 후속 검증 상태에서 개발을 진행했다. 완료/제어 EV-005 로컬 Pass·Human 리뷰 승인 이력은 보존한다. 최신 RV-001~005 수정은 EV-009 로컬 Pass·2026-10-29 Human 승인/native 대기다.
 - 2026-10-29 Human 「승인」으로 TASK-006 최신 수정분과 native 이월 상태의 TASK-007 진행을 승인했다. TASK-007은 RV-006~010 수정·EV-011 로컬 Pass, 당시 최신 구현 Human 리뷰/native 대기였다. 2026-10-30 최신 구현 Human 승인 완료, native는 잔여다.
+- 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 EV-013 소스14fd1a4/문서1f2f44d를 게시하고 TASK-009 후속 개발을 진행했다. TASK-008 최종 리뷰·native는 잔여이며 TASK-009는 별도 로컬 구현/EV-014·REV-011로 추적한다.
 - 모든 Build Task는 TASK-001의 Gate 3와 관련 ADR/계약 합의가 선행한다. 의존 Task의 완료가 추가 진입 조건이다.
 - TDD: 해당 상세 문서의 실패 동작부터 Red → Green → Refactor. 구현/테스트/근거는 서로 별도 체크한다.
 - TASK-018은 FR-015 범위 승인이 추가로 필요하며 Must 완료의 필수 의존에 포함하지 않는다.
@@ -19,7 +20,7 @@
 | TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-29 | EV-009 RV-001~005 Human 승인·로컬 Pass; native 후속 검증 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-011 로컬 Pass·Human 승인 완료; native 대기 | TASK-006 | [상세](tasks/TASK-007.md) | 2~3 |
 | TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-013 로컬 Pass·REV-009/010 Resolved, Human 구현 리뷰 대기; native 후속 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
-| TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | chunk 중간 절단·CRC 손상·ENOSPC·sync/rename 실패 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
+| TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-014 로컬 Pass·REV-011 Resolved → Human 구현 리뷰/native·장비 후속 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 쓰는 중 incomplete chunk 비노출·cursor 만료·페이지 bytes/count 이중 제한 | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | seek 뒤 이전 generation 미전송·pause/resume·배속·늦은 소비자 | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
 | TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 느린 구독자·잘못된 조각·ACK 전 disconnect·인증 없는 비-loopback | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |

@@ -444,6 +444,18 @@ RV-005 수정 — 2026-10-29: 일반 `request_sync`의 진입부터 슬롯 게�
 
 `SegmentStore`는 fresh filesystem 여유 관측·create/finalize/remove·directory sync capability를 제공하는 host port다. logger catalog/event/pin/인코더 상태는 공유 output 예산에 포함하며, OS cache·host adapter 자체 상태와 외부 프로세스의 공간 경쟁은 별도다. 표준 `FileStore`는 신선한 session/target namespace와 Unix directory sync를 제공하고 다른 OS는 Unsupported로 거절한다. OS별 어댑터/native·실장비 durability는 미검증이다. `finish`/Drop은 control의 Synced 성공을 만들지 않는다.
 
+### 13.5 TASK-009 중단 복구 API — 2026-10-30
+
+`recover_segment(source, budget, channels, options, sink, cancel)`는 일반 경로에서 변경이 멈춘 `Read + Seek` 원본과 독립된 빈 `SyncSink`를 사용한다. 호출자는 원래 session/revision·생산자 수·동일 순서의 채널/사용자 schema 등록을 제공한다. 호스트가 원본을 읽기 전용으로 열고 복구 중 불변성을 보장한다. 자동 startup namespace 발견/기존 target 재개나 worker 기동은 하지 않는다.
+
+`RecoveryOptions`는 출력 `WriterConfig`와 `RecoveryConfig { max_source_bytes, max_record_bytes, max_chunks }`를 명시한다. source 크기 초과는 출력 쓰기 전 거절한다. 고정 body buffer·metadata/decoder 임시 메모리·참조/sequence registry를 `RecoveryOptions::reservation`으로 공유 output 예산에서 추가 예약하며, 별도 writer 예약과 함께 검사한다. 파일 길이/u64 overflow를 검사한 뒤 고정 buffer 안에서만 읽는다. host source/sink buffer·allocator 내부·OS cache는 별도다.
+
+현재 제품 writer의 `dot-logger/1` 무압축 형식을 대상으로 header/magic·record 길이/opcode·nonzero chunk CRC·schema/channel 선행 참조·등록 metadata·봉투 식별자/시각·생산자별 증가 sequence·chunk 시각 범위를 검증한다. 완전한 chunk 전체를 검증한 뒤에만 해당 chunk의 메시지를 출력한다. 중간 오류가 있는 chunk의 앞선 메시지도 제외하며 이후 바이트를 재동기화하지 않는다. 지원하지 않는 압축·CRC 부재·record/chunk 한계도 명시 stop 원인이다. 손상/누락된 옛 summary/인덱스를 신뢰하지 않고 새 표준 summary/보조 인덱스를 만든다. 복구 봉투는 현재 버전의 알려진 필드를 재인코딩하며 사용자 payload는 opaque bytes로 보존한다. 원본 파일은 수정하지 않는다. 형식 판단 근거는 [MCAP 규격](https://mcap.dev/spec)과 고정된 mcap0.26.0 writer/독립 판독 시험이다.
+
+`RecoveryReport`는 원본 길이·마지막 완전 검증/복사 chunk 끝(`verified_end`, 없으면0)·반개구간 제외 suffix·chunk/record 수·stop 원인을 보고한다. 제외 suffix에는 새로 만드는 옛 message index/summary도 포함하며 전부 손실된 메시지라는 의미가 아니다. 보고된 count/offset은 실패 시에도 앞서 완전히 복사한 prefix만 나타낸다. 원본 CRC 손상/절단/입력 한계에서 얻은 prefix는 성공한 복구 파일로 반환할 수 있지만, IO·writer 예산/용량 오류·취소는 `RecoveryError { error, report }`이고 출력을 성공으로 게시하지 않는다. 원 OS 오류는 보존한다. 취소는 유한 record/chunk 경계와 최종 file sync 이후에 확인한다. 진행 중 OS IO를 강제로 취소하거나 deadline을 보장하지 않는다.
+
+`RecoveredSegment`는 새 파일의 finish+실제 file sync를 마친 `FinishedSegment`와 보고서다. 과거 프로세스의 Written/Synced 응답을 추정하거나 completion registry에 복원하지 않는다. `recover_to_store`는 create→복구/file sync→close→finalize→directory sync를 구동한다. capability 미지원은 생성 전 거절하며 모든 단계 실패를 원인/앞선 prefix와 반환한다. 실패한 active/rename 파일은 조사용으로 보존하고 자동 삭제·재시도·catalog 공개를 하지 않는다. FileStore의 Unix 지원/배타적 namespace/기존 경로 거절 계약을 유지한다. 대상 IO 실패→기존 completion 보고 및 StorageDegraded 계측 연결은 호스트/후속 worker·TASK-014 범위다. 실제 전원 차단·OS별 장애·재기동 durable namespace 수락은 TASK-022 이후 검증이며 복구 primitive 통과로 완료하지 않는다.
+
 ## 14. 조회·재생·원격 계약안
 
 | 작업 | 계약 |

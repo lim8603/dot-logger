@@ -74,6 +74,10 @@ pre-window는 실제 디스크 순환 파일을 보존한다. 큰 원본 전체�
 
 복구는 active/미종료 세그먼트를 읽기 전용으로 조사한다. 길이·opcode·schema 참조·CRC와 bounds를 확인하고 마지막 **완전하고 검증된 chunk**까지만 새 복구 파일로 만든다. 원본은 보존한다. 불완전한 chunk·손상 꼬리는 제외 범위와 원인을 보고한다. 중간 CRC 손상 뒤의 임의 바이트를 무조건 유효 메시지로 재동기화하지 않는다. summary/보조 인덱스는 재생성한다. `Written`만 확인된 데이터와 `Synced`를 구분하고, 재기동 때 과거 프로세스가 성공 응답했는지 추측하지 않는다. 실제 차단 시험의 외부 receipt oracle과 파일 내용을 대조한다.
 
+### TASK-009 로컬 구현 경계 — 2026-10-30
+
+`storage/recovery.rs`는 불변 원본의 마지막 완전 검증 chunk prefix만 독립 출력에 복구하고 표준 summary/보조 인덱스를 재생성한다. chunk CRC/길이/선행 schema·channel·봉투·sequence 검증을 마친 뒤 메시지를 복사하며 손상 뒤 재동기화하지 않는다. 입력 bytes/record/chunk 제한·추가 공유 메모리 예약·오류/취소의 prefix 및 OS 원인 보고를 제공한다. 새 파일 sync 뒤 finalize/directory sync를 할 수 있으나 과거 프로세스의 완료 응답·Synced 상태는 복원하지 않는다. 데이터가 손상된 suffix와 단순 교체한 summary/index를 같은 손실 메시지 수로 해석하지 않는다. 자동 디렉터리 발견·기존 namespace 재개·worker/지표는 후속이다. 상세는 [인터페이스 §13.5](interface_contract.md#135-task-009-중단-복구-api--2026-10-30), 검증은 EV-014다.
+
 ### TASK-008 구현 경계 — 2026-10-30
 
 `storage/{retention,catalog}.rs`가 세 보존 모드·회전·closed catalog·event window·읽기 pin을 구현한다. catalog/event/pin/채널 복제·producer 범위·사전 검증 scratch는 유한 공유 output 예약에 포함한다. active file은 disk/protected quota에서 설정한 최대 파일 bytes를 선예약하고 closed 후 실제 길이로 전환한다. 겹친 event는 세그먼트별 한 번만 차감한다. 실제 event extents는 mono min/max 기반이며 gap-free 기록 존재를 보장하지 않는다. 상세 API·오류·capability는 [인터페이스 §13.4](interface_contract.md#134-task-008-회전보존-api--2026-10-30)다.

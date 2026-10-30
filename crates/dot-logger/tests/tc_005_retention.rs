@@ -868,3 +868,159 @@ fn batch_capacity_failure_preserves_accepted_prefix_and_retention_cause() {
         });
     });
 }
+
+#[test]
+fn query_owned_pin_waits_for_reader_close_on_error_cancel_and_expiry() {
+    use dot_logger::query::{Query, QueryBudget, QueryConfig, QueryError, Snapshot, TimeBasis};
+    use std::cell::Cell;
+    use std::io::Read;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    struct Reader {
+        bytes: Cursor<Vec<u8>>,
+        log: Rc<RefCell<SegmentLog<Store>>>,
+        sequence: u64,
+        fail: Rc<Cell<bool>>,
+        cancel_on_read: Rc<Cell<bool>>,
+        cancel: Rc<AtomicBool>,
+        closed: Rc<Cell<bool>>,
+    }
+    impl Read for Reader {
+        fn read(&mut self, b: &mut [u8]) -> io::Result<usize> {
+            if self.fail.get() {
+                return Err(io::Error::from_raw_os_error(5));
+            }
+            let n = self.bytes.read(b)?;
+            if self.cancel_on_read.get() {
+                self.cancel.store(true, Ordering::Release);
+            }
+            Ok(n)
+        }
+    }
+    impl Seek for Reader {
+        fn seek(&mut self, p: SeekFrom) -> io::Result<u64> {
+            self.bytes.seek(p)
+        }
+    }
+    impl Drop for Reader {
+        fn drop(&mut self) {
+            // The pin remains occupied while the actual reader is being closed.
+            assert!(matches!(
+                self.log.borrow_mut().pin(self.sequence, 1, 22, 30),
+                Err(RetentionError::PinLimit)
+            ));
+            self.closed.set(true);
+        }
+    }
+    for case in 0..4 {
+        let mut retention = retention(RetentionMode::Circular);
+        retention.max_pins = 1;
+        with_log(retention, writer(), |mut log, state| {
+            log.append(record(1, 1), &[7], 0).unwrap();
+            log.rotate(1).unwrap();
+            let sequence = log.segments()[0].sequence;
+            let bytes = state.borrow().files[&sequence].clone();
+            let log = Rc::new(RefCell::new(log));
+            let fail = Rc::new(Cell::new(false));
+            let cancel_on_read = Rc::new(Cell::new(false));
+            let cancel = Rc::new(AtomicBool::new(false));
+            let closed = Rc::new(Cell::new(false));
+            let reader = Reader {
+                bytes: Cursor::new(bytes),
+                log: log.clone(),
+                sequence,
+                fail: fail.clone(),
+                cancel_on_read: cancel_on_read.clone(),
+                cancel: cancel.clone(),
+                closed: closed.clone(),
+            };
+            let source = log
+                .borrow_mut()
+                .query_source(reader, sequence, 4096, 2, 20)
+                .unwrap();
+            let mut c = support::plan().config().clone();
+            c.memory.external_bytes = 1024 * 1024;
+            c.memory.total_bytes += 1024 * 1024;
+            let p = dot_logger::config::SessionBuilder::new(c)
+                .validate(&dot_logger::platform::PlatformCapabilities::default())
+                .unwrap();
+            let budget = QueryBudget::new(&p);
+            let mut snapshot = Snapshot::new(
+                &budget,
+                42,
+                1,
+                channels(),
+                vec![source],
+                QueryConfig {
+                    max_segments: 1,
+                    max_records: 4,
+                    max_record_bytes: 8192,
+                    max_source_bytes: 4096,
+                    max_payload_bytes: 16,
+                    max_metadata_bytes: 128,
+                    producers: 2,
+                    page_records: 4,
+                    page_bytes: 1024,
+                    inline_bytes: 16,
+                    blob_read_bytes: 16,
+                    read_bytes: 8192,
+                },
+                2,
+                100,
+                &cancel,
+            )
+            .unwrap();
+            let cursor = snapshot
+                .start(
+                    Query {
+                        basis: TimeBasis::Mono,
+                        from: 0,
+                        to: 10,
+                        channel: None,
+                        minimum_level: dot_logger::capture::Level::Trace,
+                    },
+                    3,
+                    &cancel,
+                )
+                .unwrap();
+            fail.set(case == 1);
+            cancel_on_read.set(case == 2);
+            let result = snapshot.page(&cursor, if case == 3 { 20 } else { 4 }, &cancel);
+            match case {
+                0 => assert_eq!(result.unwrap().records.len(), 1),
+                1 => assert!(
+                    matches!(result,Err(QueryError::Io(ref e)) if e.raw_os_error()==Some(5))
+                ),
+                2 => assert!(matches!(result, Err(QueryError::Cancelled))),
+                _ => assert!(matches!(result, Err(QueryError::Expired))),
+            }
+            assert!(!closed.get());
+            assert!(matches!(
+                log.borrow_mut().pin(sequence, 1, 21, 30),
+                Err(RetentionError::PinLimit)
+            ));
+            drop(snapshot);
+            assert!(closed.get());
+            assert_eq!(budget.used_bytes(), 0);
+            let pin = log.borrow_mut().pin(sequence, 1, 23, 30).unwrap();
+            log.borrow_mut().release_pin(pin).unwrap();
+        });
+    }
+}
+
+#[test]
+fn active_query_pin_survives_rotation_and_is_reclaimed_after_source_drop() {
+    let mut config = retention(RetentionMode::Circular);
+    config.max_segments = 2;
+    config.max_pins = 1;
+    with_log(config, writer(), |mut log, _| {
+        log.append(record(1, 1), &[1], 0).unwrap();
+        log.flush().unwrap();
+        let source = log
+            .active_query_source(Cursor::new(Vec::<u8>::new()), 4096, 1, 20)
+            .unwrap();
+        log.rotate(2).unwrap();
+        assert!(matches!(log.rotate(21), Err(RetentionError::Capacity)));
+        drop(source);
+        log.rotate(22).unwrap();
+    });
+}

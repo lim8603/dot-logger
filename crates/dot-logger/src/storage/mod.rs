@@ -2,11 +2,12 @@
 mod catalog;
 mod codec;
 mod index;
-mod recovery;
+pub(crate) mod recovery;
 mod retention;
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};
+pub(crate) use catalog::ReadPermit;
 pub use catalog::{EventReport, ReadPin, RetentionConfig, RetentionMode, SegmentInfo};
 pub use codec::{StoredRecord, decode_record, encode_record};
 pub use index::ChunkIndexEntry;
@@ -41,7 +42,7 @@ impl WriterBudget {
     pub fn limit_bytes(&self) -> usize {
         self.ledger.storage_limit
     }
-    fn reserve(&self, bytes: usize) -> Result<Lease, StorageError> {
+    pub(crate) fn reserve(&self, bytes: usize) -> Result<Lease, StorageError> {
         let used = self.used_bytes();
         let next = used.checked_add(bytes).ok_or(StorageError::InvalidConfig)?;
         if next > self.limit_bytes() {
@@ -60,7 +61,7 @@ impl WriterBudget {
         })
     }
 }
-struct Lease {
+pub(crate) struct Lease {
     budget: WriterBudget,
     bytes: usize,
 }

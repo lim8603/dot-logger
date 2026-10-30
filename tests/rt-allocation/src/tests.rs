@@ -936,3 +936,201 @@ fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations()
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[test]
+fn query_index_pages_and_large_blob_reads_stay_inside_external_reservation() {
+    use dot_logger::{
+        capture::{CaptureReceipt, CapturedRecord},
+        query::*,
+        routing::{Route, Router, RoutingConfig, Schedule, TargetConfig},
+        storage::{SegmentWriter, StorageChannel, WriterConfig},
+    };
+    use std::sync::atomic::AtomicBool;
+    use std::time::Duration;
+    for max in [256usize, 8 * 1024 * 1024] {
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 256 * 1024 * 1024,
+                input_bytes: 128 * 1024,
+                raw_bytes: 0,
+                output_bytes: 64 * 1024 * 1024,
+                external_bytes: 128 * 1024 * 1024,
+                control_bytes: 256 * 1024,
+                worker_bytes: 256 * 1024,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 8,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+        let path =
+            std::env::temp_dir().join(format!("dot-query-memory-{}-{max}", std::process::id()));
+        let payload = vec![128; max];
+        owner.scope(|scope| {
+            let routing = RoutingConfig {
+                targets: vec![TargetConfig {
+                    id: 10,
+                    required: true,
+                    queue_slots: 2,
+                    pending_slots: 0,
+                    retained_bytes: 512,
+                    max_attempts: 1,
+                    max_age: Duration::from_secs(1),
+                }],
+                routes: vec![Route {
+                    channel_id: 7,
+                    targets: vec![10],
+                }],
+                shared_records: 2,
+                small_copy_bytes: 512,
+                schedule: Schedule {
+                    record_quantum: 1,
+                    byte_quantum: 256,
+                    records_per_turn: 1,
+                    bytes_per_turn: 256,
+                    retries_per_target: 1,
+                    reclaim_slots_per_producer: 1,
+                },
+            };
+            let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), routing).unwrap();
+            let channels = || {
+                vec![StorageChannel {
+                    channel: ChannelConfig::new(7, 99, 1),
+                    topic: "blob".into(),
+                    payload_encoding: "opaque".into(),
+                    schema: None,
+                }]
+            };
+            let file = std::fs::OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .open(&path)
+                .unwrap();
+            let mut writer = SegmentWriter::new(
+                router.writer_budget(10).unwrap(),
+                WriterConfig {
+                    max_payload_bytes: max,
+                    write_buffer_bytes: 4096,
+                    chunk_target_bytes: 65536,
+                    max_records: 2,
+                    max_chunks: 2,
+                    max_metadata_bytes: 1024,
+                },
+                channels(),
+                file,
+            )
+            .unwrap();
+            writer
+                .append(
+                    CapturedRecord {
+                        receipt: CaptureReceipt {
+                            session_id: 42,
+                            producer_id: 0,
+                            accepted_seq: 1,
+                        },
+                        metadata: RecordMetadata {
+                            channel_id: 7,
+                            schema_id: 99,
+                            schema_version: 1,
+                            mono_ns: 1,
+                            real_ns: 1,
+                            source_time: None,
+                            level: Level::Info,
+                            importance: Some(Importance::Normal),
+                        },
+                        revision: 1,
+                        payload_len: max,
+                    },
+                    &payload,
+                )
+                .unwrap();
+            writer.flush_chunk().unwrap();
+            let safe = writer.safe_offset();
+            drop(writer);
+            let source = std::fs::File::open(&path).unwrap();
+            let budget = QueryBudget::new(&plan);
+            let config = QueryConfig {
+                max_segments: 1,
+                max_records: 2,
+                max_record_bytes: max + 8192,
+                max_source_bytes: (max + 65536) as u64,
+                max_payload_bytes: max,
+                max_metadata_bytes: 1024,
+                producers: 1,
+                page_records: 2,
+                page_bytes: 1024,
+                inline_bytes: 256,
+                blob_read_bytes: 256,
+                read_bytes: (max + 131072) as u64,
+            };
+            let mut concrete = 0;
+            let (remaining, peak) = allocator::observe_memory(|| {
+                let registrations = channels();
+                concrete = config.reservation(&registrations).unwrap();
+                let cancel = AtomicBool::new(false);
+                let mut snapshot = Snapshot::new(
+                    &budget,
+                    42,
+                    1,
+                    registrations,
+                    vec![QuerySource::active(source, 1, safe)],
+                    config,
+                    0,
+                    100,
+                    &cancel,
+                )
+                .unwrap();
+                let cursor = snapshot
+                    .start(
+                        Query {
+                            basis: TimeBasis::Mono,
+                            from: 0,
+                            to: 2,
+                            channel: None,
+                            minimum_level: Level::Trace,
+                        },
+                        1,
+                        &cancel,
+                    )
+                    .unwrap();
+                let page = snapshot.page(&cursor, 1, &cancel).unwrap();
+                assert_eq!(page.records.len(), 1);
+                match &page.records[0].payload {
+                    Payload::Inline { .. } => {
+                        assert_eq!(page.inline(&page.records[0]).unwrap(), payload)
+                    }
+                    Payload::Blob(handle) => {
+                        let handle = handle.clone();
+                        assert_eq!(
+                            snapshot.read_blob(&handle, 0, 256, 1, &cancel).unwrap(),
+                            &payload[..256]
+                        );
+                    }
+                }
+            });
+            assert_eq!(remaining, 0);
+            assert_eq!(budget.used_bytes(), 0);
+            assert!(peak > 0 && peak <= concrete as i128);
+            println!(
+                "query payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}"
+            );
+        });
+        std::fs::remove_file(path).unwrap();
+    }
+}

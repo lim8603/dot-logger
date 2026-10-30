@@ -25,11 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     const MIB: usize = 1024 * 1024;
     let config = SessionConfig {
         memory: MemoryBudget {
-            total_bytes: 8 * MIB,
+            total_bytes: 9 * MIB,
             input_bytes: MIB,
             raw_bytes: 0,
             output_bytes: 2 * MIB,
-            external_bytes: 0,
+            external_bytes: MIB,
             control_bytes: MIB,
             worker_bytes: 4 * MIB,
         },
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         capabilities: vec![],
     };
     let plan = SessionBuilder::new(config).validate(&PlatformCapabilities::default())?;
-    assert_eq!(plan.reserved_bytes(), 8 * MIB);
+    assert_eq!(plan.reserved_bytes(), 9 * MIB);
     assert_eq!(plan.raw_pool_bytes(), 0);
     let routing = RoutingConfig {
         targets: vec![TargetConfig {
@@ -212,6 +212,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     completion.poll(second, 1, Boundary::Synced)?.outcome,
                     QueryOutcome::Complete
                 );
+                // An independent read descriptor observes only the captured boundary.
+                let query_budget = dot_logger::query::QueryBudget::new(&plan);
+                let cancel = std::sync::atomic::AtomicBool::new(false);
+                let mut snapshot = dot_logger::query::Snapshot::new(
+                    &query_budget,
+                    1,
+                    1,
+                    vec![StorageChannel {
+                        channel: ChannelConfig::new(7, 99, 1),
+                        topic: "example".into(),
+                        payload_encoding: "application/octet-stream".into(),
+                        schema: None,
+                    }],
+                    vec![dot_logger::query::QuerySource::active(
+                        std::fs::File::open(&path.0)?,
+                        0,
+                        finished.safe_offset(),
+                    )],
+                    dot_logger::query::QueryConfig {
+                        max_segments: 1,
+                        max_records: 4,
+                        max_record_bytes: 16384,
+                        max_source_bytes: 65536,
+                        max_payload_bytes: 256,
+                        max_metadata_bytes: 1024,
+                        producers: 1,
+                        page_records: 4,
+                        page_bytes: 4096,
+                        inline_bytes: 256,
+                        blob_read_bytes: 256,
+                        read_bytes: 131072,
+                    },
+                    0,
+                    100,
+                    &cancel,
+                )?;
+                let cursor = snapshot.start(
+                    dot_logger::query::Query {
+                        basis: dot_logger::query::TimeBasis::Mono,
+                        from: 0,
+                        to: u64::MAX as i128 + 1,
+                        channel: Some(7),
+                        minimum_level: Level::Trace,
+                    },
+                    1,
+                    &cancel,
+                )?;
+                let page = snapshot.page(&cursor, 1, &cancel)?;
+                assert_eq!(page.records.len(), 2);
+                assert_eq!(page.records[0].record.receipt, receipt);
+                assert_eq!(page.inline(&page.records[0]), Some(b"example".as_slice()));
+                drop(snapshot);
+                assert_eq!(query_budget.used_bytes(), 0);
                 control.release_sync(token)?;
                 let result = control.begin_shutdown(
                     ShutdownPlan { sync_files: false },

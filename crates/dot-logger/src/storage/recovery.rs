@@ -362,7 +362,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
 // Bounds are checked against the frozen source length and fixed buffer before IO
 // or any file-controlled allocation. A short read after that is an actual IO error.
 type Frame = Result<(u8, usize, [u8; 9]), RecoveryStop>;
-fn read_frame<R: Read>(
+pub(crate) fn read_frame<R: Read>(
     source: &mut R,
     buffer: &mut [u8],
     end: u64,
@@ -393,53 +393,53 @@ fn read_frame<R: Read>(
     *pos = next;
     Ok(Ok((header[0], len, header)))
 }
-struct Fields<'a>(&'a [u8]);
+pub(crate) struct Fields<'a>(pub(crate) &'a [u8]);
 impl<'a> Fields<'a> {
-    fn take(&mut self, n: usize) -> Result<&'a [u8], RecoveryStop> {
+    pub(crate) fn take(&mut self, n: usize) -> Result<&'a [u8], RecoveryStop> {
         let value = self.0.get(..n).ok_or(RecoveryStop::InvalidRecord)?;
         self.0 = &self.0[n..];
         Ok(value)
     }
-    fn u16(&mut self) -> Result<u16, RecoveryStop> {
+    pub(crate) fn u16(&mut self) -> Result<u16, RecoveryStop> {
         Ok(u16::from_le_bytes(
             self.take(2)?
                 .try_into()
                 .map_err(|_| RecoveryStop::InvalidRecord)?,
         ))
     }
-    fn u32(&mut self) -> Result<u32, RecoveryStop> {
+    pub(crate) fn u32(&mut self) -> Result<u32, RecoveryStop> {
         Ok(u32::from_le_bytes(
             self.take(4)?
                 .try_into()
                 .map_err(|_| RecoveryStop::InvalidRecord)?,
         ))
     }
-    fn u64(&mut self) -> Result<u64, RecoveryStop> {
+    pub(crate) fn u64(&mut self) -> Result<u64, RecoveryStop> {
         Ok(u64::from_le_bytes(
             self.take(8)?
                 .try_into()
                 .map_err(|_| RecoveryStop::InvalidRecord)?,
         ))
     }
-    fn string(&mut self) -> Result<&'a [u8], RecoveryStop> {
+    pub(crate) fn string(&mut self) -> Result<&'a [u8], RecoveryStop> {
         let n = self.u32()? as usize;
         self.take(n)
     }
-    fn record(&mut self) -> Result<(u8, &'a [u8]), RecoveryStop> {
+    pub(crate) fn record(&mut self) -> Result<(u8, &'a [u8]), RecoveryStop> {
         let op = self.take(1)?[0];
         let n = usize::try_from(self.u64()?).map_err(|_| RecoveryStop::InvalidRecord)?;
         Ok((op, self.take(n)?))
     }
 }
-struct Validation<'a> {
-    session: u128,
-    revision: u64,
-    channels: &'a [StorageChannel],
-    envelope: Option<u16>,
-    payload_schemas: Vec<Option<u16>>,
-    seen: Vec<bool>,
-    last: Vec<u64>,
-    max_payload: usize,
+pub(crate) struct Validation<'a> {
+    pub(crate) session: u128,
+    pub(crate) revision: u64,
+    pub(crate) channels: &'a [StorageChannel],
+    pub(crate) envelope: Option<u16>,
+    pub(crate) payload_schemas: Vec<Option<u16>>,
+    pub(crate) seen: Vec<bool>,
+    pub(crate) last: Vec<u64>,
+    pub(crate) max_payload: usize,
 }
 // The longest expected value is payload.<32 hex digits>.v<u32> (52 bytes).
 // Use the same canonical formatting as the writer without allocating per comparison.
@@ -450,7 +450,7 @@ fn matches_text(actual: &[u8], expected: std::fmt::Arguments<'_>) -> bool {
         && actual == &cursor.get_ref()[..cursor.position() as usize]
 }
 impl Validation<'_> {
-    fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+    pub(crate) fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         let mut f = Fields(body);
         let id = f.u16()?;
         let name = f.string()?;
@@ -503,7 +503,7 @@ impl Validation<'_> {
             Err(RecoveryStop::InvalidRecord)
         }
     }
-    fn channel(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+    pub(crate) fn channel(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         let mut f = Fields(body);
         let id = f.u16()?;
         let schema = f.u16()?;
@@ -596,7 +596,7 @@ impl Validation<'_> {
         self.last[p] = r.receipt.accepted_seq;
         Ok(log)
     }
-    fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
+    pub(crate) fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
         if body.len() < 40 {
             return Err(RecoveryStop::Truncated);
         }
@@ -653,7 +653,7 @@ const CRC_TABLE: [u32; 256] = {
     }
     table
 };
-fn crc_update(mut crc: u32, bytes: &[u8]) -> u32 {
+pub(crate) fn crc_update(mut crc: u32, bytes: &[u8]) -> u32 {
     for byte in bytes {
         crc = (crc >> 8) ^ CRC_TABLE[usize::from(crc as u8 ^ byte)];
     }

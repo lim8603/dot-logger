@@ -1,5 +1,8 @@
 use super::{Lease, RetentionError, WriterBudget};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 /// Explicit retention policy. Continuous mode never deletes implicitly.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -104,11 +107,18 @@ pub struct EventReport {
 /// protection for the catalog's remaining lifetime, potentially causing `PinLimit`
 /// or `Capacity` failures. Preserve it across errors and cancellation until all
 /// reads finish, then pass it to `SegmentLog::release_pin`.
-#[derive(Debug)]
 #[must_use = "retain this permit and call SegmentLog::release_pin after all reads finish"]
 pub struct ReadPin {
-    owner: Arc<()>,
+    owner: Arc<Lease>,
     id: u64,
+    released: Arc<AtomicBool>,
+}
+impl std::fmt::Debug for ReadPin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReadPin")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Clone, Copy)]
 struct Event {
@@ -117,12 +127,12 @@ struct Event {
     end: u64,
     expires: u64,
 }
-#[derive(Clone, Copy)]
 struct Pin {
     id: u64,
     sequence: u64,
     deadline: u64,
     remaining: u64,
+    released: Arc<AtomicBool>,
 }
 
 pub(super) struct Catalog {
@@ -132,8 +142,7 @@ pub(super) struct Catalog {
     pins: Vec<Pin>,
     next_event: u64,
     next_pin: u64,
-    identity: Arc<()>,
-    _lease: Lease,
+    identity: Arc<Lease>,
 }
 fn intersects(a: Option<(u64, u64)>, start: u64, end: u64) -> bool {
     a.is_some_and(|(lo, hi)| lo <= end && start <= hi)
@@ -151,7 +160,7 @@ impl Catalog {
         for (count, width) in [
             (config.max_segments, std::mem::size_of::<SegmentInfo>()),
             (config.max_events, std::mem::size_of::<Event>()),
-            (config.max_pins, std::mem::size_of::<Pin>()),
+            (config.max_pins, std::mem::size_of::<Pin>() + 64),
         ] {
             bytes = bytes
                 .checked_add(
@@ -169,8 +178,7 @@ impl Catalog {
             pins: Vec::with_capacity(config.max_pins),
             next_event: 1,
             next_pin: 1,
-            identity: Arc::new(()),
-            _lease: lease,
+            identity: Arc::new(lease),
         })
     }
     pub fn protected(&self, range: Option<(u64, u64)>) -> bool {
@@ -198,7 +206,9 @@ impl Catalog {
         }
     }
     pub fn pinned(&self, seq: u64) -> bool {
-        self.pins.iter().any(|p| p.sequence == seq)
+        self.pins
+            .iter()
+            .any(|p| p.sequence == seq && !p.released.load(Ordering::Acquire))
     }
     pub fn oldest_deletable(&self) -> Option<usize> {
         self.closed
@@ -297,6 +307,17 @@ impl Catalog {
         if !self.closed.iter().any(|s| s.sequence == seq) {
             return Err(RetentionError::UnknownToken);
         }
+        self.pin_known(seq, bytes, now, deadline)
+    }
+    // SegmentLog validates that this sequence names its current active writer.
+    pub(super) fn pin_known(
+        &mut self,
+        seq: u64,
+        bytes: u64,
+        now: u64,
+        deadline: u64,
+    ) -> Result<ReadPin, RetentionError> {
+        self.pins.retain(|p| !p.released.load(Ordering::Acquire));
         if self.pins.len() == self.config.max_pins
             || bytes == 0
             || bytes > self.config.max_pin_bytes
@@ -307,15 +328,18 @@ impl Catalog {
         }
         let id = self.next_pin;
         self.next_pin = id.checked_add(1).ok_or(RetentionError::PinLimit)?;
+        let released = Arc::new(AtomicBool::new(false));
         self.pins.push(Pin {
             id,
             sequence: seq,
             deadline,
             remaining: bytes,
+            released: Arc::clone(&released),
         });
         Ok(ReadPin {
             owner: Arc::clone(&self.identity),
             id,
+            released,
         })
     }
     pub fn consume_pin(
@@ -352,5 +376,41 @@ impl Catalog {
             .ok_or(RetentionError::UnknownToken)?;
         self.pins.remove(index);
         Ok(())
+    }
+}
+
+// Created only when a reader takes ownership of the low-level pin. Its containing
+// QuerySource declares the reader first, so actual synchronous IO/close ends before
+// this Release publishes reclamation to the catalog. Forgetting still retains pins.
+pub(crate) struct ReadPermit {
+    token: ReadPin,
+    remaining: u64,
+    deadline: u64,
+}
+impl ReadPermit {
+    pub(crate) fn new(token: ReadPin, remaining: u64, deadline: u64) -> Self {
+        Self {
+            token,
+            remaining,
+            deadline,
+        }
+    }
+    pub(crate) fn deadline(&self) -> u64 {
+        self.deadline
+    }
+    pub(crate) fn authorize(&mut self, bytes: u64, now: u64) -> Result<(), RetentionError> {
+        if now >= self.deadline {
+            return Err(RetentionError::Expired);
+        }
+        if bytes > self.remaining {
+            return Err(RetentionError::PinLimit);
+        }
+        self.remaining -= bytes;
+        Ok(())
+    }
+}
+impl Drop for ReadPermit {
+    fn drop(&mut self) {
+        self.token.released.store(true, Ordering::Release);
     }
 }

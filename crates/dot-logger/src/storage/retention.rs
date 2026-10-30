@@ -634,6 +634,62 @@ impl<S: SegmentStore> SegmentLog<S> {
         self.clock(now)?;
         self.catalog.pin(seq, bytes, now, deadline)
     }
+    /// Freeze the active segment's sequence and complete-chunk OS write boundary.
+    /// This is not a durability acknowledgment. Open an independent reader before
+    /// allowing publication/deletion; a bare active source requires host protection.
+    pub fn active_boundary(&self) -> Option<(u64, u64)> {
+        Some((
+            self.active.as_ref()?.sequence,
+            self.writer.as_ref()?.safe_offset(),
+        ))
+    }
+    /// Pin the current active file at its frozen complete-chunk offset. Protection
+    /// follows the sequence through rotation until the actual reader is dropped.
+    /// Open a separate descriptor for this exact active file before calling.
+    pub fn active_query_source<R: std::io::Read + std::io::Seek>(
+        &mut self,
+        reader: R,
+        bytes: u64,
+        now: u64,
+        deadline: u64,
+    ) -> Result<crate::query::QuerySource<R>, RetentionError> {
+        self.clock(now)?;
+        let (sequence, safe) = self.active_boundary().ok_or(RetentionError::UnknownToken)?;
+        let pin = self.catalog.pin_known(sequence, bytes, now, deadline)?;
+        Ok(crate::query::QuerySource::pinned(
+            reader,
+            sequence,
+            safe,
+            super::ReadPermit::new(pin, bytes, deadline),
+        ))
+    }
+    /// Transfer a published file's pin to a synchronous query source. The supplied
+    /// reader must be independently opened and refer to this exact catalog file.
+    /// Prefix mutation/replacement is forbidden; closing the reader precedes unpin.
+    /// A failed construction drops the reader; no read is left in flight.
+    pub fn query_source<R: std::io::Read + std::io::Seek>(
+        &mut self,
+        reader: R,
+        seq: u64,
+        bytes: u64,
+        now: u64,
+        deadline: u64,
+    ) -> Result<crate::query::QuerySource<R>, RetentionError> {
+        let pin = self.pin(seq, bytes, now, deadline)?;
+        let safe = self
+            .catalog
+            .closed
+            .iter()
+            .find(|s| s.sequence == seq)
+            .map(|s| s.bytes)
+            .ok_or(RetentionError::UnknownToken)?;
+        Ok(crate::query::QuerySource::pinned(
+            reader,
+            seq,
+            safe,
+            super::ReadPermit::new(pin, bytes, deadline),
+        ))
+    }
     /// Authorize the next read against this pin's remaining bytes and deadline.
     pub fn consume_pin(
         &mut self,

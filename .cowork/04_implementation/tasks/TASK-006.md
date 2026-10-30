@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-29 |
-| 다음 액션 | EV-009 RV-005 수정·로컬 회귀 Pass; RV-001~005 반영사항 포함 최종 Human 리뷰·native 후속 검증 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | EV-009 최신 수정분 로컬 Pass·Human 승인; native는 공개 완료 후(T3) 실행 |
 | 의존 | TASK-005 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -170,3 +170,7 @@ Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006
 ## 최종 승인 — 2026-10-29
 
 Human 「승인」은 직전 질문의 TASK-006 수정분 승인과 native 검증 이월 상태의 TASK-007 개발 진행 승인이다. EV-009 source38개/로컬 Pass를 유지하며 TASK-006은 native 후속 검증으로 In Progress다. commit/push 승인은 포함하지 않는다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

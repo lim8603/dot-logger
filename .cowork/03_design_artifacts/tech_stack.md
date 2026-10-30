@@ -12,7 +12,7 @@
 | 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | hosted native CI는 EV-001 Pass; Windows 11·Linux RT 커널/장비·추가 CPU는 TASK-022에서 별도 검증 |
 | 큐 | rtrb | 0.4.0 SPSC | ADR-009 | 전체 API/Drop의 RT 안전성은 TASK-003·004 |
 | 파일 | MCAP | mcap 0.26.0; CRC/index on, 초기 압축 off | ADR-009·010 | 인덱스 상한·active reader·복구/성능 검증 |
-| 저장 매체 | SSD | SATA/NVMe·용량/제품 미정 | ADR-004 | 처리와 저장/보존 예산 분리 |
+| 저장 매체 | SSD | 현재 PC의 CT1000T500SSD8(루트), HP EX950 512GB 2개(/data/build·/data/db)·ext4 | ADR-004·011 | 시험별 대상 경로 고정·실측으로 판정, 제품 사양으로 처리량 추정 금지 |
 | 봉투·통신 | Protobuf·gRPC | tonic 0.13.1 / prost 0.13.5 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
@@ -28,7 +28,7 @@ MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-0
 
 CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 [Pass](https://github.com/lim8603/dot-logger/actions/runs/40504484501)했다(2026-10-27, EV-001, GAP-004 Closed). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
 
-TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다. R1은 참조 조건이며 다른 장비·Tier 2에 자동 적용하지 않는다. FR-015 추천 기능은 별도 제안이며 자동 채택하지 않았다.
+2026-10-31 ADR-011로 현재 Ubuntu PC를 실제 장치 시험 대체 환경으로 확정했다. TASK-022에서 실행 커널/시험 경로·NIC·제어 부하/기한을 고정하며 UPS는 시뮬레이션으로 판정한다. GitHub native는 공개 완료 후 실행한다. R1은 참조 조건이며 다른 장비·Tier 2에 자동 적용하지 않는다. FR-015 추천 기능은 별도 제안이며 자동 채택하지 않았다.
 
 ## 검토했으나 첫 범위에 채택하지 않은 대안
 
@@ -47,3 +47,7 @@ TASK-022에서 실제 OS/CPU/SSD/FS/NIC/제어 주기/UPS 조건을 확정한다
 ## TASK-004 검증 도구 구체화 — 2026-10-27
 
 ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그대로이고 검증 전용 `nightly-2026-10-26`(Miri 포함)을 추가 설치했다. strict provenance·8개 seed의 raw 수명/반환 해석 검사는 EV-003 로컬 Pass이며 CI에 동일 명령의 raw-memory job을 추가했다. 해당 변경분 native CI는 게시 후 시도했으나 GitHub 계정 결제/지출 한도로 runner 시작 전에 차단돼 시험은 미실행이다(EV-003/GAP-004 Open). 제품 workspace forbid는 유지하고 dot-logger package deny/private pool-storage allow로 원본 UnsafeCell 접근을 한 모듈에 격리했다. 외부 dependency/lock 변경은 없다. Miri의 공식 사용법·coverage 한계는 [공식 문서](https://github.com/rust-lang/miri#using-miri)를 따르며 실제 장비 성능 수락을 대체하지 않는다.
+
+## 현재 PC 검증 프로필 — 2026-10-31
+
+[ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)·[TASK-022](../04_implementation/tasks/TASK-022.md): Ubuntu26.04.1 LTS x86_64, Ryzen7 H255 8코어16스레드, OS 인식 메모리59,750,248,448B. 현재 실행7.0.0-42-generic(CONFIG_PREEMPT_RT 미설정), 설치7.0.0-38-realtime(CONFIG_PREEMPT_RT=y). 현재 PC 실측/UPS 시뮬레이션을 수락하며 일반/RT 실행을 별도로 기록한다. [환경 원문](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json). 제품 기능·성능 시험은 이번 환경 조사에서 실행하지 않았다.

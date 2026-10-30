@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-30 |
-| 다음 액션 | EV-017 리뷰 조치 로컬 Pass·REV-013/014 Resolved → Human 구현 리뷰/native·장비 후속 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | REV-013/014 Human 리뷰·현재 PC 조회/IO 실측, native 공개 완료 후(T3) |
 | 의존 | TASK-009 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -82,3 +82,7 @@ Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리�
 2026-10-30 후속 지시 「커밋 푸시하고 다음 작업 시작하자」: EV-017 소스 `439d9c5` 로컬 커밋·source52개 commit blob hash 일치 확인, 동일 성공 시험은 반복하지 않았다. 문서는 별도 커밋·[skip ci] 게시하며 TASK-011 개발 진행은 승인됐다. 이 지시를 별도 최종 구현 리뷰 승인으로 확대하지 않아 REV-013/014 Resolved·native/장비 대기는 유지한다.
 
 게시 확인 — 2026-10-30: 소스439d9c5·문서35e3ac3 origin/main push 성공·ls-remote HEAD 일치를 확인했다. [게시 근거](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/push.json). TASK-011 후속 구현/EV-018 로컬 Pass는 별도 작업 트리다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

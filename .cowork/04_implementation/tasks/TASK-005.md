@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-28 |
-| 다음 액션 | 구현·EV-004 로컬 Pass 완료; Human 리뷰 승인·native CI 후속 검증 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | EV-004 로컬 Pass·Human 승인 유지; native는 공개 완료 후(T3) 실행 |
 | 의존 | TASK-004 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -91,3 +91,7 @@
 2. 취소 후에도 실제 진행 IO guard가 남으면 원본/대상 예산을 반환하지 않는다. queue 취소/age 배출은 target reader를 구동해야 한다.
 3. 원본은 capture의 물리 예약으로 한 번만 집계하고 output별 retained bytes는 보유 원인이다. 일반 경로 공유 header/소형 복사는 output 예산, allocator 내부 비용은 worker headroom이다.
 4. TASK-004 승인은 유지, TASK-005 Human 리뷰는 승인됐고 native는 대기다. TASK-006 및 실제 파일 IO·장비 성능은 미착수/미검증이다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

@@ -9,8 +9,8 @@
 | ADR | ADR-003~010 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-30 |
-| 다음 액션 | EV-014/015 로컬 Pass·Human 승인·REV-011/012 Closed → native·장비 검증 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | EV-014/015 로컬 Pass·Human 승인; 현재 PC 대체 실측·모의 장애, native 공개 후 |
 | 의존 | TASK-008 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -73,3 +73,7 @@ Human의 새 리뷰 지적사항 처리 요청으로 RV-016/017(P3)을 수용했
 [EV-015](../../05_verification/verification_evidence.md#ev-015)에서 Rust1.85/1.96 workspace/all-features 각각201개(복구19·allocator9·doctest17 포함)·양쪽 clippy·fmt Pass. 이전 EV-014와 소스51개 중 recovery.rs만 달라졌고 최신 hash/로그는 EV-015다. Miri/16-feature matrix/rustdoc은 EV-014 이전 소스의 이력으로 보존한다. [REV-012](../../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md)는 Open→In Progress→Resolved, Human 최종 리뷰 전 Closed로 올리지 않는다. native GAP-004·장비 검증·TASK-009/MS-003 In Progress는 유지한다. 이번 요청으로 commit/push·TASK-010 착수는 수행하지 않았다.
 
 2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」: TASK-009 최신 구현 승인·REV-011/012 Closed, 소스 `fe03468`은 EV-015 source51개와 일치한다. native/장비 미완료로 In Progress를 유지하며 TASK-010 진행을 승인받았다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

@@ -5,12 +5,12 @@
 - 일자/리뷰어: 2026-10-30 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
 - 대상: TASK-010 소스439d9c5·문서35e3ac3 게시 후 작업 트리의 replay/query/lib·통합/pin/consumer/allocator·CI recipe.
 - 판정: Conditional — 초기 미구현 API Red 후 구현, 재생 경계의 RV-024/025 행동 Red→Green, 최종 EV-018 로컬 Pass·Human 리뷰/native·장비 대기.
-- 상태: Resolved (Open 진단→In Progress 조치→EV-018 최종 로컬 Pass). 리뷰 전용 세션이 아닌 승인된 개발 세션의 자가 리뷰다.
+- 상태: Closed (EV-018/019 로컬 Pass·2026-10-31 Human 최종 구현 승인). 리뷰 전용 세션이 아닌 승인된 개발 세션의 자가 리뷰다.
 
 | ID | 중요도 | 위치·문제 | 처리 | 상태 |
 |---|---|---|---|---|
-| RV-024 | P2 | blocked 상태에서 set_speed/pause가 media anchor를 미전달 record보다 앞으로 옮기면 뒤 레코드 due가 현재 시각으로 뭉침 | 전달 시 media anchor가 해당 record를 지났으면 실제 전달 시각/원 mono로 재기준화 | Resolved |
-| RV-025 | P2 | read_blob IO 실패 뒤 Playing/예약을 유지해 terminal 오류 계약과 다름 | bounded IO 반환을 확인한 뒤 pending/cursor·snapshot을 Drop하여 reader close와 pin/예약 반환 | Resolved |
+| RV-024 | P2 | blocked 상태에서 set_speed/pause가 media anchor를 미전달 record보다 앞으로 옮기면 뒤 레코드 due가 현재 시각으로 뭉침 | 전달 시 media anchor가 해당 record를 지났으면 실제 전달 시각/원 mono로 재기준화 | Closed |
+| RV-025 | P2 | read_blob IO 실패 뒤 Playing/예약을 유지해 terminal 오류 계약과 다름 | bounded IO 반환을 확인한 뒤 pending/cursor·snapshot을 Drop하여 reader close와 pin/예약 반환 | Closed |
 
 ## RV-024
 
@@ -47,3 +47,15 @@
 ## 마감·형상 기준 — 2026-10-30
 
 Human 커밋·푸시·세션 종료 지시로 소스 `026999f`를 origin/main 게시했다. EV-018 source54개와 commit blob hash가 일치하며 시험을 반복하지 않았다. [커밋 대조](../../06_evolution/imported_context/task_011_2026-10-30/commit.json)·[게시 근거](../../06_evolution/imported_context/task_011_2026-10-30/push.json). 검증/마감 문서는 소스와 별도 커밋한다. 위 미커밋/미게시 설명은 검증 당시 이력이다. Human 최종 구현 리뷰는 별도이므로 Resolved를 유지한다.
+
+## Human 최종 구현 승인 — 2026-10-31
+
+구현 계약 확인(배속·pause/resume·seek/stop·세대·late 간격·prefetch/읽기 예산·reader 수명) 보고 후 Human 「승인」을 TASK-011 최종 구현 승인으로 반영했다. 승인 대상은 EV-018 구현 및 EV-019/source54개 hash로 고정된 현재 리뷰 조치 작업 트리다. REV-015/016 및 RV-024~028을 Closed로 마감한다. 이전 본문의 Resolved/Human 대기 표기는 승인 전 이력이다.
+
+native GAP-004·다른 OS/장비·실제 timer/성능 검증은 잔여이며 TASK-011/MS-004 In Progress·Gate4/5 Not Ready를 유지한다. 소스 hash가 EV-019와 같아 성공 시험은 반복하지 않았다. 이번 승인은 구현 수락이며 커밋/푸시·TASK-012 착수는 수행하지 않았다.
+
+## 세션 마감·게시 — 2026-10-31
+
+Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `9660d7d`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. [커밋 대조](../../06_evolution/imported_context/task_011_review_fixes_2026-10-31/commit.json)·[소스 게시 근거](../../06_evolution/imported_context/task_011_review_fixes_2026-10-31/push.json). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
+
+TASK-011 Human 승인·REV-015/016 Closed, ADR-011 Accepted를 유지한다. 현재 PC 실측/UPS 시뮬레이션을 수락하며 native는 공개 완료 후(T3) 진행한다. 다음 시작점은 TASK-022의 실행 커널 확인·P0/제어 부하/기한/경로/예산 프로필 준비다. 현재 generic 실행/RT 설치를 구분하며 재부팅·부트 변경은 수행하지 않았다. TASK-008/010 Human 리뷰·PC 실측/UPS/24h 미실행·Gate4/5 Not Ready는 잔여다. 검증/수락/마감 문서는 별도 docs(cowork)·[skip ci] 커밋으로 게시하며 세션 종료 후 새 Task를 자동 착수하지 않는다.

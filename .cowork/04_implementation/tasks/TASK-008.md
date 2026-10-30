@@ -9,8 +9,8 @@
 | ADR | ADR-003~010 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-30 |
-| 다음 액션 | REV-010 RV-012~014 조치·EV-013 로컬 Pass → Human 구현 리뷰/native·장비 후속 검증 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | REV-009/010 Human 리뷰·현재 PC 실측, native는 공개 완료 후(T3) |
 | 의존 | TASK-007 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -80,3 +80,7 @@ Human 「프로젝트 브리핑해주고, 리뷰 지적사항 처리하고, TASK
 변경 파일/타입은 `catalog.rs`(`ReadPin`), `retention.rs`(`SegmentLog`, `FileStore`), `tc_005_retention.rs`(test `State`·신규 행동2개)다. 보존 통합17개·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt·보존 Miri16×8=128회 Pass다. REV-010은 Resolved로 갱신했다. 최종 명령·source49개 hash·원본 로그·결과/미실행 범위는 [EV-013](../../05_verification/verification_evidence.md#ev-013)에 기록했다. dependency/lock·RT 입력·unsafe 경계·worker 기동은 유지하며 TASK-008/MS-003 In Progress, TC-005 부분 실행·Gate4/5 Not Ready다.
 
 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 EV-013 소스 `14fd1a4`를 커밋했다(source49개/commit blob hash 일치). `.cowork` 문서와 분리해 게시하며 TASK-009 후속 착수는 승인됐다. TASK-008 최종 구현 리뷰·REV-009/010 Resolved·native GAP-004는 유지한다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

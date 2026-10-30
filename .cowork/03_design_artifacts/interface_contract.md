@@ -2,9 +2,9 @@
 
 - 관련 Intent: INT-001
 - 상태: Approved — 2026-10-26 상세설계·ADR-008/009 기준선 채택. 공개 함수 표기는 설계 계약이며 컴파일/수명·실제 호환 검증은 구현 Task에서 수행한다.
-- 해석 우선순위: §13~17과 ADR-008·009가 현재 상세 계약이다. §1~12의 초기 제안/미정 표현은 여기서 구체화한 범위에서 대체된다. 장비별 수치·알고리즘 증명은 미검증이다.
+- 해석 우선순위: §13~17과 ADR-008·009가 현재 상세 동작 계약이며, 검증 방법/시점은 2026-10-31 ADR-011을 우선한다. §1~12의 초기 제안/미정 표현은 여기서 구체화한 범위에서 대체된다. 장비별 수치·알고리즘 증명은 미검증이다.
 - 승인 기준선: ADR-003~009, US-001~005(US-002 AC6~10 포함)
-- 후속 요구: FR-018 — 선택 옵션·기본 비활성은 Human 확정. 활성 시 전원 예고 전체 약 3초·중요 파일 우선 기록, §12·16의 상세 동작도 기준선 채택 완료, 실제 차단 검증 전.
+- 후속 요구: FR-018 — 선택 옵션·기본 비활성·전체 약3초/중요 파일 우선 기록 계약 유지. 2026-10-31 ADR-011로 UPS는 시뮬레이션 판정, 실제 장치 시험은 현재 PC 실측으로 대체 수락한다.
 - 갱신: 2026-10-27 / AI
 
 ## 1. 제공자·소비자와 실행 경계
@@ -497,7 +497,7 @@ RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연
 
 `replay::{Replay, Speed, ReplayState, ReplayPoll, ReplayFrame, ReplayPayload, Transition, ReplayError}`는 `Snapshot<Read+Seek>`을 소유하는 일반 동기식 offline API다. 자동 timer/worker/전송을 시작하지 않으며 RT 수집에 대기를 전파하지 않는다. host는 snapshot/pin과 같은 단조 ns clock domain의 now를 제공하고 Replay는 최대 관측값으로 역행을 막는다. `new`는 mono Query만 허용하고 시작 시각에 query.from을 anchor로 사용한다. leading gap을 포함한 원래 mono 간격과 `(mono,producer,seq,segment,offset)` 순서를 보존한다. 실시간/SourceTime 재생 변환은 추정하지 않는다.
 
-`Speed::new(numerator:u32, denominator:u32)`는 양수 유리수 배속(0.5/1/2 포함)을 표현하며 0 성분은 거절한다. 정수 u128 산술과 deadline ceil을 사용하고 u64 deadline 표현을 넘으면 Limit으로 중단한다. `pause`/`resume`는 시계 진행을 멈추고 이어가며 반복 호출은 idempotent다. `set_speed`는 현재 정수 ns media 위치를 유지하고 전환 때 1ns 미만 소수부는 내림한다.
+`Speed::new(numerator:u32, denominator:u32)`는 양수 유리수 배속(0.5/1/2 포함)을 표현하며 0 성분은 거절한다. `Speed::REALTIME`은 1/1이며 `numerator()`/`denominator()`는 약분 없이 입력 성분을 돌려주고 Display는 `분자/분모`(예: `6/4`)로 표시한다. `ReplayPoll`·`ReplayFrame`·`ReplayPayload`는 일반 경로 진단을 위한 Debug를 제공한다. 정수 u128 산술과 deadline ceil을 사용하고 u64 deadline 표현을 넘으면 Limit으로 중단한다. `pause`/`resume`는 시계 진행을 멈추고 이어가며 반복 호출은 idempotent다. `set_speed`는 현재 정수 ns media 위치를 유지하고 전환 때 1ns 미만 소수부는 내림한다.
 
 `poll(now_ns, consumer_ready, cancel)`는 최대1건만 prefetch한다. 기존 Snapshot의 사전 예약 page/order/blob 버퍼와 추가 heap 없는 controller metadata를 사용하며 shared external 예약은 그대로다. 아직 due가 아니거나 소비자가 준비되지 않았으면 `Waiting { due_ns, late_ns }`, paused면 읽기 없이 Paused다. Ready는 원 receipt/metadata·borrowed inline 또는 blob descriptor·generation·late_ns를 반환한다. 늦은 실제 전달만큼 offline 시계를 늦춰 후속 간격을 보존한다. blocked 상태에서 pause/배속 전환으로 media 위치가 미전달 레코드를 넘었어도, 전달 시 그 레코드 위치로 재기준화해 나머지를 몰아서 보내지 않는다. repeated blocked poll은 원본을 재읽거나 read 예산을 다시 소비하지 않는다. 데이터/범위가 없거나 끝나면 End이며 빈 범위에서 손실 건수를 추정하지 않는다.
 
@@ -505,7 +505,7 @@ RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연
 
 큰 payload는 원본 descriptor를 유지하고 `read_blob(generation, handle, offset, length, now_ns, cancel)`로 같은 Snapshot의 개별/누적 예산 안에서 읽는다. 이전 seek generation은 StaleGeneration으로 거절한다. inline/page 재사용과 blob의 Gone/원 IO/한도 판정은 query 경로를 사용한다. lifecycle 검사에서 이미 관측한 만료/취소는 `ReplayError::Query(Expired/Cancelled)`로 terminal stop한다. 실제 IO 중 발생한 원인도 반환 후 terminal stop하며 실제 reader close 뒤에만 pin과 reservation을 반환한다. `stop`/Drop은 미전달 descriptor를 버리고 실제 reader를 닫는다. stop은 idempotent·terminal이며 End는 마지막 blob read를 위해 stop/Drop까지 snapshot을 보유한다.
 
-검증은 [TASK-011](../04_implementation/tasks/TASK-011.md)과 EV-018에 기록한다. 실제 timer 지터·p95/수집 IO 간섭·native/OS/장비·remote/live/CLI는 별도 후속이다.
+검증은 [TASK-011](../04_implementation/tasks/TASK-011.md)과 EV-018·[EV-019](../05_verification/verification_evidence.md#ev-019)에 기록한다. 실제 timer 지터·p95/수집 IO 간섭·native/OS/장비·remote/live/CLI는 별도 후속이다.
 
 ## 15. 설정·운영 계측·점검 계약안
 
@@ -536,6 +536,10 @@ FR-018 활성화는 재시작 때만 허용하는 안이다. 시작 전에 중�
 - 파일: MCAP·chunk CRC/index, 제한 회전, active safe offset, 복구 파일 별도 생성, 명시 quota/보존 설정.
 - 활용: Rust API + CLI 범위는 승인. query/subscribe/replay·DB/gRPC 상세도 기준선 채택 완료.
 - 관측/계측의 승인된 합격선: 안정 합성 입력에서 카운터 정합성은 배출 후 정확 일치, 안정 추세의 포화/소진 시간 추정 오차 ≤20%(5초 이상 예측 구간), 기본 계측 활성/비활성 완료 처리량 차이 ≤5%. RT 호출 목표는 계측 포함해서 기존 §12 목표로 판정한다. 이 추가 목표는 2026-10-26 Human 승인, 실제 달성은 미검증이다.
-- 실장비 미확정: R1 조건은 유지하고 OS/CPU/SSD/UPS·제어 주기·deadline의 대응은 TASK-022에서 수집한다. 해당 정보 없이 실물 수락·Gate 4/5 통과로 표시하지 않는다.
+- 검증 장비 확정(ADR-011): 현재 PC 실측으로 실제 장치 시험을 대체 수락하며 UPS는 시뮬레이션으로 판정한다. TASK-022의 실행 커널/제어 주기·deadline·부하 프로필과 실행 증거로 판정한다. native는 공개 완료 후 진행하며 미실행을 Pass로 표시하지 않는다.
 
 TASK-004 게시 후 native CI는 GitHub 계정 결제/지출 한도로 8개 job 모두 실행 전 차단됐다. 해당 revision의 제품/native 시험은 Not Run이며 재실행 조건은 EV-003·GAP-004에서 추적한다.
+
+## 검증 방법·시점 갱신 — 2026-10-31
+
+[ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 §12/16 및 UPS·복구의 실물/실제 차단 필수 시험은 모의 신호·기한/지연·실제 파일 IO와 중단/재개/복구 시뮬레이션으로 대체 수락한다. 실제 장치 시험은 현재 Ubuntu PC 실측을 사용하고 GitHub native는 공개 완료 후 진행한다. 이전 실물 필수/장비 미확정 표기는 이 범위에서 대체하며 API·예산·순위·partial/오류 의미는 유지한다. 실행 중 generic/설치된 PREEMPT_RT는 TASK-022에 구분하며 커널별 시험 결과를 혼합하지 않는다.

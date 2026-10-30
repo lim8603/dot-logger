@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-28 |
-| 다음 액션 | Human 리뷰 승인·게시 완료; 사용량 소진으로 native CI 후속 검증(GAP-004), 계정 재확인 불필요 |
+| 마지막 갱신일 | 2026-10-31 |
+| 다음 액션 | 로컬 Pass·Human 승인 유지; native GAP-004는 공개 완료 후(T3) 실행 |
 | 의존 | TASK-003 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -58,3 +58,7 @@
 Human 구현 리뷰 승인: 2026-10-27 / 게시·CI 확인 후 오늘 세션 종료 요청. private unsafe 경계와 dot-probe 생성부 조건을 포함한 보고 범위를 승인받았다.
 
 2026-10-28 Human 확인: CI 차단은 GitHub 사용량 전량 소진이며 계정 재확인은 불필요하다. TASK-005 착수 지시로 native CI 후속 검증을 유지한 채 개발을 진행한다. TASK-004 In Progress·GAP-004 Open·기존 구현 승인은 유지한다.
+
+## 검증 환경·시점 변경 — 2026-10-31
+
+Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체 수락하며 UPS 관련 판정은 시뮬레이션을 사용한다. native GAP-004는 GitHub 공개 완료 후(T3) 진행하는 승인된 이월이다. 별도 장치/실물 UPS 확보를 대기 조건으로 요구하지 않는다. 현재 일반 커널 실행/RT 커널 설치를 구분하며 RT 실측은 해당 커널 부팅 확인 후 기록한다. 기존 로컬 Pass·Human 승인/미승인과 미실행 범위는 보존하고 이번 정책 변경만으로 Task를 Done 처리하지 않는다.

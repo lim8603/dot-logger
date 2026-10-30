@@ -38,3 +38,7 @@
 - [도메인 설계](../domain_model.md)
 - [인터페이스 계약](../interface_contract.md)
 - [프로젝트 상태](../../06_evolution/project_state.md)
+
+## 2026-10-31 검증 방법·시점 갱신
+
+Human 승인 [ADR-011](ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 수락은 현재 Ubuntu PC 실측으로 대체하고 UPS는 시뮬레이션 결과로 판정한다. GitHub native는 저장소 공개 완료 후 실행한다. 이전 실제 장비/실물 UPS 필수·native 실행 시점은 이 범위에서 갱신하며 기능/완료/오류/예산 계약은 유지한다. 시뮬레이션 수락을 물리 전원 소실 내구성의 관측 증거로 표시하지 않는다.

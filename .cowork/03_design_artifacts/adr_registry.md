@@ -36,6 +36,8 @@
 | ADR-009 | 파일·외부 연동·도구체인 권고 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-009_storage_transport_toolchain.md) | MCAP 계열만 ADR-010으로 대체, 나머지 기술 기준선 유지 |
 | ADR-010 | 압축 의존성 보안 수정에 따른 MCAP 0.26 채택 | Accepted | 2026-10-26 | INT-001 | MS-002 | [상세](adrs/ADR-010_mcap_security_update.md) | Human 승인, MCAP 0.26.0·선택 zstd 보안 의존성 수정 |
 
+| ADR-011 | 현재 PC 실측·UPS 시뮬레이션 수락과 공개 후 native 검증 | Accepted | 2026-10-31 | INT-001 | MS-002~007 | [상세](adrs/ADR-011_local_pc_simulated_ups_verification.md) | Human 승인, 장비/UPS 수락 방법·native 시점 갱신 |
+
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`
 

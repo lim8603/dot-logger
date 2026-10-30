@@ -12,7 +12,7 @@
 | MS-004 | 조회·재생·클라이언트 | Build | In Progress | TASK-010·TASK-011·TASK-012·TASK-013 | Rust API/CLI로 실제 기록 활용 | 7~12 | [상세](milestones/MS-004.md) |
 | MS-005 | 운영 관측·조절·간편 점검 | Build | Planned | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
 | MS-006 | 외부 연동과 긴급 기록 | Build | Planned | TASK-019·TASK-020·TASK-021·TASK-026 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
-| MS-007 | 장비 검증과 인수 | Verify | Planned | TASK-022·TASK-023·TASK-024·TASK-025 | 실측·24시간·실제 차단·OS 교환 근거 확보 | 8~14 | [상세](milestones/MS-007.md) |
+| MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
 
 필수 합계 **45~76 인일**(주 5일 전담 기준 약 9.0~15.2주), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
 
@@ -35,3 +35,9 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-30 TASK-009 최신 구현 승인·REV-011/012 Closed, 소스fe03468/문서aee3830 게시 후 TASK-010을 구현했다. EV-016 query·reader-owned pin 수명·두 Rust16조합·allocator10/lint/doc/fmt·Miri1024 로컬 Pass, REV-013 Resolved·Human 리뷰/native·장비 잔여다. MS-004 In Progress이며 재생/remote/CLI·실장비 성능은 후속이다.
 
 2026-10-30 TASK-010 소스439d9c5/문서35e3ac3 게시 후 승인된 TASK-011을 구현했다. EV-018 두 Rust16features·실제 파일 replay consumer·allocator10/lint/doc/fmt·영향 Miri304 로컬 Pass, REV-015 Resolved·Human 리뷰/native·장비 잔여로 MS-004 In Progress를 유지한다.
+
+2026-10-31 TASK-011 REV-016 반입·RV-026 방어적 정리/RV-027~028 진단 API 조치, EV-019 두 Rust all-features·실제 파일 consumer/allocator/lint/doc/fmt·replay Miri96 로컬 Pass다. REV-015/016 Resolved·Human 리뷰/native·장비 대기로 MS-004 In Progress를 유지한다. remote/CLI는 후속이며 TASK-012는 자동 착수하지 않는다.
+
+2026-10-31 구현 계약 확인 후 Human 「승인」으로 TASK-011 최종 구현 승인·REV-015/016 Closed·Human 리뷰 체크 완료를 반영했다. TASK-008/010 Human 리뷰와 native GAP-004·장비/실제 timer·remote/CLI는 잔여이며 TASK-011/MS-004 In Progress를 유지한다. TASK-012는 자동 착수하지 않는다.
+
+2026-10-31 ADR-011: 현재 PC 실측/UPS 시뮬레이션 수락·native 공개 완료 후 이월 승인. TASK-022 환경/수락 프로필 준비로 MS-007 In Progress이며 Phase Build는 유지하고 종합 시험/Verify 진입/Gate4·5 Pass를 선언하지 않는다.

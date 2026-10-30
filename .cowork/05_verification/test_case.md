@@ -110,7 +110,7 @@ TASK-009 하위 [EV-014](verification_evidence.md#ev-014): 복구/장애19개(�
 ### TC-006 — 조회·동시 쓰기·재생
 
 - 관련: MS-004 / FR-005·010 / NFR-002·005
-- 상태: 부분 실행 — TASK-010 조회/읽기 수명 로컬 Pass, 재생·성능/native 후속 / 최근 실행: 2026-10-30 / EV: EV-016
+- 상태: 부분 실행 — TASK-010 조회/읽기 수명 로컬 Pass, 재생·성능/native 후속 / 최근 실행: 2026-10-30 / EV: EV-016·017
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -121,6 +121,8 @@ TASK-009 하위 [EV-014](verification_evidence.md#ev-014): 복구/장애19개(�
 SourceTime domain 불명은 오류. 손상 index 재생성·범위 bounds. P5 응답 p95는 TC-012.
 
 TASK-010 하위 [EV-016](verification_evidence.md#ev-016): query9·retention의 reader-owned close/error/cancel/expiry 및 active→closed pin 수명2개·독립 실제 파일 API consumer·두 Rust16조합·allocator10·Miri1024 로컬 Pass. 고정 complete offset·시간/채널/level 필터·결정적 정렬·page metadata+inline bytes/count·큰 원본 descriptor/범위·cursor/handle identity/만료·공유 외부 예약/누적 IO·잘못된 파일/CRC/한도를 확인했다. closed도 bounded scan으로 index를 재구성하며 summary 기반 scan 생략은 미구현이다. 재생/prefetch/generation·live/remote/CLI·P5 실제 지연/OS/장비는 이 실행으로 완료하지 않는다.
+
+REV-014 후속 [EV-017](verification_evidence.md#ev-017): query10·retention19·두 Rust core/all-features workspace·독립 실제 파일 consumer·allocator10·lint/doc/fmt·영향 Miri224 Pass. 모든 필터 교차/이전 cursor 재개·새 동일 Query cursor·취소 복귀/만료 역행을 확인했다. 동일 Query order 재사용·inline/누적 읽기 안내를 반영했으며 실제 p95/IO 간섭·재생/native·장비는 미검증이다.
 
 
 <a id="tc-007"></a>

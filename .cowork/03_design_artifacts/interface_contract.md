@@ -476,9 +476,11 @@ gRPC/Protobuf를 통신 후보로 한다. `GetStatus`, `Query`, `ReadBlob`, `Rep
 
 ### 14.1 TASK-010 로컬 API — 2026-10-30
 
+RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연속되면 사전 예약된 정렬 index를 재사용하며 질의가 달라지면 같은 버퍼에서 재구성한다. 이전 cursor의 위치/필터·취소/만료·결정적 순서는 유지한다. `Payload::Inline` 좌표는 해당 Page 안에서만 유효하며 원본 파일 위치가 아니다. 바이트는 같은 Page의 record를 `Page::inline`에 전달해 얻는다(범위 검사는 있으나 Page identity 검증은 없음).
+
 `query::{QueryBudget, QueryConfig, QuerySource, Snapshot, Query, Cursor, Page, QueryRecord, Payload, BlobHandle, TimeBasis, QueryError}`는 일반 경로의 동기식 primitive다. 현재 고정 session/revision·동일 순서의 등록·한 target의 유한 segment 목록을 사용한다. 호스트가 각 파일의 독립 read-only descriptor를 열고 snapshot 생존 중 공개된 원본 prefix의 불변성을 보장한다. query가 파일 경로 문자열을 입력받거나 worker를 시작하지 않는다.
 
-`QueryBudget::new(plan)`는 session당 한 번 생성해 external 예약을 공유한다. 현재 query가 이 partition을 사용하며 다른 DB/remote/replay adapter 도입 시 합계 예약을 연결해야 한다. `QueryConfig::reservation(channels)`는 frame/decode scratch·유한 record/order index·페이지 metadata/inline bytes·blob read buffer·등록 검증 임시 메모리의 보수적 requested-byte 상한이다. source adapter 자체 메모리·OS cache/allocator 내부는 별도다. 동시 snapshot 합계·source bytes/segment/record/metadata/producer·누적 read bytes와 개별 blob read 길이를 제한한다. scan은 prefix 전체를 보수적으로 한 번 차감하고 page/blob 재읽기를 추가 차감한다.
+`QueryBudget::new(plan)`는 session당 한 번 생성해 external 예약을 공유한다. 현재 query가 이 partition을 사용하며 다른 DB/remote/replay adapter 도입 시 합계 예약을 연결해야 한다. `QueryConfig::reservation(channels)`는 frame/decode scratch·유한 record/order index·페이지 metadata/inline bytes·blob read buffer·등록 검증 임시 메모리의 보수적 requested-byte 상한이다. source adapter 자체 메모리·OS cache/allocator 내부는 별도다. 동시 snapshot 합계·source bytes/segment/record/metadata/producer·누적 read bytes와 개별 blob read 길이를 제한한다. QueryConfig::read_bytes는 모든 source의 safe_offset 합계(초기 scan의 보수적 차감)와 이후 page inline/blob 재읽기 전체를 포함해야 한다. prefix 합계만 예약하면 scan 직후 payload 재읽기 여유가 없고 반복 page/blob 호출도 다시 차감된다.
 
 `Snapshot::new`는 `Read+Seek` source별 frozen safe offset 안에서만 `dot-logger/1`의 무압축·nonzero chunk CRC·schema/channel/봉투/sequence/시각을 검증한다. source size/overflow·잘못된 framing/참조는 실패하며 부분 snapshot을 반환하지 않는다. offset0은 아직 공개 chunk가 없는 빈 active 범위다. 완전 검증 chunk만 index하며 뒤의 미완성/후속 기록을 노출하지 않는다. 현재 closed 파일도 data section을 bounded scan하여 조회 index를 재구성한다. 옛 summary/보조 index를 정답으로 신뢰하지 않으며 표준 summary를 이용한 scan 생략 최적화는 구현하지 않았다. 이 동작의 IO/지연은 장비 성능 달성 근거가 아니다.
 
@@ -488,7 +490,7 @@ gRPC/Protobuf를 통신 후보로 한다. `GetStatus`, `Query`, `ReadBlob`, `Rep
 
 `SegmentLog::{active_boundary,active_query_source,query_source}`는 complete-chunk offset 또는 published closed 길이를 동결하고 reader가 소유하는 읽기 permit을 제공한다. active permit은 같은 sequence가 회전해 closed가 돼도 삭제를 막는다. QuerySource는 reader를 먼저 Drop하고 permit을 나중에 반환하며 오류/취소/만료만으로 보호를 일찍 해제하지 않는다. catalog는 실제 종료가 게시된 슬롯만 다음 관리 작업에서 회수한다. 저수준 ReadPin의 명시 release 계약은 유지하고, 토큰 유실/`mem::forget`/종료를 확인할 수 없는 reader에 대한 강제 회수는 도입하지 않았다. reservation authority도 permit이 보유하여 catalog가 먼저 사라져도 잔여 reader metadata의 예산이 유지된다. `QuerySource::active` 직접 생성은 호스트가 truncation/replacement/삭제 방지를 별도로 보장하는 standalone writer/오프라인용이다.
 
-로컬 검증 범위/최신 hash는 [EV-016](../05_verification/verification_evidence.md#ev-016)이다. 실제 장비 p95/IO 간섭·native/OS 교환·replay/remote/CLI는 별도 후속이다.
+초기 구현 근거는 [EV-016](../05_verification/verification_evidence.md#ev-016), REV-014 조치의 최신 로컬 검증/hash는 [EV-017](../05_verification/verification_evidence.md#ev-017)이다. 실제 장비 p95/IO 간섭·native/OS 교환·replay/remote/CLI는 별도 후속이다.
 
 ## 15. 설정·운영 계측·점검 계약안
 

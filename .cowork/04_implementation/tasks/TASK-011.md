@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-10-26 |
-| 다음 액션 | seek 뒤 이전 generation 미전송·pause/resume·배속·늦은 소비자 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-10-30 |
+| 다음 액션 | EV-018 로컬 Pass·REV-015 Resolved → Human 리뷰/native·장비 |
 | 의존 | TASK-010 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -21,19 +21,43 @@
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger/src/replay/`. 아직 생성된 코드 경로가 아니다.
+구현 경로: [`replay/mod.rs`](../../../crates/dot-logger/src/replay/mod.rs)·[`tc_006_replay.rs`](../../../crates/dot-logger/tests/tc_006_replay.rs), query 내부의 1건 page/기존 예약 버퍼 연동.
 
 첫 실패/리뷰 조건: **seek 뒤 이전 generation 미전송·pause/resume·배속·늦은 소비자**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-006`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 최소 구현 후 관련 `TC-006`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] 가상시계로 deterministic 순서·실제 파일 replay·결측·bounded prefetch 검증.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] 가상시계로 deterministic 순서·실제 파일 replay·결측·bounded prefetch 검증.
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-006](../../05_verification/test_case.md#tc-006). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+테스트 정의: [TC-006](../../05_verification/test_case.md#tc-006). 제품 코드·테스트 실행 결과: [EV-018](../../05_verification/verification_evidence.md#ev-018). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+
+## 착수 — 2026-10-30
+
+Human 「커밋 푸시하고 다음 작업 시작하자」에 따라 TASK-010 소스439d9c5/문서35e3ac3 게시 후 착수한다. TASK-010/008 Human 최종 리뷰·native/장비 GAP은 별도 유지한다. 승인된 §14의 동기식 local replay를 가상 mono ns 시계·양수 유리수 배속으로 구현한다. Snapshot을 소유하고 기존 예약 버퍼에 1건만 prefetch하며 큰 payload는 같은 reader의 bounded blob read를 사용한다. start/pause/resume/seek/stop·generation 변경·취소/만료의 실제 reader 종료를 검증한다. remote 전송/worker/live 정책은 후속 TASK-012다.
+
+## 구현 결과 — 2026-10-30
+
+- `Replay`가 원 Snapshot을 소유하고 일반 동기식 `poll(now_ns, consumer_ready, cancel)`로 최대1건만 prefetch한다. 기존 query의 page/order/blob 사전 예약 버퍼를 공유하며 RT·dependency/lock·unsafe는 변경하지 않는다.
+- `Speed`는 양수 u32 유리수, mono native ns·checked u128 산술/ceil deadline을 사용한다. pause/resume·배속 변경·host 시각 역행 clamp·late 소비자의 후속 간격 보존, generation checked 증가와 잘못된 seek의 상태 보존을 제공한다. 제어 전환은 정수 media ns로 내림한다.
+- frame borrow가 동기식 전달 중 seek/stop을 막고 Transition은 미전달 prefetch 폐기만 보고한다. 이미 반환/복사된 외부 전송 취소는 adapter 책임이며 원격은 TASK-012다. snapshot identity/원 blob 범위·개별/누적 read 예산을 유지하고 이전 seek generation을 거절한다.
+- End는 빈 범위/선택 종료를 나타내며 누락 건수를 추정하지 않는다. 마지막 blob read를 위해 snapshot을 보유하고 stop/Drop·오류/취소/만료에서 실제 IO 반환·reader close 뒤에만 pin과 예약을 반환한다.
+- 초기 API Red 뒤 행동4개 Green, RV-024/025 반례 Red2개 뒤 수정했다. 가상시계10개와 query/pin·실제 파일 public consumer·allocator256B/8MiB 경로를 검증한다. 최종 EV-018/Miri 및 REV-015 상태는 검증 근거를 따른다.
+
+동일 승인 범위의 동기식 재생·시간 제어 세부 구현으로 새 ADR은 만들지 않았다. source54개·두 Rust16features/allocator10/lint/doc/fmt, 영향 Miri를 확인한다. 실제 timer/OS/성능·native GAP-004·장비·Human 최종 리뷰는 별도다. 신규 TASK-011 변경은 미커밋·미게시이며 TASK-012를 자동 착수하지 않는다.
+
+## 최종 로컬 검증
+
+EV-018 source54개/검사10개 exit0, 두 Rust 각16features·독립 실제 File replay API·예제/allocator10·clippy/rustdoc/fmt·영향 Miri38×8=304 Pass다. query/replay256B/8MiB peak11143/25176199 ≤ 예약110776/67217592B·잔여0, 기존 RT 할당/해제0/0 유지. REV-015 RV-024/025 Resolved·Human 리뷰/native GAP-004·장비·실제 timer/성능 대기이며 신규 소스/문서는 미커밋·미게시다.
+
+## 세션 마감·게시 — 2026-10-30
+
+Human 「커밋, 푸쉬해주고 세션마무리」에 따라 EV-018 source54개·검사10개 exit0·로그19개의 원본/뷰 hash 일치를 확인했고, 동일 성공 시험은 반복하지 않았다. 소스 `026999f`를 커밋·origin/main 게시했으며 모든 source commit blob hash도 일치한다. [커밋 대조](../../06_evolution/imported_context/task_011_2026-10-30/commit.json)·[소스 게시 근거](../../06_evolution/imported_context/task_011_2026-10-30/push.json). 검증/마감 문서는 별도 커밋·[skip ci]로 게시한다. 위 미커밋/미게시 문장은 검증 당시 이력이다.
+
+공유/개인 상태와 세션 로그를 종료로 동기화했다. 다음 시작점은 TASK-011·REV-015·EV-018의 Human 최종 구현 리뷰다. 커밋/게시 요청을 별도 최종 구현 승인으로 해석하지 않아 REV-015 Resolved·TASK-011/MS-004 In Progress·native GAP-004/장비·Gate4/5 Not Ready를 유지하며 TASK-012를 자동 착수하지 않는다.

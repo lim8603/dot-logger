@@ -33,3 +33,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-30 후속: Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 조치를 게시하고 TASK-009를 구현했다. EV-014 복구19개·두 Rust16조합/consumer/예제/lint/doc/fmt·allocator9·Miri936 로컬 Pass, REV-011 Resolved다. Human 최종 구현 리뷰/native·장비 잔여로 MS-003 In Progress를 유지한다. 자동 startup 발견/재개·worker와 실물 장애 수락은 미완료다.
 
 2026-10-30 TASK-009 최신 구현 승인·REV-011/012 Closed, 소스fe03468/문서aee3830 게시 후 TASK-010을 구현했다. EV-016 query·reader-owned pin 수명·두 Rust16조합·allocator10/lint/doc/fmt·Miri1024 로컬 Pass, REV-013 Resolved·Human 리뷰/native·장비 잔여다. MS-004 In Progress이며 재생/remote/CLI·실장비 성능은 후속이다.
+
+2026-10-30 TASK-010 소스439d9c5/문서35e3ac3 게시 후 승인된 TASK-011을 구현했다. EV-018 두 Rust16features·실제 파일 replay consumer·allocator10/lint/doc/fmt·영향 Miri304 로컬 Pass, REV-015 Resolved·Human 리뷰/native·장비 잔여로 MS-004 In Progress를 유지한다.

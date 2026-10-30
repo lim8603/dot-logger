@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-10-30 / EV-001~017 |
+| 버전 | 2026-10-30 / EV-001~018 |
 
 ---
 
@@ -497,6 +497,25 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-014](reviews/REV-014_TASK-010_CODE_REVIEW.md) RV-021~023은 로컬 조치/검증 Pass로 Resolved다. 원본 로그는 `.log.gz`, `.log`는 줄 끝/EOF 공백만 정규화한 뷰이며 각각의 hash를 results.json에 기록했다. 실제 CPU 처리량·p95/IO 간섭은 측정하지 않았으며 native GAP-004·장비·fresh audit·commit/push는 미실행이다. 변경 없는 pool/control/routing unsafe 영역의 Miri 전체 반복은 하지 않았다. TASK-010/MS-004 In Progress, Human 구현 리뷰 대기·Gate4/5 Not Ready를 유지한다.
 
+### EV-018 — TASK-011 mono 재생·유한 prefetch·시간/취소 제어
+
+- 대상: TASK-010 소스439d9c5·문서35e3ac3 게시 후 작업 트리. 신규 `replay/mod.rs`, `tc_006_replay.rs`; query의 crate-private 1건 page/검증된 buffer 접근, lib export·retention/실제 파일 consumer/allocator·native recipe 변경. [검사 명령·소스54개/로그 SHA-256](../06_evolution/imported_context/task_011_2026-10-30/results.json)에 고정한다.
+- 실행: 2026-10-30 / AI / 로컬 Linux x86_64 / Rust1.85.0·1.96.0, Miri nightly-2026-10-26. 실제 장비 수락 환경은 아니다.
+- TDD: 미구현 replay import/API Red 뒤 첫 가상시계4개 Green. 자가 리뷰 RV-024(늦은 소비 중 배속 변경 후 후속 간격 붕괴)·RV-025(blob IO 오류 뒤 terminal 정리 누락)의 행동 Red2개→수정→회귀 Green. 잘못된 invalid-seek fixture는 원 query.to가 u64::MAX+1이라 u64::MAX seek가 유효했던 harness 오류로 구분하며 제품 Red로 세지 않는다.
+
+| 범위·검증 | 결과·유효 범위 |
+|---|---|
+| replay10 | mono/tie 순서·leading gap/빈 선택 End·0.5/1/2배속·pause/resume·host now 역행·late consumer·배속 변경 중 overdue·checked deadline overflow, seek의 세대/미전달 폐기/paused/End 재개·이전 blob 세대/잘못된 range 거절·1건 prefetch/반복 blocked IO 차감 없음·누적 read 상한/오류/취소/만료/stop 예약 반환 |
+| query10·retention19 | 기존 snapshot 페이지/정렬/blob 계약 회귀, custom reader Drop 중 pin을 반환하지 않는 것을 검증. 기존 reader 수명 시험에 replay 정상/IO/취소/expiry 4경로를 추가해 실제 close 이후만 pin slot/예약 재사용 |
+| 두 Rust 각16features | Pass — 16조합·독립 actual-file consumer·예제/allocator. consumer는 파일 기록/sync→독립 read-only descriptor→query 후 Replay로 receipt/inline payload2건과 End/stop/예약 반환을 대조 |
+| clippy/rustdoc/fmt | 두 Rust workspace/all-targets/all-features clippy·rustdoc `-D warnings`, 개발1.96 fmt Pass |
+| allocator10 | 두 Rust Pass — query 후 replay256B/8MiB·blocked poll16회·bounded blob256B, peak11143/25176199 ≤ 예약110776/67217592B, 잔여0. RT 할당/해제0/0 유지. Replay는 Snapshot의 버퍼/예약을 공유하고 추가 heap prefetch queue를 만들지 않음 |
+| Miri | Pass — query10+replay10+retention18=38×8=304, strict provenance seed0..7. 프로그램3개/seed별 성공 summary24개 대조. 실제 FileStore 시험1개는 기존 Miri 제외 |
+
+[REV-015](reviews/REV-015_TASK-011.md) RV-024/025 조치·최종 검사10개 exit0로 Resolved다. source54개는 matrix/Miri/현재 hash가 일치하며 `.log.gz`는 원본, `.log`는 후행/EOF 공백 정규화 뷰로 각 hash를 기록했다. prefetch1건·동기식 borrowed frame/세대 제어는 로컬 범위이며 외부 adapter의 이미 복사/전송한 record를 실제 취소했다고 주장하지 않는다. 원본의 누락 건수를 시간 간격에서 추정하지 않고 빈/종료 선택을 End로 보고한다. End는 마지막 blob read를 위해 snapshot을 유지하고 stop/Drop·terminal 오류에서 실제 reader close 후 반환한다. 현재 배속은 양수 u32 유리수, 제어 전환은 정수 media ns로 내림하며 실제 timer가 아니다.
+
+native GAP-004·다른 OS·실제 timer 지터/처리량/p95·수집 IO 간섭/장비·remote/live/CLI·fresh audit·TASK-011 commit/push는 미실행이다. TASK-011/MS-004 In Progress·TC-006 하위 검증만 완료하며 Human 리뷰와 Gate4/5 Not Ready를 유지한다. 기존 unsafe pool/control/routing을 변경하지 않아 해당 Miri 전체는 반복하지 않았다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -506,9 +525,9 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | TASK-002/003 로컬/native Pass, TASK-004~006 로컬/Human 승인. TASK-007 EV-011 로컬 Pass·Human 승인, TASK-008 EV-012/013 회전/보존·리뷰 조치 로컬 Pass·Human 리뷰/native·TASK-009 EV-014/015 로컬 Pass·Human 승인/native·TASK-010 EV-016/017 로컬 Pass·Human 리뷰/native·조회·클라이언트/실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass, TASK-004~006 로컬/Human 승인. TASK-007 EV-011 로컬 Pass·Human 승인, TASK-008 EV-012/013 회전/보존·리뷰 조치 로컬 Pass·Human 리뷰/native·TASK-009 EV-014/015 로컬 Pass·Human 승인/native·TASK-010 EV-016/017·TASK-011 EV-018 로컬 Pass·Human 리뷰/native·조회·클라이언트/실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 실행 전 차단. Human 2026-10-28 사용량 전량 소진 확인, 계정 재확인 불필요. TASK-005 EV-004·TASK-006 EV-009·TASK-007 EV-011·TASK-008 EV-012/013·TASK-009 EV-014/015·TASK-010 EV-016/017도 native Not Run. 마지막 native Pass는 TASK-003 `902043b` | CI 실행 여건 확보 뒤 source hash를 고정해 6 contracts+audit+raw-memory(분배 Miri 포함)를 AI가 확인. Human의 TASK-005~008 착수 지시는 개발 진행 예외이며 검증 면제가 아님 | Open — native 후속 검증 |
+| GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 실행 전 차단. Human 2026-10-28 사용량 전량 소진 확인, 계정 재확인 불필요. TASK-005 EV-004·TASK-006 EV-009·TASK-007 EV-011·TASK-008 EV-012/013·TASK-009 EV-014/015·TASK-010 EV-016/017·TASK-011 EV-018도 native Not Run. 마지막 native Pass는 TASK-003 `902043b` | CI 실행 여건 확보 뒤 source hash를 고정해 6 contracts+audit+raw-memory(분배 Miri 포함)를 AI가 확인. Human의 TASK-005~008 착수 지시는 개발 진행 예외이며 검증 면제가 아님 | Open — native 후속 검증 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
@@ -530,3 +549,5 @@ Human 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 TASK-006 구�
 후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `8bbec13`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. [커밋 대조](../06_evolution/imported_context/task_010_2026-10-30/commit.json). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
 
 2026-10-30 후속 지시 「커밋 푸시하고 다음 작업 시작하자」: EV-017 소스 `439d9c5` 로컬 커밋·source52개 commit blob hash 일치 확인, 동일 성공 시험은 반복하지 않았다. 문서는 별도 커밋·[skip ci] 게시하며 TASK-011 개발 진행은 승인됐다. 이 지시를 별도 최종 구현 리뷰 승인으로 확대하지 않아 REV-013/014 Resolved·native/장비 대기는 유지한다.
+
+세션 마감·게시 — 2026-10-30: Human 「커밋, 푸쉬해주고 세션마무리」에 따라 TASK-011 소스 `026999f`를 origin/main 게시했다. EV-018 source54개·검사10개 exit0·로그19개 원본/뷰 hash 및 모든 commit blob hash 일치를 확인해 성공 시험을 반복하지 않았다. [커밋 대조](../06_evolution/imported_context/task_011_2026-10-30/commit.json)·[소스 게시 근거](../06_evolution/imported_context/task_011_2026-10-30/push.json). 검증/마감 문서는 별도 커밋·[skip ci]로 게시하며 위 commit/push 미실행 설명은 검증 당시 이력이다. REV-015 Resolved·TASK-011/MS-004 In Progress·Human 리뷰/native GAP-004·장비·Gate4/5 Not Ready를 유지한다.

@@ -80,3 +80,5 @@ Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리�
 [EV-017](../../05_verification/verification_evidence.md#ev-017) source52개·검사14개 exit0, 두 Rust 각 core/all-features workspace·실제 파일 API consumer·allocator10·clippy/rustdoc/fmt·영향 Miri(query10+retention18)×8=224 Pass다. 교차 Query/이전 cursor 재개·동일 Query 새 cursor·취소/만료 회귀를 리팩토링 전후 확인했다. RV-022/023은 문서 개선으로 형식적 신규 실패 테스트를 만들지 않았다. query256B/8MiB 메모리 peak/예약은 EV-016과 동일하며 잔여0다. REV-014 Resolved, Human 최종 리뷰/native GAP-004·장비 대기, TASK-010/MS-004 In Progress를 유지한다. 이번 조치는 미커밋·미게시이며 TASK-011은 착수하지 않았다.
 
 2026-10-30 후속 지시 「커밋 푸시하고 다음 작업 시작하자」: EV-017 소스 `439d9c5` 로컬 커밋·source52개 commit blob hash 일치 확인, 동일 성공 시험은 반복하지 않았다. 문서는 별도 커밋·[skip ci] 게시하며 TASK-011 개발 진행은 승인됐다. 이 지시를 별도 최종 구현 리뷰 승인으로 확대하지 않아 REV-013/014 Resolved·native/장비 대기는 유지한다.
+
+게시 확인 — 2026-10-30: 소스439d9c5·문서35e3ac3 origin/main push 성공·ls-remote HEAD 일치를 확인했다. [게시 근거](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/push.json). TASK-011 후속 구현/EV-018 로컬 Pass는 별도 작업 트리다.

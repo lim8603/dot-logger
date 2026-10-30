@@ -111,3 +111,7 @@ HTTP 성공은 DB API 확인 경계이며 SSD 영속 완료나 조회 결과 검
 query snapshot은 고정 session/revision·segment별 complete safe offset을 검증해 메타데이터/원본 payload 위치의 유한 index를 구성한다. 현재 closed도 제한된 data-section scan을 사용하며, 표준 summary로 scan을 생략하는 최적화는 미구현이다. 이는 위 설계의 손상/누락 index 재구성 경로를 우선 구현한 범위이고 성능 달성/완료 판정은 아니다. mono/real/명시 domain source ticks·채널/최소 level 필터 및 결정적 tie 순서, metadata+inline bytes/count 페이지, snapshot-local blob range/누적 IO 한도를 적용한다.
 
 reader-owned permit은 active→closed 회전을 따라 삭제를 막고, 실제 reader close 뒤에만 회수 가능 상태를 게시한다. 낮은 ReadPin의 명시 release/분실 시 보호 유지 계약은 그대로다. query의 external 예약은 snapshot 합계를 제한하며 catalog 예약은 남은 permit 수명까지 유지한다. 상세 [API §14.1](interface_contract.md#141-task-010-로컬-api--2026-10-30), 최신 검증 EV-016을 따른다. replay/live remote/CLI·실제 OS/장비 IO 간섭은 별도다.
+
+### TASK-011 재생 데이터 수명 — 2026-10-30
+
+Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page/blob 버퍼를 공유하며 최대1건의 미전달 descriptor만 유지한다. inline은 frame borrow 동안만 유효하고 blob은 원본 범위·현재 seek generation으로 검사한다. seek는 미전달 prefetch를 폐기하지만 이미 전달된 데이터를 취소한 것으로 보고하지 않는다. End의 마지막 blob read를 위해 snapshot을 보유하며 stop/Drop/terminal 오류에서 실제 reader close 뒤에만 읽기 permit/예약을 반환한다. 시계는 mono ns·양수 유리수 배속이고 OS timer/worker는 후속이다. 상세 [API §14.2](interface_contract.md#142-task-011-로컬-재생-api--2026-10-30), 검증 EV-018.

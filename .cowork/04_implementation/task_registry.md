@@ -22,7 +22,7 @@
 | TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-013 로컬 Pass·REV-009/010 Resolved, Human 구현 리뷰 대기; native 후속 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-014/015 로컬 Pass·Human 승인·REV-011/012 Closed → native·장비 후속 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-30 | EV-017 리뷰 조치 로컬 Pass·REV-013/014 Resolved → Human 리뷰/native·장비 | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
-| TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | seek 뒤 이전 generation 미전송·pause/resume·배속·늦은 소비자 | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
+| TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-30 | EV-018 로컬 Pass·REV-015 Resolved → Human 리뷰/native·장비 | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
 | TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 느린 구독자·잘못된 조각·ACK 전 disconnect·인증 없는 비-loopback | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
 | TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | CLI JSON schema·exit code·query→replay 사용자 흐름과 Ctrl-C | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |

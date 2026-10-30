@@ -15,6 +15,11 @@ pub struct Speed {
     denominator: u32,
 }
 impl Speed {
+    /// Original-time playback rate (1/1).
+    pub const REALTIME: Self = Self {
+        numerator: 1,
+        denominator: 1,
+    };
     /// Reject zero components. Integer ratios avoid floating-point clock drift.
     pub fn new(numerator: u32, denominator: u32) -> Result<Self, ReplayError> {
         if numerator == 0 || denominator == 0 {
@@ -24,6 +29,19 @@ impl Speed {
             numerator,
             denominator,
         })
+    }
+    /// Positive numerator as supplied, without reducing the ratio.
+    pub fn numerator(&self) -> u32 {
+        self.numerator
+    }
+    /// Positive denominator as supplied, without reducing the ratio.
+    pub fn denominator(&self) -> u32 {
+        self.denominator
+    }
+}
+impl std::fmt::Display for Speed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.numerator, self.denominator)
     }
 }
 /// Replay lifecycle; Ended keeps readers alive for the final record's blob reads.
@@ -67,6 +85,7 @@ pub struct Transition {
     pub discarded_prefetch: bool,
 }
 /// Borrowed original payload; large payloads stay on disk.
+#[derive(Debug)]
 pub enum ReplayPayload<'a> {
     /// Bytes valid for this frame's borrow only.
     Inline(&'a [u8]),
@@ -74,6 +93,7 @@ pub enum ReplayPayload<'a> {
     Blob(&'a BlobHandle),
 }
 /// One delivered record. Its borrow prevents seek/stop during synchronous use.
+#[derive(Debug)]
 pub struct ReplayFrame<'a> {
     /// Original receipt, clocks, schema and channel metadata.
     pub record: &'a CapturedRecord,
@@ -85,6 +105,7 @@ pub struct ReplayFrame<'a> {
     pub late_ns: u64,
 }
 /// One bounded turn, with no sleeping or retry loop.
+#[derive(Debug)]
 pub enum ReplayPoll<'a> {
     /// Consumer readiness was accepted; one record is delivered.
     Ready(ReplayFrame<'a>),
@@ -360,10 +381,12 @@ impl<R: Read + Seek> Replay<R> {
             self.anchor_media = media;
             self.anchor_host = now;
         } else {
-            self.anchor_host = self
-                .anchor_host
-                .checked_add(late)
-                .ok_or(ReplayError::Limit)?;
+            // Here anchor_host <= due <= now, so anchor_host + late <= now.
+            // Keep defensive failures terminal if scheduling changes later.
+            let Some(anchor_host) = self.anchor_host.checked_add(late) else {
+                return self.fail(ReplayError::Limit);
+            };
+            self.anchor_host = anchor_host;
         }
         let pending = self.pending.as_mut().ok_or(ReplayError::InvalidState)?;
         pending.delivered = true;

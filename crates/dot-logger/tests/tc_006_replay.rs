@@ -256,6 +256,77 @@ fn finite_rate_changes_are_continuous_and_backwards_host_time_never_rewinds() {
     });
 }
 #[test]
+fn speed_and_borrowed_deliveries_support_public_diagnostics() {
+    let speed = Speed::new(6, 4).unwrap();
+    assert_eq!((speed.numerator(), speed.denominator()), (6, 4));
+    assert_eq!(speed.to_string(), "6/4");
+    assert_eq!(Speed::REALTIME, Speed::new(1, 1).unwrap());
+    with_writer(|mut w, f| {
+        w.append(record(1, 10, 0), &[1, 2, 3]).unwrap();
+        w.flush_chunk().unwrap();
+        let mut r = replay(f, w.safe_offset(), Speed::REALTIME);
+        let no = AtomicBool::new(false);
+        let waiting = r.poll(9, true, &no).unwrap();
+        assert!(format!("{waiting:?}").contains("Waiting"));
+        let ready = r.poll(10, true, &no).unwrap();
+        assert!(format!("{ready:?}").contains("Ready"));
+        match ready {
+            ReplayPoll::Ready(frame) => {
+                assert!(format!("{frame:?}").contains("generation: 1"));
+                assert_eq!(format!("{:?}", frame.payload), "Inline([1, 2, 3])");
+            }
+            other => panic!("expected delivery: {other:?}"),
+        }
+    });
+}
+
+#[test]
+fn late_delivery_near_host_limit_preserves_spacing_or_stops_and_releases_budget() {
+    with_writer(|mut w, f| {
+        for i in 1..=2 {
+            w.append(record(i, i * 10, 0), &[1, 2, 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let no = AtomicBool::new(false);
+        let start = u64::MAX - 100;
+        for now in [u64::MAX - 11, u64::MAX - 2] {
+            let budget = budget();
+            let s = Snapshot::new(
+                &budget,
+                42,
+                1,
+                channels(),
+                vec![QuerySource::active(f.clone(), 1, w.safe_offset())],
+                cfg(),
+                start,
+                u64::MAX,
+                &no,
+            )
+            .unwrap();
+            let mut r = Replay::new(s, query(), Speed::new(1, 1).unwrap(), start, &no).unwrap();
+            assert_eq!(delivered(&mut r, now), (1, 1, now - (start + 10)));
+            assert_eq!(r.state(), ReplayState::Playing);
+            assert!(budget.used_bytes() > 0);
+            if let Some(due) = now.checked_add(10) {
+                assert!(matches!(
+                    r.poll(due - 1, true, &no).unwrap(),
+                    ReplayPoll::Waiting { due_ns, .. } if due_ns == due
+                ));
+                assert_eq!(delivered(&mut r, due), (2, 1, 0));
+                r.stop();
+            } else {
+                assert!(matches!(r.poll(now, true, &no), Err(ReplayError::Limit)));
+                assert_eq!(r.state(), ReplayState::Stopped);
+                assert!(matches!(
+                    r.poll(now, true, &no).unwrap(),
+                    ReplayPoll::Stopped
+                ));
+            }
+            assert_eq!(budget.used_bytes(), 0);
+        }
+    });
+}
+#[test]
 fn late_delivery_slows_next_due_without_scanning_ahead_and_stop_releases_budget() {
     with_writer(|mut w, f| {
         for i in 1..=3 {

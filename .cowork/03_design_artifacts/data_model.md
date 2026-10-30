@@ -105,3 +105,9 @@ HTTP 성공은 DB API 확인 경계이며 SSD 영속 완료나 조회 결과 검
 ### DB 충돌 검출의 제한된 상태
 
 첫 충돌 거절 구현은 adapter가 단독 소유하는 namespace와 사전 등록한 유한 series 집합을 전제로 한다. series별 마지막 제출 timestamp를 유지하고 새 point가 그보다 작거나 같으면 out-of-order/collision으로 거절한다. 네트워크 재시도는 동일 batch 재전송으로 구분한다. 임의 과거 point나 외부 writer와의 충돌을 유한 캐시로 모두 검출한다고 주장하지 않는다. 외부 writer가 같은 namespace를 사용하면 해당 보존 보장은 unsupported다. 모든 원본은 선택된 파일 경로에서 그대로 유지한다. 이 제약은 DB projection 계약이며 파일의 시간 역행 허용을 바꾸지 않는다.
+
+### TASK-010 조회/읽기 수명 구현 — 2026-10-30
+
+query snapshot은 고정 session/revision·segment별 complete safe offset을 검증해 메타데이터/원본 payload 위치의 유한 index를 구성한다. 현재 closed도 제한된 data-section scan을 사용하며, 표준 summary로 scan을 생략하는 최적화는 미구현이다. 이는 위 설계의 손상/누락 index 재구성 경로를 우선 구현한 범위이고 성능 달성/완료 판정은 아니다. mono/real/명시 domain source ticks·채널/최소 level 필터 및 결정적 tie 순서, metadata+inline bytes/count 페이지, snapshot-local blob range/누적 IO 한도를 적용한다.
+
+reader-owned permit은 active→closed 회전을 따라 삭제를 막고, 실제 reader close 뒤에만 회수 가능 상태를 게시한다. 낮은 ReadPin의 명시 release/분실 시 보호 유지 계약은 그대로다. query의 external 예약은 snapshot 합계를 제한하며 catalog 예약은 남은 permit 수명까지 유지한다. 상세 [API §14.1](interface_contract.md#141-task-010-로컬-api--2026-10-30), 최신 검증 EV-016을 따른다. replay/live remote/CLI·실제 OS/장비 IO 간섭은 별도다.

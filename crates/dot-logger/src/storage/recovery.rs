@@ -317,8 +317,10 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                                 .record()
                                 .map_err(|_| Some(StorageError::CorruptData))?;
                             if opcode == 5 {
+                                let payload =
+                                    record.get(22..).ok_or(Some(StorageError::CorruptData))?;
                                 let stored =
-                                    decode_record(&record[22..], options.writer.max_payload_bytes)?;
+                                    decode_record(payload, options.writer.max_payload_bytes)?;
                                 writer.append(stored.record, &stored.payload)?;
                             }
                         }
@@ -439,6 +441,14 @@ struct Validation<'a> {
     last: Vec<u64>,
     max_payload: usize,
 }
+// The longest expected value is payload.<32 hex digits>.v<u32> (52 bytes).
+// Use the same canonical formatting as the writer without allocating per comparison.
+fn matches_text(actual: &[u8], expected: std::fmt::Arguments<'_>) -> bool {
+    let mut buffer = [0; 64];
+    let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
+    std::io::Write::write_fmt(&mut cursor, expected).is_ok()
+        && actual == &cursor.get_ref()[..cursor.position() as usize]
+}
 impl Validation<'_> {
     fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         let mut f = Fields(body);
@@ -467,12 +477,13 @@ impl Validation<'_> {
         let mut found = false;
         for (i, c) in self.channels.iter().enumerate() {
             let matches = c.schema.as_ref().is_some_and(|s| {
-                name == format!(
-                    "payload.{:032x}.v{}",
-                    c.channel.schema_id, c.channel.schema_version
-                )
-                .as_bytes()
-                    && encoding == s.encoding.as_bytes()
+                matches_text(
+                    name,
+                    format_args!(
+                        "payload.{:032x}.v{}",
+                        c.channel.schema_id, c.channel.schema_version
+                    ),
+                ) && encoding == s.encoding.as_bytes()
                     && data == s.descriptor
             });
             if self.payload_schemas[i] == Some(id) && !matches {
@@ -511,22 +522,38 @@ impl Validation<'_> {
         while !meta.0.is_empty() {
             let key = meta.string()?;
             let value = meta.string()?;
-            let (bit, expected) = match key {
-                b"session_id" => (1, format!("{:032x}", self.session)),
-                b"revision" => (2, self.revision.to_string()),
-                b"product_channel" => (4, c.channel.channel_id.to_string()),
-                b"payload_schema_id" => (8, format!("{:032x}", c.channel.schema_id)),
-                b"payload_schema_version" => (16, c.channel.schema_version.to_string()),
-                b"payload_encoding" => (32, c.payload_encoding.clone()),
+            let (bit, matches) = match key {
+                b"session_id" => (
+                    1,
+                    matches_text(value, format_args!("{:032x}", self.session)),
+                ),
+                b"revision" => (2, matches_text(value, format_args!("{}", self.revision))),
+                b"product_channel" => (
+                    4,
+                    matches_text(value, format_args!("{}", c.channel.channel_id)),
+                ),
+                b"payload_schema_id" => (
+                    8,
+                    matches_text(value, format_args!("{:032x}", c.channel.schema_id)),
+                ),
+                b"payload_schema_version" => (
+                    16,
+                    matches_text(value, format_args!("{}", c.channel.schema_version)),
+                ),
+                b"payload_encoding" => (32, value == c.payload_encoding.as_bytes()),
                 b"payload_schema_file_id" if c.schema.is_some() => (
                     64,
-                    self.payload_schemas[i]
-                        .ok_or(RecoveryStop::InvalidRecord)?
-                        .to_string(),
+                    matches_text(
+                        value,
+                        format_args!(
+                            "{}",
+                            self.payload_schemas[i].ok_or(RecoveryStop::InvalidRecord)?
+                        ),
+                    ),
                 ),
                 _ => return Err(RecoveryStop::InvalidRecord),
             };
-            if seen & bit != 0 || value != expected.as_bytes() {
+            if seen & bit != 0 || !matches {
                 return Err(RecoveryStop::InvalidRecord);
             }
             seen |= bit;

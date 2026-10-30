@@ -5,7 +5,7 @@
 - 일자/리뷰어: 2026-10-30 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
 - 대상: 소스 `e5f3147`(게시 1f2f44d 이후 TASK-009 구현). EV-014의 최종 source51개/commit blob과 일치한다.
 - 판정: Conditional — 복구 통합19개·두 Rust 각16 features/consumer/예제/lint/doc/fmt·allocator9·Miri936 Pass, Human 최종 리뷰/native·장비 잔여.
-- 상태: Resolved — Open 등록 → In Progress 조치 → EV-014 로컬 회귀 Pass. Human 최종 구현 리뷰 대기다. 사용자 요청의 리뷰 전용 세션은 아니다.
+- 상태: Closed — 2026-10-30 Human TASK-009 최종 구현 승인, native/장비 GAP 별도 유지.
 
 ## 리뷰·처리 요약
 
@@ -40,3 +40,5 @@
 [EV-014](../verification_evidence.md#ev-014)·[source51개/명령/로그 hash](../../06_evolution/imported_context/task_009_2026-10-30/results.json)를 확인했다. 검사10개 exit0·Miri7 programs×8 seeds/56개 성공 summary·936회 Pass이며 두 Rust16조합/독립 consumer/예제/allocator9/lint/doc/fmt가 같은 source51개를 가리킨다. 현재 점검에서 추가 미해결 P1/P2는 확인하지 못했지만 Human/native·실물 검증을 대신하지 않으며 Conditional/Resolved를 유지한다. TASK-009 소스 e5f3147은 게시 요청을 받아 커밋했으며 Human 최종 구현 리뷰 대상이다.
 
 세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+
+2026-10-30 후속 승인: Human이 TASK-009 최신 구현·REV-012 조치를 승인했다. 소스 `fe03468`은 EV-015 source51개/commit blob hash와 일치한다. 본 리뷰를 Closed로 전환하며 과거 Resolved/Human 대기 문장은 당시 이력으로 보존한다. native GAP-004·실장비 검증은 미완료다.

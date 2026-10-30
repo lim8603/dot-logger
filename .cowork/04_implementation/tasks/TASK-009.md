@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-30 |
-| 다음 액션 | EV-014 로컬 Pass·REV-011 Resolved → Human 구현 리뷰/native·장비 검증 |
+| 다음 액션 | EV-014/015 로컬 Pass·Human 승인·REV-011/012 Closed → native·장비 검증 |
 | 의존 | TASK-008 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@
 - [x] 원본 보존 복구·온전한 prefix/제외 범위·RT 경로 유지·OS 오류/primitive 의미를 구현하고 로컬 시험했다. 실제 OS별 내구성/장비 판정은 native/TASK-022로 이월한다.
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-005](../../05_verification/test_case.md#tc-005). 제품 코드·테스트 실행 결과: [EV-014](../../05_verification/verification_evidence.md#ev-014). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -65,3 +65,11 @@ Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 TASK-008 EV-013
 TASK-008 REV-010 조치까지는 소스14fd1a4·문서1f2f44d로 origin/main 게시 완료했다. TASK-009는 후속 세션 마감/게시 요청으로 소스 e5f3147을 커밋했으며, Human 최종 구현 리뷰는 별도 대기다.
 
 세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+
+## REV-012 조치 — 2026-10-30
+
+Human의 새 리뷰 지적사항 처리 요청으로 RV-016/017(P3)을 수용했다. `recover_inner`의 메시지 payload 조회는 `get(22..)`로 경계를 확인한다. `Validation::schema/channel`은 `matches_text`의 고정64바이트 스택 포맷과 encoding 직접 비교를 사용해 반복 `format!`/`to_string`/clone을 없앴다. 현재 최장 스키마 이름52바이트를 수용하며 기존 canonical 문자열·복구 계약/예약/공개 API를 유지한다. 타입 선언 추가/변경은 없다.
+
+[EV-015](../../05_verification/verification_evidence.md#ev-015)에서 Rust1.85/1.96 workspace/all-features 각각201개(복구19·allocator9·doctest17 포함)·양쪽 clippy·fmt Pass. 이전 EV-014와 소스51개 중 recovery.rs만 달라졌고 최신 hash/로그는 EV-015다. Miri/16-feature matrix/rustdoc은 EV-014 이전 소스의 이력으로 보존한다. [REV-012](../../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md)는 Open→In Progress→Resolved, Human 최종 리뷰 전 Closed로 올리지 않는다. native GAP-004·장비 검증·TASK-009/MS-003 In Progress는 유지한다. 이번 요청으로 commit/push·TASK-010 착수는 수행하지 않았다.
+
+2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」: TASK-009 최신 구현 승인·REV-011/012 Closed, 소스 `fe03468`은 EV-015 source51개와 일치한다. native/장비 미완료로 In Progress를 유지하며 TASK-010 진행을 승인받았다.

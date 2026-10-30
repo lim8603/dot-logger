@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-10-30 / EV-001~012 |
+| 버전 | 2026-10-30 / EV-001~015 |
 
 ---
 
@@ -444,6 +444,21 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-011](reviews/REV-011_TASK-009.md)은 RV-015 로컬 해결·회귀 Pass로 **Resolved / Conditional**이다. TASK-009 검증 당시 작업 트리는 후속 세션 마감/게시 요청으로 소스 e5f3147을 커밋했고 source51개와 일치한다. Human 최종 구현 리뷰·native GAP-004·실제 장비/전원/OS 교환·host free-space adapter 실측은 잔여다. host가 원래 session/revision·동일 순서의 등록과 source 불변성을 보장해야 한다. 자동 startup directory 발견/기존 namespace 재개·active reader TASK-010·worker/StorageDegraded 계측 TASK-014는 별도 후속이다. TASK-009/MS-003 In Progress·TC-005 부분 실행·Gate4/5 Not Ready를 유지한다. 새 native CI recipe에는 retention/fault_storage Miri 범위를 추가했으나 CI/계정/과금 조회·차단 재시도·fresh audit는 하지 않았다.
 
+### EV-015 — TASK-009 REV-012 P3 권고 조치
+
+- 승인/대상: 2026-10-30 Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리하고, TASK-009 짧게 요약보고해줘」. `cdf9a63` 위 dirty 작업 트리, EV-014 source51개 중 `storage/recovery.rs`만 변경했다. [소스51개·환경/명령/결과·로그 SHA-256](../06_evolution/imported_context/task_009_review_fixes_2026-10-30/results.json)·[재현 script](../06_evolution/imported_context/task_009_review_fixes_2026-10-30/verify.py).
+- 변경: RV-016 메시지 replay `get(22..)` 경계 확인, RV-017 `matches_text`의 고정64바이트 스택 포맷·encoding 원본 바이트 비교. 공개 계약/형식/예약 산식·의존/lock·RT/unsafe 경계는 동일하다. 기능 결함 수정이 아닌 리팩토링으로 기존 통합 시험을 사용했고 형식적인 Red/새 테스트는 만들지 않았다.
+
+| 범위·명령 | 결과·유효 범위 |
+|---|---|
+| Rust 1.85.0·1.96.0 `cargo test --workspace --all-features --locked -- --nocapture` | 각각201 Pass(복구 통합19·allocator9 포함, doctest17 포함). 불변 원본/완전 prefix·손상/CRC/참조 거절·취소/IO/실제 Unix FileStore·선택 schema/receipt·독립 판독 회귀 |
+| 두 Rust `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | Pass |
+| 1.96.0 `cargo fmt --all --check` | Pass |
+| allocator | 두 Rust에서 복구256B/8MiB peak21386/33572214 ≤ 예약213776/50543888 bytes, 최종 잔여0. 기존 RT 할당/해제0/0 가드 Pass |
+| 근거 일치 | 검사5개 exit0, 시작/완료 source51개 동일. EV-014와 차이는 recovery.rs 한 파일 |
+
+[REV-012](reviews/REV-012_TASK-009_DEEP_REVIEW.md) RV-016/017 수용·Resolved. Human 최종 구현 리뷰·native GAP-004·장비/전원/OS 교환은 잔여이며 TASK-009/MS-003 In Progress·Gate4/5 Not Ready를 유지한다. 현재 변경은 feature 분기/unsafe를 건드리지 않아 이 영향 회귀를 적용했다. EV-014의16-feature matrix/rustdoc/Miri936은 이전 소스의 이력으로 보존하며 이번 변경에서 다시 실행했다고 표시하지 않는다. native CI/계정 조회·차단 재시도·fresh audit·commit/push는 수행하지 않았다.
+
 ## Gate 판정 메모
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
@@ -453,9 +468,9 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | 실제 OS/CPU/SSD/제어 주기/NIC/UPS 미정. 실행 근거 없음 | Human/AI, TASK-022 환경 확정 후 TC-011·012 | Open |
-| GAP-002 | TASK-002/003 로컬/native Pass, TASK-004~006 로컬/Human 승인. TASK-007 EV-011 로컬 Pass·Human 승인, TASK-008 EV-012/013 회전/보존·리뷰 조치 로컬 Pass·Human 리뷰/native·TASK-009 EV-014 복구/IO 장애 로컬 Pass·Human 리뷰/native·클라이언트/실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass, TASK-004~006 로컬/Human 승인. TASK-007 EV-011 로컬 Pass·Human 승인, TASK-008 EV-012/013 회전/보존·리뷰 조치 로컬 Pass·Human 리뷰/native·TASK-009 EV-014/015 복구/IO 장애·리뷰 조치 로컬 Pass·Human 리뷰/native·클라이언트/실장비 TC 잔여 | AI, 후속 Task별 TDD/인수 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 실행 전 차단. Human 2026-10-28 사용량 전량 소진 확인, 계정 재확인 불필요. TASK-005 EV-004·TASK-006 EV-009·TASK-007 EV-011·TASK-008 EV-012/013·TASK-009 EV-014도 native Not Run. 마지막 native Pass는 TASK-003 `902043b` | CI 실행 여건 확보 뒤 source hash를 고정해 6 contracts+audit+raw-memory(분배 Miri 포함)를 AI가 확인. Human의 TASK-005~008 착수 지시는 개발 진행 예외이며 검증 면제가 아님 | Open — native 후속 검증 |
+| GAP-004 | TASK-004 `f0ce6ee` run `40520558735`의 8개 job은 실행 전 차단. Human 2026-10-28 사용량 전량 소진 확인, 계정 재확인 불필요. TASK-005 EV-004·TASK-006 EV-009·TASK-007 EV-011·TASK-008 EV-012/013·TASK-009 EV-014/015도 native Not Run. 마지막 native Pass는 TASK-003 `902043b` | CI 실행 여건 확보 뒤 source hash를 고정해 6 contracts+audit+raw-memory(분배 Miri 포함)를 AI가 확인. Human의 TASK-005~008 착수 지시는 개발 진행 예외이며 검증 면제가 아님 | Open — native 후속 검증 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
@@ -471,3 +486,5 @@ Human 「승인, 커밋 푸쉬하고 세션 마무리해줘」로 TASK-006 구�
 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 EV-013 소스 `14fd1a4`를 커밋했다(source49개/commit blob hash 일치). `.cowork` 문서와 분리해 게시하며 TASK-009 후속 착수는 승인됐다. TASK-008 최종 구현 리뷰·REV-009/010 Resolved·native GAP-004는 유지한다.
 
 세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+
+2026-10-30 후속 승인: Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최신 구현·EV-015 조치 승인, REV-011/012 Closed. 소스 `fe03468`은 EV-015 source51개와 commit blob hash가 일치하며 동일 성공 시험을 반복하지 않았다. [커밋 대조](../06_evolution/imported_context/task_009_review_fixes_2026-10-30/commit.json). native GAP-004·실장비 검증은 남으며 TASK-010 후속 개발 진행 승인은 검증 면제가 아니다.

@@ -6,7 +6,7 @@
 - **대상:** TASK-009 복구·IO 장애 구현 커밋 `e5f3147` (`crates/dot-logger/src/storage/recovery.rs`, `writer.rs`, `mod.rs`, `tests/fault_storage.rs`, `tests/rt-allocation/src/tests.rs`)
 - **종합 판정:** Pass (권고사항 P3 2건)
   - RT 경로 오염 없음, Safe Rust 100% (unsafe 0건), 철저한 산술/경계 바운드 검사, 메모리 누수 0, TDD 결함 주입 19개 및 할당 상한 검증 Pass.
-- **상태:** Open (심층 리뷰 세션 오픈 → 개발 세션/Human 리뷰 인계 대기)
+- **상태:** Closed — 2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최종 구현 승인. native/장비 GAP은 별도 유지.
 
 ---
 
@@ -14,8 +14,8 @@
 
 | ID | 중요도 | 위치 / 대상 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-016 | P3 | `recovery.rs:321` (`recover_inner`) | 중첩 메시지 디코딩 시 `&record[22..]` 고정 인덱싱 슬라이스 사용 | 상위 `state.chunk()`의 사전 검증 불변식에 의존하므로, 방어적 코딩 관점에서 `record.get(22..)` 패턴 매칭으로 잠재적 패닉 경로 원천 차단 권고 | 미반영 (제안) | Open |
-| RV-017 | P3 | `recovery.rs:470, 515, 518` (`Validation`) | 스키마 및 채널 검증 루프 내 반복적 `format!` 힙 동적 할당 | 복구(Management) 경로이므로 허용되나, 채널 수 증가 시 할당 오버헤드 완화를 위해 고정 스택 버퍼 포맷팅 또는 사전 계산 캐싱 제안 | 미반영 (제안) | Open |
+| RV-016 | P3 | `recovery.rs:321` (`recover_inner`) | 중첩 메시지 디코딩 시 `&record[22..]` 고정 인덱싱 슬라이스 사용 | 상위 `state.chunk()`의 사전 검증 불변식에 의존하므로, 방어적 코딩 관점에서 `record.get(22..)` 패턴 매칭으로 잠재적 패닉 경로 원천 차단 권고 | 수용·방어적 슬라이스 조회 반영(EV-015) | Resolved |
+| RV-017 | P3 | `recovery.rs:470, 515, 518` (`Validation`) | 스키마 및 채널 검증 루프 내 반복적 `format!` 힙 동적 할당 | 복구(Management) 경로이므로 허용되나, 채널 수 증가 시 할당 오버헤드 완화를 위해 고정 스택 버퍼 포맷팅 또는 사전 계산 캐싱 제안 | 수용·64바이트 스택 포맷/직접 비교 반영(EV-015) | Resolved |
 
 ---
 
@@ -38,6 +38,12 @@
   `record.get(22..).ok_or(Some(StorageError::CorruptData))?` 등으로 대체.
 - **심각도:** Note (P3)
 
+#### [처리담당] — 2026-10-30
+- 판정: 수용(A — 기존 계약 안의 방어적 리팩토링).
+- `recover_inner`의 메시지 재생에서 `record.get(22..).ok_or(Some(StorageError::CorruptData))?`로 변경했다. 선행 chunk 검증은 유지하고 슬라이스 경계를 독립적으로 확인한다.
+- 검증: [EV-015](../verification_evidence.md#ev-015)의 두 Rust workspace 회귀(각201개, 복구 통합19개 포함)·clippy·fmt Pass. 기능 결함 재현이 아닌 리팩토링으로 기존 실패/손상/취소 통합 시험을 회귀했다.
+
+
 ---
 
 ### RV-017: 스키마/채널 검증 시 반복적 동적 문자열 포맷팅 최적화 권고 (P3)
@@ -54,6 +60,13 @@
 - **처리 제안:**
   복구 경로는 RT 경로가 아니므로 치명적이지 않으나, 성능 향상 및 불필요한 GC 부담을 줄이기 위해 스택 버퍼(`write!(&mut buf, ...)` 등) 또는 사전 계산된 topic/schema 이름 문자열을 비교하는 구조로 리팩토링할 것을 권고합니다.
 - **심각도:** Note (P3)
+
+#### [처리담당] — 2026-10-30
+- 판정: 수용(A — 관측 동작/허용 형식 불변인 내부 최적화).
+- `matches_text`는 `format_args!`를 64바이트 스택 슬라이스에 기록해 비교한다. 현재 최장 스키마 이름은 `payload.`8 + 32 hex + `.v`2 + u32 최대10 = 52바이트다. 포맷 쓰기 실패는 불일치로 처리한다. 숫자 파싱으로 바꾸지 않아 기존 소문자/제로 패딩/10진수 표현을 그대로 검증한다.
+- `Validation::schema/channel`의 `format!`·`to_string` 및 `payload_encoding.clone()`을 제거했다. encoding은 원본 바이트를 직접 비교하여 길이 제한이 새로 생기지 않는다. 공개 타입/예약 산식·RT 경로/의존성은 동일하다.
+- 검증: [EV-015](../verification_evidence.md#ev-015)에서 선택 사용자 schema 복구·잘못된 참조 거절·독립 MCAP 판독·allocator9/RT 가드·두 Rust 회귀 Pass. 전체 복구는 여전히 관리 경로이며 처리량 개선을 실측한 것은 아니다. Rust에 GC는 없으며 본 조치는 임시 힙 할당/해제 감소다.
+
 
 ---
 
@@ -78,7 +91,7 @@
 
 ---
 
-## 5. 최종 결론 및 다음 액션
+## 5. 리뷰 당시 결론 및 다음 액션 (수정 전 이력)
 
 TASK-009의 복구 및 IO 장애 처리 구현은 설계 계약과 실시간/안전성 제약을 철저히 준수하고 있으며 완성도가 매우 높습니다.
 발견된 2건의 사항(RV-016, RV-017)은 기능적 결함이나 안전성 문제가 아닌 방어적 코딩 및 코드 최적화를 위한 권고사항(P3)입니다.
@@ -87,3 +100,9 @@ TASK-009의 복구 및 IO 장애 처리 구현은 설계 계약과 실시간/안
   2. 후속 개발 세션 또는 Human 리뷰 시 P3 권고사항(방어적 슬라이싱, 스택 버퍼 최적화) 반영 여부 결정.
   3. TASK-009 최종 구현 승인 후 다음 계획 태스크(TASK-010 active snapshot 등) 진행.
 
+
+## 6. 처리 결과 — 2026-10-30
+
+Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리하고, TASK-009 짧게 요약보고해줘」에 따라 RV-016/017을 반영했다. [EV-015 소스51개/명령/로그 hash](../../06_evolution/imported_context/task_009_review_fixes_2026-10-30/results.json) 기준 검사5개 exit0·source 불변을 확인했다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 위 리뷰어의 최초 판정은 수정 전 `e5f3147`/EV-014의 이력으로 보존한다. 현재 조치는 Resolved이며 Closed로 올리지 않는다. TASK-009 Human 최종 리뷰/native·장비 검증은 잔여다. commit/push는 수행하지 않았다.
+
+2026-10-30 후속 승인: Human이 TASK-009 최신 구현·REV-012 조치를 승인했다. 소스 `fe03468`은 EV-015 source51개/commit blob hash와 일치한다. 본 리뷰를 Closed로 전환하며 과거 Resolved/Human 대기 문장은 당시 이력으로 보존한다. native GAP-004·실장비 검증은 미완료다.

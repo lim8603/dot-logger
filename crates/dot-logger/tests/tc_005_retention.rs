@@ -911,7 +911,7 @@ fn query_owned_pin_waits_for_reader_close_on_error_cancel_and_expiry() {
             self.closed.set(true);
         }
     }
-    for case in 0..4 {
+    for case in 0..8 {
         let mut retention = retention(RetentionMode::Circular);
         retention.max_pins = 1;
         with_log(retention, writer(), |mut log, state| {
@@ -969,6 +969,49 @@ fn query_owned_pin_waits_for_reader_close_on_error_cancel_and_expiry() {
                 &cancel,
             )
             .unwrap();
+            if case >= 4 {
+                use dot_logger::replay::{Replay, ReplayError, ReplayPoll, Speed};
+                let mut replay = Replay::new(
+                    snapshot,
+                    Query {
+                        basis: TimeBasis::Mono,
+                        from: 0,
+                        to: 10,
+                        channel: None,
+                        minimum_level: dot_logger::capture::Level::Trace,
+                    },
+                    Speed::new(1, 1).unwrap(),
+                    3,
+                    &cancel,
+                )
+                .unwrap();
+                fail.set(case == 5);
+                cancel_on_read.set(case == 6);
+                let result = replay.poll(if case == 7 { 20 } else { 4 }, true, &cancel);
+                match case {
+                    4 => assert!(matches!(result, Ok(ReplayPoll::Ready(_)))),
+                    5 => assert!(
+                        matches!(result, Err(ReplayError::Query(QueryError::Io(ref e))) if e.raw_os_error()==Some(5))
+                    ),
+                    6 => assert!(matches!(
+                        result,
+                        Err(ReplayError::Query(QueryError::Cancelled))
+                    )),
+                    _ => assert!(matches!(
+                        result,
+                        Err(ReplayError::Query(QueryError::Expired))
+                    )),
+                }
+                if case == 4 {
+                    assert!(!closed.get());
+                }
+                replay.stop();
+                assert!(closed.get());
+                assert_eq!(budget.used_bytes(), 0);
+                let pin = log.borrow_mut().pin(sequence, 1, 23, 30).unwrap();
+                log.borrow_mut().release_pin(pin).unwrap();
+                return;
+            }
             let cursor = snapshot
                 .start(
                     Query {

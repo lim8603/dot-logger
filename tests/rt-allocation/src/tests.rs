@@ -938,7 +938,7 @@ fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations()
 }
 
 #[test]
-fn query_index_pages_and_large_blob_reads_stay_inside_external_reservation() {
+fn query_and_replay_pages_and_large_blobs_stay_inside_external_reservation() {
     use dot_logger::{
         capture::{CaptureReceipt, CapturedRecord},
         query::*,
@@ -1123,12 +1123,31 @@ fn query_index_pages_and_large_blob_reads_stay_inside_external_reservation() {
                         );
                     }
                 }
+                let mut replay = dot_logger::replay::Replay::new(
+                    snapshot,
+                    Query { basis: TimeBasis::Mono, from: 1, to: 2, channel: None, minimum_level: Level::Trace },
+                    dot_logger::replay::Speed::new(1, 1).unwrap(), 1, &cancel,
+                ).unwrap();
+                for _ in 0..16 {
+                    replay.poll(1, false, &cancel).unwrap();
+                }
+                match replay.poll(1, true, &cancel).unwrap() {
+                    dot_logger::replay::ReplayPoll::Ready(frame) => match frame.payload {
+                        dot_logger::replay::ReplayPayload::Inline(bytes) => assert_eq!(bytes, payload),
+                        dot_logger::replay::ReplayPayload::Blob(handle) => {
+                            let handle=handle.clone();let generation=frame.generation;
+                            assert_eq!(replay.read_blob(generation,&handle,0,256,1,&cancel).unwrap(),&payload[..256]);
+                        }
+                    },
+                    _=>panic!("expected replay frame"),
+                }
+                replay.stop();
             });
             assert_eq!(remaining, 0);
             assert_eq!(budget.used_bytes(), 0);
             assert!(peak > 0 && peak <= concrete as i128);
             println!(
-                "query payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}"
+                "query/replay payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}"
             );
         });
         std::fs::remove_file(path).unwrap();

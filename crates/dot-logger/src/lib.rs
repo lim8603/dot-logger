@@ -23,3 +23,6 @@ pub mod storage;
 
 /// Frozen complete-chunk snapshots, bounded query pages and original blob reads.
 pub mod query;
+
+/// Caller-driven offline replay, bounded prefetch and generation-based control.
+pub mod replay;

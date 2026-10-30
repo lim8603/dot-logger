@@ -263,7 +263,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 assert_eq!(page.records.len(), 2);
                 assert_eq!(page.records[0].record.receipt, receipt);
                 assert_eq!(page.inline(&page.records[0]), Some(b"example".as_slice()));
-                drop(snapshot);
+                // Replay owns the same actual file reader and bounded reservation.
+                let mut replay = dot_logger::replay::Replay::new(
+                    snapshot,
+                    dot_logger::query::Query {
+                        basis: dot_logger::query::TimeBasis::Mono,
+                        from: metadata.mono_ns as i128,
+                        to: metadata.mono_ns as i128 + 1,
+                        channel: Some(7),
+                        minimum_level: Level::Trace,
+                    },
+                    dot_logger::replay::Speed::new(1, 1)?,
+                    1,
+                    &cancel,
+                )?;
+                for (expected, payload) in [
+                    (receipt, b"example".as_slice()),
+                    (second, b"batch".as_slice()),
+                ] {
+                    match replay.poll(1, true, &cancel)? {
+                        dot_logger::replay::ReplayPoll::Ready(frame) => {
+                            assert_eq!(frame.record.receipt, expected);
+                            match frame.payload {
+                                dot_logger::replay::ReplayPayload::Inline(bytes) => {
+                                    assert_eq!(bytes, payload)
+                                }
+                                _ => panic!("expected inline replay"),
+                            }
+                        }
+                        _ => panic!("expected replay frame"),
+                    }
+                }
+                assert!(matches!(
+                    replay.poll(1, true, &cancel)?,
+                    dot_logger::replay::ReplayPoll::End
+                ));
+                replay.stop();
                 assert_eq!(query_budget.used_bytes(), 0);
                 control.release_sync(token)?;
                 let result = control.begin_shutdown(

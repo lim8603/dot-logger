@@ -569,6 +569,37 @@ impl<R: Read + Seek> Snapshot<R> {
         now: u64,
         cancel: &AtomicBool,
     ) -> Result<Page<'_>, QueryError> {
+        self.page_limit(cursor, now, cancel, self.config.page_records)
+    }
+    pub(crate) fn page_one(
+        &mut self,
+        cursor: &Cursor,
+        now: u64,
+        cancel: &AtomicBool,
+    ) -> Result<Page<'_>, QueryError> {
+        self.page_limit(cursor, now, cancel, 1)
+    }
+    pub(crate) fn check_alive(&self, now: u64, cancel: &AtomicBool) -> Result<(), QueryError> {
+        self.alive(now, cancel)
+    }
+    pub(crate) fn inline_payload(&self, record: &QueryRecord) -> Option<&[u8]> {
+        match record.payload {
+            Payload::Inline { offset, length } => {
+                self.data.get(offset..offset.checked_add(length)?)
+            }
+            Payload::Blob(_) => None,
+        }
+    }
+    pub(crate) fn blob_payload(&self, length: usize) -> Option<&[u8]> {
+        self.blob.get(..length)
+    }
+    fn page_limit(
+        &mut self,
+        cursor: &Cursor,
+        now: u64,
+        cancel: &AtomicBool,
+        records: usize,
+    ) -> Result<Page<'_>, QueryError> {
         self.alive(now, cancel)?;
         if !Arc::ptr_eq(&cursor.identity, &self.identity) {
             return Err(QueryError::Cursor);
@@ -614,9 +645,7 @@ impl<R: Read + Seek> Snapshot<R> {
                     .checked_add(len)
                     .is_some_and(|v| v <= self.config.page_bytes);
             let cost = base + if inline { len } else { 0 };
-            if self.items.len() == self.config.page_records
-                || charged + cost > self.config.page_bytes
-            {
+            if self.items.len() == records || charged + cost > self.config.page_bytes {
                 break;
             }
             let record = row.record;

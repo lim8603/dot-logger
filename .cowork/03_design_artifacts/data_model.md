@@ -74,6 +74,12 @@ pre-window는 실제 디스크 순환 파일을 보존한다. 큰 원본 전체�
 
 복구는 active/미종료 세그먼트를 읽기 전용으로 조사한다. 길이·opcode·schema 참조·CRC와 bounds를 확인하고 마지막 **완전하고 검증된 chunk**까지만 새 복구 파일로 만든다. 원본은 보존한다. 불완전한 chunk·손상 꼬리는 제외 범위와 원인을 보고한다. 중간 CRC 손상 뒤의 임의 바이트를 무조건 유효 메시지로 재동기화하지 않는다. summary/보조 인덱스는 재생성한다. `Written`만 확인된 데이터와 `Synced`를 구분하고, 재기동 때 과거 프로세스가 성공 응답했는지 추측하지 않는다. 실제 차단 시험의 외부 receipt oracle과 파일 내용을 대조한다.
 
+### TASK-008 구현 경계 — 2026-10-30
+
+`storage/{retention,catalog}.rs`가 세 보존 모드·회전·closed catalog·event window·읽기 pin을 구현한다. catalog/event/pin/채널 복제·producer 범위·사전 검증 scratch는 유한 공유 output 예약에 포함한다. active file은 disk/protected quota에서 설정한 최대 파일 bytes를 선예약하고 closed 후 실제 길이로 전환한다. 겹친 event는 세그먼트별 한 번만 차감한다. 실제 event extents는 mono min/max 기반이며 gap-free 기록 존재를 보장하지 않는다. 상세 API·오류·capability는 [인터페이스 §13.4](interface_contract.md#134-task-008-회전보존-api--2026-10-30)다.
+
+회전 순서와 multi-segment sync를 일반 경로에서 구동하고, file/directory sync 또는 rename 실패는 catalog 미공개·Poisoned다. 삭제가 성공한 뒤 directory sync만 실패하면 현재 namespace에서 없어진 파일을 catalog에서도 제외하고 미확인 durable 삭제를 성공으로 승격하지 않는다. 호스트가 관리하는 전용 파일 namespace 밖은 삭제하지 않는다. 재기동 조사/복구는 TASK-009, active snapshot/reader는 TASK-010, 실제 장비·OS 교환은 TASK-022 이후다.
+
 ## 5. DB projection과 장애 의미
 
 첫 DB 어댑터는 기존 dot-probe와 맞춘 InfluxDB v2 HTTP write API다. 수치/작은 이벤트만 mapping하고 이미지·점군 원본은 파일/선택 원격 경로에 둔다. measurement·bounded tags(장치/채널)·typed fields·real timestamp·receipt field를 사용한다. recipe ID나 sequence를 무제한 tag로 넣지 않는다.

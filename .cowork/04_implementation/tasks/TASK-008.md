@@ -6,11 +6,11 @@
 | Story | US-002·005 |
 | 요구사항 | FR-003 FR-011 NFR-003 NFR-005 |
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
-| ADR | ADR-003~009 Accepted |
+| ADR | ADR-003~010 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-10-26 |
-| 다음 액션 | bytes/time/count/index 한계별 회전·겹친 이벤트와 읽기 핀으로 삭제 불가 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-10-30 |
+| 다음 액션 | EV-012 로컬 Pass·REV-009 Resolved → Human 구현 리뷰/native·장비 후속 검증 |
 | 의존 | TASK-007 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -21,19 +21,50 @@
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger/src/storage/{retention,catalog}.rs`. 아직 생성된 코드 경로가 아니다.
+구현 경로: [`retention.rs`](../../../crates/dot-logger/src/storage/retention.rs)·[`catalog.rs`](../../../crates/dot-logger/src/storage/catalog.rs)와 `tc_005_retention.rs`다.
 
 첫 실패/리뷰 조건: **bytes/time/count/index 한계별 회전·겹친 이벤트와 읽기 핀으로 삭제 불가**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-005`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 최소 구현 후 관련 `TC-005`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] 세 보존 모드·pre/post 실제 창·디스크 reserve·보호 quota·동기화 순서 검증.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] 세 보존 모드·pre/post 실제 창·디스크 reserve·보호 quota·동기화 순서 검증.
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-005](../../05_verification/test_case.md#tc-005). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+테스트 정의: [TC-005](../../05_verification/test_case.md#tc-005). 제품 코드·테스트 실행 결과: [EV-012](../../05_verification/verification_evidence.md#ev-012). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+
+## 착수 — 2026-10-30
+
+Human 「승인, TASK-008 진행하자.」로 TASK-007 최종 구현 승인·native 검증 이월 상태의 TASK-008 착수를 승인했다. 승인된 데이터 설계의 회전 순서·보존 모드·quota·reserve·핀 계약을 TDD로 구현한다. commit/push·계정/과금 조회·CI 재시도는 요청하지 않았다.
+
+## 구현 결과 — 2026-10-30
+
+- `SegmentLog`는 bytes·host mono 시간·record 수·index bytes/chunk 한도에 따라 회전한다. 명시 구성만 사용하고 file/index 판정은 MCAP0.26의 보수적 상한이다. 단일 record가 구성에 맞지 않으면 시작 전에 거절한다.
+- chunk/footer 마감→file sync→`.active`에서 `.mcap` 이름 확정→directory sync→closed catalog 공개 순서를 지킨다. IO 실패는 Poisoned로 멈추고 미확인 파일은 catalog에 올리지 않는다. 단일 writer API를 유지하며 대상 lease는 회전 사이에도 끊기지 않는다.
+- 연속 모드는 용량/기간에서 정지하며 암묵 삭제하지 않는다. 순환/이벤트 모드는 oldest unprotected closed만 삭제한다. active·event·read pin 때문에 확보가 안 되면 Capacity다. fresh filesystem 여유는 host port가 관측하며 매 admission 전에 full active file과 별도 disk reserve를 보수적으로 확보한다.
+- pre/post는 session mono 창이며 실제 retained file record extents/부족한 과거 창/post 대기를 보고한다. overlap은 unique bytes로 차감하고 active는 최대 file bytes 전량 예약한다. 보호 quota 부족은 원인을 보존해 거절한다. event release/expiry는 명시 작업이다.
+- read pin은 closed file 한 개의 count/bytes/deadline을 제한하며 만료는 새 읽기를 막는다. 실제 IO가 끝나 `release_pin`하기 전에는 삭제하지 않는다. catalog/event/pin·채널·범위·scratch는 공유 output 예약에 포함한다.
+- `write_batch`는 회전·최종 flush 후 Written을 보고하며 오류의 accepted/flushed/reported prefix와 원래 retention 원인을 보존한다. multi-segment `sync_work`는 이전 파일 sync 사실과 current active·directory sync를 함께 구동한다. pre-IO guard 반환·IO Failed·Written 보존 계약을 유지한다.
+- TDD 첫 API 부재/컴파일되는 append 미구현 Red를 확인했고 rotation/protection/IO/고갈 행동을 Green으로 구현했다. 추가로 unlink 후 directory sync 실패가 stale catalog를 남기는 반례 Red를 확인하고 수정했다. 중요도 누락 fixture·QueryOutcome payload·poll_shutdown 가변 참조·Written 계약의 shutdown 기대값은 test harness 정정이며 제품 결함으로 세지 않는다.
+
+[EV-012](../../05_verification/verification_evidence.md#ev-012) 로컬 Pass: 저장 보존 통합15개(실제 Unix 파일1개 포함), 두 Rust 각16 features·독립 core consumer·예제·clippy/rustdoc/fmt·allocator8, Miri97×8=776회다. 신규 보존 메모리 시험256B/8MiB peak14451/16791504 ≤ 예약105696/25270752 bytes, 최종 잔여0이며 기존 RT0/0을 유지한다. source49개/명령/원본 로그 hash는 results.json에 고정했다. [REV-009](../../05_verification/reviews/REV-009_TASK-008.md)는 RV-011 로컬 해결·Resolved, Human 최신 구현 리뷰는 대기다. native CI GAP-004·실제 장비/전원·OS 교환·호스트 free-space adapter 실측은 미검증이다. 표준 FileStore는 Unix directory sync를 구현하고 다른 OS의 해당 primitive는 Unsupported로 거절한다. custom SegmentStore의 OS별 구현/장비 성능·복구/active reader는 이번 결과로 승격하지 않는다.
+
+## 파일·타입 변경
+
+| 구분 | 파일 | 타입·변경 내용 |
+|---|---|---|
+| 생성 | storage/retention.rs | SegmentStore/FileStore·SegmentLog/Active·RetentionError/RetentionBatchError·RotationReason/AppendReport — 회전/IO·예산·배치/sync |
+| 생성 | storage/catalog.rs | RetentionMode/RetentionConfig·SegmentInfo·EventReport/ReadPin·Catalog/Event/Pin — 유한 catalog/이벤트/조회 보호 |
+| 수정 | storage/mod.rs·writer.rs | 공개 export·TargetLease/TargetClaim, SegmentWriter의 private target claim·index 상한·동기화 공통 경로 |
+| 생성/수정 | tc_005_retention.rs·rt-allocation tests·README | 실제 파일·메모리 port·control/shutdown·독립 MCAP 판독·예산/실패·일반 경로/OS 지원 범위 |
+
+AI 자가 리뷰 **Conditional** — 현재 검토에서 미해결 P1/P2는 확인하지 못했다. Human 구현 리뷰/native 및 장비 검증을 대신하지 않는다. TASK-008/MS-003 In Progress·TC-005 부분 실행·Gate4/5 Not Ready다. commit/push·계정/과금 조회·CI 차단 재시도·fresh audit는 수행하지 않았다.
+
+## 로컬 커밋·세션 마감 — 2026-10-30
+
+Human 「커밋하고 세션 마무리하자」에 따라 소스 `73881452f9442e4cc38167d1a83e7fcf59a68110`를 로컬 커밋했다. EV-012 source49개와 commit blob의 SHA-256이 전부 일치하며 시험은 반복하지 않았다. [커밋 근거](../../06_evolution/imported_context/task_008_2026-10-30/commit.json)를 보존하고 마감/근거 문서는 소스와 별도 커밋한다. 푸시는 요청되지 않아 수행하지 않았다. TASK-008 Human 최종 구현 리뷰·REV-009 Resolved·native GAP-004·장비 이월을 유지한다. 다음 시작점은 TASK-008/REV-009/EV-012 구현 리뷰이며 TASK-009는 미착수다.

@@ -430,6 +430,20 @@ RV-005 수정 — 2026-10-29: 일반 `request_sync`의 진입부터 슬롯 게�
 
 제품 타입은 외부 MCAP/prost wire 타입을 공개 API에 노출하지 않는다. `encode_record`/`decode_record`는 버전 봉투·입력/해독 길이 상한을 검사하고 사용자 payload는 opaque bytes로 유지한다. 현재 압축은 off, CRC/index는 on이다. 초기 파일/독립 판독·golden 근거는 [EV-010](../05_verification/verification_evidence.md#ev-010), 리뷰 수정·배치/재시도·버퍼/할당 회귀는 [EV-011](../05_verification/verification_evidence.md#ev-011), 실제 OS/장비 내구성과 성능은 미검증이다.
 
+### 13.4 TASK-008 회전·보존 API — 2026-10-30
+
+`SegmentLog<SegmentStore>`는 일반 경로의 단일 소유자다. 같은 대상의 delivery를 producer FIFO로 전달하며, 단일 writer와 공유하는 target lease를 회전 사이에도 유지한다. `RetentionConfig`는 세 보존 모드·disk/reserve·file bytes/age·index bytes·event/pre/post/quota·pin count/bytes/deadline을 명시한다. 파일 bytes와 index bytes는 pinned MCAP의 보수적 수량 상한으로 판정해 실제보다 일찍 회전할 수 있다. 설정이 최대 단일 record와 최소 인덱스를 수용하지 못하면 IO 전에 거절한다.
+
+`append(record,payload,now_ns)`는 session/revision/schema/producer sequence·길이/시각을 사전 검증하고 bytes/time/records/index 한도 전에 회전한다. `rotate`는 chunk/footer 마감→실제 file sync→시스템 생성 이름 확정→directory sync→closed catalog 공개→다음 active 파일 순서다. 연속 모드는 용량/기간 한계에서 멈추고, 순환/이벤트 모드는 오래된 비보호 closed 파일만 삭제한다. active/이벤트/실제 읽기 핀 때문에 확보가 불가능하면 Capacity다. 삭제 후 directory sync만 실패해도 unlink된 파일은 현재 catalog에서 제외하고 writer를 Poisoned로 멈춘다. 재기동의 durable namespace 판정은 TASK-009다.
+
+`protect_event(at,expires,now)`는 active chunk를 flush하고 retained 파일의 session mono min/max와 요청 pre/post 창을 대조한다. `EventReport.actual`은 파일별 레코드 min/max 범위와 요청 창의 교집합이며 개별 레코드의 연속 존재나 gap-free coverage를 뜻하지 않는다. 부족한 과거 창과 post 대기 상태를 별도 표시한다. 겹친 창은 unique segment bytes로 한 번만 차감하며, 겹친 active는 파일 상한 전량을 예약한다. 향후 post 범위의 append도 quota를 먼저 검사한다. `release_event`/`expire_events`만 보호를 해제하고 자동 만료로 삭제하지 않는다.
+
+`pin`은 published closed 파일 한 개의 읽기 bytes/deadline을 제한한다. `consume_pin`은 남은 bytes와 기한을 검사하며, 만료 후에도 실제 IO 종료와 `release_pin` 전까지 삭제 보호를 유지한다. Drop한 pin을 자동 해제로 추정하지 않는다. active reader/snapshot은 TASK-010 후속이다.
+
+`write_batch`는 회전된 이전 파일과 마지막 완전 chunk를 대상으로 Written을 보고한다. `RetentionBatchError`는 원래 Capacity/EventQuota/IO/Completion 원인과 appended/written/reported prefix를 보존한다. 부분 append 거절 시 accepted prefix를 다시 쓰지 않고 명시 flush/report한다. 최종 flush 후 보고만 실패하면 report만 재시도한다. `sync_work`는 모든 과거 rotation 파일이 이미 동기화됐다는 사실과 같은 owner의 producer별 수락 범위·active 실제 sync·directory sync를 함께 확인한다. IO 전 거절/Busy는 원 work를 반환하고 실제 IO 실패만 Failed다. 보존 삭제는 과거 Synced 관측을 취소하거나 파일 영구 보존을 약속하지 않는다.
+
+`SegmentStore`는 fresh filesystem 여유 관측·create/finalize/remove·directory sync capability를 제공하는 host port다. logger catalog/event/pin/인코더 상태는 공유 output 예산에 포함하며, OS cache·host adapter 자체 상태와 외부 프로세스의 공간 경쟁은 별도다. 표준 `FileStore`는 신선한 session/target namespace와 Unix directory sync를 제공하고 다른 OS는 Unsupported로 거절한다. OS별 어댑터/native·실장비 durability는 미검증이다. `finish`/Drop은 control의 Synced 성공을 만들지 않는다.
+
 ## 14. 조회·재생·원격 계약안
 
 | 작업 | 계약 |

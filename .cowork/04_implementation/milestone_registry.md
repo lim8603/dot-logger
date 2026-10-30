@@ -27,3 +27,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-29 후속 리뷰 [EV-008](../05_verification/verification_evidence.md#ev-008)의 RV-005 P1은 Human 수정 지시 후 [EV-009](../05_verification/verification_evidence.md#ev-009)에서 진입/게시·종료 순서화로 수정했다. 신규 private3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass, GAP-007 로컬 Closed다. 최종 수정분 Human 리뷰/native·실장비는 잔여여서 MS-002 In Progress를 유지한다.
 
 2026-10-29 Human은 TASK-006 최신 수정분과 native 이월 상태의 TASK-007 진행을 승인했다. TASK-007 MCAP 봉투/writer/인덱스·실제 파일 sync는 [EV-010](../05_verification/verification_evidence.md#ev-010) 로컬 Pass 이후 RV-006~010을 [EV-011](../05_verification/verification_evidence.md#ev-011)에서 수정·회귀했고, 최신 수정분 Human 리뷰/native 대기다. MS-003 In Progress, 회전/복구·장비 검증은 잔여다.
+
+2026-10-30 Human은 TASK-007 최종 구현·REV-008 Closed와 native 이월 상태의 TASK-008 착수를 승인했다. TASK-008 회전/보존/이벤트 보호는 EV-012 로컬 Pass(통합15·두 Rust16 features/lint/doc/fmt·allocator8·Miri776), REV-009 Resolved·Human 최종 구현 리뷰/native 대기다. MS-003 In Progress, TASK-009 복구는 미착수다.

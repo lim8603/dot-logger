@@ -9,8 +9,8 @@
 | ADR | ADR-003~010 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-29 |
-| 다음 액션 | RV-006~010 수정·[EV-011](../../05_verification/verification_evidence.md#ev-011) 로컬 회귀 Pass → 최신 수정분 Human 구현 리뷰/native 후속 검증 |
+| 마지막 갱신일 | 2026-10-30 |
+| 다음 액션 | EV-011 로컬 Pass·2026-10-30 Human 최종 구현 승인 완료 → native GAP-004 후속 검증 |
 | 의존 | TASK-006 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@
 - [x] 독립 MCAP reader 대조·CRC/index on, index/encoder peak 예산 및 safe offset 검증.
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-004](../../05_verification/test_case.md#tc-004). 제품 코드·테스트 실행 결과: [EV-010](../../05_verification/verification_evidence.md#ev-010). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -81,3 +81,15 @@ Human 「코드리뷰 받은 내역을 확인하고 수정하자는 말이였어
 저장 통합21개·private Busy2개·두 Rust 각16 features/2-record 실제 파일 consumer→finish→sync→shutdown/예제·clippy/rustdoc/fmt·allocator7 Pass. Miri는 lib14+raw17+routing19+completion15+control18=83×8=664 Pass이며 파일 IO 통합19개는 일반 로컬 실행이다. 봉투2개는 변경되지 않아 EV-010의 Miri 근거를 재사용한다. 128채널·4096레코드 sparse/dense 요청 메모리 peak2454992/611808 bytes ≤ 예약5838400, 최종 잔여0이다. 버퍼 포함 단일 채널256B/8MiB peak108926/8497278 ≤ 예약236160/17012864다.
 
 수정분 AI 검토는 **Conditional**(로컬 수정·회귀 Pass, Human 최종 리뷰/native·장비 잔여)이다. RV-006~010은 로컬 수정 범위에서 해결했으며 TASK-007/MS-003 In Progress·TC-004 부분 실행을 유지한다. 실제 장비 성능/기본 chunk·buffer·batch 지연 설정은 TASK-022 후속이다. 수정 작업 당시 commit/push 지시는 없었다. 이후 Human 「커밋 푸쉬하고 세션 마감해줘」로 소스 `71b3e2c`를 게시했고 EV-011 source46개/commit blob 일치를 확인했다. 최신 구현 Human 리뷰/native는 계속 잔여다.
+
+## 정리 요약 — 2026-10-30
+
+- **구현 범위:** 버전1 Protobuf 봉투, MCAP 0.26 무압축 writer·CRC/index, 공유 출력 예산, 완전 chunk 이후 safe offset/Written 공개, 실제 파일 sync와 완료 추적을 연결했다. `finish`는 footer를 마감하며 저장 동기화는 명시 sync로 구분한다.
+- **리뷰 반영:** [REV-008](../../05_verification/reviews/REV-008_TASK-007_RV-006-010.md)의 RV-006~010 모두 구현되어 있다. 배치 쓰기·인덱스 예약 상한, IO 전 거절 시 원래 `SyncWork` 반환, 공통 Busy 매핑, 예산 내 쓰기 버퍼, 쓰기 중복 없는 보고 재시도를 제공한다. 배치 오류의 실제 필드는 `appended`/`written`/`reported`, sync 오류는 `SyncWorkError::work`다.
+- **검증:** EV-011의 저장 통합21개·private Busy2개, Rust1.85/1.96 각16 features·독립 consumer·예제·clippy/rustdoc/fmt·allocator7, Miri664회 Pass 근거를 유지한다. 128×64B의 File write 호출962→9는 4KiB 버퍼 시험 관측이며 실제 syscall 수·장비 성능 결과가 아니다.
+- **이번 작업:** EV-011 source46/46 SHA-256 일치와 기록된 검사10개 exit0을 확인하고 REV 처리 설명을 실제 API로 정정했다. 제품 코드는 추가 변경하지 않았고 동일 시험도 반복하지 않았다.
+- **상태·후속:** TASK-007/MS-003 In Progress, REV-008 Resolved, TC-004 부분 실행이다. Human 최종 구현 리뷰·native GAP-004는 대기이며, 회전/보존·다중 세그먼트 및 directory metadata sync는 TASK-008, 장애 복구는 TASK-009, active reader는 TASK-010, 장비 성능은 TASK-022 후속이다. 이번 반영 지시는 최종 구현 승인으로 확대하지 않는다.
+
+## 최종 구현 승인 — 2026-10-30
+
+Human 「승인, TASK-008 진행하자.」로 최신 수정분 구현 리뷰 완료·REV-008 Closed, native 이월 상태의 TASK-008 착수를 승인했다. TASK-007은 native GAP-004 잔여로 In Progress를 유지한다.

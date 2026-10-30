@@ -61,4 +61,4 @@ jobs:
       - name: Check raw ownership, completion, control, and reclamation
         env:
           MIRIFLAGS: -Zmiri-strict-provenance -Zmiri-many-seeds=0..8
-        run: cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --test tc_003_routing --test tc_003_completion --test tc_003_control --locked
+        run: cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --test tc_003_routing --test tc_003_completion --test tc_003_control --test tc_005_retention --test fault_storage --locked

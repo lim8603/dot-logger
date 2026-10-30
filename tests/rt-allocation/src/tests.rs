@@ -851,3 +851,88 @@ fn rotating_catalog_events_and_pins_stay_inside_shared_memory_reservations() {
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[test]
+fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations() {
+    use dot_logger::{
+        capture::{CaptureReceipt, CapturedRecord},
+        routing::{Route, Router, RoutingConfig, Schedule, TargetConfig},
+        storage::{
+            RecoveryConfig, RecoveryOptions, SegmentWriter, StorageChannel, WriterConfig,
+            recover_segment,
+        },
+    };
+    use std::sync::atomic::AtomicBool;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    for max in [256usize, 8 * 1024 * 1024] {
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 128 * 1024 * 1024,
+                input_bytes: 128 * 1024,
+                raw_bytes: 0,
+                output_bytes: 64 * 1024 * 1024,
+                external_bytes: 0,
+                control_bytes: 256 * 1024,
+                worker_bytes: 256 * 1024,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 8,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "dot-recovery-memory-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let source_path = root.join("source.active");
+        let output_path = root.join("recovered.mcap");
+        let payload = vec![128; max];
+        owner.scope(|scope| {
+            let route=RoutingConfig{targets:vec![TargetConfig{id:10,required:true,queue_slots:2,pending_slots:0,retained_bytes:512,max_attempts:1,max_age:Duration::from_secs(1)}],
+                routes:vec![Route{channel_id:7,targets:vec![10]}],shared_records:2,small_copy_bytes:512,
+                schedule:Schedule{record_quantum:1,byte_quantum:256,records_per_turn:1,bytes_per_turn:256,retries_per_target:1,reclaim_slots_per_producer:1}};
+            let router=Router::new(&plan,scope.map(|(_,r)|r).collect(),route).unwrap();let budget=router.writer_budget(10).unwrap();
+            let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
+            let channels=||vec![StorageChannel{channel:ChannelConfig::new(7,99,1),topic:"opaque".into(),payload_encoding:"opaque".into(),schema:None}];
+            let file=std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&source_path).unwrap();
+            let mut writer=SegmentWriter::new(budget.clone(),config,channels(),file).unwrap();
+            writer.append(CapturedRecord{receipt:CaptureReceipt{session_id:42,producer_id:0,accepted_seq:u64::MAX},metadata:RecordMetadata{channel_id:7,schema_id:99,schema_version:1,mono_ns:2,real_ns:2,source_time:None,level:Level::Info,importance:Some(Importance::Normal)},revision:1,payload_len:max},&payload).unwrap();
+            writer.flush_chunk().unwrap();drop(writer);
+            let mut source=std::fs::File::open(&source_path).unwrap();
+            let output=std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&output_path).unwrap();
+            let options=RecoveryOptions{writer:config,limits:RecoveryConfig{max_source_bytes:(max+65536) as u64,max_record_bytes:max+8192,max_chunks:2}};
+            let mut concrete=0;let mut returned=None;
+            let (remaining,peak)=allocator::observe_memory(||{
+                let channels=channels();
+                concrete=options.reservation(&channels,1).unwrap()+config.reservation(&channels,1).unwrap();
+                let recovered=recover_segment(&mut source,budget.clone(),channels,options,output,&AtomicBool::new(false)).unwrap();
+                assert_eq!(recovered.report.records,1);
+                returned=Some(recovered.segment.into_inner());
+            });
+            drop(returned);
+            assert_eq!(remaining,0);assert_eq!(budget.used_bytes(),0);assert!(peak>0&&peak<=concrete as i128);
+            println!("recovery payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}");
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

@@ -2,6 +2,7 @@
 mod catalog;
 mod codec;
 mod index;
+mod recovery;
 mod retention;
 mod writer;
 use crate::capture::ChannelConfig;
@@ -9,6 +10,10 @@ use crate::routing::{SharedLedger, TargetLedger};
 pub use catalog::{EventReport, ReadPin, RetentionConfig, RetentionMode, SegmentInfo};
 pub use codec::{StoredRecord, decode_record, encode_record};
 pub use index::ChunkIndexEntry;
+pub use recovery::{
+    RecoveredSegment, RecoveryConfig, RecoveryError, RecoveryOptions, RecoveryReport, RecoveryStop,
+    recover_segment, recover_to_store,
+};
 pub use retention::{
     AppendReport, FileStore, RetentionBatchError, RetentionError, RotationReason, SegmentLog,
     SegmentStore,

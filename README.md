@@ -86,3 +86,9 @@ MCAP 0.26.0은 압축 의존성 보안 수정에 따라 승인됐습니다(ADR-0
 2026-10-27 RustSec 검사에서 취약점·안전성 경고는 없었고, 간접 의존성 `paste`의 유지보수 중단 경고 1건을 기록했습니다.
 보안 CI는 취약점과 안전성 경고에서 실패하며 유지보수 경고도 출력합니다.
 프로젝트 상태·설계·검증 근거는 [`.cowork/06_evolution/project_state.md`](.cowork/06_evolution/project_state.md)를 따릅니다.
+
+### 중단 세그먼트 복구 (TASK-009)
+
+일반 경로의 `storage::recover_segment`는 변경이 멈춘 원본을 `Read + Seek`로 읽고 독립된 빈 sink에 복구한다. 호출자는 원래 session/revision/channel 등록, `RecoveryOptions`의 입력 크기·record/chunk 한도와 출력 `WriterConfig`, 취소 표시를 제공한다. 현재 제품의 `dot-logger/1` 무압축·nonzero chunk CRC 형식을 대상으로 하며, 완전한 chunk의 길이/CRC/참조/봉투/생산자 sequence를 모두 검사한 뒤 복사한다. 손상 뒤를 재동기화하지 않고 `RecoveryReport`로 검증 prefix와 제외 suffix/원인을 보고한다. 원본/사용자 opaque payload를 보존하고 새 표준 summary/보조 인덱스를 만든 뒤 새 파일을 sync한다. 과거 프로세스의 Written/Synced 응답은 복원하거나 추정하지 않는다.
+
+`recover_to_store`는 새 파일 생성→복구/file sync→close→이름 확정→directory sync를 구동한다. `SegmentStore`의 배타적 namespace·기존 파일 덮어쓰기 금지 계약이 필요하며, 기본 `FileStore`의 directory sync는 Unix만 지원한다. 실패한 active/이름 확정 파일은 조사용으로 남고 자동 삭제/재시도·성공 catalog 등록은 하지 않는다. 호스트는 원본을 읽기 전용으로 열고 복구 중 변경되지 않도록 보장하며, 대상별 IO 오류를 기존 completion 실패 보고와 연결한다. 자동 시작 시 디렉터리 발견/재개·worker·StorageDegraded 계측·실제 전원 차단/다른 OS 검증은 별도 후속이다.

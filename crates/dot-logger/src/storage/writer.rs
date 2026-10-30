@@ -241,6 +241,12 @@ pub struct FinishedSegment<W: SyncSink> {
     _lease: Lease,
 }
 impl<W: SyncSink> FinishedSegment<W> {
+    pub(super) fn sync_recovered(&mut self) -> Result<(), StorageError> {
+        self.sink
+            .flush()
+            .and_then(|()| self.sink.sync_all())
+            .map_err(StorageError::Io)
+    }
     /// Retained auxiliary index.
     pub fn index(&self) -> &[ChunkIndexEntry] {
         &self.index

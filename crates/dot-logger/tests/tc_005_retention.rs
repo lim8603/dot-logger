@@ -13,6 +13,7 @@ struct State {
     ops: Vec<String>,
     files: std::collections::BTreeMap<u64, Vec<u8>>,
     free: u64,
+    free_probes: usize,
     fail: Option<&'static str>,
 }
 #[derive(Clone)]
@@ -55,7 +56,9 @@ impl SegmentStore for Store {
         true
     }
     fn available_bytes(&mut self) -> io::Result<u64> {
-        Ok(self.0.borrow().free)
+        let mut state = self.0.borrow_mut();
+        state.free_probes += 1;
+        Ok(state.free)
     }
     fn create(&mut self, sequence: u64) -> io::Result<Sink> {
         self.0.borrow_mut().ops.push(format!("create:{sequence}"));
@@ -189,6 +192,57 @@ fn record_rotation_syncs_footer_renames_and_syncs_directory_before_publication()
             assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
         },
     );
+}
+#[test]
+fn rotating_append_avoids_a_redundant_host_probe_and_later_appends_still_check_reserve() {
+    with_log(
+        retention(RetentionMode::Continuous),
+        writer(),
+        |mut log, state| {
+            log.append(record(1, 1), &[1], 1).unwrap();
+            log.append(record(2, 2), &[2], 2).unwrap();
+            let before = state.borrow().free_probes;
+            let report = log.append(record(3, 3), &[3], 3).unwrap();
+            assert_eq!(report.rotated, Some(RotationReason::Records));
+            // Rotation checks capacity before closing and before opening the next file.
+            assert_eq!(state.borrow().free_probes - before, 2);
+            assert_eq!(log.segments()[0].records, 2);
+
+            state.borrow_mut().free = 100_099;
+            let before = state.borrow().free_probes;
+            assert!(matches!(
+                log.append(record(4, 4), &[4], 4),
+                Err(RetentionError::Capacity)
+            ));
+            assert_eq!(state.borrow().free_probes - before, 1);
+            state.borrow_mut().free = 100_100;
+            log.append(record(4, 4), &[4], 4).unwrap();
+            log.finish(5).unwrap();
+            let bytes = state.borrow().files[&1].clone();
+            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+        },
+    );
+}
+#[test]
+fn lost_pin_keeps_deletion_protection_and_pin_capacity_after_its_deadline() {
+    let mut cfg = retention(RetentionMode::Circular);
+    cfg.max_segments = 2;
+    cfg.max_pins = 1;
+    with_log(cfg, writer(), |mut log, state| {
+        for n in 1..=3 {
+            log.append(record(n, n), &[1], n).unwrap();
+        }
+        let pin = log.pin(0, 1, 3, 4).unwrap();
+        drop(pin);
+        assert!(matches!(log.pin(0, 1, 4, 5), Err(RetentionError::PinLimit)));
+        log.append(record(4, 4), &[1], 4).unwrap();
+        assert!(matches!(
+            log.append(record(5, 5), &[1], 5),
+            Err(RetentionError::Capacity)
+        ));
+        assert!(!state.borrow().ops.iter().any(|op| op == "delete:0"));
+        assert_eq!(log.segments()[0].sequence, 0);
+    });
 }
 #[test]
 fn continuous_stops_without_deleting_and_circular_skips_event_and_read_pins() {

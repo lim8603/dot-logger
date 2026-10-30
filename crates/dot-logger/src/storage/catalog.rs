@@ -100,7 +100,12 @@ pub struct EventReport {
 }
 /// Opaque single-file read permit; release explicitly after the actual read ends.
 /// Expiry denies further reads but never silently drops an in-flight file pin.
+/// Dropping or forgetting this permit retains its catalog slot and deletion
+/// protection for the catalog's remaining lifetime, potentially causing `PinLimit`
+/// or `Capacity` failures. Preserve it across errors and cancellation until all
+/// reads finish, then pass it to `SegmentLog::release_pin`.
 #[derive(Debug)]
+#[must_use = "retain this permit and call SegmentLog::release_pin after all reads finish"]
 pub struct ReadPin {
     owner: Arc<()>,
     id: u64,

@@ -47,6 +47,10 @@ fn sync_dir(path: &Path) -> io::Result<()> {
 impl<F: FnMut() -> io::Result<u64>> FileStore<F> {
     /// Create a fresh target namespace below an existing trusted base directory.
     /// Existing target directories are rejected; startup/recovery is TASK-009.
+    /// An existing session path must be a real directory, not a symbolic link:
+    /// the metadata check rejects symlink traversal into a different namespace.
+    /// The host must keep the trusted base and session namespace exclusively
+    /// controlled during use; this check does not prevent concurrent path replacement.
     pub fn new(base: &Path, budget: &WriterBudget, free: F) -> io::Result<Self> {
         if !cfg!(unix) {
             return Err(io::ErrorKind::Unsupported.into());
@@ -475,8 +479,9 @@ impl<S: SegmentStore> SegmentLog<S> {
         };
         if rotated.is_some() {
             self.rotate(now)?;
+        } else {
+            self.room(now, false)?;
         }
-        self.room(now, false)?;
         let mono = record.metadata.mono_ns;
         let range = |old: Option<(u64, u64)>| {
             Some(old.map_or((mono, mono), |(lo, hi)| (lo.min(mono), hi.max(mono))))
@@ -617,6 +622,8 @@ impl<S: SegmentStore> SegmentLog<S> {
         Ok(self.catalog.expire_events(now))
     }
     /// Pin a published file for a bounded read; callers release after actual IO ends.
+    /// Keep the returned permit until it can be passed to `release_pin`, including
+    /// error/cancellation paths. Dropping it does not release catalog protection.
     pub fn pin(
         &mut self,
         seq: u64,
@@ -638,6 +645,8 @@ impl<S: SegmentStore> SegmentLog<S> {
         self.catalog.consume_pin(pin, bytes, now)
     }
     /// End actual read ownership; even expired permits keep files pinned until here.
+    /// Call only after all reads using this permit have ended. A lost permit keeps
+    /// its pin slot and file protection for this catalog's remaining lifetime.
     pub fn release_pin(&mut self, pin: ReadPin) -> Result<(), RetentionError> {
         self.catalog.release_pin(pin)
     }

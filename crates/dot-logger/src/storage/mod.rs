@@ -1,11 +1,18 @@
 //! Management-path file storage. Payload encoding and file IO never run on RT handles.
+mod catalog;
 mod codec;
 mod index;
+mod retention;
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};
+pub use catalog::{EventReport, ReadPin, RetentionConfig, RetentionMode, SegmentInfo};
 pub use codec::{StoredRecord, decode_record, encode_record};
 pub use index::ChunkIndexEntry;
+pub use retention::{
+    AppendReport, FileStore, RetentionBatchError, RetentionError, RotationReason, SegmentLog,
+    SegmentStore,
+};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 pub use writer::{FinishedSegment, SegmentWriter, SyncSink};
@@ -52,7 +59,11 @@ struct Lease {
     budget: WriterBudget,
     bytes: usize,
 }
-struct TargetLease(Arc<TargetLedger>);
+#[derive(Clone)]
+struct TargetLease {
+    _claim: Arc<TargetClaim>,
+}
+struct TargetClaim(Arc<TargetLedger>);
 impl TargetLease {
     fn enter(budget: &WriterBudget) -> Result<Self, StorageError> {
         budget
@@ -60,10 +71,12 @@ impl TargetLease {
             .writer_active
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
             .map_err(|_| StorageError::Busy)?;
-        Ok(Self(Arc::clone(&budget.target_state)))
+        Ok(Self {
+            _claim: Arc::new(TargetClaim(Arc::clone(&budget.target_state))),
+        })
     }
 }
-impl Drop for TargetLease {
+impl Drop for TargetClaim {
     fn drop(&mut self) {
         self.0.writer_active.store(false, Ordering::Release);
     }

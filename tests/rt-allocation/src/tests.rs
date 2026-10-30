@@ -769,3 +769,85 @@ fn storage_encoder_indexes_and_finish_remain_within_shared_output_reservations()
         std::fs::remove_file(path).unwrap();
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn rotating_catalog_events_and_pins_stay_inside_shared_memory_reservations() {
+    use dot_logger::{
+        capture::{CaptureReceipt, CapturedRecord},
+        routing::{Route, Router, RoutingConfig, Schedule, TargetConfig},
+        storage::{
+            FileStore, RetentionConfig, RetentionMode, SegmentLog, StorageChannel, WriterConfig,
+        },
+    };
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    for max in [256usize, 8 * 1024 * 1024] {
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 128 * 1024 * 1024,
+                input_bytes: 128 * 1024,
+                raw_bytes: 0,
+                output_bytes: 64 * 1024 * 1024,
+                external_bytes: 0,
+                control_bytes: 256 * 1024,
+                worker_bytes: 256 * 1024,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 8,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "dot-logger-retention-memory-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let payload = vec![42; max];
+        owner.scope(|scope| {
+            let route=RoutingConfig{targets:vec![TargetConfig{id:10,required:true,queue_slots:2,pending_slots:0,retained_bytes:512,max_attempts:1,max_age:Duration::from_secs(1)}],
+                routes:vec![Route{channel_id:7,targets:vec![10]}],shared_records:2,small_copy_bytes:512,
+                schedule:Schedule{record_quantum:1,byte_quantum:256,records_per_turn:1,bytes_per_turn:256,retries_per_target:1,reclaim_slots_per_producer:1}};
+            let router=Router::new(&plan,scope.map(|(_,r)|r).collect(),route).unwrap();let budget=router.writer_budget(10).unwrap();
+            let mut concrete=0;
+            let (remaining,peak)=allocator::observe_memory(|| {
+                let store=FileStore::new(&root,&budget,||Ok(1024*1024*1024)).unwrap();
+                let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
+                let retention=RetentionConfig{mode:RetentionMode::Event,disk_bytes:512*1024*1024,disk_reserve_bytes:1024,max_age_ns:1000,max_segment_bytes:32*1024*1024,max_segment_ns:100,
+                    max_index_bytes:16384,protected_bytes:256*1024*1024,pre_ns:10,post_ns:10,max_segments:8,max_events:4,max_pins:4,max_pin_bytes:4096,max_pin_ns:100};
+                let mut log=SegmentLog::new(budget.clone(),config,vec![StorageChannel{channel:ChannelConfig::new(7,99,1),topic:"opaque".into(),payload_encoding:"opaque".into(),schema:None}],retention,store,0).unwrap();
+                concrete=budget.used_bytes();
+                for sequence in 1..=5 {
+                    let bytes=if sequence==1{&payload[..]}else{&payload[..1]};
+                    let record=CapturedRecord{receipt:CaptureReceipt{session_id:42,producer_id:0,accepted_seq:sequence},metadata:RecordMetadata{channel_id:7,schema_id:99,schema_version:1,mono_ns:sequence,real_ns:sequence as i64,source_time:None,level:Level::Info,importance:Some(Importance::Normal)},revision:1,payload_len:bytes.len()};
+                    log.append(record,bytes,sequence).unwrap();
+                    if sequence==2 {let a=log.protect_event(2,50,2).unwrap();let b=log.protect_event(2,50,2).unwrap();assert_eq!(a.actual,b.actual);}
+                    if sequence==3 {let pin=log.pin(0,8,3,10).unwrap();log.consume_pin(&pin,8,3).unwrap();log.release_pin(pin).unwrap();}
+                    assert!(budget.used_bytes()<=concrete);
+                }
+                log.finish(6).unwrap();drop(log);
+            });
+            assert_eq!(remaining,0);assert_eq!(budget.used_bytes(),0);assert!(peak>0&&peak<=concrete as i128);
+            println!("retention payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}");
+        });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

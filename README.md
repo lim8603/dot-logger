@@ -63,6 +63,19 @@ custom sink 버퍼는 어댑터 예산이며, 실제 worker와 allocator 내부 
 
 선택 feature는 현재 의존성 호환 검사 단계이며 해당 제품 기능의 구현 완료를 뜻하지 않습니다.
 MCAP 제품 파일 API는 `storage` 모듈에 있으며, 독립 consumer는 실제 파일 생성·마감·sync 후 임시 파일을 정리합니다.
+
+`storage::SegmentLog`는 bytes·단조시간·메시지 수·인덱스 bytes/chunk 상한에 따라 파일을 회전합니다.
+`RetentionConfig`로 연속·순환·이벤트 모드와 파일/디스크/보호/조회 핀 예산을 명시합니다.
+회전은 footer 마감 → 파일 sync → 이름 확정 → directory sync 후에만 closed catalog를 공개합니다.
+겹친 이벤트는 보호 bytes를 중복 차감하지 않고 실제 pre/post 레코드 범위와 부족한 과거 창을 보고합니다.
+조회 핀은 기한·읽기 bytes를 제한하며 실제 읽기 종료 후 명시 해제해야 삭제할 수 있습니다.
+`write_batch`의 부분 실패는 `RetentionBatchError`의 appended/written/reported prefix와 원래 오류를 보존합니다.
+같은 대상의 delivery를 생산자 FIFO 순서로 전달하며, 수락 prefix를 다시 쓰지 않습니다.
+파일 bytes·index bytes 회전 판정은 pinned MCAP의 보수적 상한으로 실제 크기보다 일찍 회전할 수 있습니다.
+`SegmentStore`는 호스트의 fresh filesystem 여유 관측과 directory sync capability를 요구합니다.
+표준 `FileStore`는 새 세션/대상 디렉터리를 만들며 Unix directory sync를 구현합니다.
+다른 OS에서 해당 primitive를 제공하지 않으면 명시 Unsupported로 거절하며 자동 성공으로 처리하지 않습니다.
+실제 디스크 여유 탐색·외부 프로세스와의 공간 경쟁, 재기동 복구·active reader·장비 내구성은 별도 호스트/후속 검증 범위입니다.
 의존성의 `compression-zstd` 옵션과 별개로 현재 제품 writer의 첫 구현은 무압축입니다.
 플랫폼 상태는 어댑터가 제공하며 기본값은 `Unavailable`입니다.
 `Supported`는 기능 탐색 결과이고, 실제 적용 성공이나 실시간 성능 보장이 아닙니다.

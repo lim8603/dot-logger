@@ -87,7 +87,7 @@ impl<W: SyncSink> Seek for Sink<W> {
         Ok(self.signals.position.load(Ordering::Acquire))
     }
 }
-fn check_sync(
+pub(super) fn check_sync(
     budget: &WriterBudget,
     work: &SyncWork<'_, '_>,
     first: &[u64],
@@ -105,7 +105,7 @@ fn check_sync(
         _ => Err(StorageError::InvalidRecord),
     }
 }
-fn report_written(delivery: &Delivery<'_>) -> Result<(), StorageError> {
+pub(super) fn report_written(delivery: &Delivery<'_>) -> Result<(), StorageError> {
     delivery
         .report(Update::Confirmed(Boundary::Written))
         .map_err(|e| match e {
@@ -287,10 +287,20 @@ impl<W: SyncSink> SegmentWriter<W> {
         budget: WriterBudget,
         config: WriterConfig,
         channels: Vec<StorageChannel>,
+        sink: W,
+    ) -> Result<Self, StorageError> {
+        config.reservation(&channels, budget.producers)?;
+        let target_lease = TargetLease::enter(&budget)?;
+        Self::with_target(budget, config, channels, sink, target_lease)
+    }
+    pub(super) fn with_target(
+        budget: WriterBudget,
+        config: WriterConfig,
+        channels: Vec<StorageChannel>,
         mut sink: W,
+        target_lease: TargetLease,
     ) -> Result<Self, StorageError> {
         let bytes = config.reservation(&channels, budget.producers)?;
-        let target_lease = TargetLease::enter(&budget)?;
         let lease = budget.reserve(bytes)?;
         if sink.stream_position().map_err(StorageError::Io)? != 0
             || sink.seek(SeekFrom::End(0)).map_err(StorageError::Io)? != 0
@@ -513,6 +523,45 @@ impl<W: SyncSink> SegmentWriter<W> {
         }
         self.safe = self.signals.position.load(Ordering::Acquire);
         Ok(self.safe)
+    }
+    pub(super) fn projected_index_bytes(
+        &self,
+        record: CapturedRecord,
+        payload_len: usize,
+    ) -> usize {
+        let bytes = payload_len
+            .saturating_add(codec::OVERHEAD)
+            .saturating_add(31);
+        // Use the maximum envelope width, so a possible split is counted even
+        // when the actual envelope would fit the current chunk.
+        let split = self.pending_records > 0
+            && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
+        let new_pair = split
+            || self
+                .channels
+                .iter()
+                .position(|c| c.channel.channel_id == record.metadata.channel_id)
+                .is_none_or(|i| self.current[i].is_none());
+        let pairs = self
+            .index
+            .len()
+            .saturating_add(self.current.iter().filter(|e| e.is_some()).count())
+            .saturating_add(usize::from(new_pair));
+        self.records
+            .saturating_add(1)
+            .saturating_mul(64)
+            .saturating_add(
+                self.chunks
+                    .saturating_add(1 + usize::from(split))
+                    .saturating_mul(512),
+            )
+            .saturating_add(pairs.saturating_mul(512))
+    }
+    pub(super) fn synchronize(&mut self) -> Result<(), StorageError> {
+        self.signals.sync.store(true, Ordering::Release);
+        let result = self.flush_chunk();
+        self.signals.sync.store(false, Ordering::Release);
+        result.map(|_| ())
     }
     /// Write a routing guard and flush its complete chunk before reporting Written.
     /// Prefer write_batch for throughput; this method explicitly flushes one record.

@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-003 In Progress — 파일 저장(MS-002 native 검증 이월) |
 | 활성 Task | TASK-009 In Progress — EV-014 로컬 Pass, Human 구현 리뷰/native 대기 |
-| 미처리 리뷰 | [REV-011](../05_verification/reviews/REV-011_TASK-009.md) Resolved — TASK-009 RV-015 로컬 해결·Human 리뷰 대기 / REV-009·010 Resolved 유지 |
-| 상태 | Yellow — TASK-009 EV-014 로컬 Pass, TASK-008/009 Human 리뷰·native CI 차단·실장비/후속 제품 기능 잔여 |
+| 미처리 리뷰 | [REV-012](../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md) Open — TASK-009 심층 리뷰(P3 2) / [REV-011](../05_verification/reviews/REV-011_TASK-009.md) Resolved / REV-009·010 Resolved 유지 |
+| 상태 | Yellow — TASK-009 EV-014 로컬 Pass, REV-012 Open, TASK-008/009 Human 리뷰·native CI 차단 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-30 / AI |
-| 세션 상태 | 종료 — 개발 세션 #003, TASK-009 소스/문서 게시 완료 |
+| 세션 상태 | 리뷰 세션 — TASK-009 중단 복구 심층 코드리뷰 완료 (REV-012 Open) |
 | 최근 세션 | [2026-10-30 #003](../members/lim8603/workspace/session_logs/session_2026-10-30_003.md) 종료 — TASK-008 조치 게시·TASK-009 복구 구현/검증·commit/push |
 
 ## 현재 결정과 제약
@@ -65,12 +65,13 @@
 | [REV-009](../05_verification/reviews/REV-009_TASK-008.md) | TASK-008 | 2026-10-30 | 회전·보존 자가 리뷰 / Conditional (P2 1, 로컬 해결) | Resolved | RV-011 EV-012 수정/회귀 Pass, Human 최종 구현 승인 대기 |
 | [REV-010](../05_verification/reviews/REV-010_TASK-008_CODE_REVIEW.md) | TASK-008 | 2026-10-30 | 회전·보존 심층 코드리뷰 / Conditional (P2 1, P3 2) | Resolved | EV-013 로컬 Pass, RV-012 위험/후속 TASK-010 유지·Human 최종 리뷰 대기 |
 | [REV-011](../05_verification/reviews/REV-011_TASK-009.md) | TASK-009 | 2026-10-30 | 복구·IO 장애 자가 리뷰 / Conditional (P2 1, 로컬 해결) | Resolved | RV-015 EV-014 수정·회귀 Pass, 소스e5f3147·Human 리뷰 대기 |
+| [REV-012](../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md) | TASK-009 | 2026-10-30 | 심층 코드리뷰 / Pass (P3 2) | Open | RV-016(방어적 슬라이싱)·RV-017(포맷팅 최적화) 제안, 제품 코드 수정 없이 Open 등록 |
 
 ## 다음 시작점
 
 0. **현재 형상 기준:** TASK-008 조치 소스14fd1a4·문서1f2f44d를 origin/main에 게시했고 source49개/EV-013 blob hash를 확인했다([게시 근거](imported_context/task_008_review_fixes_2026-10-30/push.json)). TASK-009 소스 `e5f3147`은 EV-014 source51개와 일치하며 검증/마감 문서212373c와 origin/main 게시 완료다([게시 근거](imported_context/task_009_2026-10-30/push.json)). 최신 검증 hash/명령/로그는 EV-014다. CI/계정/과금 조회·차단 재시도는 하지 않는다.
 
-1. **TASK-009 구현 리뷰:** [TASK-009](../04_implementation/tasks/TASK-009.md)·[REV-011](../05_verification/reviews/REV-011_TASK-009.md)·[EV-014](../05_verification/verification_evidence.md#ev-014)를 Human이 최종 리뷰한다. TASK-008 REV-009/010도 최종 구현 리뷰 대기다. 구현 승인 전 Resolved 리뷰를 Closed로 바꾸지 않는다. 동일 source의 성공 시험은 반복하지 않는다.
+1. **TASK-009 구현 리뷰:** [TASK-009](../04_implementation/tasks/TASK-009.md)·[REV-011](../05_verification/reviews/REV-011_TASK-009.md)·[REV-012](../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md)·[EV-014](../05_verification/verification_evidence.md#ev-014)를 Human이 최종 리뷰한다. TASK-008 REV-009/010도 최종 구현 리뷰 대기다. 구현 승인 전 Resolved/Open 리뷰를 Closed로 바꾸지 않는다. 동일 source의 성공 시험은 반복하지 않는다.
 2. TASK-004~007은 구현·로컬 Pass·Human 승인 완료, TASK-008/009는 로컬 Pass·Human 리뷰 대기다. native GAP-004는 모두 잔여이며 후속 개발은 Human 지시로 진행했다. 여건 확보 후 current source로 6 contracts+audit+raw-memory(보존/복구 Miri 포함)를 확인한다. 계정 조회/차단 재시도는 하지 않는다.
 3. 다음 신규 개발 후보는 TASK-010 시간·채널 조회/active snapshot(Planned·미착수)다. TASK-009 Human 리뷰 후 고정 safe offset·cursor/page bytes/count·원본 descriptor/read pin·취소/실제 IO 종료 후 반환과 RV-012 고립 회수 조건을 연결한다. 실제 장비 검증 TASK-022는 후속이다.
 

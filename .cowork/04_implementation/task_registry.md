@@ -18,8 +18,8 @@
 | TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-28 | Human 지시로 선행 CI 대기 중 착수; EV-004 구현·로컬 Pass; Human 리뷰 승인/native 대기 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |
 | TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-29 | EV-009 RV-001~005 Human 승인·로컬 Pass; native 후속 검증 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-011 로컬 Pass·Human 승인 완료; native 대기 | TASK-006 | [상세](tasks/TASK-007.md) | 2~3 |
-| TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-012 로컬 Pass·REV-009 Resolved, Human 구현 리뷰/native 대기 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
-| TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | Planned | 2026-10-26 | chunk 중간 절단·CRC 손상·ENOSPC·sync/rename 실패 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
+| TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | EV-013 로컬 Pass·REV-009/010 Resolved, Human 구현 리뷰 대기; native 후속 | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
+| TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-30 | chunk 중간 절단·CRC 손상·ENOSPC·sync/rename 실패 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 쓰는 중 incomplete chunk 비노출·cursor 만료·페이지 bytes/count 이중 제한 | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | seek 뒤 이전 generation 미전송·pause/resume·배속·늦은 소비자 | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
 | TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 느린 구독자·잘못된 조각·ACK 전 disconnect·인증 없는 비-loopback | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |

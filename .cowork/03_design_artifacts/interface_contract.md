@@ -438,7 +438,7 @@ RV-005 수정 — 2026-10-29: 일반 `request_sync`의 진입부터 슬롯 게�
 
 `protect_event(at,expires,now)`는 active chunk를 flush하고 retained 파일의 session mono min/max와 요청 pre/post 창을 대조한다. `EventReport.actual`은 파일별 레코드 min/max 범위와 요청 창의 교집합이며 개별 레코드의 연속 존재나 gap-free coverage를 뜻하지 않는다. 부족한 과거 창과 post 대기 상태를 별도 표시한다. 겹친 창은 unique segment bytes로 한 번만 차감하며, 겹친 active는 파일 상한 전량을 예약한다. 향후 post 범위의 append도 quota를 먼저 검사한다. `release_event`/`expire_events`만 보호를 해제하고 자동 만료로 삭제하지 않는다.
 
-`pin`은 published closed 파일 한 개의 읽기 bytes/deadline을 제한한다. `consume_pin`은 남은 bytes와 기한을 검사하며, 만료 후에도 실제 IO 종료와 `release_pin` 전까지 삭제 보호를 유지한다. Drop한 pin을 자동 해제로 추정하지 않는다. active reader/snapshot은 TASK-010 후속이다.
+`pin`은 published closed 파일 한 개의 읽기 bytes/deadline을 제한한다. `consume_pin`은 남은 bytes와 기한을 검사하며, 만료 후에도 실제 IO 종료와 `release_pin` 전까지 삭제 보호를 유지한다. Drop한 pin을 자동 해제로 추정하지 않는다. `ReadPin`은 `must_use`이며 오류/취소 경로에서도 보관 후 실제 읽기가 모두 끝나면 명시 반환한다. 토큰 유실 시 해당 catalog가 살아 있는 동안 보호와 pin slot이 남아 `PinLimit`/`Capacity`가 발생할 수 있다. 기한만으로 IO 종료를 증명할 수 없으므로 자동 강제 회수는 하지 않는다. 리더 수명 관리·중단/종료 확인 후 반환 및 고립 회수 조건 검토는 TASK-010 후속이다([REV-010 RV-012](../05_verification/reviews/REV-010_TASK-008_CODE_REVIEW.md)).
 
 `write_batch`는 회전된 이전 파일과 마지막 완전 chunk를 대상으로 Written을 보고한다. `RetentionBatchError`는 원래 Capacity/EventQuota/IO/Completion 원인과 appended/written/reported prefix를 보존한다. 부분 append 거절 시 accepted prefix를 다시 쓰지 않고 명시 flush/report한다. 최종 flush 후 보고만 실패하면 report만 재시도한다. `sync_work`는 모든 과거 rotation 파일이 이미 동기화됐다는 사실과 같은 owner의 producer별 수락 범위·active 실제 sync·directory sync를 함께 확인한다. IO 전 거절/Busy는 원 work를 반환하고 실제 IO 실패만 Failed다. 보존 삭제는 과거 Synced 관측을 취소하거나 파일 영구 보존을 약속하지 않는다.
 

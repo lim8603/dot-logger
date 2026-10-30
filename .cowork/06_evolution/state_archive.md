@@ -256,3 +256,10 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 - 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
 - 이전 개인 상태의 2026-10-29 #001 세션 Intent: INT-001 / MS-002·003 / TASK-006·007 — 개선 검토·종료 경합 수정·MCAP 파일 구현/검증. 결과 TASK-006 Human 승인, TASK-007 EV-010 로컬 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-29_001.md).
+
+## 2026-10-30 #003 상태 인덱스 이관
+
+`project_state.md` 최근3세션을 #003/#002/#001로 정렬하며 기존 요약을 보존한다.
+
+- 2026-10-29 #004: 리뷰 절차 공식화·`reviews/` 신설·REV-001~003 복원·문서/진입점 갱신 및 커밋 푸시 마감 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md).
+- 2026-10-29 #003: RV-006~010 수정·EV-011 로컬 회귀 Pass·소스 71b3e2c 게시·세션 종료, 최신 구현 Human 리뷰/native·장비 이월 — [수정 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md).

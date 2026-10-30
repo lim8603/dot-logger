@@ -39,4 +39,4 @@
 
 [EV-014](../verification_evidence.md#ev-014)·[source51개/명령/로그 hash](../../06_evolution/imported_context/task_009_2026-10-30/results.json)를 확인했다. 검사10개 exit0·Miri7 programs×8 seeds/56개 성공 summary·936회 Pass이며 두 Rust16조합/독립 consumer/예제/allocator9/lint/doc/fmt가 같은 source51개를 가리킨다. 현재 점검에서 추가 미해결 P1/P2는 확인하지 못했지만 Human/native·실물 검증을 대신하지 않으며 Conditional/Resolved를 유지한다. TASK-009 소스 e5f3147은 게시 요청을 받아 커밋했으며 Human 최종 구현 리뷰 대상이다.
 
-세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 문서와 분리해 게시하며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).

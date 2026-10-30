@@ -64,4 +64,4 @@ Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 TASK-008 EV-013
 
 TASK-008 REV-010 조치까지는 소스14fd1a4·문서1f2f44d로 origin/main 게시 완료했다. TASK-009는 후속 세션 마감/게시 요청으로 소스 e5f3147을 커밋했으며, Human 최종 구현 리뷰는 별도 대기다.
 
-세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 문서와 분리해 게시하며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).

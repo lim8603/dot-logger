@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-30 / AI |
-| 세션 상태 | 종료 — 개발 세션 #003, TASK-009 소스 커밋·문서/게시 마감 |
+| 세션 상태 | 종료 — 개발 세션 #003, TASK-009 소스/문서 게시 완료 |
 | 최근 세션 | [2026-10-30 #003](../members/lim8603/workspace/session_logs/session_2026-10-30_003.md) 종료 — TASK-008 조치 게시·TASK-009 복구 구현/검증·commit/push |
 
 ## 현재 결정과 제약
@@ -25,7 +25,7 @@
 
 - **승인·리뷰·검증 경계:** Human이 TASK-008 게시와 TASK-009 후속 개발을 지시했고, 세션 종료와 TASK-009 commit/push도 추가 요청했다. 게시/마감은 최종 구현 승인으로 확대하지 않으며 REV-009/010/011 Resolved·TASK-008/009 Human 리뷰 대기다. TASK-004~009 native GAP-004는 검증 면제가 아니며 CI/계정/과금 조회·차단 재시도는 하지 않는다.
 
-- **형상관리 제약:** 소스와 `.cowork` 문서는 별도 커밋·[skip ci]로 관리한다. TASK-009 소스 `e5f3147`는 EV-014 source51개와 commit blob hash가 일치한다. 인증 정보는 OS keyring에 두고 저장소에 넣지 않는다. 세션 종료 후 새 Task를 자동 착수하지 않는다.
+- **형상관리 제약:** 소스와 `.cowork` 문서는 별도 커밋·[skip ci]로 관리한다. TASK-009 소스 `e5f3147`은 EV-014 source51개와 commit blob hash가 일치하며 검증/마감 문서212373c와 origin/main 게시 완료다. 인증 정보는 OS keyring에 두고 저장소에 넣지 않는다. 세션 종료 후 새 Task를 자동 착수하지 않는다.
 
 - **2026-10-26 Human 승인:** 「권고 기준선 채택 — 장비·호환 검증은 계획대로 진행」. 상세설계·ADR-008/009·추가 시험 목표·MS 계획을 채택했다. 검증 이월은 면제가 아니다.
 
@@ -68,7 +68,7 @@
 
 ## 다음 시작점
 
-0. **현재 형상 기준:** TASK-008 조치 소스14fd1a4·문서1f2f44d를 origin/main에 게시했고 source49개/EV-013 blob hash를 확인했다([게시 근거](imported_context/task_008_review_fixes_2026-10-30/push.json)). TASK-009 소스 `e5f3147`는 EV-014 source51개와 일치하며 Human 요청으로 문서와 분리해 게시한다([커밋 근거](imported_context/task_009_2026-10-30/commit.json)). 최신 검증 hash/명령/로그는 EV-014다. CI/계정/과금 조회·차단 재시도는 하지 않는다.
+0. **현재 형상 기준:** TASK-008 조치 소스14fd1a4·문서1f2f44d를 origin/main에 게시했고 source49개/EV-013 blob hash를 확인했다([게시 근거](imported_context/task_008_review_fixes_2026-10-30/push.json)). TASK-009 소스 `e5f3147`은 EV-014 source51개와 일치하며 검증/마감 문서212373c와 origin/main 게시 완료다([게시 근거](imported_context/task_009_2026-10-30/push.json)). 최신 검증 hash/명령/로그는 EV-014다. CI/계정/과금 조회·차단 재시도는 하지 않는다.
 
 1. **TASK-009 구현 리뷰:** [TASK-009](../04_implementation/tasks/TASK-009.md)·[REV-011](../05_verification/reviews/REV-011_TASK-009.md)·[EV-014](../05_verification/verification_evidence.md#ev-014)를 Human이 최종 리뷰한다. TASK-008 REV-009/010도 최종 구현 리뷰 대기다. 구현 승인 전 Resolved 리뷰를 Closed로 바꾸지 않는다. 동일 source의 성공 시험은 반복하지 않는다.
 2. TASK-004~007은 구현·로컬 Pass·Human 승인 완료, TASK-008/009는 로컬 Pass·Human 리뷰 대기다. native GAP-004는 모두 잔여이며 후속 개발은 Human 지시로 진행했다. 여건 확보 후 current source로 6 contracts+audit+raw-memory(보존/복구 Miri 포함)를 확인한다. 계정 조회/차단 재시도는 하지 않는다.

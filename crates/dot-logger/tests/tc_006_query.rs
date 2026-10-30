@@ -204,6 +204,105 @@ fn pages_sort_out_of_order_timestamps_and_freeze_filters() {
     });
 }
 #[test]
+fn interleaved_queries_and_reused_cursors_keep_their_original_order() {
+    with_writer(|mut w, f| {
+        for (i, t) in [30, 10, 20, 10, 40].into_iter().enumerate() {
+            let mut r = record(i as u64 + 1, t, 100 - t as i64);
+            r.metadata.level = if i == 2 { Level::Error } else { Level::Info };
+            w.append(r, &[i as u8; 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let mut s = snapshot(f, w.safe_offset(), cfg());
+        let cancel = AtomicBool::new(false);
+        let original = s.start(query(), 1, &cancel).unwrap();
+        let next = s.page(&original, 1, &cancel).unwrap().next.unwrap();
+        let cases = [
+            (
+                Query {
+                    basis: TimeBasis::Real,
+                    to: i64::MAX as i128 + 1,
+                    ..query()
+                },
+                vec![5, 1],
+            ),
+            (
+                Query {
+                    basis: TimeBasis::Source(9),
+                    to: i64::MAX as i128 + 1,
+                    ..query()
+                },
+                vec![5, 1],
+            ),
+            (
+                Query {
+                    from: 20,
+                    ..query()
+                },
+                vec![3, 1],
+            ),
+            (Query { to: 20, ..query() }, vec![2, 4]),
+            (
+                Query {
+                    channel: Some(8),
+                    ..query()
+                },
+                vec![],
+            ),
+            (
+                Query {
+                    minimum_level: Level::Error,
+                    ..query()
+                },
+                vec![3],
+            ),
+        ];
+        for (q, expected) in cases {
+            let other = s.start(q, 1, &cancel).unwrap();
+            let page = s.page(&other, 1, &cancel).unwrap();
+            assert_eq!(
+                page.records
+                    .iter()
+                    .map(|r| r.record.receipt.accepted_seq)
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            let page = s.page(&next, 1, &cancel).unwrap();
+            assert_eq!(page.records[0].record.receipt.accepted_seq, 3);
+            assert_eq!(page.records[1].record.receipt.accepted_seq, 1);
+            assert_eq!(page.inline(&page.records[0]), Some([2; 3].as_slice()));
+        }
+        let restarted = s.start(query(), 1, &cancel).unwrap();
+        assert_eq!(
+            s.page(&restarted, 1, &cancel).unwrap().records[0]
+                .record
+                .receipt
+                .accepted_seq,
+            2
+        );
+        cancel.store(true, std::sync::atomic::Ordering::Release);
+        assert!(matches!(
+            s.page(&next, 1, &cancel),
+            Err(QueryError::Cancelled)
+        ));
+        cancel.store(false, std::sync::atomic::Ordering::Release);
+        assert_eq!(
+            s.page(&next, 1, &cancel).unwrap().records[0]
+                .record
+                .receipt
+                .accepted_seq,
+            3
+        );
+        assert!(matches!(
+            s.page(&next, 100, &cancel),
+            Err(QueryError::Expired)
+        ));
+        assert!(matches!(
+            s.page(&next, 1, &cancel),
+            Err(QueryError::Expired)
+        ));
+    });
+}
+#[test]
 fn byte_limit_counts_descriptors_and_large_payload_reads_stay_bounded() {
     with_writer(|mut w, f| {
         for seq in 1..=3 {

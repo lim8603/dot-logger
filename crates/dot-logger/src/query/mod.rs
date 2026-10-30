@@ -25,7 +25,7 @@ pub enum TimeBasis {
     Source(u64),
 }
 /// Immutable half-open query filter. Bounds must fit the selected time axis.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Query {
     /// Timestamp axis and explicit source domain.
     pub basis: TimeBasis,
@@ -63,7 +63,10 @@ pub struct QueryConfig {
     pub inline_bytes: usize,
     /// Maximum bytes returned by one blob read.
     pub blob_read_bytes: usize,
-    /// Cumulative physical source read allowance per snapshot.
+    /// Cumulative read allowance: the sum of all frozen source safe offsets for
+    /// the initial scan, plus every subsequent page inline and blob reread.
+    /// A budget equal to the scanned prefixes leaves no allowance for payload
+    /// rereads; repeated pages/blob ranges consume allowance again.
     pub read_bytes: u64,
 }
 /// Structured query failure; IO causes retain the original OS error.
@@ -186,7 +189,9 @@ pub struct BlobHandle {
 /// Bounded payload representation in a borrowed page.
 #[derive(Clone, Debug)]
 pub enum Payload {
-    /// Byte range in Page's inline byte storage.
+    /// Byte range local to the page that returned this record.
+    /// Obtain payload bytes with [`Page::inline`]; these coordinates are not
+    /// source-file offsets and must not be reused with another page.
     Inline {
         /// Start in the page's borrowed inline bytes.
         offset: usize,
@@ -220,7 +225,9 @@ pub struct Page<'a> {
     data: &'a [u8],
 }
 impl Page<'_> {
-    /// Obtain inline bytes, or None for a blob descriptor or invalid range.
+    /// Obtain inline bytes for a record from this page, or None for a blob
+    /// descriptor or invalid range. Pass records from this page only: ranges
+    /// are bounds-checked but do not carry page identity.
     pub fn inline(&self, item: &QueryRecord) -> Option<&[u8]> {
         match item.payload {
             Payload::Inline { offset, length } => {
@@ -235,6 +242,7 @@ pub struct Snapshot<R> {
     sources: Vec<QuerySource<R>>,
     rows: Vec<Row>,
     order: Vec<usize>,
+    ordered_query: Option<Query>,
     items: Vec<QueryRecord>,
     data: Vec<u8>,
     blob: Vec<u8>,
@@ -378,6 +386,7 @@ impl<R: Read + Seek> Snapshot<R> {
             sources: sources.into_boxed_slice().into_vec(),
             rows: Vec::with_capacity(config.max_records),
             order: Vec::with_capacity(config.max_records),
+            ordered_query: None,
             items: Vec::with_capacity(config.page_records),
             data: Vec::with_capacity(config.page_bytes),
             blob: vec![0; config.blob_read_bytes],
@@ -551,8 +560,9 @@ impl<R: Read + Seek> Snapshot<R> {
             position: 0,
         })
     }
-    /// Rebuild the finite ordering index for this immutable cursor. Payloads remain
-    /// on disk; only selected inline bytes are read into the borrowed page buffer.
+    /// Reuse the finite ordering index while the cursor's filter is unchanged;
+    /// switching filters rebuilds it in the same reserved buffer. Payloads remain
+    /// on disk; selected inline bytes are reread for each borrowed page.
     pub fn page(
         &mut self,
         cursor: &Cursor,
@@ -565,26 +575,33 @@ impl<R: Read + Seek> Snapshot<R> {
         }
         self.items.clear();
         self.data.clear();
-        self.order.clear();
-        for (i, row) in self.rows.iter().enumerate() {
-            self.alive(now, cancel)?;
-            if matches_filter(row, cursor.query) {
-                let time = timestamp(row, cursor.query.basis)?;
-                if cursor.query.from <= time && time < cursor.query.to {
-                    self.order.push(i);
+        if self.ordered_query != Some(cursor.query) {
+            // A failed/cancelled rebuild must never publish a partial index as
+            // the previous query's cache. Rows and source boundaries are frozen.
+            self.ordered_query = None;
+            self.order.clear();
+            for (i, row) in self.rows.iter().enumerate() {
+                self.alive(now, cancel)?;
+                if matches_filter(row, cursor.query) {
+                    let time = timestamp(row, cursor.query.basis)?;
+                    if cursor.query.from <= time && time < cursor.query.to {
+                        self.order.push(i);
+                    }
                 }
             }
+            self.order.sort_unstable_by_key(|i| {
+                let r = &self.rows[*i];
+                (
+                    timestamp(r, cursor.query.basis).unwrap_or(0),
+                    r.record.receipt.producer_id,
+                    r.record.receipt.accepted_seq,
+                    self.sources[r.source].sequence,
+                    r.payload_offset,
+                )
+            });
+            self.alive(now, cancel)?;
+            self.ordered_query = Some(cursor.query);
         }
-        self.order.sort_unstable_by_key(|i| {
-            let r = &self.rows[*i];
-            (
-                timestamp(r, cursor.query.basis).unwrap_or(0),
-                r.record.receipt.producer_id,
-                r.record.receipt.accepted_seq,
-                self.sources[r.source].sequence,
-                r.payload_offset,
-            )
-        });
         let mut at = cursor.position;
         let mut charged = 0usize;
         while let Some(&row_id) = self.order.get(at) {

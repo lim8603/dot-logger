@@ -9,6 +9,12 @@ use super::{Observation, Window};
 
 /// Selected output's interval outcomes and final pending assignments. The host
 /// must use target-specific completion counters, preserving terminal outcomes.
+/// At each successful sample, retain the sample identity/time with target_totals
+/// in a bounded host history. Match window.from_ns/to_ns exactly (not to_ns minus
+/// the requested seconds), reject foreign epochs/targets/boundaries, overflow,
+/// Busy or decreasing terminal counters, and use the final pending value.
+/// Missing endpoints stay Unavailable; all-target Sample.outputs is not a target
+/// snapshot. Concurrent capture/completion observations can mix nearby instants.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OutputDelta {
     /// Assignments completing at Conditions::boundary during the interval.
@@ -102,7 +108,7 @@ impl ReportInput {
 /// Pressure of the reported interval. Absence of loss is not device headroom.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Pressure {
-    /// Rejection/acquisition failure/output loss, a full resource or offered load
+    /// Capacity rejection/acquisition failure/output loss, a full resource or attempt load
     /// beyond validated capacity. Queue stability after discards does not clear it.
     Overloaded,
     /// Occupancy grew; finite buffer capacity is being consumed.
@@ -132,14 +138,27 @@ pub struct Report {
     pub rejected: Value<u64>,
     /// Raw acquisition failures, not necessarily additional attempted records.
     pub acquire_rejected: Value<u64>,
+    /// Capacity-rejected submission attempts.
+    pub rejected_capacity: Value<u64>,
+    /// Contract-rejected submission attempts; not capacity pressure.
+    pub rejected_contract: Value<u64>,
+    /// Lifecycle-rejected submission attempts; not capacity pressure.
+    pub rejected_lifecycle: Value<u64>,
+    /// Capacity-rejected raw acquisition attempts.
+    pub acquire_rejected_capacity: Value<u64>,
+    /// Contract-rejected raw acquisition attempts; not capacity pressure.
+    pub acquire_rejected_contract: Value<u64>,
+    /// Lifecycle-rejected raw acquisition attempts; not capacity pressure.
+    pub acquire_rejected_lifecycle: Value<u64>,
     /// Selected output completion rate in assignments per nanosecond.
     pub completed_rate: Value<Rate>,
     /// Selected output's final pending count and terminal interval outcomes.
     pub output: Value<OutputDelta>,
     /// Matching externally validated ingress-equivalent completion rate.
     pub capacity: Value<Rate>,
-    /// Non-filtered offered records / validated ingress-equivalent completion.
-    /// Failed raw acquisition is not added (a submission may follow a retry).
+    /// Accepted plus capacity-rejected submission attempts / validated completion.
+    /// Retries count again: this is attempt demand, not unique offered records.
+    /// Contract/lifecycle failures, skips and all raw acquisitions are excluded.
     pub load: Value<Ratio>,
     /// Interval pressure; missing evidence never becomes a healthy zero.
     pub pressure: Value<Pressure>,
@@ -243,7 +262,9 @@ impl Report {
                 .age(expired || stale);
                 load = if expired {
                     Value::Unavailable(Reason::ExpiredCapacity)
-                } else if let Some(offered) = w.counts.accepted.checked_add(w.counts.rejected) {
+                } else if let Some(offered) =
+                    w.counts.accepted.checked_add(w.counts.rejected_capacity)
+                {
                     let ratio = Ratio {
                         numerator: u128::from(offered) * u128::from(c.elapsed_ns),
                         denominator: u128::from(c.amount) * u128::from(elapsed),
@@ -324,8 +345,8 @@ impl Report {
             other => Value::Unavailable(read(other).err().unwrap_or(Reason::MissingMeasurement)),
         };
         let o = read(input.output);
-        let loss = w.counts.rejected > 0
-            || w.counts.acquire_rejected > 0
+        let loss = w.counts.rejected_capacity > 0
+            || w.counts.acquire_rejected_capacity > 0
             || o.is_ok_and(|o| o.failed > 0 || o.dropped > 0 || o.unknown > 0);
         let full = b
             .is_ok_and(|b| b.end_bytes == b.capacity_bytes || b.end_slots == b.capacity_slots)
@@ -355,6 +376,12 @@ impl Report {
             skipped: count(w.counts.skipped),
             rejected: count(w.counts.rejected),
             acquire_rejected: count(w.counts.acquire_rejected),
+            rejected_capacity: count(w.counts.rejected_capacity),
+            rejected_contract: count(w.counts.rejected_contract),
+            rejected_lifecycle: count(w.counts.rejected_lifecycle),
+            acquire_rejected_capacity: count(w.counts.acquire_rejected_capacity),
+            acquire_rejected_contract: count(w.counts.acquire_rejected_contract),
+            acquire_rejected_lifecycle: count(w.counts.acquire_rejected_lifecycle),
             completed_rate: match o {
                 Ok(o) => rate(o.complete),
                 Err(r) => Value::Unavailable(r),
@@ -386,6 +413,12 @@ impl Report {
         self.skipped = Value::Unavailable(r);
         self.rejected = Value::Unavailable(r);
         self.acquire_rejected = Value::Unavailable(r);
+        self.rejected_capacity = Value::Unavailable(r);
+        self.rejected_contract = Value::Unavailable(r);
+        self.rejected_lifecycle = Value::Unavailable(r);
+        self.acquire_rejected_capacity = Value::Unavailable(r);
+        self.acquire_rejected_contract = Value::Unavailable(r);
+        self.acquire_rejected_lifecycle = Value::Unavailable(r);
         self.completed_rate = Value::Unavailable(r);
         self.output = Value::Unavailable(r);
         self.capacity = Value::Unavailable(r);

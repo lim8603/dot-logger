@@ -1310,7 +1310,10 @@ fn telemetry_preallocation_and_rotating_history_stay_inside_control_reservation(
         }
     });
     assert_eq!((live, peak), (0, 0));
-    assert_eq!(telemetry.history_len(), 301);
+    assert_eq!(
+        telemetry.history_len(),
+        dot_logger::telemetry::Observation::Observed(301)
+    );
 }
 
 #[test]
@@ -1351,4 +1354,73 @@ fn management_report_build_has_no_hidden_heap_or_worker_allocation() {
         }
     });
     assert_eq!(calls, (0, 0));
+}
+
+#[test]
+fn classified_telemetry_failures_keep_rt_allocation_and_release_zero() {
+    let plan = tracked_fixtures::plan();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    owner.enable_telemetry().unwrap();
+    owner.scope(|mut s| {
+        let telemetry = s.telemetry().unwrap();
+        let control = s.control();
+        let (mut p, _) = s.next().unwrap();
+        let calls = allocator::observe(|| {
+            for _ in 0..8 {
+                p.try_record_small(tracked_fixtures::meta(), &[1]).unwrap();
+            }
+            assert_eq!(
+                p.try_record_small(tracked_fixtures::meta(), &[1]),
+                Err(CaptureError::Capacity)
+            );
+            let loan = p.try_acquire(1, Importance::Normal).unwrap();
+            let other = p.try_acquire(1, Importance::Normal).unwrap();
+            assert_eq!(
+                p.try_acquire(1, Importance::Normal).err(),
+                Some(CaptureError::Capacity)
+            );
+            assert_eq!(
+                p.try_acquire(65, Importance::Normal).err(),
+                Some(CaptureError::TooLarge)
+            );
+            let error = p
+                .try_record_raw(tracked_fixtures::meta(), loan)
+                .unwrap_err();
+            assert_eq!(error.reason, CaptureError::Capacity);
+            let mut wrong = tracked_fixtures::meta();
+            wrong.schema_id += 1;
+            let error = p.try_record_raw(wrong, error.loan).unwrap_err();
+            assert_eq!(error.reason, CaptureError::SchemaMismatch);
+            control.close();
+            let error = p
+                .try_record_raw(tracked_fixtures::meta(), error.loan)
+                .unwrap_err();
+            assert_eq!(error.reason, CaptureError::Closing);
+            assert_eq!(
+                p.try_acquire(1, Importance::Normal).err(),
+                Some(CaptureError::Closing)
+            );
+            drop((error.loan, other));
+        });
+        assert_eq!(calls, (0, 0));
+        let dot_logger::telemetry::Observation::Observed(c) = telemetry.producer(0) else {
+            panic!("observed")
+        };
+        assert_eq!(
+            (
+                c.rejected_capacity,
+                c.rejected_contract,
+                c.rejected_lifecycle
+            ),
+            (2, 1, 1)
+        );
+        assert_eq!(
+            (
+                c.acquire_rejected_capacity,
+                c.acquire_rejected_contract,
+                c.acquire_rejected_lifecycle
+            ),
+            (1, 1, 1)
+        );
+    });
 }

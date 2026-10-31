@@ -108,6 +108,30 @@ MCAP 0.26.0은 압축 의존성 보안 수정에 따라 승인됐습니다(ADR-0
 포함하고 독립 큐/풀은 별도 리포트로 계산합니다. 지연 계측·물리 gauge 수집·자동 worker와
 CLI 운영 metrics backend는 이 계산 API가 구현하지 않습니다.
 
+거절 총계 `rejected`/`acquire_rejected`는 유지하며 각각 `_capacity`, `_contract`,
+`_lifecycle` 범주를 제공합니다. 용량 관련 거절만 과부하 증거로 사용합니다.
+잘못된 입력·미지원 호출과 정상 종료/식별자 고갈 거절은 별도 진단이며 용량 부하로
+더하지 않습니다. 부하율은 `(accepted + rejected_capacity)` 제출 **시도율**을 검증된
+완료 능력과 비교합니다. 같은 raw loan 재시도나 일반 생산자 재시도도 매번 셉니다.
+고유 입력 건수·유실 건수로 해석하지 않으며 acquire 실패·skip은 분자에서 제외합니다.
+실제 제출 전 GeneralProducer의 종료/기한 사전 거절은 제출 시도가 아닙니다.
+
+대상별 출력 관측은 호스트의 유한 이력으로 정렬합니다. 성공한 `sample`마다 반환된
+session/revision/epoch/시각과 선택 대상의 `Completion::target_totals(id)`를 함께 보관하고,
+`Window.from_ns`와 `to_ns`에 정확히 맞는 두 표본을 찾습니다. 요청한 10초 구간도 실제로는
+최대 2초 일찍 시작할 수 있으므로 `to_ns - 10초`로 시작점을 추정하지 않습니다.
+대상·설정된 completion boundary·세션/epoch 불일치, 누락된 끝점, overflow·Busy 또는
+감소한 누적값은 `Unavailable`로 둡니다. complete/failed/dropped/unknown은 checked 차분,
+`pending`은 마지막 표본의 값입니다. `Sample.outputs`의 전체 합계로 대체하지 않습니다.
+호스트 이력은 301개 표본 등 명시한 상한과 자체 메모리 예산으로 관리하고 reset 시 비웁니다.
+동시 capture/completion 관측은 가까운 시점이 섞일 수 있으며 전역 원자 snapshot은 아닙니다.
+연결 예제는 `tc_009_telemetry.rs`의 `host_aligns_target_completion_history_to_actual_window_endpoints`입니다.
+
+`Telemetry::history_len()`은 `Observation<usize>`를 반환합니다. 이력 오류는 길이 0과
+구분하며, 독점 owner의 `reset_telemetry`는 이력을 비운 뒤 poison을 해제합니다.
+기존 호출자는 `Observation::Observed(n)`/`Unavailable`을 처리해야 합니다.
+`CaptureCounts` 직접 구성 시 새 범주 필드도 설정하거나 `..Default::default()`를 사용합니다.
+
 `capacity::Profile`은 호스트가 확보한 검증 근거를 가리킵니다. 같은 장비/OS/feature·부하/codec/fanout·
 revision·출력·완료 경계와 현재 세션의 유효 구간이 일치해야 부하율을 계산합니다.
 분모는 global ingress와 비교 가능한 완료 능력이며 fanout assignment 합계를 그대로 쓰지 않습니다.

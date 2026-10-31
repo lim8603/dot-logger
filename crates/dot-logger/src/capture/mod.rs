@@ -530,14 +530,11 @@ impl<'owner> Producer<'owner> {
     ) -> Result<RecordOutcome, CaptureError> {
         let result = self.record_small_inner(metadata, payload);
         if let Some(counter) = self.telemetry {
-            counter.record(
-                match &result {
-                    Ok(RecordOutcome::Accepted(_)) => 0,
-                    Err(_) => 1,
-                    Ok(RecordOutcome::Skipped) => 2,
-                },
-                payload.len(),
-            );
+            match &result {
+                Ok(RecordOutcome::Accepted(_)) => counter.record(0, payload.len()),
+                Ok(RecordOutcome::Skipped) => counter.record(2, 0),
+                Err(error) => counter.reject(*error, false),
+            }
         }
         result
     }
@@ -650,9 +647,9 @@ impl<'owner> Producer<'owner> {
         importance: Importance,
     ) -> Result<Loan<'owner>, CaptureError> {
         let result = self.acquire_inner(length, importance);
-        if result.is_err() {
+        if let Err(error) = &result {
             if let Some(counter) = self.telemetry {
-                counter.record(4, 0);
+                counter.reject(*error, true);
             }
         }
         result
@@ -688,14 +685,11 @@ impl<'owner> Producer<'owner> {
         let length = loan.len();
         let result = self.record_raw_inner(metadata, loan);
         if let Some(counter) = self.telemetry {
-            counter.record(
-                match &result {
-                    Ok(RawRecordOutcome::Accepted(_)) => 0,
-                    Err(_) => 1,
-                    Ok(RawRecordOutcome::Skipped(_)) => 2,
-                },
-                length,
-            );
+            match &result {
+                Ok(RawRecordOutcome::Accepted(_)) => counter.record(0, length),
+                Ok(RawRecordOutcome::Skipped(_)) => counter.record(2, 0),
+                Err(error) => counter.reject(error.reason, false),
+            }
         }
         result
     }

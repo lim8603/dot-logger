@@ -407,6 +407,10 @@ fn report_contract() {
         },
     );
     let r = Report::build(input, None, window.to_ns);
+    assert_eq!(r.rejected_capacity, Value::Observed(0));
+    assert_eq!(r.rejected_contract, Value::Observed(0));
+    assert_eq!(r.rejected_lifecycle, Value::Observed(0));
+    assert_eq!(r.acquire_rejected_contract, Value::Observed(0));
     assert_eq!(r.capacity, Value::Unavailable(Reason::MissingCapacity));
     assert_eq!(
         r.disk_exhaustion,

@@ -127,8 +127,12 @@ impl Telemetry<'_> {
         }
     }
     /// Retained sample count, bounded by 301 (300 seconds plus baseline).
-    pub fn history_len(self) -> usize {
-        self.bank.history.lock().map_or(0, |h| h.len)
+    /// A poisoned history is unavailable, distinct from an observed empty history.
+    pub fn history_len(self) -> Observation<usize> {
+        self.bank.history.lock().map_or(
+            Observation::Unavailable(Unavailable::HistoryUnavailable),
+            |h| Observation::Observed(h.len),
+        )
     }
     /// Delta over one of the registered 10/60/300 second windows. Reset clears
     /// history; gaps and saturation make the whole interval unavailable.
@@ -137,5 +141,40 @@ impl Telemetry<'_> {
             Observation::Unavailable(Unavailable::HistoryUnavailable),
             |h| h.window(seconds),
         )
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exclusive_reset_recovers_poisoned_history() {
+        let mut bank = Bank::new(1, 1);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = bank.history.lock().unwrap();
+            panic!("inject management history failure");
+        }));
+        let t = Telemetry {
+            bank: &bank,
+            session: 42,
+            revision: 1,
+        };
+        assert_eq!(t.sample(0, None), Err(TelemetryError::HistoryUnavailable));
+        assert_eq!(
+            t.history_len(),
+            Observation::Unavailable(Unavailable::HistoryUnavailable)
+        );
+        bank.reset(2);
+        let t = Telemetry {
+            bank: &bank,
+            session: 42,
+            revision: 1,
+        };
+        assert_eq!(t.history_len(), Observation::Observed(0));
+        assert!(t.sample(0, None).is_ok());
+        assert_eq!(t.history_len(), Observation::Observed(1));
+        assert_eq!(t.epoch(), 2);
     }
 }

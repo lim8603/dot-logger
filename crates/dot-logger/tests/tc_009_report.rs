@@ -72,6 +72,7 @@ fn estimated<T: Copy + std::fmt::Debug>(v: Value<T>) -> T {
 fn loss_stabilized_queue_stays_overloaded_without_a_capacity_denominator() {
     let mut i = input();
     i.window.counts.rejected = 3;
+    i.window.counts.rejected_capacity = 3;
     if let Observation::Observed(ref mut b) = i.buffer {
         b.start_bytes = b.end_bytes;
         b.start_slots = b.end_slots;
@@ -81,6 +82,61 @@ fn loss_stabilized_queue_stays_overloaded_without_a_capacity_denominator() {
     assert_eq!(r.load, Value::Unavailable(Reason::MissingCapacity));
     assert_eq!(estimated(r.buffer_limit), Forecast::NoGrowth);
     assert_eq!(r.rejected, Value::Observed(3));
+}
+
+#[test]
+fn noncapacity_failures_remain_diagnostic_without_inventing_pressure_or_load() {
+    let mut i = input();
+    i.window.counts.rejected = 1000;
+    i.window.counts.rejected_contract = 600;
+    i.window.counts.rejected_lifecycle = 400;
+    i.window.counts.acquire_rejected = 1000;
+    i.window.counts.acquire_rejected_contract = 700;
+    i.window.counts.acquire_rejected_lifecycle = 300;
+    if let Observation::Observed(ref mut b) = i.buffer {
+        b.start_bytes = b.end_bytes;
+        b.start_slots = b.end_slots;
+    }
+    let profile = Profile {
+        session_id: 42,
+        id: 9,
+        conditions: i.conditions,
+        valid_from_ns: 0,
+        valid_until_ns: 100 * SECOND,
+        completed_records: Rate {
+            amount: 200,
+            elapsed_ns: 10 * SECOND,
+        },
+    };
+    let report = Report::build(i, Some(profile), 10 * SECOND);
+    assert_eq!(
+        report.pressure,
+        Value::Observed(Pressure::NoPressureObserved)
+    );
+    assert_eq!(
+        estimated(report.load).numerator * 2,
+        estimated(report.load).denominator
+    );
+    assert_eq!(report.rejected, Value::Observed(1000));
+    assert_eq!(report.rejected_contract, Value::Observed(600));
+    assert_eq!(report.rejected_lifecycle, Value::Observed(400));
+    assert_eq!(report.acquire_rejected_contract, Value::Observed(700));
+    assert_eq!(report.acquire_rejected_lifecycle, Value::Observed(300));
+    let stale = Report::build(i, Some(profile), 20 * SECOND);
+    assert!(matches!(
+        stale.rejected_contract,
+        Value::Stale { value: 600, .. }
+    ));
+    i.window.counts.overflowed = true;
+    let invalid = Report::build(i, Some(profile), 10 * SECOND);
+    assert_eq!(
+        invalid.rejected_contract,
+        Value::Unavailable(Reason::Arithmetic)
+    );
+    assert_eq!(
+        invalid.acquire_rejected_lifecycle,
+        Value::Unavailable(Reason::Arithmetic)
+    );
 }
 #[test]
 fn zero_or_negative_growth_never_invents_a_finite_deadline() {
@@ -203,7 +259,10 @@ fn output_loss_and_raw_acquisition_failure_are_not_hidden_by_flat_occupancy() {
                 0 => o.failed = 1,
                 1 => o.dropped = 1,
                 2 => o.unknown = 1,
-                _ => i.window.counts.acquire_rejected = 1,
+                _ => {
+                    i.window.counts.acquire_rejected = 1;
+                    i.window.counts.acquire_rejected_capacity = 1;
+                }
             }
         }
         assert_eq!(

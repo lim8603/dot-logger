@@ -16,8 +16,8 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-31 #013 / AI |
-| 세션 상태 | #013 리뷰 전용 세션 — REV-025 Open 등록, 제품 코드 미수정. 다음 개발 세션은 REV-025 처리 후 TASK-016 권고 |
-| 최근 세션 | [2026-10-31 #012](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md) — TASK-015 리포트 |
+| 세션 상태 | 종료 — Human 「리뷰세션 마무리」. #013 리뷰 전용 세션에서 REV-025 Open 등록, 제품 코드 미수정. 다음 개발 세션은 REV-025 처리 후 TASK-016 권고 |
+| 최근 세션 | [2026-10-31 #013](../members/lim8603/workspace/session_logs/session_2026-10-31_013.md) — REV-025 독립 리뷰 |
 
 ## 현재 결정과 제약
 
@@ -170,10 +170,8 @@
 
 ## 최근 작업·이력
 
-- 2026-10-31 #013: TASK-014/015(`b3c08bd..a247d01`) 독립 Read-Only 리뷰. fmt/clippy/workspace test Pass. REV-025 Open (P2 1·P3 2), 제품 코드 미수정 — [리뷰](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md).
+- 2026-10-31 #013: TASK-014/015(`b3c08bd..a247d01`) 독립 Read-Only 리뷰. fmt/clippy/workspace test Pass. REV-025 Open (P2 1·P3 2), 제품 코드 미수정, Human 요청으로 종료 — [리뷰](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-10-31_013.md).
 - 2026-10-31 #012: TASK-015 리포트 TDD14·실제 window 연계·할당0/공개 consumer·EV-028 source100개/검사13개·Miri168·소스a247d01 로컬 수락·REV-024 Closed·Human 요청으로 세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md).
 - 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
-- 2026-10-31 #010: 현황 파악·REV-022 반입·승인 경계 보고 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_010.md).
-- 2026-10-31 #009: 독립 리뷰 REV-022 Open 등록 — [리뷰](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

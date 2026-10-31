@@ -4,10 +4,12 @@
 |---|---|
 | 역할/실행 모드 | 프로젝트 오너/Master, solo |
 | 활성 Intent/Milestone | INT-001 Approved / MS-005 In Progress, MS-004/007 후속 |
-| 현재 담당 | TASK-014 EV-027 로컬 수락·실측/native 잔여 / TASK-022 준비 |
-| 리뷰 | REV-001~023 Closed·위임 로컬 수락, RV-049/053 후속 Task 유지 |
-| 갱신/세션 | 2026-10-31 #011 / 종료 — 다음 세션 TASK-015 착수 승인 |
-| 로그 | [2026-10-31 #011](session_logs/session_2026-10-31_011.md) |
+| 현재 담당 | TASK-014/015 EV-027/028 로컬 수락·실측/native 잔여 / REV-025 처리 대기 / TASK-022 준비 |
+| 리뷰 | REV-025 Open (P2 1·P3 2) — RV-060 우선. REV-001~024 Closed, RV-049/053 후속 Task 유지 |
+| 갱신/세션 | 2026-10-31 #013 / 종료 — 리뷰 전용 세션, 다음 개발 세션은 RV-060부터 |
+| 로그 | [2026-10-31 #013](session_logs/session_2026-10-31_013.md) |
+
+**#013 인계:** 「코드리뷰 세션 진행해줘」로 TASK-014/015(`b3c08bd..a247d01`)를 독립 Read-Only 리뷰했고, 「리뷰세션 마무리」로 종료했다. [REV-025](../../../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) RV-060(거절 범주 혼합으로 인한 허위 Overloaded·부하율 과대)은 API§15.1·공개 필드 변경을 동반한다. 그래서 착수 전에 권한 수준을 확인하고 Red 시험부터 진행한다. RV-061/062는 P3다. TASK-016은 RV-060 처리 뒤 착수를 권고한다. 아래 #011 내용은 당시 이력이다.
 
 [공유 상태](../../../06_evolution/project_state.md)를 기준으로 기존 구현/검증/수락·작업 단위별 커밋/푸시 위임을 유지한다. Human 「권고대로 진행하자」에 따라 REV-022 EV-026(sourceb3c08bd·검사14개/Miri32) 조치 뒤 TASK-014 EV-027(sourced99ba3b·source97개/검사14개/Miri56)을 로컬 수락했다. 고정 counter/301이력·reset·target 합계·예산/할당0 및 fixture 준비까지다.
 

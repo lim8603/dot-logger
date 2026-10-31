@@ -55,16 +55,21 @@ impl Record {
         Ok(record)
     }
 }
-pub(crate) fn method(request: &ManagementRequest) -> &'static str {
+pub(crate) fn method(request: &ManagementRequest) -> (&'static str, &'static str) {
     match request {
-        ManagementRequest::GetStatus => "GetStatus",
-        ManagementRequest::Query { .. } => "Query",
-        ManagementRequest::ReadBlob { .. } => "ReadBlob",
-        ManagementRequest::Replay { .. } => "Replay",
-        ManagementRequest::GetCompletion { .. } => "GetCompletion",
-        ManagementRequest::ApplyConfig { .. } => "ApplyConfig",
-        ManagementRequest::RunCheck { .. } => "RunCheck",
-        ManagementRequest::Compare { .. } => "Compare",
+        ManagementRequest::GetStatus => ("GetStatus", "/dot_logger.remote.v1.Logger/GetStatus"),
+        ManagementRequest::Query { .. } => ("Query", "/dot_logger.remote.v1.Logger/Query"),
+        ManagementRequest::ReadBlob { .. } => ("ReadBlob", "/dot_logger.remote.v1.Logger/ReadBlob"),
+        ManagementRequest::Replay { .. } => ("Replay", "/dot_logger.remote.v1.Logger/Replay"),
+        ManagementRequest::GetCompletion { .. } => (
+            "GetCompletion",
+            "/dot_logger.remote.v1.Logger/GetCompletion",
+        ),
+        ManagementRequest::ApplyConfig { .. } => {
+            ("ApplyConfig", "/dot_logger.remote.v1.Logger/ApplyConfig")
+        }
+        ManagementRequest::RunCheck { .. } => ("RunCheck", "/dot_logger.remote.v1.Logger/RunCheck"),
+        ManagementRequest::Compare { .. } => ("Compare", "/dot_logger.remote.v1.Logger/Compare"),
     }
 }
 pub(crate) fn request(native: ManagementRequest, max: usize) -> Result<wire::Request, RemoteError> {

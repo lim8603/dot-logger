@@ -86,13 +86,18 @@ impl From<ClientError> for Failure {
             ClientError::Remote(RemoteError::Gone) => Self::Gone,
             ClientError::Remote(RemoteError::PermissionDenied) => Self::PermissionDenied,
             ClientError::Remote(RemoteError::InvalidInput | RemoteError::Disabled) => Self::Input,
-            _ => Self::Io,
+            ClientError::StaleConnection => Self::Gone,
+            ClientError::AlreadyConnected => Self::Input,
+            ClientError::ConsumerRejected
+            | ClientError::Disconnected
+            | ClientError::Remote(RemoteError::Transport) => Self::Io,
         }
     }
 }
 /// JSON lines and human text use the same versioned native result representation.
 pub struct Output {
     pub remote_io: bool,
+    pub mutation_requested: bool,
     pub json: bool,
     pub command: String,
     pub records: usize,
@@ -105,6 +110,7 @@ impl Output {
     pub fn new(json: bool, command: String, cap: usize) -> Self {
         Self {
             remote_io: false,
+            mutation_requested: false,
             json,
             command,
             cap,
@@ -159,14 +165,14 @@ impl Output {
                 };
                 let mut data = json!({"outcome":failure.name(),"records":self.records,"acknowledged":self.acknowledged,"exit_code":failure.code()});
                 if self.remote_io
-                    && matches!(
+                    && (matches!(
                         failure,
                         Failure::Io
                             | Failure::Corrupt
                             | Failure::Cancelled
                             | Failure::Deadline
                             | Failure::Unknown
-                    )
+                    ) || (self.mutation_requested && matches!(failure, Failure::Gone)))
                 {
                     data["posted_host_io"] = json!("completion_unconfirmed");
                 }

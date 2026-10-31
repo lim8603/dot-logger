@@ -204,6 +204,318 @@ fn unsafe_endpoint_and_cancelled_connect_are_rejected_without_secret_output() {
     });
 }
 
+#[test]
+fn handoff_preflight_expiry_and_generation_are_not_consumer_rejections() {
+    runtime().block_on(async {
+        for expire in [false, true] {
+            let budget = budget();
+            let (hub, inbox, addr, stop, server) = start(
+                ServerConfig {
+                    enabled: true,
+                    ..Default::default()
+                },
+                limits(),
+                &budget,
+            )
+            .await;
+            let cancel = Cancellation::new();
+            let mut client =
+                RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                    .await
+                    .unwrap();
+            let mut stream = client
+                .subscribe(
+                    &budget,
+                    SubscriptionFilter {
+                        channel: None,
+                        minimum_level: Level::Trace,
+                        originals: false,
+                        overflow: OverflowPolicy::Gap,
+                    },
+                    ReceiverConfig {
+                        records: 1,
+                        record_bytes: 8,
+                        ttl: Duration::from_millis(300),
+                    },
+                    &cancel,
+                )
+                .await
+                .unwrap();
+            let mut ids = [0; 2];
+            assert_eq!(hub.subscriptions(&mut ids), 1);
+            let ack = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+            let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+                panic!("record")
+            };
+            if expire {
+                tokio::time::sleep(Duration::from_millis(350)).await;
+            } else {
+                stream.discard_generations(2).unwrap();
+            }
+            let mut called = false;
+            assert_eq!(
+                stream
+                    .handoff(
+                        ready,
+                        |_, _| {
+                            called = true;
+                            true
+                        },
+                        &cancel
+                    )
+                    .await,
+                Err(ClientError::Remote(RemoteError::Gone))
+            );
+            assert!(!called);
+            assert_ne!(ack.state(), AckState::Acknowledged);
+            drop((stream, client, inbox, ack));
+            stop.send(()).unwrap();
+            server.await.unwrap().unwrap();
+            drop(hub);
+            assert_eq!(budget.used_bytes(), 0);
+        }
+    });
+}
+
+#[test]
+fn local_next_timeout_preserves_subscription_but_server_lease_and_cancel_close_it() {
+    runtime().block_on(async {
+        let budget = budget();
+        let (hub, inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut config = RemoteConfig::new(format!("http://{addr}"));
+        config.timeout = Duration::from_millis(150);
+        let mut client = RemoteClient::connect(config, &cancel).await.unwrap();
+        let filter = SubscriptionFilter {
+            channel: None,
+            minimum_level: Level::Trace,
+            originals: false,
+            overflow: OverflowPolicy::Gap,
+        };
+        let mut stream = client
+            .subscribe(
+                &budget,
+                filter,
+                ReceiverConfig {
+                    records: 1,
+                    record_bytes: 8,
+                    ttl: Duration::from_secs(2),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        for _ in 0..2 {
+            assert!(matches!(
+                stream.next(&cancel).await,
+                Err(ClientError::Remote(RemoteError::TimedOut))
+            ));
+        }
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let ack = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+        let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+            panic!("record")
+        };
+        stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+        assert_eq!(ack.state(), AckState::Acknowledged);
+        drop(stream);
+        let mut stream = client
+            .subscribe(
+                &budget,
+                filter,
+                ReceiverConfig {
+                    records: 1,
+                    record_bytes: 8,
+                    ttl: Duration::from_millis(100),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            stream.next(&cancel).await,
+            Err(ClientError::Remote(RemoteError::TimedOut))
+        ));
+        assert!(stream.next(&cancel).await.unwrap().is_none());
+        drop(stream);
+        let mut stream = client
+            .subscribe(
+                &budget,
+                filter,
+                ReceiverConfig {
+                    records: 1,
+                    record_bytes: 8,
+                    ttl: Duration::from_secs(2),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        cancel.cancel();
+        assert!(matches!(
+            stream.next(&cancel).await,
+            Err(ClientError::Cancelled)
+        ));
+        drop((stream, client, inbox, ack));
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+
+#[test]
+fn corrupt_and_oversized_host_responses_keep_their_failure_category() {
+    runtime().block_on(async {
+        let budget = budget();
+        let token = "test-only-manage-credential";
+        let (hub, mut inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                tokens: vec![AccessToken::new(token.into(), Permission::Manage).unwrap()],
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut config = RemoteConfig::new(format!("http://{addr}"));
+        config.token = Some(token.into());
+        config.message_bytes = 2048;
+        let mut client = RemoteClient::connect(config, &cancel).await.unwrap();
+        let host = tokio::spawn(async move {
+            command(&mut inbox).await.respond(Err(RemoteError::Corrupt));
+            command(&mut inbox)
+                .await
+                .respond(Ok(ManagementReply::Report(vec![0; 4096])));
+        });
+        assert!(matches!(
+            client.request(ManagementRequest::GetStatus, &cancel).await,
+            Err(ClientError::Remote(RemoteError::Corrupt))
+        ));
+        assert!(matches!(
+            client
+                .request(ManagementRequest::RunCheck { plan: 1 }, &cancel)
+                .await,
+            Err(ClientError::Remote(RemoteError::Limit))
+        ));
+        host.await.unwrap();
+        drop(client);
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+
+#[test]
+fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    runtime().block_on(async {
+        let budget = budget();
+        let (hub, inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_addr = listener.local_addr().unwrap();
+        let pause = Arc::new(AtomicBool::new(false));
+        let pause_copy = pause.clone();
+        let proxy = tokio::spawn(async move {
+            let (downstream, _) = listener.accept().await.unwrap();
+            let upstream = tokio::net::TcpStream::connect(addr).await.unwrap();
+            let (mut down_read, mut down_write) = downstream.into_split();
+            let (mut up_read, mut up_write) = upstream.into_split();
+            let upload = tokio::spawn(async move {
+                let _ = tokio::io::copy(&mut down_read, &mut up_write).await;
+            });
+            let mut bytes = [0; 1024];
+            loop {
+                let n = up_read.read(&mut bytes).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                if pause_copy.swap(false, Ordering::AcqRel) {
+                    down_write.write_all(&bytes[..1]).await.unwrap();
+                    tokio::time::sleep(Duration::from_millis(250)).await;
+                    down_write.write_all(&bytes[1..n]).await.unwrap();
+                } else {
+                    down_write.write_all(&bytes[..n]).await.unwrap();
+                }
+            }
+            upload.abort();
+            let _ = upload.await;
+        });
+        let cancel = Cancellation::new();
+        let mut config = RemoteConfig::new(format!("http://{proxy_addr}"));
+        config.timeout = Duration::from_millis(150);
+        let mut client = RemoteClient::connect(config, &cancel).await.unwrap();
+        let mut stream = client
+            .subscribe(
+                &budget,
+                SubscriptionFilter {
+                    channel: None,
+                    minimum_level: Level::Trace,
+                    originals: false,
+                    overflow: OverflowPolicy::Gap,
+                },
+                ReceiverConfig {
+                    records: 1,
+                    record_bytes: 8192,
+                    ttl: Duration::from_secs(2),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        pause.store(true, Ordering::Release);
+        let payload = vec![7; 8192];
+        let ack = hub
+            .offer(ids[0], record(1, payload.len()), &payload, false, 1)
+            .unwrap();
+        assert!(matches!(
+            stream.next(&cancel).await,
+            Err(ClientError::Remote(RemoteError::TimedOut))
+        ));
+        let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+            panic!("record")
+        };
+        stream
+            .handoff(ready, |_, data| data == payload, &cancel)
+            .await
+            .unwrap();
+        assert_eq!(ack.state(), AckState::Acknowledged);
+        drop((stream, client, ack, inbox));
+        proxy.abort();
+        let _ = proxy.await;
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+
 async fn start(
     config: ServerConfig,
     limits: RemoteLimits,

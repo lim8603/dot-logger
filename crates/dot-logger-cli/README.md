@@ -61,3 +61,7 @@ offline replay는 start와 실제 caller clock을 지원한다. 실행 중 제�
 `gone_or_expired`, `permission_denied`, `incompatible_protocol`을 일반 통신 오류와 구분한다.
 
 Ctrl-C/기한 초과가 이미 게시한 host 명령/IO를 취소하거나 미완료를 성공으로 바꾸지 않는다. 원격 취소/기한 결과의 `posted_host_io` 안내와 완료/상태 조회를 함께 사용한다. Metrics 없는 status에 0·성능 합격 같은 값을 만들어 넣지 않는다.
+
+REV-022 보강: `tail`의 전체 입력/예약 검증은 연결 전에 수행한다. local replay는 정확히 limit개로 선택 범위가 끝나면 정상 완료하고 추가 기록이 있을 때만 부분 완료(exit3)다. `--limit` 이후 추가 기록은 출력하지 않는다. tail은 계속 전체 `--timeout-ms`에 제한되며, SDK의 로컬 next 대기 재시도와 무관하게 전체 기한을 자동 연장하지 않는다. `--age-ms`는 기록 수명 및 서버 idle lease 요청을 겸한다. 서버 lease 종료/새 구독 사이 누락은 Gap으로 보장되지 않으므로 별도 구독을 연속 수신이라고 해석하지 않는다.
+
+만료/세대 폐기로 handoff가 사전 거절되면 `gone_or_expired`/exit3이고 ACK는 없다. 원본 손상은 `invalid_data`/exit4, 메시지 크기 상한은 `limit`/exit3이다. 원격 config apply/check run/replay의 Gone도 이미 게시된 호스트 작업의 완료를 증명하지 않으므로 `posted_host_io: completion_unconfirmed`를 표시한다. 읽기 전용 capability Gone과 Unsupported 응답의 기존 분류는 유지한다.

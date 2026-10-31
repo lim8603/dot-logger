@@ -15,7 +15,9 @@ pub struct ReceiverConfig {
     pub records: usize,
     /// Maximum payload bytes per record.
     pub record_bytes: usize,
-    /// Maximum incomplete/unaccepted record age.
+    /// Maximum incomplete/unaccepted record age. For RemoteClient::subscribe this
+    /// also requests the server idle lease (bounded by server max_age).
+    /// No heartbeat or continuity across fresh subscriptions is provided.
     pub ttl: Duration,
 }
 

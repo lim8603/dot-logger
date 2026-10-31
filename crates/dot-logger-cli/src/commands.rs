@@ -56,6 +56,7 @@ impl Context {
                     || records > 1024
                     || bytes == 0
                     || bytes > 64 * 1024 * 1024
+                    || external > 2 * 1024 * 1024 * 1024
                     || !(1..=86_400_000).contains(&age)
                     || bytes
                         .checked_add(1024)
@@ -64,6 +65,7 @@ impl Context {
                 {
                     return Err(Failure::Input);
                 }
+                tail_plan(external)?;
                 if let Some(channel) = self.optional("channel") {
                     channel.parse::<u32>().map_err(|_| Failure::Input)?;
                 }
@@ -337,7 +339,7 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
             )?;
             loop {
                 ctx.check()?;
-                match replay.poll(ctx.now(), true, ctx.cancel.as_atomic())? {
+                match replay.poll(ctx.now(), out.records < limit, ctx.cancel.as_atomic())? {
                     ReplayPoll::Ready(frame) => {
                         let record = *frame.record;
                         let generation = frame.generation;
@@ -378,12 +380,12 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                             bytes.as_deref(),
                             json!({"generation":generation.to_string(),"late_ns":late.to_string()}),
                         )?;
+                    }
+                    ReplayPoll::Waiting { due_ns, .. } => {
                         if out.records == limit {
                             replay.stop();
                             return Err(Failure::Limit);
                         }
-                    }
-                    ReplayPoll::Waiting { due_ns, .. } => {
                         let wait = due_ns.saturating_sub(ctx.now()).min(10_000_000);
                         if wait > 0 {
                             std::thread::sleep(Duration::from_nanos(wait));
@@ -418,6 +420,16 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
         return Err(Failure::Unsupported);
     }
     let mut file = File::open(&source.path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(Failure::Input);
+    }
+    if source
+        .safe_offset
+        .is_some_and(|safe| safe != metadata.len())
+    {
+        return Err(Failure::Unsupported);
+    }
     // create_new prevents overwriting the source or an existing output; failures
     // preserve the independent partial file for investigation, without retries.
     let output = OpenOptions::new()
@@ -686,6 +698,12 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                 },
                 _ => return Err(Failure::Unsupported),
             };
+            out.mutation_requested = matches!(
+                request,
+                ManagementRequest::ApplyConfig { .. }
+                    | ManagementRequest::RunCheck { .. }
+                    | ManagementRequest::Replay { .. }
+            );
             let reply = client.request(request, &ctx.cancel).await?;
             let (kind, data) = match reply {
                 ManagementReply::Status { session, revision } => (

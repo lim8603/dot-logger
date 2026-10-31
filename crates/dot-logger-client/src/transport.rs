@@ -36,7 +36,8 @@ pub struct RemoteConfig {
     pub ca_certificate: Option<Vec<u8>>,
     /// Optional TLS certificate DNS identity, e.g. localhost for a fixture IP.
     pub tls_domain: Option<String>,
-    /// Finite connect/RPC/next-record deadline, up to one hour.
+    /// Finite connect/RPC/next-call wait, up to one hour. A local `next` timeout
+    /// leaves the subscription open; server lease expiry remains terminal.
     pub timeout: Duration,
     /// Encoded request/reply cap: 2048..=16 MiB; decode/runtime headroom is separate.
     pub message_bytes: usize,
@@ -152,6 +153,8 @@ fn rpc_error(status: tonic::Status) -> ClientError {
             RemoteError::PermissionDenied
         }
         tonic::Code::ResourceExhausted => RemoteError::Limit,
+        tonic::Code::OutOfRange => RemoteError::Limit,
+        tonic::Code::DataLoss => RemoteError::Corrupt,
         tonic::Code::FailedPrecondition => RemoteError::Version,
         tonic::Code::DeadlineExceeded => RemoteError::TimedOut,
         tonic::Code::NotFound => RemoteError::Gone,
@@ -192,18 +195,6 @@ async fn unary(
         .await
         .map_err(rpc_error)?;
     Ok(reply.into_inner())
-}
-fn path(method: &str) -> &'static str {
-    match method {
-        "Query" => "/dot_logger.remote.v1.Logger/Query",
-        "ReadBlob" => "/dot_logger.remote.v1.Logger/ReadBlob",
-        "Replay" => "/dot_logger.remote.v1.Logger/Replay",
-        "GetCompletion" => "/dot_logger.remote.v1.Logger/GetCompletion",
-        "ApplyConfig" => "/dot_logger.remote.v1.Logger/ApplyConfig",
-        "RunCheck" => "/dot_logger.remote.v1.Logger/RunCheck",
-        "Compare" => "/dot_logger.remote.v1.Logger/Compare",
-        _ => "/dot_logger.remote.v1.Logger/GetStatus",
-    }
 }
 /// Native client over one actual TCP/TLS connection. No automatic reconnect or
 /// retry is permitted: create a fresh client after failure. The caller owns Tokio.
@@ -260,7 +251,10 @@ impl RemoteClient {
                 if !(16..=256).contains(&t.len()) || !t.bytes().all(|b| b.is_ascii_graphic()) {
                     return Err(invalid());
                 }
-                Some(format!("Bearer {t}").parse().map_err(|_| invalid())?)
+                let mut value: MetadataValue<Ascii> =
+                    format!("Bearer {t}").parse().map_err(|_| invalid())?;
+                value.set_sensitive(true);
+                Some(value)
             }
         };
         let port = uri
@@ -341,7 +335,7 @@ impl RemoteClient {
         if self.state.closed.load(Ordering::Acquire) {
             return Err(ClientError::Disconnected);
         }
-        let method = codec::method(&request);
+        let (method, path) = codec::method(&request);
         let boundary = if let ManagementRequest::GetCompletion { boundary, .. } = &request {
             Some(*boundary)
         } else {
@@ -364,13 +358,7 @@ impl RemoteClient {
         let reply = cancel
             .guard(
                 self.timeout,
-                unary(
-                    &mut self.grpc,
-                    &self.token,
-                    self.timeout,
-                    path(method),
-                    request,
-                ),
+                unary(&mut self.grpc, &self.token, self.timeout, path, request),
             )
             .await?;
         let reply =
@@ -521,7 +509,9 @@ impl RemoteSubscription {
             .discard_generations(&self.id, self.subscription, generation)
     }
     /// Await one complete record or explicit Gap. No ACK is sent by reading.
-    /// Cancellation/error closes this stream and preserves external owner reservations.
+    /// A local wait timeout returns TimedOut without closing the stream. Retry on
+    /// this same subscription explicitly; no reconnect is performed. Server errors
+    /// (including its idle lease timeout) and cancellation close the stream.
     pub async fn next(
         &mut self,
         cancel: &Cancellation,
@@ -530,11 +520,22 @@ impl RemoteSubscription {
             self.close();
             return Err(ClientError::Disconnected);
         }
-        let result = cancel.guard(self.timeout, self.next_inner()).await;
-        if result.is_err() {
-            self.close();
+        // Keep server errors inside Ok so they cannot be confused with the local
+        // timer. Streaming::message's decoder state and our partial records are
+        // owned by self, not by the dropped wait future (tonic 0.13.1).
+        match cancel
+            .guard(self.timeout, async { Ok(self.next_inner().await) })
+            .await
+        {
+            Ok(Ok(event)) => Ok(event),
+            Err(ClientError::Remote(RemoteError::TimedOut)) => {
+                Err(ClientError::Remote(RemoteError::TimedOut))
+            }
+            Ok(Err(error)) | Err(error) => {
+                self.close();
+                Err(error)
+            }
         }
-        result
     }
     async fn next_inner(&mut self) -> Result<Option<RemoteEvent>, ClientError> {
         loop {
@@ -587,10 +588,20 @@ impl RemoteSubscription {
         if self.stream.is_none() || self.state.closed.load(Ordering::Acquire) {
             return Err(ClientError::Disconnected);
         }
+        let mut called = false;
         let receipt: Acknowledgement = self
             .receiver
-            .handoff(record, consumer)
-            .map_err(|_| ClientError::ConsumerRejected)?;
+            .handoff(record, |record, bytes| {
+                called = true;
+                consumer(record, bytes)
+            })
+            .map_err(|_| {
+                if called {
+                    ClientError::ConsumerRejected
+                } else {
+                    ClientError::Remote(RemoteError::Gone)
+                }
+            })?;
         let ack = self.receiver.take_ack(&self.id, receipt)?;
         let result = cancel
             .guard(self.timeout, async {

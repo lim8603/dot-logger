@@ -95,7 +95,8 @@ impl Security {
 fn status(e: RemoteError) -> Status {
     match e {
         RemoteError::Version => Status::failed_precondition(e.to_string()),
-        RemoteError::InvalidInput | RemoteError::Corrupt => Status::invalid_argument(e.to_string()),
+        RemoteError::InvalidInput => Status::invalid_argument(e.to_string()),
+        RemoteError::Corrupt => Status::data_loss(e.to_string()),
         RemoteError::Limit => Status::resource_exhausted(e.to_string()),
         RemoteError::PermissionDenied => Status::permission_denied(e.to_string()),
         RemoteError::TimedOut => Status::deadline_exceeded(e.to_string()),

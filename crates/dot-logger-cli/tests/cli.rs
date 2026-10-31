@@ -213,6 +213,140 @@ fn invalid_replay_rate_is_input_error_before_any_connect() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
 }
+
+#[test]
+fn tail_external_budget_is_validated_before_connect() {
+    let output = command()
+        .args([
+            "tail",
+            "--json",
+            "--endpoint",
+            "http://127.0.0.1:1",
+            "--external-bytes",
+            "3221225472",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        lines(&output.stdout).last().unwrap()["data"]["outcome"],
+        "invalid_input"
+    );
+}
+
+#[test]
+fn offline_replay_exact_limit_is_complete_and_extra_records_are_partial() {
+    for (limit, exit, records) in [(1, 3, 1), (2, 0, 2), (3, 0, 2)] {
+        let f = fixture([10, 20]);
+        let output = command()
+            .args(["replay", "--json", "--manifest"])
+            .arg(&f.manifest)
+            .args(["--limit", &limit.to_string()])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(exit),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert_eq!(
+            lines(&output.stdout)
+                .iter()
+                .filter(|r| r["kind"] == "record")
+                .count(),
+            records
+        );
+    }
+}
+
+#[test]
+fn dropped_mutating_host_command_marks_completion_unconfirmed() {
+    use dot_logger::{adapters::remote::*, query::QueryBudget};
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let mut c = support::plan().config().clone();
+        c.memory.external_bytes = 8 * 1024 * 1024;
+        c.memory.total_bytes += 8 * 1024 * 1024;
+        let plan = SessionBuilder::new(c)
+            .validate(&PlatformCapabilities::default())
+            .unwrap();
+        let budget = QueryBudget::new(&plan);
+        let (hub, mut inbox) = RemoteHub::new(
+            &budget,
+            RemoteLimits {
+                connections: 2,
+                subscriptions: 2,
+                commands: 2,
+                message_bytes: 4096,
+                record_bytes: 8192,
+                subscription_records: 2,
+                subscription_bytes: 16384,
+                max_age: Duration::from_secs(2),
+                request_timeout: Duration::from_secs(2),
+            },
+        )
+        .unwrap();
+        let server = RemoteServer::bind(
+            ServerConfig {
+                enabled: true,
+                tokens: vec![
+                    AccessToken::new("test-only-manage-credential".into(), Permission::Manage)
+                        .unwrap(),
+                ],
+                ..Default::default()
+            },
+            hub.clone(),
+        )
+        .await
+        .unwrap();
+        let endpoint = format!("http://{}", server.local_addr().unwrap());
+        let (stop, done) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(server.serve(async {
+            let _ = done.await;
+        }));
+        let host = tokio::spawn(async move {
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    if let Some(command) = inbox.try_next() {
+                        drop(command);
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        });
+        let output = command()
+            .args([
+                "check",
+                "run",
+                "--plan",
+                "1",
+                "--json",
+                "--endpoint",
+                &endpoint,
+            ])
+            .env("DOT_LOGGER_TOKEN", "test-only-manage-credential")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(3));
+        let rows = lines(&output.stdout);
+        let data = &rows.last().unwrap()["data"];
+        assert_eq!(data["outcome"], "gone_or_expired");
+        assert_eq!(data["posted_host_io"], "completion_unconfirmed");
+        host.await.unwrap();
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
 #[test]
 fn duplicate_offline_channel_is_rejected_by_config_validation() {
     let f = fixture([10, 20]);

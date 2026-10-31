@@ -46,3 +46,11 @@ consumer 거절은 `ConsumerRejected`이며 ACK가 없다. 소비 인계 뒤 ACK
 | Completion | Complete/Pending/Failed/Dropped/Unknown/Expired/NotRouted/Busy를 구분 |
 
 화면 렌더링 완료는 수신 ACK 성능 경계가 아니다. 실제 dot-probe 화면 적용은 TASK-020/026에서 수행한다. 현재 증거는 로컬 client/server/CLI이고 실제 앱·다른 OS/native·LAN/RT/전체 RSS 성능을 대신하지 않는다.
+
+### 구독 대기·종료와 오류 분류 (REV-022)
+
+`RemoteConfig::timeout`은 연결/unary/subscribe handshake와 개별 `next()` 대기 상한이다. **로컬 대기만 만료된 경우 같은 구독을 유지**하며, 호출자가 같은 `RemoteSubscription::next`를 다시 호출할 수 있다. decoder와 미완성 기록은 그 구독이 소유한다. 서버가 보낸 오류(lease 만료의 TimedOut 포함)·명시 취소·연결 오류는 stream을 닫는다. 서버 오류 뒤 다음 `next`는 `None`이다. 자동 재연결/재전송은 하지 않는다.
+
+`ReceiverConfig::ttl`은 미완성/미수락 기록 수명이면서 서버에 요청하는 idle lease다(실제 lease는 서버 max_age 이내). heartbeat는 없으므로 서버 lease를 넘는 유휴는 여전히 종료된다. **서로 다른 구독 사이의 누락은 Gap으로 복원/표시되지 않는다.** 화면 호스트는 종료/새 구독 경계를 불연속으로 표시해야 하고 이어진 무손실 스트림으로 표현하면 안 된다. 장기 유휴 tail·재구독 간 복원은 후속 범위다. CLI는 별도의 전체 작업 기한을 유지한다.
+
+handoff의 TTL 만료/폐기된 세대는 consumer를 호출하지 않고 `Remote(Gone)`·ACK 없음으로 반환한다. 실제 consumer 거절은 `ConsumerRejected`다. 응답 손상은 `DataLoss → Corrupt`, 메시지 크기 상한은 `OutOfRange → Limit`로 구분한다. 기존 `InvalidArgument → InvalidInput`은 유지한다. bearer metadata는 sensitive로 표시하며 임의 request Debug 로깅을 추가하지 않는다.

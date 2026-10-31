@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-022 로컬 Pass·REV-019 반입(RV-036~038 개선/검증 대기) → Human 최종 리뷰 → TASK-013, native 공개 후 |
+| 다음 액션 | EV-023 로컬 Pass·REV-018/019 Closed·TASK-013 착수 승인, native/실측 후속 |
 | 의존 | TASK-010·TASK-006 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@
 - [x] 로컬 구현 범위: 제한 reassembly·Gap/Unknown·버전/권한·취소·receiver ACK, 독립 파일 경로 Written 유지(EV-022).
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 로컬 구현 수락·추가 조치 검증/마감 위임 완료. native/실측 수락은 별도다.
 
 테스트 정의: [TC-007](../../05_verification/test_case.md#tc-007). 제품 코드·테스트 실행 결과: [EV-022](../../05_verification/verification_evidence.md#ev-022). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -66,3 +66,7 @@ Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 E
 Human 「프로젝트 브리핑하고, 리뷰 반입하고, 승인 해야 하는 업무 보고해줘」에 따라 [REV-019](../../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md)를 In Progress로 반입했다. RV-036은 기존 초과 연결 거절/한도를 유지하는 재폴링 대기 개선으로 수용, RV-037은 방어 보강으로 부분 수용하되 실제 공격·constant-time 보장은 미확정, RV-038은 연결별 receiver 수명 지침 보강으로 수용하고 gate 자동 삭제는 채택하지 않았다. 상세 근거·첫 검증은 REV-019 처리담당 영역을 따른다.
 
 이번 요청에서 개선 제품 코드는 수정하지 않았다. 기존 EV-022 source70개 hash 일치·검사11개 exit0·Miri48 Pass를 확인했고 동일 시험은 반복하지 않았다. 개선 구현/회귀·문서 조치 후 REV-019를 Resolved로 올리고 REV-018과 함께 Human 최종 구현 수락을 받는 순서를 권고한다. 승인된 계약 안의 수정 세부사항은 A이며 별도 재승인 대상이 아니다. TASK-013 착수는 TASK-012 수락 및 다음 작업 지시 후다.
+
+## REV-019 조치·수락 및 TASK-013 전환 — 2026-10-31 #007
+
+Human 기존 로컬 구현 승인·모든 권한 위임·다음 착수 요청으로 REV-018 Closed를 반영하고, RV-036 timer 대기·RV-037 고정 credential 비교·RV-038 연결 수명 지침을 조치했다. [EV-023](../../05_verification/verification_evidence.md#ev-023) source70개/검사9개 exit0·두 Rust16feature·Miri25 Pass·commit blob70개 일치(`4f79119`) 후 AI의 위임된 마감 판단으로 REV-019도 Closed다. 이전 승인 대기/미구현 문구는 당시 이력이다. 로컬 Human 리뷰 완료를 전체 Task/TC·native/PC 수락 완료로 확대하지 않는다. 다음 TASK-013에 착수한다.

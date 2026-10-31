@@ -144,6 +144,8 @@ TASK-011 하위 [EV-018](verification_evidence.md#ev-018): 가상시계 replay10
 TASK-012 하위 [EV-022](verification_evidence.md#ev-022): 원격 unit10/public3, 실제 loopback8MiB/32조각·CRC/소비 인계 ACK·Gap/Unknown·TLS/read-manage·version/auth/length/capacity/TTL/세대, File→Snapshot Query/ReadBlob3bytes·Replay/Completion 및 ACK/Unknown 모두에서 독립 파일Written을 확인했다. 두 Rust각16feature·독립core/remote consumer·RT allocator11/lint/doc/fmt·영향 Miri48 Pass. CLI JSON/exit/Ctrl-C·dot-probe/실제 관리 backend·LAN 정량 성능/전체RSS·다른 OS/native 공개 후는 미검증이며 TC 전체 완료로 표시하지 않는다.
 
 <a id="tc-008"></a>
+TASK-012 후속 [EV-023](verification_evidence.md#ev-023): 연결 포화 자기 wake Red→10ms timer 대기 Green·permit 회수 뒤 재수락, 고정256B credential/길이 비교와 경계 입력, receiver gate 한도/이전 세대 handoff/연결별 예산 수명 회귀를 추가했다. 두 Rust각16feature·독립 consumer/allocator·lint/doc/fmt/proto·영향 Miri25 Pass. REV-018/019 Closed·위임에 따른 조치 검증 수락, CLI/실제 transport 재연결·실앱/LAN/RSS/native/성능은 잔여다.
+
 ### TC-008 — DB 매핑·충돌·재시도
 
 - 관련: MS-006 / FR-004 / NFR-003·005

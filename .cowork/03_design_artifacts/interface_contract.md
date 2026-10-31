@@ -521,6 +521,10 @@ RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연
 
 `RemoteDelivery::poll`은 원래 Delivery guard를 보관하면서 ReceiverAcknowledged/Unknown/명시 Dropped를 실제 completion에 게시한다. 보고 Busy는 guard를 유지하고 다음 host turn으로 넘긴다. 바이트 send 또는 Query 조회가 receiver 완료를 만들지 않으며 unreported Drop의 기존 Unknown 계약을 유지한다. 파일의 Written/Synced와 별도 경계다.
 
+REV-019 보강: 연결 한도 초과 TCP는 기존처럼 닫되 이후 accept 재폴링은 10ms timer를 기다려 연속 backlog에 의한 자기 wake 반복을 억제한다. 한도/기존 연결 permit과 shutdown 의미는 유지하며 실제 CPU 점유율 상한을 보장하지 않는다. Bearer credential은 bind 시 길이와 고정256B 배열로 정규화하고 기존 lock의 subtle2.6.1로 고정 크기 bytes/길이를 비교한다. 이는 비교 primitive의 보강이며 전체 RPC·토큰 목록 탐색의 constant-time이나 공격 불가능을 보장하지 않는다.
+
+수신자는 실제 transport 연결별 Reassembler를 소유한다. 서로 다른 구독의 generation gate는 `records`개까지 누적되고 동일 구독 갱신은 추가 슬롯을 쓰지 않는다. 미완성 원본 만료가 gate를 지우지 않는다. gate `Limit`이면 연결을 종료하고 새 연결에 새 receiver를 만든다. 재연결 시 이전 조각 라우팅/미인계 owner를 정리하고 이전 ACK를 새 연결로 보내지 않는다. 이전 owner/IO의 예산은 실제 종료까지 유지한다. 늦은 조각·ready handoff 방어를 위해 gate를 자동 삭제하지 않는다. TASK-013 transport가 이 수명을 연결한다.
+
 관리 unary RPC는 유한 `CommandInbox`로 native `ManagementRequest`를 전달한다. host가 `Command::request`에 따라 실제 Snapshot/page/blob·Replay·Completion 또는 등록된 관리 기능을 실행하고 `respond`로 native reply를 돌려준다. 미구현 기능은 Unsupported로 명시한다. Query/ReadBlob/Replay의 handle/TTL·page/item/blob 권한/reader 종료는 host가 기존 primitive와 제한된 capability 목록으로 관리한다. timeout/취소는 대기만 끝내며 host Command가 살아 있으면 permit/예약을 회수하지 않는다. `cancelled`를 actual IO 종료로 해석하지 않는다. CLI/실제 설정 적용·RunCheck/Compare backend 자체는 TASK-013/016/017 및 관련 Task다. 관리 응답의 type/record 수·encoded bytes·소유한 Vec capacity 및 요청 blob length도 제한하며 과대 응답은 Limit이다.
 
 초기 로컬 근거와 자가 리뷰는 [TASK-012](../04_implementation/tasks/TASK-012.md)·[REV-018](../05_verification/reviews/REV-018_TASK-012.md)·[EV-022](../05_verification/verification_evidence.md#ev-022)에 기록한다. 실제 LAN 지연/처리량·network/runtime 전체 RSS·dot-probe 통합/운영 보안 정책·다른 OS/native는 별도 검증이며 core 소유권/RT·실제 저장 경로를 바꾸지 않는다.

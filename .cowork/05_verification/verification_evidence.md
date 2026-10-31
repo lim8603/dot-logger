@@ -587,6 +587,17 @@ EV-021 수치 승인 — 2026-10-31 10ms 주기 조정 보고 후 Human 「승�
 
 native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC 성능/UPS·dot-probe/운영 보안 정책·TASK-013 CLI/SDK·TASK-016/017 등 관리 backend·fresh online audit·commit/push는 미실행이다. 서버의 테스트 실행은 종료했고 상시 데몬/실제 배포를 수행하지 않았다. 기존 unsafe pool/control/routing 전체 Miri는 변경 영향이 없어 반복하지 않았다.
 
+### EV-023 — TASK-012 REV-019 연결 포화·credential 비교·receiver 수명 보강
+
+- 대상: 소스 `4f791194d1cf2256ee275fec2fe89fab5ad4f3f1`. [source70개/검사9개/hash](../06_evolution/imported_context/task_012_review_fixes_2026-10-31/results.json)·[재현 script](../06_evolution/imported_context/task_012_review_fixes_2026-10-31/verify.py)·[commit blob70개 일치](../06_evolution/imported_context/task_012_review_fixes_2026-10-31/commit.json). EV-022는 이전 형상의 이력이다.
+- 실행: 2026-10-31 / AI / 로컬 Linux x86_64 / Rust1.85.0·1.96.0 / Miri nightly-2026-10-26. PC 성능/RT/UPS 수락 실행이 아니다.
+- TDD: 고정 크기 Credential primitive 부재 compile Red, 기존 포화 경로에서 즉시 자기 wake1회 행동 Red → 각각 Green. 기능 시험을 타이밍 공격 측정/constant-time 증명으로 세지 않는다.
+- 변경: 초과 연결 거절 후10ms timer wake, bind 시 고정256B credential 정규화·subtle2.6.1 bytes/길이 비교, 연결별 receiver/gate 한도·예산 수명 지침. 기존 lock package/version 집합 그대로, remote 전용 subtle 직접 edge1개만 추가했다.
+- 결과: 두 Rust각16feature·core/remote 독립 consumer·RT allocator core10/remote11·프로토콜9message83field·clippy/rustdoc `-D warnings`·fmt Pass. 새 회귀3개(포화/credential/gate), 기존 소켓/TLS/관리·ACK/파일/완료 회귀 포함. 영향 Miri receiver3×8=24 + credential1=25 Pass. Miri의 기존 wire native dead_code 경고2개는 socket 테스트 제외에 따른 것이며 native 경고0과 구분한다.
+- 원본 로그 `.log.gz`와 공백 정규화 뷰 `.log` hash, source 검사 전후 동일을 결과 JSON에 보존했다. 기존 unsafe 전체 Miri는 변경 영향이 없어 반복하지 않았다.
+- 수락: Human 기존 로컬 구현 승인·마감 위임을 근거로 검증 뒤 AI 수락. REV-018/019 Closed, TASK-012는 로컬 Human 리뷰 완료/native·실측 잔여로 In Progress다. TASK-013 착수 승인 유지.
+- 미검증: native 공개 후(T3)·다른 OS·PC 성능/RT/UPS/LAN/RSS·실제 dot-probe/운영 backend·전체 인증 시간 특성. Gate4/5 Not Ready 유지.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.

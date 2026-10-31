@@ -13,7 +13,7 @@
   - **동시성 및 메모리 안전성**: Tonic/Tokio 기반의 비동기 I/O와 원격 버퍼 예약(`QueryBudget`), 단조 `AtomicU8` 상태 머신(Pending → Acknowledged / Unknown / Dropped), 세대(`generation`) 기반 분기 보호가 엄격히 적용됨.
   - **소유권 및 취소 안전성(Cancellation Safety)**: 클라이언트 타임아웃 발생 시에도 호스트 I/O 커맨드(`CommandInbox`/`Command`)는 조기 반환되지 않고 실제 호스트 완료 시까지 리소스를 유지함.
   - **정적 분석 및 테스트 전체 통과**: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, 전체 단위/통합 테스트 24+19+13+21+19+10+14+3=123건 Pass.
-- **상태:** In Progress — 2026-10-31 개발 측 반입·판정 완료, 개선 구현/검증 전. 리뷰어의 최초 판정과 아래 원문은 이력으로 보존한다.
+- **상태:** Closed — 2026-10-31 #007 EV-023 조치/검증 Pass·Human 위임에 따른 AI 마감. 최초 리뷰 및 #006 반입 계획은 당시 이력으로 보존한다.
 
 ---
 
@@ -21,9 +21,9 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-036 | P2 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L195) | 연결 포화·연속 유입 시 즉시 재폴링으로 CPU 소비 증가 가능 | 기존 초과 연결 거절·한도를 유지하며 재폴링 대기 도입 | 수용 — 재현/구현 대기 | In Progress |
-| RV-037 | P2 (원 리뷰) | [`equal`](../../../crates/dot-logger/src/adapters/remote/server.rs#L42) | 길이 불일치 조기 반환 존재. 실제 타이밍 공격은 미검증 | 비교 경로 보강 검토, 기능 시험과 시간 특성 증거 구분 | 부분 수용 — 방어 보강, 취약점 확정 유보 | In Progress |
-| RV-038 | P3 | [`Reassembler::discard_generations`](../../../crates/dot-logger/src/adapters/remote/receiver.rs#L203) | 유한 세대 gate가 서로 다른 구독 ID로 소진될 수 있음 | 연결별 수신자 수명·재연결 시 재생성 지침 보강 | 수용 — 문서 조치 대기, 자동 제거 미채택 | In Progress |
+| RV-036 | P2 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L195) | 연결 포화·연속 유입 시 즉시 재폴링으로 CPU 소비 증가 가능 | 기존 초과 연결 거절·한도를 유지하며 재폴링 대기 도입 | 수용 — 재현/구현 대기 | Closed |
+| RV-037 | P2 (원 리뷰) | [`equal`](../../../crates/dot-logger/src/adapters/remote/server.rs#L42) | 길이 불일치 조기 반환 존재. 실제 타이밍 공격은 미검증 | 비교 경로 보강 검토, 기능 시험과 시간 특성 증거 구분 | 부분 수용 — 방어 보강, 취약점 확정 유보 | Closed |
+| RV-038 | P3 | [`Reassembler::discard_generations`](../../../crates/dot-logger/src/adapters/remote/receiver.rs#L203) | 유한 세대 gate가 서로 다른 구독 ID로 소진될 수 있음 | 연결별 수신자 수명·재연결 시 재생성 지침 보강 | 수용 — 문서 조치 대기, 자동 제거 미채택 | Closed |
 
 ---
 
@@ -140,3 +140,17 @@
 - 이번 세션은 기존 리뷰 반입·판정·승인 업무 보고 범위다. 새 리뷰 회차·EV를 만들지 않았고 제품 코드/테스트/의존성도 변경하지 않았다. 최초 리뷰의 Pass는 리뷰어 평가이며 개선 조치 완료나 최종 수락을 뜻하지 않는다.
 - 승인된 계약 안의 재현·수정·문서 보강은 A 범위다. 각 세부 단계마다 재승인받지 않는다. TASK-012 최종 구현 수락은 §1E의 Human 리뷰 사항이며 TASK-013 전환은 현재 작업 지시를 따른다.
 
+
+## 6. 조치·검증 및 위임에 따른 마감 — 2026-10-31 #007
+
+Human 「승인」으로 기존 TASK-012 로컬 구현을 수락하고 「모든 권한을 위임」하여 추가 조치의 검증·수락/마감 판단과 TASK-013 착수를 맡겼다. 이번 조치는 [EV-023](../verification_evidence.md#ev-023)·소스 `4f79119`로 검증 후 AI가 수락했다. 상태 이력은 Open → In Progress(#006 반입) → Resolved(조치/검증) → Closed(위임된 마감)다. 앞선 “미수정/구현 대기”는 #006 당시 상태다.
+
+| 항목 | 실제 조치 | 검증 | 결과 |
+|---|---|---|---|
+| RV-036 | Incoming은 기존 초과 TCP 거절 후 고정10ms timer를 등록한다. permit 한도/기존 연결 수명은 유지한다 | 기존 구현에서 즉시 자기 wake1회 행동 Red → Green. 초과 연결 EOF·대기 wake·permit 반환 뒤 수락/반환 및 실제 소켓/TLS/종료 회귀 | Closed |
+| RV-037 | bind 시 Credential을 고정256B+길이로 정규화하고 subtle2.6.1의 고정 크기 bytes/길이 비교를 사용한다 | primitive 부재 compile Red → Green. 정답·동일/다른 길이 오답·NUL padding·16/256/257 경계, 기존 TLS/read-manage/malformed auth/secret 비노출 회귀·credential Miri1 | Closed — 전체 인증 constant-time/공격 불가능 주장은 하지 않음 |
+| RV-038 | Reassembler rustdoc·API §14.3에 연결별 소유/재생성·구독 gate 한도·old owner/ACK·예산 수명 명시. 자동 gate 삭제 미도입 | gate 한도 후 stale handoff 거절 유지·동일 gate 갱신·새 receiver와 기존 예산의 독립 수명, receiver3×8 seeds Miri24 | Closed — TASK-013 transport 소비자 후속 |
+
+최종 source70개/검사9개 exit0·두 Rust1.85.0/1.96.0 각16feature·core/remote consumer·RT allocator11·clippy/rustdoc `-D warnings`·fmt·proto·Miri25 Pass. commit blob70개도 검증 hash와 일치한다. Miri는 기존 socket 전용 코드 제외에 따른 wire native 두 메서드 dead_code 경고가 있으며 native clippy/rustdoc 경고0과 구분한다.
+
+새 package/version은 추가하지 않았다. 기존 TLS 간접 의존 subtle2.6.1을 remote 전용 직접 edge로 고정했다. 핵심 기술 계열·공개 인증 전략/오류/ACK 의미 변경이 아니므로 별도 ADR 승격 없이 API/tech_stack에 기록한다. RT 입력·unsafe·core 네트워크 격리는 유지한다. native 공개 후(T3)·LAN/실앱/RSS·PC/RT/UPS·Gate4/5는 미완료다.

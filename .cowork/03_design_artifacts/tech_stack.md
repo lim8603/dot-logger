@@ -53,3 +53,5 @@ ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그
 [ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)·[TASK-022](../04_implementation/tasks/TASK-022.md): Ubuntu26.04.1 LTS x86_64, Ryzen7 H255 8코어16스레드, OS 인식 메모리59,750,248,448B. 현재 실행7.0.0-42-generic(CONFIG_PREEMPT_RT 미설정), 설치7.0.0-38-realtime(CONFIG_PREEMPT_RT=y). 현재 PC 실측/UPS 시뮬레이션을 수락하며 일반/RT 실행을 별도로 기록한다. [환경 원문](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json). 제품 기능·성능 시험은 이번 환경 조사에서 실행하지 않았다.
 
 TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기존 lock의 package/version 집합은 유지하고 TLS dependency edge만 연결했다. host 소유 Tokio runtime·실제 TLS/read-manage 권한·bounded RPC는 EV-022 로컬 검증이며 core consumer의 네트워크 격리는 두 Rust16feature로 회귀했다. LAN 성능·native 공개 후 검증은 별도다.
+
+2026-10-31 REV-019 보강(EV-023): 기존 TLS 간접 의존 subtle2.6.1을 remote 전용 직접 의존으로 pin해 고정256B credential/길이 비교에 사용한다. package/version 집합·MSRV/기술 계열·인증 정책은 유지한다. 전체 RPC constant-time/실제 공격 내성의 정량 증거는 아니다.

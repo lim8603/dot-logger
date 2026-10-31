@@ -47,3 +47,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-31 TASK-014 EV-027: 고정 계측·유한 이력/대상 합계·fixture 로컬 구현/검증·REV-023 위임 수락. MS-005 In Progress, 비용/RT/실앱/native·TASK-015~017은 미완료이며 다음 후보 TASK-015는 미착수다.
 
 2026-10-31 #012 TASK-015 로컬 수락: EV-028 source100개/검사13개·Miri168·소스a247d01, REV-024 Closed. Observed/Validated/Estimated/Stale·손실 안정 큐 Overloaded·분리된 bytes/slots/출력정지/filesystem/quota/순환 보존 산술과 합성 오차 시나리오를 검증했다. TASK-016/017·실제 PC/RT 오차/비용·native·실앱이 남아 MS-005 In Progress/TC-009 전체 미완료다.
+
+2026-10-31 #014 REV-025 조치: [EV-029](../05_verification/verification_evidence.md#ev-029) sourceeaf736c·검사14개/Miri224·source101개 blob일치로 거절 범주/압력·시도 부하·host 출력 끝점 정렬·poison 복구를 로컬 수락, REV-025 Closed. TASK-016/017·실측 비용/오차·native/실앱은 남아 MS-005 In Progress/TC-009·Gate4/5 전체 미완료를 유지한다.

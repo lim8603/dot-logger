@@ -118,7 +118,7 @@ Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page
 
 ## TASK-014 계측 데이터 — 2026-10-31
 
-- CaptureCounts: accepted/rejected/skipped/accepted_bytes/acquire_rejected·overflowed. producer 수 고정, 임의 record/string label 없음. 원본 대여 실패는 제출 결과와 별도이며 재시도마다 즉시 판정을 집계한다.
+- CaptureCounts: accepted/rejected/skipped/accepted_bytes/acquire_rejected·overflowed와 제출/대여 각각의 rejected_capacity/rejected_contract/rejected_lifecycle 범주. 총계는 범주 checked 합계이며 overflow 표시를 보존한다. producer 수 고정, 임의 record/string label 없음. 원본 대여 실패는 제출 결과와 별도이며 재시도마다 즉시 판정을 집계한다. 리포트 용량 압력은 capacity만 사용하고 부하율은 accepted+rejected_capacity 시도율이다. 고유 입력/손실 records로 해석하지 않는다.
 - Sample: session_id/revision/epoch/at_ns와 ingress·전체/필수 CompletionTotals. 301개 고정 ring으로 300초 구간+기준 표본을 보존한다.
 - Window: 실제 from_ns/to_ns·session/revision/epoch와 누적 counter 차. 10/60/300초 선택만 제공하며 시간 누락/reset/포화에서 값을 꾸미지 않는다.
 - Observation: Observed·Stale·Unavailable(reason). 미계측은 owner telemetry()의 None, 미제공 completion/다른 session·revision/누락 이력은 명시 사유다. 동시 atomics는 전체 시점 일관성을 약속하지 않으며 배출 후 정확 대조한다.

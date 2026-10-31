@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-028 로컬 수락·REV-024 Closed; PC/RT 예측 오차·native/실앱 후속, 다음 후보 TASK-016 |
+| 다음 액션 | EV-029/sourceeaf736c·REV-025 Closed; PC/RT 비용·오차/native·실앱 후속, 다음 후보 TASK-016 |
 | 의존 | TASK-014·TASK-008 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -55,3 +55,9 @@ Human 「세션 마무리해줘. 다음 세션에서 TASK-015 시작하자」. �
 - RV-056~059의 profile session/독립 quota/BeyondRange/Estimated 과부하 provenance는 assertion Red→Green으로 조치했다. 초기 MSRV lint 실패 원본은 before-lint-fix에 보존하고 공통 표현으로 정리한 최종 소스를 재검증했다.
 - 취소/종료: 순수 계산 API로 새 IO/worker/자원 수명 없음. 기존 producer/reader 종료 계약을 바꾸지 않는다. 누락/포화·0분모/0구간·역방향/낡은 시각·만료·음수/0 증가율·full 경계를 검증했다.
 - 미완료: 실제 capacity 검증·호스트 물리 gauge/지연 수집/자동 worker·CLI runtime backend·실앱, PC/RT 실제 예측 오차≤20%/계측 비용≤5%, 다른 OS/native 공개 후(T3). Task In Progress·MS-005/TC-009 전체·Gate4/5 미완료 유지.
+
+## REV-025 조치·위임 수락 — 2026-10-31 #014
+
+[EV-029](../../05_verification/verification_evidence.md#ev-029) sourceeaf736c·source101개/검사14개·Miri224·commit blob일치, [REV-025](../../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) Closed. 제출/대여 거절 총계와 capacity/contract/lifecycle 6개 범주를 보존하고 용량 거절만 압력·부하율에 사용한다. 시도율은 재시도 중복을 포함하므로 고유 입력/손실 records로 비교하지 않는다. target_totals 호스트 유한 이력을 실제 window 양끝에 맞추는 절차·실제 completion 연결 시험, poison reset 복구·history_len Observation 반환 migration을 반영했다. CounterCell128B·RT 할당/해제0·추가 이력 크기의 checked control 예약을 확인했다.
+
+Human 「권고대로 진행」과 기존 위임으로 API 정정·로컬 수락/마감을 수행했다. 기존 계약/검증의 이력은 보존하며 실제 비용≤5%·PC/RT 예측 오차≤20%·native 공개 후T3·실앱/운영 backend는 여전히 미완료다. TASK-016 Planned/미착수, Task/MS/TC 전체·Gate4/5 미완료를 유지한다.

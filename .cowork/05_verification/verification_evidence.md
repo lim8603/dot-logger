@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-10-28 / Build, MS-002 In Progress. TASK-002/003은 Human 리뷰·로컬/native Pass 이력을 유지한다. TASK-004 원본 풀·반환은 EV-003 로컬 Pass·Human 승인·게시 완료, 사용량 소진으로 native 미실행이다. Human은 계정 재확인 불필요·TASK-005 착수를 지시했다. TASK-005 분배·출력 격리·예산은 EV-004 로컬 Pass이며 Human 리뷰는 승인됐고 native는 대기다. TASK-006 완료 추적·명시 sync·종료 coordinator는 EV-005 로컬 Pass·Human 리뷰 승인/native 대기다. 실제 파일/worker·Windows/macOS/PREEMPT_RT·장비 검증은 남아 있다.
+INT-001 / 2026-10-31 #014 / Build, MS-005 In Progress. TASK-002/003 로컬/native 이력 Pass, TASK-004~015 로컬 수락 및 리뷰 조치는 EV-029까지 기록했다. REV-025 Closed, TASK-016 Planned. 최신 변경 native는 공개 후(T3), PC/RT/실앱·UPS/장기 성능과 운영 backend는 후속이다. 각 EV의 과거 실행/미실행과 형상을 구분하고 Gate4/5 Not Ready를 유지한다.
 
 ## Evidence Index
 
@@ -657,6 +657,18 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 게시: 소스 a247d01 origin/main push 및 [원격 HEAD 일치](../06_evolution/imported_context/task_015_2026-10-31/source-push.json) 확인. 소스/검증 문서는 별도 커밋이며 [skip ci]를 유지했다. native 실행·공개 전환/CI 조회를 수행하지 않았다.
 - 미실행: 실제 capacity benchmark·물리 gauge/지연 수집/자동 worker·CLI runtime metrics backend·실앱, PC/RT 실제 예측 오차≤20%/계측 비용≤5%·LAN/RSS/UPS/장기 부하·다른 OS/native 공개 후(T3)·fresh audit. TASK-015/MS-005 In Progress·TC-009 전체·Gate4/5 미완료를 유지한다.
 
+<a id="ev-029"></a>
+### EV-029 — REV-025 계측 거절 범주·리포트·이력 복구 정정
+
+- 형상: `eaf736c`, [source101개/검사14개·로그 hash](../06_evolution/imported_context/rev_025_fixes_2026-10-31/results.json)·[재현 script](../06_evolution/imported_context/rev_025_fixes_2026-10-31/verify.py)·[commit blob101개 일치](../06_evolution/imported_context/rev_025_fixes_2026-10-31/commit.json). dependency/lock·unsafe·wire 변경0.
+- 권한/범위: Human 상세 브리핑 뒤 「권고대로 진행」, 기존 구현·검증·리뷰 마감·게시 위임. 공개 CaptureCounts/Report 범주 추가·history_len 반환형 정정을 API§15/데이터/README에 반영했고 새 기술·소유권·장기 불가역 결정이 없어 ADR 추가 없음. TASK-016은 Planned/미착수.
+- TDD: [Red2개](../06_evolution/imported_context/rev_025_fixes_2026-10-31/red.json) — TooLarge만으로 Observed Overloaded, poison reset 뒤 sample 실패 → Green. 실제 small/raw/acquire의 용량/계약/수명 분리·raw 재시도·전체 총계/차분/reset·합산 포화·정상 자원 부하/pressure·Stale/invalid 진단을 검증했다. 수집 즉시 판정의 범주 store1개·CounterCell128B·RT 할당/해제0을 유지한다. 이력 Sample 크기 증가는 기존 checked control 예약과 allocator live/peak 검사로 포함한다.
+- RV-061은 리뷰 제안③으로 수락: 새 공개 sample/target 이력 없이 호스트 유한 이력·실제 양끝/identity/boundary 대조·checked terminal 차분/최종 pending·누락/Busy/overflow 거절 절차를 문서화했다. 실제 0~11초 window(요청10초)에 target10 complete2/failed1/dropped1/unknown1/pending2·ingress6·다른 target 미혼합을 연결 시험했다. 호스트는 입력 identity와 계측 시점을 책임지고 concurrent 근접 시점 혼합은 유지한다.
+- 로컬 Linux7.0.0-42-generic / Rust1.85.0·1.96.0 각각16feature·공개 core/remote consumer·workspace/all-features·기본 client·clippy/rustdoc -D warnings·fmt 검사14개 exit0. TC-009 계측10개/리포트15개·telemetry unit3개, Miri strict provenance8seeds×28=224 Pass. F-11 소비자(small/raw/acquire/일반 재시도·counter/window/report·consumer·allocator/예제) 회귀와 source hash 불변 확인.
+- [REV-025](reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) RV-060/062 수용·RV-061 대안 수용, Open→In Progress→Resolved 후 기존 위임으로 로컬 수락/Closed. 시도 부하율은 accepted+rejected_capacity이며 재시도 중복을 포함해 고유 입력/손실량으로 주장하지 않는다. acquire/계약/수명 거절은 분자 제외.
+- 게시: 소스 eaf736c origin/main push 및 [원격 HEAD 일치](../06_evolution/imported_context/rev_025_fixes_2026-10-31/source-push.json) 확인. 문서는 별도 커밋으로 게시하며 [skip ci] 유지, CI/계정/과금 조회·native 실행·공개 전환은 수행하지 않았다.
+- 미실행: native 공개 후T3·다른 OS, PC/RT 실제 성능/계측 비용≤5%/예측 오차≤20%, 물리 gauge/자동 worker·CLI runtime backend·실앱/장기 tail/LAN/RSS/UPS/24h·fresh audit. TASK-014/015/MS-005·TC-009 전체·Gate4/5는 미완료 유지.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.
@@ -674,7 +686,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012 EV-022 원격 로컬 Pass·REV-018 Human 리뷰 대기. 후속 클라이언트/운영·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029까지 로컬 수락·REV-001~025 Closed. 후속 운영·설정/비교/점검·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~015의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

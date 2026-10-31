@@ -9,7 +9,7 @@
   - TASK-015 `a247d01`: [capacity.rs](../../../crates/dot-logger/src/telemetry/capacity.rs)·[report.rs](../../../crates/dot-logger/src/telemetry/report.rs), TC-009 시험·api-consumer·rt-allocation 추가분, README
 - **정적 확인:** `cargo fmt --all --check` Pass. `cargo clippy --workspace --all-targets --all-features -- -D warnings` Pass. `cargo test --workspace --all-features` 전체 Pass. Miri는 EV-028과 소스가 같아 다시 실행하지 않았다. 아래 반례는 코드 정독과 기존 시험 대조로 도출했다. 실행 재현은 처리담당 Red 시험에 맡긴다.
 - **종합 판정:** Conditional (P2 1, P3 2). P1 없음. RT 할당·대기·unsafe 위반은 확인하지 못했다. 다만 리포트의 병목 진단 의미에 결함이 1건 있다.
-- **상태:** Open
+- **상태:** Closed — #014 EV-029/sourceeaf736c·검사14개/Miri224·commit blob101개 일치 후 기존 위임으로 로컬 수락. 최초 Conditional 판정은 발견 당시 이력이다.
 
 ### 확인한 긍정 사항
 
@@ -26,9 +26,9 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-060 | P2 | [`try_record_small`](../../../crates/dot-logger/src/capture/mod.rs#L526-L543)·[`try_acquire`](../../../crates/dot-logger/src/capture/mod.rs#L647-L659)·[`try_record_raw`](../../../crates/dot-logger/src/capture/mod.rs#L683-L702) → [`Report::build` loss/load](../../../crates/dot-logger/src/telemetry/report.rs#L246-L252)·[L327-L334](../../../crates/dot-logger/src/telemetry/report.rs#L327-L334), API§15.1 | `rejected`/`acquire_rejected`가 모든 `CaptureError`를 한 값으로 센다. 리포트는 0보다 크면 Observed `Overloaded`로 보고 부하율 분자에도 넣는다. 호출자 계약 오류·종료 중 거절·재시도가 용량 병목으로 진단된다 | 거절을 용량/계약/수명 범주로 나눠 세고, 용량 범주만 Overloaded·부하율에 사용 (계약 문구 변경 동반) | — | Open |
-| RV-061 | P3 | [`Sample.outputs`](../../../crates/dot-logger/src/telemetry/aggregate.rs#L16-L20)·[`Window`](../../../crates/dot-logger/src/telemetry/aggregate.rs#L24-L37)·[`ReportInput.output`](../../../crates/dot-logger/src/telemetry/report.rs#L82-L83) | 같은 구간의 대상별 `OutputDelta`를 만들 수단이 없다. 이력은 전체 대상 합계만 보존하고 과거 표본 조회 API도 없다. `from_ns`는 요청 초보다 최대 2초 이를 수 있다 | 구간 끝점 표본 노출 또는 선택 대상 합계 이력화. 최소한 호스트 절차 문서·연결 시험 | — | Open |
-| RV-062 | P3 | [`Bank::reset`](../../../crates/dot-logger/src/telemetry/counters.rs#L262-L272)·[`history_len`](../../../crates/dot-logger/src/telemetry/mod.rs#L129-L132) | reset은 poison된 이력을 비우지만 poison 표시는 그대로 둔다. 그래서 owner 수명 동안 복구되지 않는다. `history_len`은 poison 시 0을 반환한다 ("미측정≠0" 원칙 위반) | reset에서 `clear_poison()` 호출(MSRV 1.85에서 사용 가능), `history_len`을 `Option`/`Observation`으로 | — | Open |
+| RV-060 | P2 | [`try_record_small`](../../../crates/dot-logger/src/capture/mod.rs#L526-L543)·[`try_acquire`](../../../crates/dot-logger/src/capture/mod.rs#L647-L659)·[`try_record_raw`](../../../crates/dot-logger/src/capture/mod.rs#L683-L702) → [`Report::build` loss/load](../../../crates/dot-logger/src/telemetry/report.rs#L246-L252)·[L327-L334](../../../crates/dot-logger/src/telemetry/report.rs#L327-L334), API§15.1 | `rejected`/`acquire_rejected`가 모든 `CaptureError`를 한 값으로 센다. 리포트는 0보다 크면 Observed `Overloaded`로 보고 부하율 분자에도 넣는다. 호출자 계약 오류·종료 중 거절·재시도가 용량 병목으로 진단된다 | 거절을 용량/계약/수명 범주로 나눠 세고, 용량 범주만 Overloaded·부하율에 사용 (계약 문구 변경 동반) | 수용·EV-029 | Closed |
+| RV-061 | P3 | [`Sample.outputs`](../../../crates/dot-logger/src/telemetry/aggregate.rs#L16-L20)·[`Window`](../../../crates/dot-logger/src/telemetry/aggregate.rs#L24-L37)·[`ReportInput.output`](../../../crates/dot-logger/src/telemetry/report.rs#L82-L83) | 같은 구간의 대상별 `OutputDelta`를 만들 수단이 없다. 이력은 전체 대상 합계만 보존하고 과거 표본 조회 API도 없다. `from_ns`는 요청 초보다 최대 2초 이를 수 있다 | 구간 끝점 표본 노출 또는 선택 대상 합계 이력화. 최소한 호스트 절차 문서·연결 시험 | 대안 수용(③)·EV-029 | Closed |
+| RV-062 | P3 | [`Bank::reset`](../../../crates/dot-logger/src/telemetry/counters.rs#L262-L272)·[`history_len`](../../../crates/dot-logger/src/telemetry/mod.rs#L129-L132) | reset은 poison된 이력을 비우지만 poison 표시는 그대로 둔다. 그래서 owner 수명 동안 복구되지 않는다. `history_len`은 poison 시 0을 반환한다 ("미측정≠0" 원칙 위반) | reset에서 `clear_poison()` 호출(MSRV 1.85에서 사용 가능), `history_len`을 `Option`/`Observation`으로 | 수용·EV-029 | Closed |
 
 ---
 
@@ -57,9 +57,9 @@
   4. Red 시험: `TooLarge`/`Closing`/`Unsupported`만 발생하고 자원에 여유가 있는 window → `Overloaded`가 아니어야 한다. `Capacity` 거절 window는 계속 Overloaded여야 한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: 수용 — Human 「권고대로 진행」과 기존 위임 범위에서 구현. 공개 필드/API 정정 방향 승인, 별도 ADR 승격 조건 미해당.
+- 처리 내용: CaptureCounts/Report에 제출·대여 각각 capacity/contract/lifecycle 6개 범주를 추가하고 총계는 보존했다. RT는 해당 범주 1개만 relaxed 증가하고 총계 합산은 관리 읽기에서 수행한다. CounterCell은 128B 유지. Overloaded는 capacity 거절만, 부하율은 accepted+rejected_capacity 제출 시도만 사용한다. 재시도 중복을 고유 입력/손실로 오인하지 않도록 rustdoc/README/API§15·데이터 모델을 정정했다. GeneralProducer 실제 제출 전 종료/기한 검사는 기존대로 counter 밖이다.
+- 검증 근거: red-pressure.log에서 TooLarge→Observed Overloaded assertion 실패를 확인한 뒤 Green. TooLarge/Closing/Unsupported와 raw acquire Closing 제외, 실제 raw capacity 재시도·schema/종료 거절·pool 고갈/계측 reset, 알려진 자원에서 정상 pressure/분자·Stale/invalid 범주, 합산·delta·포화·RT 할당0 회귀. [EV-029](../verification_evidence.md#ev-029) sourceeaf736c·검사14개·Miri224 Pass, commit blob101개 일치로 로컬 수락.
 
 ### RV-061: window와 정렬된 대상별 OutputDelta를 만들 수 없음 (P3)
 
@@ -74,9 +74,9 @@
 - **처리 제안:** (택1) ① `Telemetry::window`가 끝점 두 `Sample`을 함께 반환하거나 `sample_at(at_ns)`를 제공한다. ② enable 시 선택한 대상의 `target_totals`를 이력에 함께 보존한다. ③ 현재 API를 유지하고 README/API§15.1에 호스트 절차(표본별 대상 합계 저장 → `from_ns`/`to_ns` 일치 확인 → `pending`은 끝점 값)를 명시한다. 그리고 실제 completion이 있는 window→OutputDelta 연결 시험을 추가한다. 공개 API 확장은 TASK-016/020 소비 시점에 결정해도 된다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: 대안 수용 — 리뷰 제안 ③(host 절차 명시 + 실제 completion 연결 시험)으로 처리. 공개 sample 조회/target 이력 추가는 이번 범위에 도입하지 않았다.
+- 처리 내용: 성공한 sample의 session/revision/epoch/시각과 target_totals·target/설정 boundary를 호스트의 유한 이력에 보관하고 실제 window.from/to를 맞추는 절차를 OutputDelta rustdoc/README/API§15.1에 명시했다. 누락/foreign/overflow/Busy/감소는 Unavailable, terminal은 checked 차분·pending은 끝점 값·reset 때 이력 비움을 명시했다. concurrent 근접 시점 혼합과 host 예산 책임은 유지한다.
+- 검증 근거: host_aligns_target_completion_history_to_actual_window_endpoints — 실제 window는 0~11초(요청10초). target10 complete2/failed1/dropped1/unknown1/pending2, ingress6, target20 결과 미혼합·to-10초 끝점 부재를 확인했다. [EV-029](../verification_evidence.md#ev-029) sourceeaf736c·검사14개·Miri224 Pass, commit blob101개 일치로 로컬 수락.
 
 ### RV-062: 이력 poison이 reset으로 복구되지 않음·history_len 0 반환 (P3)
 
@@ -87,9 +87,9 @@
 - **처리 제안:** reset에서 비운 뒤 `self.history.clear_poison()`을 호출한다(Rust 1.77 안정화, MSRV 1.85 충족). `history_len`은 `Option<usize>` 또는 `Observation<usize>`로 바꾸거나, poison 시 의미를 rustdoc에 명시한다. 단위 시험에서 강제 poison → reset → sample 성공을 확인한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: 수용.
+- 처리 내용: 독점 Bank::reset에서 이력/counter를 초기화한 후 Mutex::clear_poison, history_len은 Observation<usize>로 오류와 Observed(0)을 분리했다. 기존 호출자·allocator 시험 및 README/API migration 안내를 함께 갱신했다. epoch checked 증가·receipt/completion 수명 계약은 유지한다.
+- 검증 근거: red-poison.log의 강제 poison→reset→sample 실패 Red, 조치 뒤 HistoryUnavailable→reset→Observed(0)→sample 성공/Observed(1)와 epoch2 Green. [EV-029](../verification_evidence.md#ev-029) sourceeaf736c·검사14개·Miri224 Pass, commit blob101개 일치로 로컬 수락.
 
 ---
 
@@ -98,3 +98,9 @@
 - `examples/telemetry_overhead.rs`는 fixture 구조만 확인했다. 비용 ≤5%·PC/RT 실측은 TASK-022/023 범위이며 이번 리뷰가 판정하지 않는다.
 - Miri, native, 실제 장비 시험은 실행하지 않았다. EV-027/028의 기존 결과와 미실행 표시를 그대로 유지한다.
 - RV-060은 공개 `CaptureCounts`/`Report` 필드와 API§15.1 문구를 바꿀 수 있다. TASK-016(revision 비교)이 같은 counter를 비교 근거로 소비하므로 TASK-016 착수 전에 처리하는 것을 권고한다.
+
+## 5. #014 조치·검증 및 위임 수락 — 2026-10-31
+
+Human 「권고대로 진행」으로 개발 세션에 전환해 Open→In Progress, Red2개 재현/조치 뒤 EV-029로 Resolved, 기존 수락/마감 위임으로 Closed 처리했다. 최종 자가 점검은 code-review 스킬의 RT/원자성·수명/공개 API·feature 격리 기준을 적용했다. RT는 범주1개 relaxed load/store, 관리 읽기는 유한 checked 합산, owner 독점 reset만 poison을 해제한다. 새 unsafe/worker·dependency/lock·wire는 없다. 알려진 P1/P2 미해결 항목은 이 조치 범위에서 없으며, RV-061의 호스트 정렬/근접 시점 혼합·예산 책임은 공개 계약으로 남긴다.
+
+호환성: CaptureCounts/Report의 6개 범주 필드 추가, Telemetry::history_len()은 usize→Observation<usize>다. README/API§15에 migration과 시도율/고유 기록 구분을 명시했다. 기능 Pass는 로컬 Linux 회귀 범위이고 비용≤5%·실제 PC/RT 오차/지연·native/실앱 수락이 아니다. TASK-014/015 In Progress·Gate4/5 미완료, 다음 후보 TASK-016 Planned를 유지한다.

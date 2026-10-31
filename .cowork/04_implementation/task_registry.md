@@ -23,7 +23,7 @@
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | EV-014/015 로컬 Pass·Human 승인; 현재 PC 대체 실측·모의 장애, native 공개 후 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
-| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-022 로컬 Pass·REV-018 Human 리뷰 → TASK-013, native 공개 후 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
+| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-022 로컬 Pass·REV-019 반입/개선 대기 → REV-018/019 Human 리뷰 → TASK-013, native 공개 후 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
 | TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | CLI JSON schema·exit code·query→replay 사용자 흐름과 Ctrl-C | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 폐기로 안정된 큐 Overloaded·미측정 분모·음수/0 증가율 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |

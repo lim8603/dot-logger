@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-022 로컬 Pass·REV-018 Human 최종 구현 리뷰 → TASK-013 클라이언트·CLI, native 공개 후 |
+| 다음 액션 | EV-022 로컬 Pass·REV-019 반입(RV-036~038 개선/검증 대기) → Human 최종 리뷰 → TASK-013, native 공개 후 |
 | 의존 | TASK-010·TASK-006 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -60,3 +60,9 @@ F-11 소비자: remote feature 서버/수신 재조립/관리 요청·query/repl
 Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 EV-022 source70개/검사11개·Miri48·원본/뷰 로그16쌍의 hash 일치를 확인하고 동일 성공 시험은 반복하지 않았다. 소스 `5f0ad83`를 source/docs 분리·[skip ci] 커밋으로 origin/main 게시했으며 EV-022 commit blob70개와 원격 hash가 일치한다. [commit 대조](../../06_evolution/imported_context/task_012_2026-10-31/commit.json)·[게시 근거](../../06_evolution/imported_context/task_012_2026-10-31/source-push.json). 검증/승인/마감 문서는 별도 docs(cowork) 커밋으로 게시한다. 앞선 미커밋/미게시 본문은 검증 당시 이력이다.
 
 공유/개인 상태와 세션 로그를 종료로 동기화했다. 마감/게시 요청을 별도 최종 구현 승인으로 확대하지 않아 REV-018 Resolved·TASK-012/MS-004 In Progress·Human 리뷰·native/실측 이월·Gate4/5 Not Ready를 유지한다. 다음 시작점은 TASK-012 최종 구현 리뷰이며 승인 뒤 TASK-013으로 진행한다. 새 Task는 자동 착수하지 않는다.
+
+## REV-019 반입 — 2026-10-31
+
+Human 「프로젝트 브리핑하고, 리뷰 반입하고, 승인 해야 하는 업무 보고해줘」에 따라 [REV-019](../../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md)를 In Progress로 반입했다. RV-036은 기존 초과 연결 거절/한도를 유지하는 재폴링 대기 개선으로 수용, RV-037은 방어 보강으로 부분 수용하되 실제 공격·constant-time 보장은 미확정, RV-038은 연결별 receiver 수명 지침 보강으로 수용하고 gate 자동 삭제는 채택하지 않았다. 상세 근거·첫 검증은 REV-019 처리담당 영역을 따른다.
+
+이번 요청에서 개선 제품 코드는 수정하지 않았다. 기존 EV-022 source70개 hash 일치·검사11개 exit0·Miri48 Pass를 확인했고 동일 시험은 반복하지 않았다. 개선 구현/회귀·문서 조치 후 REV-019를 Resolved로 올리고 REV-018과 함께 Human 최종 구현 수락을 받는 순서를 권고한다. 승인된 계약 안의 수정 세부사항은 A이며 별도 재승인 대상이 아니다. TASK-013 착수는 TASK-012 수락 및 다음 작업 지시 후다.

@@ -4,7 +4,7 @@
 
 - 일자/리뷰어: 2026-10-31 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
 - 범위: `adapters/remote`·logger.proto·선택 TLS feature/lock edge·query external authority 공유·remote 계약/소켓/독립 consumer/allocator/feature 검사.
-- 상태: Resolved — RV-032~035 조치·EV-022 최종 로컬 Pass, Human 최종 구현 리뷰 대기.
+- 상태: Closed — 2026-10-31 Human 기존 로컬 구현 수락·권한 위임. RV-032~035 조치·EV-022 로컬 Pass, native/실측 후속 유지.
 - 판정: Conditional — 발견 P2 4건은 모두 조치/회귀 완료. native·LAN/실앱·CLI/후속 관리 backend는 별도다.
 - 본 문서는 개발 세션의 자가 점검/조치 자산이며 별도 Read-Only 리뷰 세션이 아니다.
 
@@ -12,10 +12,10 @@
 
 | ID | 중요도 | 관측·반례 | 처리 | 상태 |
 |---|---|---|---|---|
-| RV-032 | P2 | 잘못된 Authorization scheme을 token=None으로 처리하면 익명 read-only로 내려가 host에 전달 | 헤더 존재와 token 파싱을 분리, 헤더가 있으면 불일치/불량 credential을 거절 | Resolved |
-| RV-033 | P2 | seek 뒤 incomplete만 제거하면 늦은 이전 generation 조각이 새 원본으로 조립됨 | bounded 단조 generation gate·ready handoff 검사·과거 gate 복원 거절 | Resolved |
-| RV-034 | P2 | 작은 encoded 길이와 큰 native Vec capacity가 reply queue에 함께 들어감 | reply enqueue 전 capacity/metadata 한도 검사 | Resolved |
-| RV-035 | P2 | ReadBlob 요청 길이1에 host가2bytes를 반환해도 전체 message cap 안이면 성공 | host reply enqueue 전에 요청 length와 대조해 초과 거절 | Resolved |
+| RV-032 | P2 | 잘못된 Authorization scheme을 token=None으로 처리하면 익명 read-only로 내려가 host에 전달 | 헤더 존재와 token 파싱을 분리, 헤더가 있으면 불일치/불량 credential을 거절 | Closed |
+| RV-033 | P2 | seek 뒤 incomplete만 제거하면 늦은 이전 generation 조각이 새 원본으로 조립됨 | bounded 단조 generation gate·ready handoff 검사·과거 gate 복원 거절 | Closed |
+| RV-034 | P2 | 작은 encoded 길이와 큰 native Vec capacity가 reply queue에 함께 들어감 | reply enqueue 전 capacity/metadata 한도 검사 | Closed |
+| RV-035 | P2 | ReadBlob 요청 길이1에 host가2bytes를 반환해도 전체 message cap 안이면 성공 | host reply enqueue 전에 요청 length와 대조해 초과 거절 | Closed |
 
 ### [처리담당] RV-032
 
@@ -80,3 +80,7 @@ RT 입력·원본 private unsafe·기존 파일/완료 의미를 변경하지 �
 제품 구현/조치 최종 Human 리뷰 전 Closed로 올리지 않는다. 서버/SDK 입력은 opaque handle을 받지만 handle별 host 권한/실제 Snapshot 수명·관리 기능 backend의 구현은 host와 후속 Task 경계다. 실제 dot-probe 보안/운영 연동·CLI·P4/LAN 성능/전체RSS·다른 OS/native 공개 후(T3)·PC 성능/UPS·fresh online audit는 미실행이며 Gate4/5 Not Ready 유지. 소스/문서는 미커밋·미게시다.
 
 세션 마감·게시(2026-10-31): 소스 `5f0ad83` origin/main 게시·EV-022 source70개 commit blob 일치. 문서는 별도 [skip ci] 커밋으로 게시한다. 게시/마감 요청은 최종 구현 승인으로 해석하지 않아 Resolved·Human 리뷰 대기를 유지한다. 앞선 미커밋/미게시 표기는 검증 당시 이력이다.
+
+## Human 수락 — 2026-10-31 후속 세션
+
+브리핑·반입 보고 후 Human 「승인」으로 TASK-012 기존 로컬 구현 및 본 리뷰를 수락했다. RV-032~035는 Closed다. REV-019의 추가 개선은 별도로 구현/검증하고 위임된 마감 판단으로 처리한다. 기존 Human 리뷰 대기 문구는 승인 전 이력이다. native·실앱/LAN/RSS·PC 성능/UPS와 Task/MS 전체 완료를 뜻하지 않는다.

@@ -325,3 +325,8 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-10-30 #004: REV-012 조치·TASK-009 승인/게시·REV-011/012 Closed 후 TASK-010 EV-016 Pass·REV-013 Resolved, 후속 소스8bbec13 로컬 커밋·미게시/Human 리뷰 대기로 종료 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_004.md).
 - 2026-10-30 #003: TASK-008 조치 게시·TASK-009 복구 구현/EV-014 Pass·REV-011 Resolved 및 소스e5f3147 게시 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_003.md).
 - 2026-10-30 #002: TASK-008 심층 리뷰·REV-010 Open 등록·과거 리뷰 안건 감사 — [리뷰 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_002.md).
+
+## 2026-10-31 #006 상태 인덱스 이관
+
+- 2026-10-31 #003: REV-017 조치/EV-020 Pass 후 TASK-008/010/011 승인·리뷰5건 Closed, TASK-022 10ms 수치 승인·EV-021 준비 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_003.md).
+- 2026-10-31 #002: TASK-011 최종 안전성 코드리뷰·REV-017 Open 등록(제품 미수정) — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_002.md).

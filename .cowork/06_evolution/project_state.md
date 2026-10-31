@@ -92,7 +92,8 @@
 
 ## 새 세션 재개 메모
 
-- VSCode 저장 충돌(2026-10-31): 최신 디스크/커밋과 다른 이전 TASK-011 편집 복구본 및 `파일 수정됨` 저장 실패를 확인했고, 저장으로 되돌아간 `my_state.md`를 백업 후 최신 상태로 복구했다. Human은 안티그래비티 쪽 편집 상태 잔류 가능성을 염두에 두고 조사 종료를 요청했다. 원인 도구는 미확정이며 편집기 정상화·재발 방지 완료는 확인되지 않았다. 재발 시 두 도구의 동일 파일 편집 시간대·미저장 내용·디스크 변경을 대조한다. 상세는 [#004 로그](../members/lim8603/workspace/session_logs/session_2026-10-31_004.md).
+- VSCode 저장 충돌 원인 규명 및 자동화 설정 완료(2026-10-31 #005): 탭 닫기 시 저장을 요구하던 원인은 에디터의 메모리 버퍼 상 'Accept All' 수락 대기(Pending edits) 상태 때문임이 확인되었다. Human의 요청으로 `~/.config/Code/User/settings.json`에 `chat.editing.alwaysSaveWithGeneratedChanges: true`, `files.autoSave: "afterDelay"`, `antigravity.autoOpenFiles: false` 설정을 반영하여 수동 Accept/저장 팝업 없이 자동 저장·수락되도록 조치 완료했다.
+- TASK-012 종합 코드리뷰 REV-019 Open 등록: RV-036(연결 한도 busy loop 완화), RV-037(토큰 constant-time 길이 방어), RV-038(수신자 세대 게이트 누적 지침) 관측. 후속 세션에서 개선 코드 반영 또는 승인 후 TASK-013 착수 결정.
 - TASK-022 수치 Approved·EV-021(프로필 준비/승인)과 EV-022(TASK-012 제품 로컬 Pass)을 구분한다. 기존 TASK-008/010/011 리뷰·TASK-022 수치 승인은 완료됐으며 신규 TASK-012 구현 리뷰만 대기다.
 - 개발1.96.0·MSRV1.85·nightly-2026-10-26 Miri 고정, dependency/lock·RT 무할당/무대기·private unsafe 경계를 유지한다. 전역 rustup default는 바꾸지 않았다.
 - 완료/종료·writer 배치/재시도 의미는 API§13·TASK-006~008을 따른다. 낮은 ReadPin 유실/forget·종료 불명 background IO는 강제 회수하지 않고 reader-owned permit만 실제 reader 종료 후 반환한다.

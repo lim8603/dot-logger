@@ -529,6 +529,14 @@ REV-019 보강: 연결 한도 초과 TCP는 기존처럼 닫되 이후 accept �
 
 초기 로컬 근거와 자가 리뷰는 [TASK-012](../04_implementation/tasks/TASK-012.md)·[REV-018](../05_verification/reviews/REV-018_TASK-012.md)·[EV-022](../05_verification/verification_evidence.md#ev-022)에 기록한다. 실제 LAN 지연/처리량·network/runtime 전체 RSS·dot-probe 통합/운영 보안 정책·다른 OS/native는 별도 검증이며 core 소유권/RT·실제 저장 경로를 바꾸지 않는다.
 
+### 14.4 TASK-013 클라이언트 수신 수명 API — 2026-10-31 첫 단위
+
+`dot-logger-client`는 기본 core-only이며 remote feature에서 `ClientReceiver`·`ReceiverConfig`·`ConnectionId`·`PendingRecord`·`Acknowledgement`·`ClientError`를 제공한다. 자체 runtime/socket/worker는 시작하지 않는다. 호스트가 실제 연결 후 `begin_connection(&QueryBudget, config)`을 호출하고 해당 transport가 가진 opaque identity를 push/세대 갱신/end/ACK 추출에 전달한다. identity는 Arc allocation으로 구분하며 이전 owner/token이 남은 동안 새 연결과 동일해질 수 없다. 이미 연결된 상태의 begin이나 잘못된 구성/예약 실패는 기존 상태를 바꾸지 않는다.
+
+`push`는 연결 identity를 검사한 뒤 core Reassembler의 offset/CRC/TTL/세대/예산 검사를 사용한다. `handoff`는 현재 연결의 owner만 core consumer handoff로 넘기고 거절 시 원래 owner를 반환한다. `end_connection`은 잘못된 연결 identity로 현재 연결을 종료하지 않으며 미완성 버퍼만 정리한다. 외부 PendingRecord의 실제 Drop 전에는 원래 예약을 강제 회수하지 않는다.
+
+ACK는 성공한 소비 인계 뒤에도 원래 연결 identity를 보유한다. `take_ack`로 현재 transport identity와 대조한 바로 뒤 그 연결에 전송해야 하며, 인계와 추출 사이의 disconnect/reconnect는 ACK를 거절한다. 이미 추출된 native ACK와 수락된 consumer 데이터를 취소했다고 주장하지 않는다. 실제 전송/취소 경쟁·TLS/token/endpoint·CLI JSON/exit/Ctrl-C·query/replay는 후속 구현이다. identity/receipt metadata·transport decode/consumer buffer는 별도 host headroom이다. gate 한도/연결 재생성 계약은 §14.3을 따른다. [TASK-013](../04_implementation/tasks/TASK-013.md)·EV-024/REV-020은 이 첫 단위의 근거다.
+
 ## 15. 설정·운영 계측·점검 계약안
 
 `validate_config(base_revision, patch)`는 차이·예산·정보 손실·재시작 필요 여부를 반환한다. `apply_config`는 명시 요청만 수행하고 revision 불일치면 Conflict다. 라우팅/필터는 producer 경계에서 적용하며 모든 생산자가 같은 순간에 바뀐다는 보장을 하지 않는다. 응답은 posted revision과 per-producer applied revision을 분리한다. old plan을 처리 중이면 추가 업데이트는 RevisionBusy다.

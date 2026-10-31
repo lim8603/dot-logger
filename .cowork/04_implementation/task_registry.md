@@ -24,7 +24,7 @@
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
 | TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-023 로컬 Pass·REV-018/019 Closed·TASK-013 착수 승인, native/실측 잔여 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
-| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | CLI JSON schema·exit code·query→replay 사용자 흐름과 Ctrl-C | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
+| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-024 수신 수명 API 첫 단위 Pass; 실제 transport/CLI·query→replay/Ctrl-C 후속 | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 폐기로 안정된 큐 Overloaded·미측정 분모·음수/0 증가율 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |

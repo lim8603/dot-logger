@@ -598,6 +598,15 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 수락: Human 기존 로컬 구현 승인·마감 위임을 근거로 검증 뒤 AI 수락. REV-018/019 Closed, TASK-012는 로컬 Human 리뷰 완료/native·실측 잔여로 In Progress다. TASK-013 착수 승인 유지.
 - 미검증: native 공개 후(T3)·다른 OS·PC 성능/RT/UPS/LAN/RSS·실제 dot-probe/운영 backend·전체 인증 시간 특성. Gate4/5 Not Ready 유지.
 
+### EV-024 — TASK-013 착수·클라이언트 연결별 수신 수명 API
+
+- 대상: 소스 `ded6372655eda685a8de7bc39013247446f8e135`, 새 dot-logger-client crate와 workspace/lock 등록. [source74개/검사12개/log hash](../06_evolution/imported_context/task_013_start_2026-10-31/results.json)·[검증 script](../06_evolution/imported_context/task_013_start_2026-10-31/verify.py)·[commit blob74개 일치](../06_evolution/imported_context/task_013_start_2026-10-31/commit.json). 외부 package/version은 그대로이며 로컬 workspace package1개만 추가했다. TASK-012 코드 조치 근거는 EV-023을 유지하고 현재 통합 workspace snapshot은 EV-024다.
+- 실행: 2026-10-31 / AI / 로컬 Linux x86_64 / Rust1.85.0·1.96.0 / Miri nightly-2026-10-26. 실제 client transport/CLI·성능/RT/장비 수락 실행이 아니다.
+- TDD: 공개 ClientReceiver/ClientError/ReceiverConfig 부재 compile Red → 통합3개 Green. 재연결 후 old fragments/ready handoff/ACK 거절·서버 ID 재사용·외부 old owner 실제 종료까지 예약 보존·동일 연결 세대/consumer 거절·잘못된/중복/다른 연결 거절·잔여 예약0을 확인했다.
+- 결과: 두 Rust workspace all-features·client no-default·독립 core consumer·clippy/rustdoc `-D warnings`·fmt Pass. workspace에 기존 core/remote·소켓/TLS/ACK/파일/allocator11 회귀가 포함된다. metadata graph에서 독립 core consumer와 기본 client가 Tokio/tonic/HTTP/압축/tracing/subtle을 요구하지 않음을 확인했다. 영향 client Miri3×8seeds=24 Pass(strict provenance), 검사 전후 source74개 불변. 원본 gzip/공백 정규화 뷰 hash를 별도 보존했다.
+- 개발 자가 점검 [REV-020](reviews/REV-020_TASK-013_RECEIVER_START.md) Pass·위임된 첫 단위 수락/마감 Closed. TASK-013/MS-004 In Progress·Gate4/5 Not Ready 유지. 상위 Task 완료 체크를 채우지 않는다.
+- 미구현/미검증: 실제 client socket/재연결·endpoint/TLS/token/버전·요청/stream transport·CLI JSON/exit/Ctrl-C·query→replay/오프라인 파일/예제/dot-probe. raw ACK 추출 후 실제 연결로 보내는 경쟁/수명은 transport 구현에서 검증해야 한다. native 공개 후(T3)·PC 성능/RT/UPS/LAN/RSS/다른 OS는 별도다.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.

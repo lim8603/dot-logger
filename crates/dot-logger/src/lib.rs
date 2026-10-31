@@ -29,3 +29,6 @@ pub mod replay;
 
 /// Optional general-path output and network adapters.
 pub mod adapters;
+
+/// Fixed producer counters and bounded caller-driven operational observations.
+pub mod telemetry;

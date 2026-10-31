@@ -73,6 +73,8 @@ pub struct CaptureOwner {
     control_reserved_bytes: usize,
     completion: Option<Box<Registry>>,
     memory: MemoryBudget,
+    telemetry: Option<Box<crate::telemetry::Bank>>,
+    telemetry_epoch: u64,
 }
 
 impl CaptureOwner {
@@ -230,6 +232,8 @@ impl CaptureOwner {
             control_reserved_bytes: control_bytes,
             completion: None,
             memory: config.memory.clone(),
+            telemetry: None,
+            telemetry_epoch: 0,
         })
     }
 
@@ -269,6 +273,58 @@ impl CaptureOwner {
         self.completion
             .as_ref()
             .map(|registry| Completion { registry })
+    }
+
+    /// Preallocate fixed counters and 301 one-second samples in the remaining
+    /// control budget. Explicit opt-in; call before lending any RT handles.
+    pub fn enable_telemetry(&mut self) -> Result<(), CaptureBuildError> {
+        if self.telemetry.is_some() {
+            return Ok(());
+        }
+        let overflow = || CaptureBuildError::Config(ConfigError::ArithmeticOverflow);
+        let epoch = self.telemetry_epoch.checked_add(1).ok_or_else(overflow)?;
+        let bytes = crate::telemetry::Bank::required(self.entries.len()).ok_or_else(overflow)?;
+        let required = self
+            .control_reserved_bytes
+            .checked_add(bytes)
+            .ok_or_else(overflow)?;
+        if required > self.memory.control_bytes {
+            return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
+                resource: Resource::Control,
+                required,
+                available: self.memory.control_bytes,
+            }));
+        }
+        self.telemetry = Some(Box::new(crate::telemetry::Bank::new(
+            self.entries.len(),
+            epoch,
+        )));
+        self.control_reserved_bytes = required;
+        self.telemetry_epoch = epoch;
+        Ok(())
+    }
+    /// Explicit management reset after capture/telemetry borrows have ended.
+    /// Clears counter history without resetting capture receipt sequences.
+    pub fn reset_telemetry(&mut self) -> Result<(), crate::telemetry::TelemetryError> {
+        use crate::telemetry::TelemetryError;
+        let bank = self.telemetry.as_mut().ok_or(TelemetryError::Disabled)?;
+        let epoch = self
+            .telemetry_epoch
+            .checked_add(1)
+            .ok_or(TelemetryError::EpochExhausted)?;
+        bank.reset(epoch);
+        self.telemetry_epoch = epoch;
+        Ok(())
+    }
+    /// Fixed management observations, absent until explicit enable.
+    pub fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'_>> {
+        self.telemetry
+            .as_deref()
+            .map(|bank| crate::telemetry::Telemetry {
+                bank,
+                session: self.session_id,
+                revision: self.revision,
+            })
     }
 
     /// Bytes reserved for concrete input arrays, queue descriptors, and endpoints.
@@ -322,6 +378,7 @@ impl CaptureOwner {
                 .map(|registry| Completion { registry }),
             control_reserved_bytes: self.control_reserved_bytes,
             memory: &self.memory,
+            telemetry: self.telemetry.as_deref(),
         })
     }
 }
@@ -352,9 +409,18 @@ pub struct CaptureScope<'owner> {
     completion: Option<Completion<'owner>>,
     control_reserved_bytes: usize,
     memory: &'owner MemoryBudget,
+    telemetry: Option<&'owner crate::telemetry::Bank>,
 }
 
 impl<'owner> CaptureScope<'owner> {
+    /// Management observations sharing this scope's immutable registration.
+    pub fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'owner>> {
+        self.telemetry.map(|bank| crate::telemetry::Telemetry {
+            bank,
+            session: self.session_id,
+            revision: self.revision,
+        })
+    }
     /// Management completion handle sharing the fixed capture registration.
     pub fn completion(&self) -> Option<Completion<'owner>> {
         self.completion
@@ -389,6 +455,7 @@ impl<'owner> Iterator for CaptureScope<'owner> {
                     revision: self.revision,
                     raw: entry.raw.as_ref(),
                     completion: self.completion,
+                    telemetry: self.telemetry.map(|bank| &bank.cells[id]),
                 },
                 CaptureConsumer {
                     read: &mut entry.read,
@@ -448,6 +515,7 @@ pub struct Producer<'owner> {
     revision: u64,
     raw: Option<&'owner RawPool>,
     completion: Option<Completion<'owner>>,
+    telemetry: Option<&'owner crate::telemetry::CounterCell>,
 }
 
 impl<'owner> Producer<'owner> {
@@ -456,6 +524,24 @@ impl<'owner> Producer<'owner> {
     /// No clock reads, I/O, callbacks, allocation, deallocation, or retry loops.
     /// The input slice is no longer borrowed when this function returns.
     pub fn try_record_small(
+        &mut self,
+        metadata: RecordMetadata,
+        payload: &[u8],
+    ) -> Result<RecordOutcome, CaptureError> {
+        let result = self.record_small_inner(metadata, payload);
+        if let Some(counter) = self.telemetry {
+            counter.record(
+                match &result {
+                    Ok(RecordOutcome::Accepted(_)) => 0,
+                    Err(_) => 1,
+                    Ok(RecordOutcome::Skipped) => 2,
+                },
+                payload.len(),
+            );
+        }
+        result
+    }
+    fn record_small_inner(
         &mut self,
         mut metadata: RecordMetadata,
         payload: &[u8],
@@ -563,6 +649,19 @@ impl<'owner> Producer<'owner> {
         length: usize,
         importance: Importance,
     ) -> Result<Loan<'owner>, CaptureError> {
+        let result = self.acquire_inner(length, importance);
+        if result.is_err() {
+            if let Some(counter) = self.telemetry {
+                counter.record(4, 0);
+            }
+        }
+        result
+    }
+    fn acquire_inner(
+        &mut self,
+        length: usize,
+        importance: Importance,
+    ) -> Result<Loan<'owner>, CaptureError> {
         // Loan acquisition can overlap closure just like record publication.
         // Quiescent shutdown must observe its final Loaned/return state too.
         let _active = self
@@ -582,6 +681,25 @@ impl<'owner> Producer<'owner> {
     /// omission returns the exact same loan. Pool/producer/importance mismatches
     /// are InvalidInput, checked before a filter can hide invalid ownership.
     pub fn try_record_raw(
+        &mut self,
+        metadata: RecordMetadata,
+        loan: Loan<'owner>,
+    ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
+        let length = loan.len();
+        let result = self.record_raw_inner(metadata, loan);
+        if let Some(counter) = self.telemetry {
+            counter.record(
+                match &result {
+                    Ok(RawRecordOutcome::Accepted(_)) => 0,
+                    Err(_) => 1,
+                    Ok(RawRecordOutcome::Skipped(_)) => 2,
+                },
+                length,
+            );
+        }
+        result
+    }
+    fn record_raw_inner(
         &mut self,
         mut metadata: RecordMetadata,
         loan: Loan<'owner>,

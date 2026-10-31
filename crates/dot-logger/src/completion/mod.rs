@@ -318,6 +318,15 @@ pub struct Completion<'owner> {
     pub(crate) registry: &'owner Registry,
 }
 impl<'owner> Completion<'owner> {
+    /// Original session identity, for combining observations from the same owner.
+    pub fn session_id(self) -> u128 {
+        self.registry.session_id
+    }
+    /// Immutable capture revision, for observation identity checks.
+    pub fn revision(self) -> u64 {
+        self.registry.revision
+    }
+
     /// Immutable initial target contracts.
     pub fn targets(self) -> &'owner [TargetContract] {
         &self.registry.targets
@@ -493,6 +502,19 @@ impl<'owner> Completion<'owner> {
     /// Aggregate retired terminal counts and current windows. Concurrent samples can
     /// include Busy; shutdown uses this only after closing and resource quiescence.
     pub fn totals(self, required_only: bool) -> CompletionTotals {
+        self.selected_totals(required_only, None)
+    }
+    /// Assignments for one fixed target, including retired outcomes. Records and
+    /// expired_records retain their session-wide meaning; fanout is not ingress.
+    /// A concurrent view may include Busy and is not a global atomic snapshot.
+    pub fn target_totals(self, id: u32) -> Option<CompletionTotals> {
+        self.registry
+            .targets
+            .iter()
+            .any(|t| t.id == id)
+            .then(|| self.selected_totals(false, Some(id)))
+    }
+    fn selected_totals(self, required_only: bool, target_id: Option<u32>) -> CompletionTotals {
         let mut out = CompletionTotals::default();
         for (pid, producer) in self.registry.producers.iter().enumerate() {
             accumulate(
@@ -506,7 +528,9 @@ impl<'owner> Completion<'owner> {
                 &mut out.overflowed,
             );
             for (i, history) in producer.retired.iter().enumerate() {
-                if required_only && !self.registry.targets[i].required {
+                if (required_only && !self.registry.targets[i].required)
+                    || target_id.is_some_and(|id| id != self.registry.targets[i].id)
+                {
                     continue;
                 }
                 for j in 0..4 {
@@ -527,7 +551,9 @@ impl<'owner> Completion<'owner> {
                     continue;
                 }
                 for target in self.registry.targets.iter() {
-                    if required_only && !target.required {
+                    if (required_only && !target.required)
+                        || target_id.is_some_and(|id| id != target.id)
+                    {
                         continue;
                     }
                     let receipt = CaptureReceipt {

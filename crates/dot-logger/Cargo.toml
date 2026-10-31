@@ -37,3 +37,7 @@ expect_used = "warn"
 [[example]]
 name = "scoped_capture"
 path = "../../examples/scoped_capture.rs"
+
+[[example]]
+name = "telemetry_overhead"
+path = "../../examples/telemetry_overhead.rs"

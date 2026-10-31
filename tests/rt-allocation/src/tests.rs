@@ -1255,3 +1255,60 @@ fn remote_receiver_and_hub_buffers_stay_in_shared_external_reservation() {
         );
     }
 }
+
+#[test]
+fn enabled_telemetry_capture_rejection_skip_raw_and_handle_drop_do_not_allocate() {
+    let plan = tracked_fixtures::plan();
+    let mut channel = ChannelConfig::new(7, 99, 1);
+    channel.minimum_level = Level::Info;
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[channel]).unwrap();
+    owner.enable_telemetry().unwrap();
+    owner.scope(|mut s| {
+        let t = s.telemetry().unwrap();
+        let control = s.control();
+        let (mut p, _) = s.next().unwrap();
+        let calls = allocator::observe(|| {
+            let _ = p.try_record_small(tracked_fixtures::meta(), &[1]).unwrap();
+            assert_eq!(
+                p.try_record_small(tracked_fixtures::meta(), &[0; 17]),
+                Err(CaptureError::TooLarge)
+            );
+            let mut m = tracked_fixtures::meta();
+            m.level = Level::Trace;
+            assert_eq!(p.try_record_small(m, &[1]), Ok(RecordOutcome::Skipped));
+            let loan = p.try_acquire(4, Importance::Normal).unwrap();
+            let _ = p.try_record_raw(tracked_fixtures::meta(), loan).unwrap();
+            control.close();
+            assert_eq!(p.try_record_small(m, &[1]), Err(CaptureError::Closing));
+            let _last_producer = p;
+        });
+        assert_eq!(calls, (0, 0));
+        let dot_logger::telemetry::Observation::Observed(c) = t.producer(0) else {
+            panic!("observed")
+        };
+        assert_eq!((c.accepted, c.rejected, c.skipped), (2, 2, 1));
+        let calls = allocator::observe(|| {
+            let _ = t.sample(0, None).unwrap();
+        });
+        assert_eq!(calls, (0, 0));
+    });
+}
+
+#[test]
+fn telemetry_preallocation_and_rotating_history_stay_inside_control_reservation() {
+    let plan = tracked_fixtures::plan();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    let before = owner.control_reserved_bytes();
+    let (live, peak) = allocator::observe_memory(|| owner.enable_telemetry().unwrap());
+    let extra = owner.control_reserved_bytes() - before;
+    assert!(live > 0 && live <= extra as i128);
+    assert!(peak <= extra as i128);
+    let telemetry = owner.telemetry().unwrap();
+    let (live, peak) = allocator::observe_memory(|| {
+        for second in 0..1024 {
+            telemetry.sample(second * 1_000_000_000, None).unwrap();
+        }
+    });
+    assert_eq!((live, peak), (0, 0));
+    assert_eq!(telemetry.history_len(), 301);
+}

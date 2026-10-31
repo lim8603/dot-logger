@@ -580,6 +580,16 @@ reset_telemetry는 모든 핸들이 끝난 독점 owner에서만 epoch를 checke
 
 보고서 값은 `Observed`, `Validated(profile_id)`, `Estimated(assumptions)`, `Unavailable(reason)`, `Stale`로 구분한다. 부하율의 분모는 동일 장비/기능/부하 조합의 검증된 완료 능력이다. 포화 예상은 가용 bytes와 slots 각각의 양의 순증가율로 계산해 먼저 오는 한계를 표시한다. 거절/폐기로 큐가 정체한 경우 Overloaded를 유지한다. 순환 보존 창과 디스크 소진 시간을 다른 필드로 둔다.
 
+### 15.1 TASK-015 로컬 리포트 API — 2026-10-31
+
+`telemetry::report::ReportInput::from_window(window, conditions)`는 TASK-014의 전체 생산자/채널 `Window`를 사용한다. session/revision/epoch·실제 from/to 시각을 보존하고, 출력은 `Conditions::target_id/boundary`로 범위를 명시한다. 호스트는 같은 window/조건의 `OutputDelta`(완료 assignment 수·최종 pending·실패/폐기/Unknown), `BufferTrend`(물리 resource ID·처음/끝 bytes/slots·gross 유입·상한), `DiskTrend`(처음/끝 filesystem free·reserve·출력 quota 잔여·실제 쓰기/삭제·순환 재사용 예산/보존 span)를 제공한다. 다른 session/revision/epoch·구간/대상 관측을 합치기 전에 거절하고 원본 참조 유지·작업/회수 예약을 해당 물리 자원 점유에 포함하는 것은 호스트 책임이다. 독립 큐/풀은 각각 보고하며 ingress payload bytes를 물리 점유·파일 bytes로 치환하지 않는다. 미제공 관측은 `Unavailable(MissingMeasurement)`다. 현재 API는 지연 계측/물리 gauge 수집·자동 worker·CLI runtime backend를 시작하지 않는다.
+
+`Report::build(input, profile, now_ns)`는 할당/대기/IO/클록/상시 worker 없는 유한 관리 경로 계산이다. 분모 `capacity::Profile`은 실제 검증을 수행한 호스트의 evidence ID이며 이 라이브러리가 성능 시험을 했다는 증명이 아니다. profile의 session clock identity·장비/OS/feature·부하/payload/fanout/codec·revision·출력·완료 경계와 전체 관측 구간/현재 시각 유효성을 검사한다. host가 이전 세션의 측정 능력을 재사용하려면 현재 조건을 검증하고 현재 세션 clock으로 명시 재발급한다. 분모는 전역 ingress에 환산한 완료 records rate이며 fanout assignment 합계를 그대로 사용하지 않는다. 부하율 분자는 accepted+rejected submissions, 의도적 skipped와 중복될 수 있는 raw acquire 실패는 제외한다. output completion rate는 assignment 단위로 별도다. rate/ratio는 정수 유리수여서 0 분모·부동소수 NaN/반올림 성공이 없다.
+
+`Value<T>`는 Observed/Validated(profile_id)/Estimated(assumptions)/Unavailable(reason)/Stale(value,basis)다. 최신 시각이 2초를 초과해 낡거나 역방향이면 값/원래 provenance를 Stale로 보존한다. stale resource 입력은 현재 예측에 사용하지 않고 명시 사유를 반환한다. profile 만료·미측정·조건 불일치·0 능력/0 구간·counter 포화를 수치0으로 바꾸지 않는다. reject/acquire 실패·출력 실패/폐기/Unknown·현재 자원 한계는 Observed Overloaded이며, 오직 용량 대비 계산으로 초과했으면 Estimated(MatchingCapacity) Overloaded다. loss로 점유가 평탄해져도 정상으로 바뀌지 않는다. NoPressureObserved는 해당 구간에서 압력 증거를 보지 못했다는 뜻이며 검증된 여유 보장이 아니다.
+
+버퍼 예측은 `remaining_bytes/양의 물리 bytes 순증가율`, `remaining_slots/양의 slots 순증가율`의 빠른 한계다. 출력/회수 정지 가정은 순증가율 대신 gross 물리 유입률을 쓴다. filesystem은 free-reserve와 net free 감소율, 출력 quota는 quota 잔여와 written-deleted 순증가율을 독립 계산해 빠른 것을 고른다. 순환 보존은 보호/pin을 뺀 재사용 byte 예산/gross 물리 쓰기율 모델이며 실제 retained timestamp span과 분리하고 구간 내 완전한 연속 보존을 보장하지 않는다. Forecast는 AtLimit(잔여0), AfterNs(양수·ns 올림), NoGrowth(증가율0/음수·무한 여유 아님), BeyondRange(양수지만 u64 ns 초과)다. BeyondRange보다 먼저 도달하는 알려진 유한/AtLimit 한계를 유지한다. 안정 합성 step simulation은 계산 시나리오 검증이며 PC/RT 예측 오차≤20%·계측 비용≤5% 실측은 별도다.
+
 `RunCheck`는 dry-run 계획에서 시간·CPU worker 수·RAM·총 쓰기 bytes·디스크 reserve·상대 수신자·완료 경계를 먼저 보여준다. 실행은 명시 요청이다. 어느 예산이 먼저 소진되거나 운영 오류/공간 reserve 침범·취소가 오면 신규 부하를 중단하고 진행 중 IO를 정리한다. 결과는 Pass/Fail/Aborted/Inconclusive이며 짧은 점검을 24시간/UPS 검증으로 바꾸지 않는다. 사용자가 지정한 전용 시험 디렉터리만 만들고 지운다.
 
 `Compare`는 before/after의 profile/revision/window·완료/지연/손실·의도적 생략·CPU/메모리를 대조한다. 다른 장비·부하/측정 경계는 비비교 가능으로 표시한다. 입력 자체를 조절하는 코드는 사용자 앱의 책임이며 로거의 샘플링은 기록량만 바꾼다. FR-015 추천은 제안 기능으로 명시하고 자동 적용을 하지 않는다.

@@ -646,6 +646,17 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - [REV-023](reviews/REV-023_TASK-014_TELEMETRY.md) 개발 자가 점검 Pass·기존 위임에 따른 AI 로컬 수락/Closed. 검증 근거는 위의 코드·파일/명령·환경 범위이며 MS-005/TC-009 전체 완료가 아니다.
 - 미실행: 기본 계측 완료 처리량 비용≤5%·계측 포함 RT 지연·PC 실측/프로필·LAN/RSS/장기 부하·다른 OS/native 공개 후T3·실앱/자동1초 worker·원격 runtime metrics backend. fixture debug128은 실제 성능 수락이 아니며 수치는 로그의 smoke 이력이다. 용량/예측·추정 오차·설정 변경/비교/간편 점검은 TASK-015~017 및 관련 Task다. Gate4/5 Not Ready를 유지한다.
 
+<a id="ev-028"></a>
+### EV-028 — TASK-015 여유·병목·보존 리포트
+
+- 대상: 소스 `a247d018525a67a42c8f76e0c3258fd076e51821`. [source100개/검사13개·명령/환경·로그 SHA-256](../06_evolution/imported_context/task_015_2026-10-31/results.json)·[재현 script](../06_evolution/imported_context/task_015_2026-10-31/verify.py)·[commit blob 대조](../06_evolution/imported_context/task_015_2026-10-31/commit.json). dependency/lock·RT/unsafe·wire 변경0.
+- TDD: API 부재 compile Red→리포트14개, 후속 session clock/독립 quota·u64 horizon 초과/AtLimit·Estimated provenance assertion Red→Green. 실제 window→report 통합1개(계측 suite7개), 관리 build1024회 할당0/해제0 추가1·공개 core/remote consumer 회귀. [개발 자가 점검 REV-024](reviews/REV-024_TASK-015_REPORT.md) RV-056~059 조치 후 위임 로컬 수락/Closed.
+- 두 Rust1.85.0/1.96.0 각각16feature/독립 consumer/기존 RT allocator·workspace/all-features·core-client·clippy/rustdoc -D warnings, fmt 검사13개 exit0. Miri nightly-2026-10-26 strict provenance8seeds×(report14+telemetry7)=168 Pass. 최종 source hash 불변·commit blob 일치. 첫 MSRV clippy의 closure 불필요 borrow는 공통 Copy 표현으로 조치하고 최종 소스 전체를 재검증했다. 실패 원본은 before-lint-fix에 보존한다.
+- 보고 계약: session/revision/epoch/실제 구간·환경/부하/target/boundary 보존, 검증 profile 일치/유효성·미측정/포화/만료·Stale provenance, 손실 안정 큐 Overloaded·의도적 skip 분리. bytes/slots·출력정지·filesystem free/reserve와 output quota·순환 보존/실제 retained span을 구분한다. 정수 유리수·signed 순증가율·ns 올림·AtLimit/NoGrowth/BeyondRange를 사용한다. 원래 관측과 가정을 함께 유지한다.
+- 합성 정확도: 4개 일정 증가율×5/13/60초의12조합에서 독립1초 step simulation과 buffer/disk 예측 오차≤20%를 확인했다. 이는 모델 산술 검증이며 실제 PC/RT IO 예측 오차 수락이 아니다. 파일시스템 여유 변화와 gross 실제 writes/deletes·물리 점유/원본 참조 유지의 출처/동일 구간·overflow 검증 및 capacity evidence는 호스트 책임이다.
+- 게시: 소스 a247d01 origin/main push 및 [원격 HEAD 일치](../06_evolution/imported_context/task_015_2026-10-31/source-push.json) 확인. 소스/검증 문서는 별도 커밋이며 [skip ci]를 유지했다. native 실행·공개 전환/CI 조회를 수행하지 않았다.
+- 미실행: 실제 capacity benchmark·물리 gauge/지연 수집/자동 worker·CLI runtime metrics backend·실앱, PC/RT 실제 예측 오차≤20%/계측 비용≤5%·LAN/RSS/UPS/장기 부하·다른 OS/native 공개 후(T3)·fresh audit. TASK-015/MS-005 In Progress·TC-009 전체·Gate4/5 미완료를 유지한다.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.
@@ -665,7 +676,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
 | GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012 EV-022 원격 로컬 Pass·REV-018 Human 리뷰 대기. 후속 클라이언트/운영·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~014의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
+| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~015의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |

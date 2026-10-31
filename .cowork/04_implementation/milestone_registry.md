@@ -45,3 +45,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-31 TASK-013 EV-025: Rust native client/CLI·오프라인·취소/ACK·화면 API 계약 로컬 구현/리뷰 수락 완료(소스29e55da, 검사15개·Miri32). MS-004의 로컬 조회·재생·원격·클라이언트 근거를 연결했으며 native/다른 OS·실앱/성능 후속 때문에 MS-004 In Progress·Gate4/5 미완료를 유지한다. 다음 개발 후보 TASK-014는 이번 요청 범위에서 착수하지 않았다.
 
 2026-10-31 TASK-014 EV-027: 고정 계측·유한 이력/대상 합계·fixture 로컬 구현/검증·REV-023 위임 수락. MS-005 In Progress, 비용/RT/실앱/native·TASK-015~017은 미완료이며 다음 후보 TASK-015는 미착수다.
+
+2026-10-31 #012 TASK-015 로컬 수락: EV-028 source100개/검사13개·Miri168·소스a247d01, REV-024 Closed. Observed/Validated/Estimated/Stale·손실 안정 큐 Overloaded·분리된 bytes/slots/출력정지/filesystem/quota/순환 보존 산술과 합성 오차 시나리오를 검증했다. TASK-016/017·실제 PC/RT 오차/비용·native·실앱이 남아 MS-005 In Progress/TC-009 전체 미완료다.

@@ -15,9 +15,9 @@
 | 상태 | Yellow — 클라이언트/계측 로컬 수락, 운영 backend/실앱·비용/PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-10-31 #014 / AI |
-| 세션 상태 | 작업 단위 완료 — REV-025 EV-029/sourceeaf736c·검사14개/Miri224 로컬 수락·마감. 다음 TASK-016은 Planned/미착수 |
-| 최근 세션 | [2026-10-31 #014](../members/lim8603/workspace/session_logs/session_2026-10-31_014.md) — REV-025 조치·검증 |
+| 갱신 | 2026-11-01 / #014 종료 / AI |
+| 세션 상태 | 종료 — 2026-11-01 Human 「세션마무리」. REV-025 EV-029/sourceeaf736c 로컬 수락·Closed 유지. 다음 TASK-016은 Planned/미착수 |
+| 최근 세션 | [2026-10-31 #014](../members/lim8603/workspace/session_logs/session_2026-10-31_014.md) — REV-025 조치·검증, 2026-11-01 종료 |
 
 ## 현재 결정과 제약
 
@@ -84,7 +84,7 @@
 ## 다음 시작점
 
 1. **REV-025 RV-060~062 조치 완료/Closed.** EV-029 sourceeaf736c·검사14개/Miri224 로컬 수락. 같은 범위 재승인은 불필요하다. 재시도는 시도율로 표시하고 고유 입력으로 비교하지 않는다. 출력 delta는 host 유한 이력의 실제 끝점을 맞추며 history_len의 Observation 반환을 소비한다.
-2. **다음 개발 후보 TASK-016(revision 설정 변경과 전후 비교)은 Planned/미착수.** TASK-013 EV-026·TASK-015 EV-029 기준, 상세/API§15/TC-009에서 old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌부터 조사/TDD한다. 이번 작업 단위는 REV-025 조치·검증·게시까지이며 TASK-016 제품 코드는 만들지 않았다. 새 H/J 결정이 생길 때만 판단을 받는다.
+2. **다음 개발 후보 TASK-016(revision 설정 변경과 전후 비교)은 Planned/미착수.** TASK-013 EV-026·TASK-015 EV-029 기준, 상세/API§15/TC-009에서 old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌부터 조사/TDD한다. Human 「세션마무리」로 #014를 종료했다. 이번 작업 단위는 REV-025 조치·검증·게시까지이며 TASK-016 제품 코드는 만들지 않았다. 다음 세션은 위 조사/TDD부터 재개한다. 새 H/J 결정이 생길 때만 판단을 받는다.
 3. RV-049 포화 회복 실측은 TASK-022, RV-053 server lease 초과 유휴/재구독 연속성·화면 불연속은 TASK-020 후속. 현재 wire 유지로 수락했고 새 프로토콜이 필요할 때 H/J 판단한다.
 4. native는 공개 후(T3), 실제 PC/RT 오차·비용/UPS/실앱·TC-009 전체/MS-005/Gate4·5는 미완료. 새 T1/T2/T3 도래 근거 없음.
 
@@ -137,7 +137,7 @@
 
 ## 최근 작업·이력
 
-- 2026-10-31 #014: REV-025 거절 범주·압력/시도 부하·host 끝점 정렬·poison 복구 Red→Green, EV-029/eaf736c·검사14개/Miri224·source101개 blob일치 위임 수락/Closed, TASK-016 Planned — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_014.md).
+- 2026-10-31 #014: REV-025 거절 범주·압력/시도 부하·host 끝점 정렬·poison 복구 Red→Green, EV-029/eaf736c·검사14개/Miri224·source101개 blob일치 위임 수락/Closed, 2026-11-01 Human 요청으로 종료·TASK-016 Planned — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_014.md).
 
 - 2026-10-31 #013: TASK-014/015(`b3c08bd..a247d01`) 독립 Read-Only 리뷰. fmt/clippy/workspace test Pass. REV-025 Open (P2 1·P3 2), 제품 코드 미수정, Human 요청으로 종료 — [리뷰](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-10-31_013.md).
 - 2026-10-31 #012: TASK-015 리포트 TDD14·실제 window 연계·할당0/공개 consumer·EV-028 source100개/검사13개·Miri168·소스a247d01 로컬 수락·REV-024 Closed·Human 요청으로 세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md).

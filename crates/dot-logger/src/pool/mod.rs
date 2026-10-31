@@ -211,6 +211,7 @@ pub struct RawRecordError<'owner> {
 pub struct RawRecord<'owner> {
     access: storage::Shared<'owner>,
     record: CapturedRecord,
+    pub(crate) plan_guard: Option<crate::control::config_update::PlanGuard<'owner>>,
 }
 
 impl RawRecord<'_> {
@@ -307,7 +308,11 @@ impl RawPool {
             .slots
             .get(identity.slot_id)?
             .read(identity, &self.notice)?;
-        Some(RawRecord { access, record })
+        Some(RawRecord {
+            access,
+            record,
+            plan_guard: None,
+        })
     }
 
     pub(crate) fn snapshot(&self) -> PoolSnapshot {

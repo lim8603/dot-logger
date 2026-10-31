@@ -1310,3 +1310,69 @@ fn expired_completion_after_a_successful_write_remains_distinct_from_invalid_inp
         });
     });
 }
+
+#[test]
+fn live_revision_uses_explicit_separate_writer_metadata_and_roundtrips() {
+    use dot_logger::control::config_update::{ChannelPatch, ConfigPatch};
+    let plan = support::plan();
+    let route = support::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        support::tracking(8),
+    )
+    .unwrap();
+    owner.enable_config_updates(&route).unwrap();
+    owner.scope(|mut scope| {
+        let updates = scope.config_updates().unwrap();
+        let (mut p, a) = scope.next().unwrap();
+        let (mut p2, b) = scope.next().unwrap();
+        updates
+            .apply_config(
+                1,
+                &ConfigPatch {
+                    channels: vec![ChannelPatch {
+                        channel_id: 7,
+                        minimum_level: dot_logger::capture::Level::Info,
+                        sample_every: 1,
+                    }],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        p2.apply_pending_config();
+        let receipt = support::accepted(p.try_record_small(support::meta(), &[4, 5]).unwrap());
+        let mut router = Router::new(&plan, vec![a, b], route).unwrap();
+        assert!(router.writer_budget_for_revision(10, 99).is_err());
+        let (path, file) = Temp::new();
+        let mut writer = SegmentWriter::new(
+            router.writer_budget_for_revision(10, 2).unwrap(),
+            config(64),
+            channels(),
+            file,
+        )
+        .unwrap();
+        router.scope(|mut d, mut readers| {
+            d.turn(std::time::Instant::now(), &mut [None; 8]).unwrap();
+            let delivery = readers[0]
+                .try_next(std::time::Instant::now())
+                .unwrap()
+                .unwrap();
+            assert_eq!(delivery.record().revision, 2);
+            assert_eq!(delivery.record().receipt, receipt);
+            writer.write_batch(&[&delivery]).unwrap();
+        });
+        writer.finish().unwrap();
+        let bytes = fs::read(&path.0).unwrap();
+        let mut messages = mcap::MessageStream::new(&bytes).unwrap();
+        let message = messages.next().unwrap().unwrap();
+        let decoded = decode_record(&message.data, 64).unwrap();
+        assert_eq!(decoded.record.revision, 2);
+        assert_eq!(decoded.record.receipt, receipt);
+        assert_eq!(decoded.payload, &[4, 5]);
+        assert_eq!(message.channel.metadata.get("revision").unwrap(), "2");
+    });
+}

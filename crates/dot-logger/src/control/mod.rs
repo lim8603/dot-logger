@@ -14,6 +14,8 @@ use crate::config::{ConfigError, Resource, ValidatedConfig};
 use crate::routing::Dispatcher;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::time::Instant;
+/// Explicit two-generation filter, sampling and existing-target route updates.
+pub mod config_update;
 mod types;
 pub use types::*;
 const FREE: u8 = 0;

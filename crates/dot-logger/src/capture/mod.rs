@@ -39,6 +39,7 @@ struct WriteState {
     sequence: u64,
     normal_accepted: usize,
     raw_cursor: usize,
+    sampling: Box<[u32]>,
 }
 
 struct ReadState {
@@ -46,6 +47,7 @@ struct ReadState {
     bytes: rtrb::Consumer<u8>,
     normal_consumed: usize,
     reclaim_cursor: usize,
+    last_sequence: u64,
 }
 
 struct Entry {
@@ -75,6 +77,7 @@ pub struct CaptureOwner {
     memory: MemoryBudget,
     telemetry: Option<Box<crate::telemetry::Bank>>,
     telemetry_epoch: u64,
+    updates: Option<Box<crate::control::config_update::State>>,
 }
 
 impl CaptureOwner {
@@ -159,6 +162,13 @@ impl CaptureOwner {
             .checked_mul(size_of::<ChannelConfig>())
             .and_then(|n| n.checked_add(size_of::<Self>()))
             .and_then(|n| n.checked_add(raw_metadata_bytes))
+            .and_then(|n| {
+                channels
+                    .len()
+                    .checked_mul(config.producers.len())?
+                    .checked_mul(size_of::<u32>())?
+                    .checked_add(n)
+            })
             .ok_or_else(overflow)?;
         if control_bytes > config.memory.control_bytes {
             return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
@@ -204,12 +214,14 @@ impl CaptureOwner {
                     sequence: 0,
                     normal_accepted: 0,
                     raw_cursor: 0,
+                    sampling: vec![0; channels.len()].into_boxed_slice(),
                 },
                 read: ReadState {
                     records: record_read,
                     bytes: byte_read,
                     normal_consumed: 0,
                     reclaim_cursor: 0,
+                    last_sequence: 0,
                 },
                 consumed: AtomicUsize::new(0),
                 slot_bytes: quota.slot_bytes,
@@ -234,6 +246,7 @@ impl CaptureOwner {
             memory: config.memory.clone(),
             telemetry: None,
             telemetry_epoch: 0,
+            updates: None,
         })
     }
 
@@ -266,6 +279,39 @@ impl CaptureOwner {
         owner.control_reserved_bytes += registry.reserved();
         owner.completion = Some(Box::new(registry));
         Ok(owner)
+    }
+
+    /// Reserve two runtime policy banks before lending producers. Targets, schemas,
+    /// pools and worker placement remain fixed. Requires matching tracked routing.
+    pub fn enable_config_updates(
+        &mut self,
+        routing: &RoutingConfig,
+    ) -> Result<(), crate::control::config_update::ConfigUpdateError> {
+        use crate::control::config_update::{ConfigUpdateError, State};
+        let registry = self
+            .completion
+            .as_deref()
+            .ok_or(ConfigUpdateError::Untracked)?;
+        if !registry.matches(routing) {
+            return Err(ConfigUpdateError::Untracked);
+        }
+        if self.updates.is_some() {
+            return Ok(());
+        }
+        let state = State::new(
+            &self.channels,
+            self.entries.len(),
+            routing,
+            &self.memory,
+            self.revision,
+            self.memory.control_bytes - self.control_reserved_bytes,
+        )?;
+        for (id, entry) in self.entries.iter().enumerate() {
+            state.consumed(id as u32, entry.read.last_sequence);
+        }
+        self.control_reserved_bytes += state.reserved();
+        self.updates = Some(Box::new(state));
+        Ok(())
     }
 
     /// Borrow management completion metadata; absent for untracked ingress.
@@ -324,7 +370,16 @@ impl CaptureOwner {
                 bank,
                 session: self.session_id,
                 revision: self.revision,
+                updates: self.config_updates(),
             })
+    }
+
+    fn config_updates(&self) -> Option<crate::control::config_update::ConfigUpdates<'_>> {
+        Some(crate::control::config_update::ConfigUpdates {
+            state: self.updates.as_deref()?,
+            registry: self.completion.as_deref()?,
+            closing: &self.closing,
+        })
     }
 
     /// Bytes reserved for concrete input arrays, queue descriptors, and endpoints.
@@ -379,6 +434,7 @@ impl CaptureOwner {
             control_reserved_bytes: self.control_reserved_bytes,
             memory: &self.memory,
             telemetry: self.telemetry.as_deref(),
+            updates: self.updates.as_deref(),
         })
     }
 }
@@ -410,6 +466,7 @@ pub struct CaptureScope<'owner> {
     control_reserved_bytes: usize,
     memory: &'owner MemoryBudget,
     telemetry: Option<&'owner crate::telemetry::Bank>,
+    updates: Option<&'owner crate::control::config_update::State>,
 }
 
 impl<'owner> CaptureScope<'owner> {
@@ -419,6 +476,15 @@ impl<'owner> CaptureScope<'owner> {
             bank,
             session: self.session_id,
             revision: self.revision,
+            updates: self.config_updates(),
+        })
+    }
+    /// Management publication handle, absent until explicit preallocation.
+    pub fn config_updates(&self) -> Option<crate::control::config_update::ConfigUpdates<'owner>> {
+        Some(crate::control::config_update::ConfigUpdates {
+            state: self.updates?,
+            registry: self.completion?.registry,
+            closing: self.closing,
         })
     }
     /// Management completion handle sharing the fixed capture registration.
@@ -452,10 +518,11 @@ impl<'owner> Iterator for CaptureScope<'owner> {
                     normal_limit: entry.normal_limit,
                     session_id: self.session_id,
                     producer_id: id as u32,
-                    revision: self.revision,
+                    revision: self.updates.map_or(self.revision, |u| u.applied(id)),
                     raw: entry.raw.as_ref(),
                     completion: self.completion,
                     telemetry: self.telemetry.map(|bank| &bank.cells[id]),
+                    updates: self.updates,
                 },
                 CaptureConsumer {
                     read: &mut entry.read,
@@ -468,6 +535,7 @@ impl<'owner> Iterator for CaptureScope<'owner> {
                     session_id: self.session_id,
                     producer_id: id as u32,
                     revision: self.revision,
+                    updates: self.updates,
                 },
             )
         })
@@ -516,9 +584,44 @@ pub struct Producer<'owner> {
     raw: Option<&'owner RawPool>,
     completion: Option<Completion<'owner>>,
     telemetry: Option<&'owner crate::telemetry::CounterCell>,
+    updates: Option<&'owner crate::control::config_update::State>,
 }
 
 impl<'owner> Producer<'owner> {
+    /// Adopt a posted policy at this producer boundary. Fixed scans/stores only;
+    /// idle producers may poll explicitly. No global simultaneous change implied.
+    pub fn apply_pending_config(&mut self) -> u64 {
+        if let Some(state) = self.updates {
+            let revision = state.boundary(self.producer_id, self.write.sequence, self.revision);
+            if revision != self.revision {
+                self.write.sampling.fill(0);
+                self.revision = revision;
+            }
+        }
+        self.revision
+    }
+    fn sampled_out(&mut self, channel: u32, importance: Importance) -> bool {
+        if importance == Importance::Important {
+            return false;
+        }
+        let Some(state) = self.updates else {
+            return false;
+        };
+        let Some((_, every)) = state.policy(self.revision, channel) else {
+            return false;
+        };
+        let Some(index) = self.channels.iter().position(|c| c.channel_id == channel) else {
+            return false;
+        };
+        let remaining = &mut self.write.sampling[index];
+        if *remaining == 0 {
+            *remaining = every - 1;
+            false
+        } else {
+            *remaining -= 1;
+            true
+        }
+    }
     /// Copy one small record using only preallocated storage.
     ///
     /// No clock reads, I/O, callbacks, allocation, deallocation, or retry loops.
@@ -528,6 +631,7 @@ impl<'owner> Producer<'owner> {
         metadata: RecordMetadata,
         payload: &[u8],
     ) -> Result<RecordOutcome, CaptureError> {
+        self.apply_pending_config();
         let result = self.record_small_inner(metadata, payload);
         if let Some(counter) = self.telemetry {
             match &result {
@@ -547,7 +651,7 @@ impl<'owner> Producer<'owner> {
             .completion
             .map(|completion| completion.enter(self.producer_id));
         let (importance, skip) = self.classify(&metadata, payload.len(), self.slot_bytes)?;
-        if skip {
+        if skip || self.sampled_out(metadata.channel_id, importance) {
             return Ok(RecordOutcome::Skipped);
         }
         if importance == Importance::Normal {
@@ -579,7 +683,14 @@ impl<'owner> Producer<'owner> {
         let tracking = self
             .completion
             .map(|completion| {
-                completion.reserve(self.producer_id, sequence, metadata.channel_id, importance)
+                completion.reserve(
+                    self.producer_id,
+                    sequence,
+                    metadata.channel_id,
+                    importance,
+                    self.revision,
+                    self.updates,
+                )
             })
             .transpose()
             .map_err(|_| CaptureError::CompletionCapacity)?;
@@ -636,7 +747,11 @@ impl<'owner> Producer<'owner> {
         let importance = metadata
             .importance
             .unwrap_or_else(|| channel.importance.resolve(metadata.level));
-        Ok((importance, metadata.level < channel.minimum_level))
+        let minimum = self
+            .updates
+            .and_then(|u| u.policy(self.revision, metadata.channel_id))
+            .map_or(channel.minimum_level as usize, |(level, _)| level);
+        Ok((importance, (metadata.level as usize) < minimum))
     }
 
     /// Borrow one fixed-class original slot. At most two finite slot scans;
@@ -682,6 +797,7 @@ impl<'owner> Producer<'owner> {
         metadata: RecordMetadata,
         loan: Loan<'owner>,
     ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
+        self.apply_pending_config();
         let length = loan.len();
         let result = self.record_raw_inner(metadata, loan);
         if let Some(counter) = self.telemetry {
@@ -713,7 +829,7 @@ impl<'owner> Producer<'owner> {
             Ok(value) => value,
             Err(reason) => return Err(RawRecordError { reason, loan }),
         };
-        if skip {
+        if skip || self.sampled_out(metadata.channel_id, importance) {
             return Ok(RawRecordOutcome::Skipped(loan));
         }
         if importance == Importance::Normal
@@ -743,7 +859,14 @@ impl<'owner> Producer<'owner> {
         let tracking = match self
             .completion
             .map(|completion| {
-                completion.reserve(self.producer_id, sequence, metadata.channel_id, importance)
+                completion.reserve(
+                    self.producer_id,
+                    sequence,
+                    metadata.channel_id,
+                    importance,
+                    self.revision,
+                    self.updates,
+                )
             })
             .transpose()
         {
@@ -833,6 +956,7 @@ pub struct CaptureConsumer<'owner> {
     session_id: u128,
     producer_id: u32,
     revision: u64,
+    updates: Option<&'owner crate::control::config_update::State>,
 }
 
 pub(crate) struct CaptureRegistration<'owner> {
@@ -844,6 +968,7 @@ pub(crate) struct CaptureRegistration<'owner> {
     pub(crate) raw_layout: Option<(usize, usize)>,
     pub(crate) completion: Option<Completion<'owner>>,
     pub(crate) memory: &'owner MemoryBudget,
+    pub(crate) updates: Option<&'owner crate::control::config_update::State>,
 }
 
 impl<'owner> CaptureConsumer<'owner> {
@@ -866,7 +991,15 @@ impl<'owner> CaptureConsumer<'owner> {
             raw_layout: self.raw.map(RawPool::layout),
             completion: self.completion,
             memory: self.memory,
+            updates: self.updates,
         }
+    }
+
+    pub(crate) fn retain_plan(
+        &self,
+        revision: u64,
+    ) -> Option<crate::control::config_update::PlanGuard<'owner>> {
+        self.updates.and_then(|u| u.retain(revision))
     }
 
     /// Copy the next small or raw payload into caller-owned management storage.
@@ -903,6 +1036,9 @@ impl<'owner> CaptureConsumer<'owner> {
         // Return bytes before the envelope, then release the Normal ingress quota.
         records.commit_all();
         release_normal(self.read, self.consumed, record);
+        if let Some(u) = self.updates {
+            u.consumed(self.producer_id, record.receipt.accepted_seq);
+        }
         Ok(Some(record))
     }
 
@@ -914,12 +1050,16 @@ impl<'owner> CaptureConsumer<'owner> {
         };
         let queued = queued_head(&records)?;
         let identity = queued.raw.ok_or(ReadError::PayloadKindMismatch)?;
-        let raw = self
+        let mut raw = self
             .raw
             .and_then(|pool| pool.take(identity, queued.record))
             .ok_or(ReadError::InconsistentQueue)?;
+        raw.plan_guard = self.updates.and_then(|u| u.retain(queued.record.revision));
         records.commit_all();
         release_normal(self.read, self.consumed, queued.record);
+        if let Some(u) = self.updates {
+            u.consumed(self.producer_id, queued.record.receipt.accepted_seq);
+        }
         Ok(Some(raw))
     }
 
@@ -954,6 +1094,7 @@ fn queued_head(
 }
 
 fn release_normal(read: &mut ReadState, consumed: &AtomicUsize, record: CapturedRecord) {
+    read.last_sequence = record.receipt.accepted_seq;
     if record.metadata.importance == Some(Importance::Normal) {
         read.normal_consumed = read.normal_consumed.wrapping_add(1);
         consumed.store(read.normal_consumed, Ordering::Release);

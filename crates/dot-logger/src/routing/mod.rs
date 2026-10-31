@@ -73,6 +73,7 @@ struct SharedPayload<'owner> {
     payload: Payload<'owner>,
     record: CapturedRecord,
     _permit: SharedPermit,
+    _plan: Option<crate::control::config_update::PlanGuard<'owner>>,
 }
 impl SharedPayload<'_> {
     fn bytes(&self) -> &[u8] {
@@ -119,7 +120,7 @@ impl Delivery<'_> {
     pub fn payload(&self) -> &[u8] {
         self.shared.bytes()
     }
-    /// Original metadata, ingress identity, and immutable initial revision.
+    /// Original metadata, ingress identity, and immutable admission revision.
     pub fn record(&self) -> CapturedRecord {
         self.shared.record
     }
@@ -317,6 +318,7 @@ pub struct Router<'owner> {
     raw_reserved_bytes: usize,
     session_id: u128,
     revision: u64,
+    updates: Option<&'owner crate::control::config_update::State>,
     completion: Option<Completion<'owner>>,
     feedback: Feedback,
 }
@@ -575,6 +577,7 @@ impl<'owner> Router<'owner> {
             raw_reserved_bytes: plan.raw_pool_bytes(),
             session_id,
             revision,
+            updates: first.updates,
             completion,
             feedback: Feedback::new(feedback_capacity),
         })
@@ -596,6 +599,25 @@ impl<'owner> Router<'owner> {
             producers: self.inputs.len(),
             target_state: Arc::clone(&target_state.ledger),
         })
+    }
+    /// Create an explicit file budget for a currently retained configuration
+    /// revision. Writers remain single-revision: rotate/open a separate writer
+    /// rather than mixing records under incorrect MCAP metadata. This does not
+    /// start a writer or provide an automatic worker/rotation backend.
+    pub fn writer_budget_for_revision(
+        &self,
+        target: u32,
+        revision: u64,
+    ) -> Result<crate::storage::WriterBudget, RoutingError> {
+        if !self
+            .updates
+            .map_or(revision == self.revision, |u| u.known_revision(revision))
+        {
+            return Err(RoutingError::RecordMismatch);
+        }
+        let mut budget = self.writer_budget(target)?;
+        budget.revision = revision;
+        Ok(budget)
     }
     /// Lend a unique dispatcher and independent target FIFO readers. Reader IO can
     /// run on scoped threads; dispatcher operations never invoke a reader callback.
@@ -633,6 +655,7 @@ impl<'owner> Router<'owner> {
                 raw_reserved_bytes: self.raw_reserved_bytes,
                 session_id: self.session_id,
                 revision: self.revision,
+                updates: self.updates,
                 completion: self.completion,
                 feedback: &mut self.feedback,
             },
@@ -653,6 +676,7 @@ pub struct Dispatcher<'scope, 'owner> {
     raw_reserved_bytes: usize,
     session_id: u128,
     revision: u64,
+    updates: Option<&'owner crate::control::config_update::State>,
     completion: Option<Completion<'owner>>,
     feedback: &'scope mut Feedback,
 }
@@ -893,7 +917,9 @@ impl Dispatcher<'_, '_> {
                 };
                 if head.receipt.session_id != self.session_id
                     || head.receipt.producer_id as usize != index
-                    || head.revision != self.revision
+                    || !self.updates.map_or(head.revision == self.revision, |u| {
+                        u.contains(head.revision)
+                    })
                     || head.payload_len > input.max_payload
                 {
                     report.fault = Some(RoutingError::RecordMismatch);
@@ -911,7 +937,17 @@ impl Dispatcher<'_, '_> {
                     break;
                 }
                 // Reserve the worst possible event count before consuming ingress.
-                if events.len() - report.events < route.targets.len().max(1) {
+                let selected_count = self
+                    .targets
+                    .iter()
+                    .filter(|t| {
+                        self.updates
+                            .map_or(route.targets.contains(&t.config.id), |u| {
+                                u.selected(head.revision, head.metadata.channel_id, t.config.id)
+                            })
+                    })
+                    .count();
+                if events.len() - report.events < selected_count.max(1) {
                     report.backpressured = true;
                     break 'visit;
                 }
@@ -929,7 +965,7 @@ impl Dispatcher<'_, '_> {
                 input.deficit -= cost;
                 report.records += 1;
                 report.bytes += head.payload_len;
-                if route.targets.is_empty() {
+                if selected_count == 0 {
                     emit(
                         events,
                         &mut report,
@@ -944,7 +980,16 @@ impl Dispatcher<'_, '_> {
                 } else {
                     // Iterate configured targets without allocating a fanout list.
                     for target in &mut self.targets {
-                        if route.targets.contains(&target.config.id) {
+                        if self
+                            .updates
+                            .map_or(route.targets.contains(&target.config.id), |u| {
+                                u.selected(
+                                    head.revision,
+                                    head.metadata.channel_id,
+                                    target.config.id,
+                                )
+                            })
+                        {
                             target.submit(&shared, now, events, &mut report);
                         }
                     }
@@ -1014,6 +1059,7 @@ fn take_shared<'owner>(
     if ledger.records.load(Ordering::Acquire) >= limits.shared_records {
         return Ok(None);
     }
+    let plan_guard = input.consumer.retain_plan(head.revision);
     let (payload, small, raw) = match input.consumer.try_take_raw() {
         Ok(Some(raw)) => (Payload::Raw(raw), 0, head.payload_len),
         Ok(None) => return Err(RoutingError::Read(ReadError::InconsistentQueue)),
@@ -1039,6 +1085,7 @@ fn take_shared<'owner>(
     Ok(Some(Arc::new(SharedPayload {
         payload,
         record: head,
+        _plan: plan_guard,
         _permit: SharedPermit {
             ledger: Arc::clone(ledger),
             small,

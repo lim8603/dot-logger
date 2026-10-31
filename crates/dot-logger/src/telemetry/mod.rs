@@ -6,6 +6,8 @@
 //! workers and device validation remain the host's responsibility.
 mod aggregate;
 pub mod capacity;
+/// Before/after condition checks and evidence-preserving rate comparison.
+pub mod compare;
 mod counters;
 pub mod report;
 
@@ -17,6 +19,8 @@ pub(crate) use counters::{Bank, CounterCell};
 /// Why an observation cannot be supplied; never a numeric zero.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Unavailable {
+    /// Producer adoption, old completion or retained payloads still span revisions.
+    RevisionTransition,
     /// The host has not supplied the required resource/output observation.
     MissingMeasurement,
     /// No completion registry was supplied.
@@ -50,6 +54,7 @@ pub struct Telemetry<'owner> {
     pub(crate) bank: &'owner Bank,
     pub(crate) session: u128,
     pub(crate) revision: u64,
+    pub(crate) updates: Option<crate::control::config_update::ConfigUpdates<'owner>>,
 }
 impl Telemetry<'_> {
     /// Counter generation, advanced only by explicit management reset/enable.
@@ -75,6 +80,14 @@ impl Telemetry<'_> {
         at_ns: u64,
         completion: Option<Completion<'_>>,
     ) -> Result<Sample, TelemetryError> {
+        // Hold publication serialization across the sample: an apply cannot
+        // race a stable generation label. RT producers never acquire this lock.
+        let observation = self.updates.map(|u| u.state.observation(u.registry));
+        let (revision, transition) = match &observation {
+            Some(Ok((m, ready))) => (m.revision, !ready),
+            Some(Err(_)) => (self.revision, true),
+            None => (self.revision, false),
+        };
         let mut capture = CaptureCounts::default();
         for cell in &self.bank.cells {
             capture.add(cell.read());
@@ -99,12 +112,24 @@ impl Telemetry<'_> {
             ));
         let sample = Sample {
             session_id: self.session,
-            revision: self.revision,
+            revision,
             at_ns,
             epoch: self.epoch(),
-            capture: Observation::Observed(capture),
-            outputs: completion.0,
-            required_outputs: completion.1,
+            capture: if transition {
+                Observation::Unavailable(Unavailable::RevisionTransition)
+            } else {
+                Observation::Observed(capture)
+            },
+            outputs: if transition {
+                Observation::Unavailable(Unavailable::RevisionTransition)
+            } else {
+                completion.0
+            },
+            required_outputs: if transition {
+                Observation::Unavailable(Unavailable::RevisionTransition)
+            } else {
+                completion.1
+            },
         };
         self.bank
             .history
@@ -160,6 +185,7 @@ mod tests {
             bank: &bank,
             session: 42,
             revision: 1,
+            updates: None,
         };
         assert_eq!(t.sample(0, None), Err(TelemetryError::HistoryUnavailable));
         assert_eq!(
@@ -171,6 +197,7 @@ mod tests {
             bank: &bank,
             session: 42,
             revision: 1,
+            updates: None,
         };
         assert_eq!(t.history_len(), Observation::Observed(0));
         assert!(t.sample(0, None).is_ok());

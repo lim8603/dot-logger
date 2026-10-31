@@ -27,12 +27,14 @@ fn entry() -> Entry {
             sequence: 0,
             normal_accepted: 0,
             raw_cursor: 0,
+            sampling: vec![0].into_boxed_slice(),
         },
         read: ReadState {
             records: record_read,
             bytes: byte_read,
             normal_consumed: 0,
             reclaim_cursor: 0,
+            last_sequence: 0,
         },
         consumed: AtomicUsize::new(0),
         slot_bytes: 1,
@@ -54,6 +56,7 @@ fn owner(entry: Entry) -> CaptureOwner {
         completion: None,
         telemetry: None,
         telemetry_epoch: 0,
+        updates: None,
         memory: crate::config::MemoryBudget {
             total_bytes: 0,
             input_bytes: 0,

@@ -107,7 +107,11 @@ impl History {
             let Some(old) = self.slots[(self.next + SAMPLES - 1 - offset) % SAMPLES] else {
                 return unavailable;
             };
-            if newer.at_ns - old.at_ns > 2_000_000_000 || old.epoch != last.epoch {
+            if newer.at_ns - old.at_ns > 2_000_000_000
+                || old.epoch != last.epoch
+                || old.revision != last.revision
+                || old.session_id != last.session_id
+            {
                 return unavailable;
             }
             let (Observation::Observed(_), Observation::Observed(_)) = (old.capture, newer.capture)

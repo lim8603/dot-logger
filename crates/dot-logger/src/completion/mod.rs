@@ -33,6 +33,7 @@ pub(crate) struct RecordSlot {
     phase: AtomicU8,
     pub(crate) sequence: AtomicU64,
     terminal_at: AtomicU64,
+    revision: AtomicU64,
     cells: Box<[TargetCell]>,
 }
 struct Retired {
@@ -209,6 +210,7 @@ impl Registry {
                         phase: AtomicU8::new(EMPTY),
                         sequence: AtomicU64::new(0),
                         terminal_at: AtomicU64::new(u64::MAX),
+                        revision: AtomicU64::new(revision),
                         cells: (0..targets.len())
                             .map(|_| TargetCell {
                                 word: AtomicU32::new(NOT_ROUTED),
@@ -291,6 +293,16 @@ impl Registry {
                 || Boundaries(word & 31).contains(target.completion)
         })
     }
+    pub(crate) fn pending_revision(&self, revision: u64) -> bool {
+        self.producers.iter().any(|p| {
+            p.slots.iter().any(|slot| {
+                let phase = slot.phase.load(Ordering::Acquire);
+                phase != EMPTY
+                    && phase != TERMINAL
+                    && slot.revision.load(Ordering::Acquire) == revision
+            })
+        })
+    }
     pub(crate) fn matches(&self, routing: &RoutingConfig) -> bool {
         routing.targets.len() == self.targets.len()
             && routing.routes.len() == self.routes.len()
@@ -322,7 +334,7 @@ impl<'owner> Completion<'owner> {
     pub fn session_id(self) -> u128 {
         self.registry.session_id
     }
-    /// Immutable capture revision, for observation identity checks.
+    /// Initial registration revision, for session observation identity checks.
     pub fn revision(self) -> u64 {
         self.registry.revision
     }
@@ -623,6 +635,8 @@ impl<'owner> Completion<'owner> {
         sequence: u64,
         channel: u32,
         importance: Importance,
+        revision: u64,
+        updates: Option<&'owner crate::control::config_update::State>,
     ) -> Result<Reservation<'owner>, CompletionError> {
         let state = &self.registry.producers[producer as usize];
         let index = (sequence % self.registry.limits.window as u64) as usize;
@@ -670,6 +684,8 @@ impl<'owner> Completion<'owner> {
             slot,
             sequence,
             route,
+            revision,
+            updates,
             previous: phase,
             committed: false,
         })
@@ -696,7 +712,13 @@ impl<'owner> Completion<'owner> {
         })
     }
     pub(crate) fn apply_dispatch(self, event: DispatchEvent) -> Result<(), CompletionError> {
-        if event.revision != self.registry.revision {
+        if event.revision
+            != self
+                .registry
+                .locate(event.receipt)?
+                .revision
+                .load(Ordering::Acquire)
+        {
             return Err(CompletionError::InvalidReceipt);
         }
         match event.outcome {
@@ -750,6 +772,8 @@ pub(crate) struct Reservation<'a> {
     slot: &'a RecordSlot,
     sequence: u64,
     route: &'a RoutePlan,
+    revision: u64,
+    updates: Option<&'a crate::control::config_update::State>,
     previous: u8,
     committed: bool,
 }
@@ -777,17 +801,20 @@ impl Reservation<'_> {
         for cell in &self.slot.cells {
             cell.word.store(NOT_ROUTED, Ordering::Release);
         }
-        for &i in &self.route.indices {
-            self.slot.cells[i].word.store(0, Ordering::Release);
+        let mut selected = 0;
+        for (i, target) in self.registry.targets.iter().enumerate() {
+            if self.updates.map_or(self.route.indices.contains(&i), |u| {
+                u.selected(self.revision, self.route.channel_id, target.id)
+            }) {
+                self.slot.cells[i].word.store(0, Ordering::Release);
+                selected += 1;
+            }
         }
+        self.slot.revision.store(self.revision, Ordering::Relaxed);
         self.slot.terminal_at.store(u64::MAX, Ordering::Relaxed);
         self.slot.sequence.store(self.sequence, Ordering::Release);
         self.slot.phase.store(
-            if self.route.indices.is_empty() {
-                TERMINAL
-            } else {
-                ACTIVE
-            },
+            if selected == 0 { TERMINAL } else { ACTIVE },
             Ordering::Release,
         );
         self.producer

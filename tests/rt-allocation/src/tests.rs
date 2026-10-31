@@ -1424,3 +1424,57 @@ fn classified_telemetry_failures_keep_rt_allocation_and_release_zero() {
         );
     });
 }
+
+#[test]
+fn live_revision_boundary_sampling_raw_errors_and_drop_do_not_allocate() {
+    use dot_logger::control::config_update::{ChannelPatch, ConfigPatch};
+    let plan = tracked_fixtures::plan();
+    let routes = tracked_fixtures::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routes,
+        tracked_fixtures::tracking(8),
+    )
+    .unwrap();
+    owner.enable_config_updates(&routes).unwrap();
+    owner.enable_telemetry().unwrap();
+    owner.scope(|mut s| {
+        let updates = s.config_updates().unwrap();
+        let (mut p, _) = s.next().unwrap();
+        updates
+            .apply_config(
+                1,
+                &ConfigPatch {
+                    channels: vec![ChannelPatch {
+                        channel_id: 7,
+                        minimum_level: Level::Info,
+                        sample_every: 2,
+                    }],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let calls = allocator::observe(|| {
+            assert_eq!(p.apply_pending_config(), 2);
+            assert!(matches!(
+                p.try_record_small(tracked_fixtures::meta(), &[1]),
+                Ok(RecordOutcome::Accepted(_))
+            ));
+            assert_eq!(
+                p.try_record_small(tracked_fixtures::meta(), &[1]),
+                Ok(RecordOutcome::Skipped)
+            );
+            let loan = p.try_acquire(4, Importance::Normal).unwrap();
+            let _ = p.try_record_raw(tracked_fixtures::meta(), loan).unwrap();
+            assert_eq!(
+                p.try_record_small(tracked_fixtures::meta(), &[0; 17]),
+                Err(CaptureError::TooLarge)
+            );
+            let _last_producer = p;
+        });
+        assert_eq!(calls, (0, 0));
+    });
+}

@@ -79,6 +79,8 @@ pub enum Basis {
 /// Why a report field is unavailable; none of these mean zero or spare capacity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Reason {
+    /// Before and after have different input, environment, scope or time conditions.
+    IncomparableConditions,
     /// The host has not supplied this measurement.
     MissingMeasurement,
     /// No validated completion capacity exists.

@@ -407,6 +407,17 @@ fn report_contract() {
         },
     );
     let r = Report::build(input, None, window.to_ns);
+    use dot_logger::telemetry::compare::{Comparison, Snapshot};
+    let mut next = input;
+    next.window.revision = 2;
+    next.conditions.revision = 2;
+    next.window.from_ns = 10_000_000_000;
+    next.window.to_ns = 20_000_000_000;
+    let comparison = Comparison::build(
+        Snapshot::new(r, 99),
+        Snapshot::new(Report::build(next, None, 20_000_000_000), 99),
+    );
+    assert!(comparison.differences.comparable());
     assert_eq!(r.rejected_capacity, Value::Observed(0));
     assert_eq!(r.rejected_contract, Value::Observed(0));
     assert_eq!(r.rejected_lifecycle, Value::Observed(0));

@@ -287,6 +287,34 @@ fn receiver_generation_change_rejects_late_old_network_fragments() {
     );
 }
 
+#[test]
+fn receiver_gate_limit_preserves_stale_rejection_and_connection_reservations() {
+    let b = budget();
+    let mut old = Reassembler::new(&b, 1, 8, Duration::from_secs(1)).unwrap();
+    let ready = old
+        .push(
+            Chunk::single(1, 1, 1, record(1, 1), &[1], true),
+            Instant::now(),
+        )
+        .unwrap()
+        .unwrap();
+    old.discard_generations(1, 2).unwrap();
+    assert_eq!(old.discard_generations(2, 1), Err(RemoteError::Limit));
+    old.discard_generations(1, 3).unwrap();
+    assert!(
+        ready
+            .handoff(|_, _| panic!("old handoff must stay rejected"))
+            .is_err()
+    );
+    let mut fresh = Reassembler::new(&b, 1, 8, Duration::from_secs(1)).unwrap();
+    fresh.discard_generations(2, 1).unwrap();
+    let both = b.used_bytes();
+    drop(old);
+    assert!(b.used_bytes() > 0 && b.used_bytes() < both);
+    drop(fresh);
+    assert_eq!(b.used_bytes(), 0);
+}
+
 #[cfg(not(miri))]
 mod sockets {
     use super::*;

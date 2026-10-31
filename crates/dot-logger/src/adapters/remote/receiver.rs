@@ -27,6 +27,9 @@ struct Assembly {
 }
 /// Synchronous receiver with bounded incomplete and handed-off-but-unaccepted records.
 /// Transport-decoded fragment storage is separate; each input is capped at 256 KiB.
+/// Own one receiver per actual transport connection. On reconnect, stop routing old
+/// fragments and drop old unaccepted records; do not send their ACKs on the new
+/// connection. Old owners retain their reservation until actually dropped.
 pub struct Reassembler {
     ledger: Arc<Ledger>,
     frames: Vec<Assembly>,
@@ -200,6 +203,10 @@ impl Reassembler {
     /// Future fragments and ready-but-unaccepted records also check this gate.
     /// Tracking is limited to the configured record count; recreate the receiver
     /// for a new connection. Already accepted consumer data cannot be revoked.
+    /// Distinct subscription gates persist for this receiver's lifetime, even
+    /// after their incomplete records expire. Repeated advances of the same gate
+    /// do not consume another slot. On `Limit`, reconnect with a new receiver;
+    /// erasing a gate could allow late stale fragments or handoffs through.
     pub fn discard_generations(
         &mut self,
         subscription: u64,

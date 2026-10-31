@@ -13,6 +13,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
+use subtle::ConstantTimeEq;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
@@ -37,13 +38,36 @@ pub struct RemoteServer {
 }
 struct Security {
     anonymous: bool,
-    tokens: Vec<AccessToken>,
+    tokens: Vec<Credential>,
 }
-fn equal(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
+// Normalize stored secrets once; comparison never loops over their actual length.
+// This protects the comparison primitive, not the timing of the entire RPC.
+struct Credential {
+    bytes: [u8; 256],
+    length: u16,
+    permission: Permission,
+}
+impl From<AccessToken> for Credential {
+    fn from(token: AccessToken) -> Self {
+        let mut bytes = [0u8; 256];
+        bytes[..token.value.len()].copy_from_slice(token.value.as_bytes());
+        Self {
+            bytes,
+            length: token.value.len() as u16,
+            permission: token.permission,
+        }
     }
-    a.iter().zip(b).fold(0u8, |d, (a, b)| d | (a ^ b)) == 0
+}
+impl Credential {
+    fn matches(&self, supplied: &[u8]) -> bool {
+        // The peer already knows its own supplied length. Stored length is secret.
+        if supplied.len() > 256 {
+            return false;
+        }
+        let mut padded = [0u8; 256];
+        padded[..supplied.len()].copy_from_slice(supplied);
+        bool::from(self.bytes.ct_eq(&padded) & self.length.ct_eq(&(supplied.len() as u16)))
+    }
 }
 impl Security {
     fn check<T>(&self, request: &Request<T>, manage: bool) -> Result<SocketAddr, RemoteError> {
@@ -57,7 +81,7 @@ impl Security {
         let permission = token.and_then(|value| {
             self.tokens
                 .iter()
-                .find(|t| equal(t.value.as_bytes(), value.as_bytes()))
+                .find(|t| t.matches(value.as_bytes()))
                 .map(|t| t.permission)
         });
         match permission {
@@ -97,7 +121,7 @@ impl RemoteServer {
         }
         let security = Arc::new(Security {
             anonymous: config.address.ip().is_loopback() && config.anonymous_loopback_read,
-            tokens: config.tokens,
+            tokens: config.tokens.into_iter().map(Credential::from).collect(),
         });
         let listener = TcpListener::bind(config.address)
             .await
@@ -125,10 +149,7 @@ impl RemoteServer {
         }
         let _close = Close(self.hub.clone());
         let limits = &self.hub.shared.limits;
-        let incoming = Incoming {
-            listener: self.listener,
-            permits: Arc::new(Semaphore::new(limits.connections)),
-        };
+        let incoming = Incoming::new(self.listener, limits.connections);
         let service = RpcService {
             hub: self.hub.clone(),
             security: self.security,
@@ -189,24 +210,48 @@ impl AsyncWrite for LimitedIo {
 struct Incoming {
     listener: TcpListener,
     permits: Arc<Semaphore>,
+    retry: Pin<Box<tokio::time::Sleep>>,
+    cooling: bool,
+}
+impl Incoming {
+    fn new(listener: TcpListener, connections: usize) -> Self {
+        Self {
+            listener,
+            permits: Arc::new(Semaphore::new(connections)),
+            retry: Box::pin(tokio::time::sleep(Duration::ZERO)),
+            cooling: false,
+        }
+    }
 }
 impl Stream for Incoming {
     type Item = Result<LimitedIo, std::io::Error>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.listener.poll_accept(cx) {
-            Poll::Ready(Ok((stream, _))) => match self.permits.clone().try_acquire_owned() {
-                Ok(permit) => Poll::Ready(Some(Ok(LimitedIo {
-                    stream,
-                    _permit: permit,
-                }))),
-                Err(_) => {
-                    drop(stream);
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
-            },
-            Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-            Poll::Pending => Poll::Pending,
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        loop {
+            if self.cooling {
+                std::task::ready!(self.retry.as_mut().poll(cx));
+                self.cooling = false;
+            }
+            match self.listener.poll_accept(cx) {
+                Poll::Ready(Ok((stream, _))) => match self.permits.clone().try_acquire_owned() {
+                    Ok(permit) => {
+                        return Poll::Ready(Some(Ok(LimitedIo {
+                            stream,
+                            _permit: permit,
+                        })));
+                    }
+                    Err(_) => {
+                        drop(stream);
+                        // Preserve excess-connection rejection, but register a timer
+                        // wake instead of continuously repolling a ready backlog.
+                        self.retry
+                            .as_mut()
+                            .reset(tokio::time::Instant::now() + Duration::from_millis(10));
+                        self.cooling = true;
+                    }
+                },
+                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
+                Poll::Pending => return Poll::Pending,
+            }
         }
     }
 }
@@ -404,5 +449,119 @@ impl Stream for SubscriptionStream {
             return Poll::Ready(Some(Err(status(RemoteError::TimedOut))));
         }
         Poll::Pending
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod admission_tests {
+    use super::*;
+    #[cfg(not(miri))]
+    use std::{
+        future::poll_fn,
+        sync::atomic::{AtomicUsize, Ordering},
+        task::{Wake, Waker},
+    };
+
+    #[cfg(not(miri))]
+    struct CountWake {
+        count: AtomicUsize,
+        parent: Waker,
+    }
+    #[cfg(not(miri))]
+    impl Wake for CountWake {
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.count.fetch_add(1, Ordering::Relaxed);
+            self.parent.wake_by_ref();
+        }
+    }
+
+    #[test]
+    #[cfg(not(miri))]
+    fn saturated_listener_waits_without_self_wake_and_recovers() {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let address = listener.local_addr().unwrap();
+                let mut incoming = Incoming::new(listener, 1);
+                let first_client = TcpStream::connect(address).await.unwrap();
+                let first = poll_fn(|cx| Pin::new(&mut incoming).poll_next(cx))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let mut surplus = TcpStream::connect(address).await.unwrap();
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    poll_fn(|cx| {
+                        let wake = Arc::new(CountWake {
+                            count: AtomicUsize::new(0),
+                            parent: cx.waker().clone(),
+                        });
+                        let waker = Waker::from(wake.clone());
+                        let mut context = Context::from_waker(&waker);
+                        assert!(Pin::new(&mut incoming).poll_next(&mut context).is_pending());
+                        assert_eq!(
+                            wake.count.load(Ordering::Relaxed),
+                            0,
+                            "admission must wait for an external event"
+                        );
+                        let mut bytes = [0u8; 1];
+                        let mut buf = ReadBuf::new(&mut bytes);
+                        match Pin::new(&mut surplus).poll_read(cx, &mut buf) {
+                            Poll::Ready(Ok(())) if buf.filled().is_empty() => Poll::Ready(()),
+                            Poll::Ready(result) => {
+                                panic!("surplus connection was not closed: {result:?}")
+                            }
+                            Poll::Pending => Poll::Pending,
+                        }
+                    }),
+                )
+                .await
+                .unwrap();
+                assert_eq!(incoming.permits.available_permits(), 0);
+                drop(first);
+                let next_client = TcpStream::connect(address).await.unwrap();
+                let next = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    poll_fn(|cx| Pin::new(&mut incoming).poll_next(cx)),
+                )
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+                assert_eq!(incoming.permits.available_permits(), 0);
+                drop(next);
+                assert_eq!(incoming.permits.available_permits(), 1);
+                drop((first_client, surplus, next_client));
+            });
+    }
+
+    #[test]
+    fn credential_comparison_rejects_length_padding_and_content_mismatches() {
+        let token = AccessToken::new("test-only-read-credential".into(), Permission::Read).unwrap();
+        let credential = Credential::from(token);
+        assert!(credential.matches(b"test-only-read-credential"));
+        for candidate in [
+            &b""[..],
+            &b"test-only-read-credentiaL"[..],
+            &b"test-only-read-credentia"[..],
+            &b"test-only-read-credential!"[..],
+            &b"test-only-read-credential\0"[..],
+            &[b'x'; 257][..],
+        ] {
+            assert!(!credential.matches(candidate));
+        }
+        let maximum =
+            Credential::from(AccessToken::new("x".repeat(256), Permission::Manage).unwrap());
+        assert!(maximum.matches(&[b'x'; 256]));
+        assert!(!maximum.matches(&[b'x'; 255]));
+        let minimum = Credential::from(AccessToken::new("x".repeat(16), Permission::Read).unwrap());
+        assert!(minimum.matches(&[b'x'; 16]));
     }
 }

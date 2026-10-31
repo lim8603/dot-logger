@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-005 In Progress — 운영 계측, MS-004/007은 native·실앱/실측 후속 |
-| 활성 Task | TASK-014 In Progress — EV-027 로컬 수락/비용·실측/native 잔여 / 다음 후보 TASK-015 |
+| 활성 Task | TASK-014 In Progress — EV-027 로컬 수락/비용·실측/native 잔여 / 다음 세션 TASK-015 착수 승인 |
 | 미처리 리뷰 | 없음 — REV-001~023 Closed. REV-022 EV-026·REV-023 EV-027 로컬 수락, RV-049 실측/TASK-022·RV-053 장기 tail/화면 TASK-020 후속 |
 | 상태 | Yellow — 클라이언트/계측 로컬 수락, 운영 backend/실앱·비용/PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-31 #011 / AI |
-| 세션 상태 | 요청 범위 완료 — REV-022 조치·TASK-014 로컬 수락/게시, TASK-015 미착수 |
+| 세션 상태 | 종료 — Human 요청으로 마감, 다음 세션 TASK-015 착수 승인·현재 Planned/미착수 |
 | 최근 세션 | [2026-10-31 #011](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md) — REV-022 조치·TASK-014 |
 
 ## 현재 결정과 제약
@@ -99,12 +99,13 @@
 ## 다음 시작점
 
 1. 이번 승인 범위의 REV-022 개선/회귀·TASK-014 로컬 구현/검증/수락을 완료했다. REV-022/023 Closed, EV-026 sourceb3c08bd·EV-027 sourced99ba3b 근거를 따른다. 같은 범위 재승인은 불필요하다.
-2. 다음 개발 후보 TASK-015(여유·병목·보존 시간 리포트)는 Planned/미착수다. TASK-014 비용≤5%/계측 포함 RT·PC·native/실앱은 미완료이며 TASK-022/023과 연결한다. 상위 MS-005·TC-009·Gate4/5 전체 완료가 아니다.
+2. **다음 세션은 TASK-015(여유·병목·보존 시간 리포트)부터 시작한다.** Human 「세션 마무리해줘. 다음 세션에서 TASK-015 시작하자」로 착수 승인했다. 현재는 Planned/미착수이며 이번 종료 처리에서 구현하지 않는다. TASK-008 EV-013·TASK-014 EV-027의 승인된 로컬 구현을 선행 근거로 삼고 native/실측 이월은 유지한다. TASK-015 상세·API§15·TC-009를 필요한 범위로 읽고 폐기로 안정된 큐의 Overloaded·미측정 분모·음수/0 증가율 Red부터 진행한다. TASK-014 비용≤5%/RT·PC/native/실앱 및 MS-005·TC-009·Gate4/5 전체는 미완료다.
 3. RV-049 최적화/포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성·화면 불연속은 TASK-020 후속이다. 현재 wire 유지로 수락했고 heartbeat/lease 확장이 필요하면 H/J 판단한다. 새 프로토콜 승인을 요구하며 현재 작업을 중단한 상태는 아니다.
 4. native는 공개 완료 후(T3), PC/RT/UPS/실앱 및 Gate4/5는 후속이다. 새 T1/T2/T3 도래는 확인되지 않았다.
 
 ## 승인·권한 위임 상태 — 2026-10-31 #007
 
+- #011 종료 지시: 다음 세션 TASK-015 착수 승인. 재개 시 작업 재선택/같은 범위 재승인 없이 TDD로 시작하되 이번 세션 종료 뒤 자동 구현하지 않는다.
 - Human의 기존 모든 권한/게시 위임과 #008 TASK-013 진행 지시를 유지한다. EV-025 검증 뒤 AI가 로컬 구현을 수락하고 REV-021을 마감했다. 같은 범위의 최종 승인 요청은 반복하지 않는다.
 - 구현/검증 결과와 위험·미완료를 보고하며, 미실행 native/PC 시험이나 제품 전체 수락을 임의로 Pass로 바꾸지 않는다. 공개 전환/선택 기능 자동 착수 지시로 확대하지 않는다.
 
@@ -162,7 +163,7 @@
 
 ## 최근 작업·이력
 
-- 2026-10-31 #011: REV-022 EV-026 조치/수락·TASK-014 EV-027 로컬 구현/수락·단위별 게시 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
+- 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
 - 2026-10-31 #010: 현황 파악·REV-022 반입·승인 경계 보고 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_010.md).
 - 2026-10-31 #009: 독립 리뷰 REV-022 Open 등록 — [리뷰](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md).
 

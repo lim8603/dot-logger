@@ -3,7 +3,6 @@
 
 import argparse
 import itertools
-import json
 import subprocess
 import sys
 
@@ -26,23 +25,18 @@ def main():
 
     # Resolve the consumer alone: optional network/runtime and compression crates
     # must not become mandatory dependencies through feature unification.
-    metadata = json.loads(subprocess.check_output(
-        cargo + ["metadata", "--locked", "--format-version", "1", "--no-default-features"],
-        text=True,
-    ))
-    packages = {package["id"]: package["name"] for package in metadata["packages"]}
-    nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
-    consumer = next(key for key, name in packages.items() if name == "dot-logger-api-consumer")
-    reached, pending = set(), [consumer]
-    while pending:
-        package = pending.pop()
-        if package not in reached:
-            reached.add(package)
-            pending.extend(nodes[package]["dependencies"])
-    forbidden = {"tokio", "tonic", "reqwest", "hyper", "zstd", "zstd-sys", "tracing"}
-    unexpected = forbidden.intersection(packages[key] for key in reached)
-    if unexpected:
-        raise SystemExit(f"core consumer unexpectedly requires: {sorted(unexpected)}")
+    forbidden = {"tokio", "tonic", "reqwest", "hyper", "zstd", "zstd-sys", "tracing", "subtle"}
+    # metadata resolves all workspace members together, including the intentional
+    # remote CLI. Inspect each selected package graph to test isolation accurately.
+    for consumer in ["dot-logger-api-consumer", "dot-logger-client"]:
+        tree = subprocess.check_output(cargo + [
+            "tree", "--locked", "-p", consumer, "--no-default-features",
+            "--edges", "normal,build", "--prefix", "none", "--format", "{p}"
+        ], text=True)
+        reached = {line.split()[0] for line in tree.splitlines() if line.strip()}
+        unexpected = forbidden.intersection(reached)
+        if unexpected:
+            raise SystemExit(f"{consumer} unexpectedly requires: {sorted(unexpected)}")
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer"], check=True)
     subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation"], check=True)
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger", "--example", "scoped_capture"], check=True)

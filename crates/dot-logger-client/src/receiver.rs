@@ -41,6 +41,12 @@ pub struct Acknowledgement {
 /// Client lifecycle failures; messages contain no credential or payload data.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClientError {
+    /// Local cancellation; an already posted host operation may still be running.
+    Cancelled,
+    /// Consumer rejected a verified record; no receiving acknowledgement was sent.
+    ConsumerRejected,
+    /// Consumer accepted, but the receiving acknowledgement could not be confirmed.
+    AcknowledgementUnknown,
     /// No current connection exists.
     Disconnected,
     /// End the existing connection before starting another.
@@ -53,6 +59,13 @@ pub enum ClientError {
 impl std::fmt::Display for ClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Cancelled => {
+                f.write_str("operation cancelled; posted host IO may still be running")
+            }
+            Self::ConsumerRejected => f.write_str("consumer rejected the record; no ACK sent"),
+            Self::AcknowledgementUnknown => {
+                f.write_str("consumer accepted; acknowledgement outcome is unknown")
+            }
             Self::Disconnected => f.write_str("no active receiver connection"),
             Self::AlreadyConnected => f.write_str("end the active connection before reconnecting"),
             Self::StaleConnection => f.write_str("input belongs to a stale or foreign connection"),

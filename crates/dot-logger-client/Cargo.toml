@@ -7,10 +7,19 @@ publish.workspace = true
 
 [features]
 default = []
-remote = ["dot-logger/remote"]
+remote = ["dot-logger/remote", "dep:tonic", "dep:tokio", "dep:prost", "dep:tower", "dep:hyper-util"]
 
 [dependencies]
 dot-logger = { path = "../dot-logger", default-features = false }
+tonic = { workspace = true, optional = true, features = ["tls-ring"] }
+tokio = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true }
 
 [lints]
 workspace = true
+
+[[example]]
+name = "remote_query_replay"
+required-features = ["remote"]

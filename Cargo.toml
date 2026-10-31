@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/dot-logger", "crates/dot-logger-client", "tests/api-consumer", "tests/rt-allocation"]
+members = ["crates/dot-logger", "crates/dot-logger-client", "crates/dot-logger-cli", "tests/api-consumer", "tests/rt-allocation"]
 default-members = ["crates/dot-logger"]
 resolver = "3"
 
@@ -21,6 +21,11 @@ reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-
 tracing = "=0.1.44"
 log = "=0.4.29"
 subtle = "=2.6.1"
+tower = { version = "=0.5.3", features = ["util"] }
+hyper-util = { version = "=0.1.21", features = ["tokio"] }
+clap = { version = "=4.6.6", default-features = false, features = ["std", "help", "usage", "error-context"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
 
 [workspace.lints.rust]
 missing_docs = "warn"

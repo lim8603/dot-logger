@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "session": "0000000000000000000000000000002a",
+  "revision": 1,
+  "producers": 1,
+  "external_bytes": 134217728,
+  "channels": [
+    { "id": 7, "schema": "00000000000000000000000000000063", "version": 1, "topic": "raw", "encoding": "opaque" }
+  ],
+  "sources": [{ "path": "recording.mcap", "sequence": 1 }],
+  "limits": {
+    "max_segments": 4,
+    "max_records": 10000,
+    "max_record_bytes": 16777216,
+    "max_source_bytes": 67108864,
+    "max_payload_bytes": 8388608,
+    "max_metadata_bytes": 65536,
+    "page_records": 1000,
+    "page_bytes": 262144,
+    "inline_bytes": 4096,
+    "blob_read_bytes": 262144,
+    "read_bytes": 268435456
+  }
+}

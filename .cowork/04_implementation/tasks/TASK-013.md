@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-025 로컬 구현/리뷰 완료; native 공개 후(T3)·실앱/성능 관련 Task 후속. TASK-014는 별도 지시 후 |
+| 다음 액션 | EV-025 로컬 수락 유지·REV-022 In Progress: RV-046/053 우선 및 나머지 조치; native T3·실앱/성능 후속, TASK-014 미착수 |
 | 의존 | TASK-011·TASK-012 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -62,3 +62,9 @@ Human 「TASK-013까지 진행할래?」·「계속 이어서 진행해줘」에
 - [EV-025](../../05_verification/verification_evidence.md#ev-025) source92개/검사15개 exit0·commit blob92개 일치. 두 Rust각16feature/workspace/default client/독립 consumer/allocator·clippy/rustdoc/fmt/proto 두 사본·CLI 선언 예제·cached audit·Miri32 Pass. transport7·CLI10·codec1·기존 수신 수명3을 포함한다. [REV-021](../../05_verification/reviews/REV-021_TASK-013_CLIENT_CLI.md) RV-039~045 조치·Closed다.
 
 로컬 구현 DoD는 완료했다. native/다른 OS는 GitHub 공개 후(T3), 실제 앱 적용·LAN/RSS/PC 성능/RT/UPS는 각 Task의 잔여로 보존하여 Task 상태는 In Progress를 유지한다. MS-004/Gate4·5 전체 완료로 올리지 않는다. 다음 개발 후보는 TASK-014이며 이번 범위에서 자동 착수하지 않는다. 작업 단위별 소스/문서 분리 커밋·푸시는 위임에 따라 처리한다.
+
+## REV-022 반입 — 2026-10-31 #010
+
+[REV-022](../../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md)을 코드와 대조하여 Open→In Progress로 반입했다. RV-046~055 수용9건·부분 수용1건(RV-049 영향 조건 보정, 최적화 실측 후 판단)이다. 처리담당 영역에 방향·첫 Red/회귀·승인 경계를 기록했으며 구현/새 시험은 수행하지 않았다. 기존 EV-025 source92개와 현재 파일 hash 불일치0, EV-023/025의 기존 로컬 수락은 유지한다. 이번 반입으로 새 지적을 해결/마감하거나 native·실앱·성능을 수락하지 않는다.
+
+다음 개발 순서는 RV-046/053(P2) 우선 조치 후 나머지 개선/회귀를 권고한다. RV-053 문서/클라이언트 세부는 기존 위임 안이며 heartbeat/lease wire 변경만 H/J 판단 후 진행한다. 자동 reconnect·재전송/구독 간 복원은 도입하지 않았다. 상세와 권한 근거는 REV-022 §7을 따른다.

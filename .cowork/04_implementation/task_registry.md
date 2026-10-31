@@ -1,6 +1,6 @@
 # Task 목록과 실행 계획
 
-- 현재(2026-10-31): TASK-013 EV-025 로컬 구현/위임 수락 완료·native 이월, 다음 개발 후보 TASK-014는 Planned/미착수다. TASK-022 수치 Approved·실측 준비를 유지한다. 아래 과거 승인 기록은 당시 이력이다.
+- 현재(2026-10-31): TASK-013 EV-025 로컬 구현/위임 수락 완료·native 이월, REV-022 반입/In Progress·RV-046/053 우선 조치 권고, 다음 개발 후보 TASK-014는 Planned/미착수다. TASK-022 수치 Approved·실측 준비를 유지한다. 아래 과거 승인 기록은 당시 이력이다.
 - INT-001 / 2026-10-28 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
 - 담당 AI는 승인된 실행 담당이며 Human은 프로젝트 오너다. 2026-10-31 모든 권한/게시 위임에 따라 승인된 목표의 구현·검증·로컬 수락/마감·단위별 커밋/푸시는 AI가 수행·보고한다. 같은 범위의 재승인은 받지 않으며 solo를 유지한다.
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
@@ -24,8 +24,8 @@
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | EV-014/015 로컬 Pass·Human 승인; 현재 PC 대체 실측·모의 장애, native 공개 후 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
-| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-023 로컬 Pass·REV-018/019 Closed·EV-025 client/CLI 회귀; native/실측 후속 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
-| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-025 로컬 DoD/REV-021 수락 완료; native 공개 후(T3)·실앱/성능 후속, TASK-014 미착수 | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
+| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-023 수락 유지·REV-022 In Progress(RV-049/053~055); native/실측 후속 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
+| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-025 수락 유지·REV-022 반입/RV-046/053 우선; native T3·실앱/성능 후속, TASK-014 미착수 | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 폐기로 안정된 큐 Overloaded·미측정 분모·음수/0 증가율 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |

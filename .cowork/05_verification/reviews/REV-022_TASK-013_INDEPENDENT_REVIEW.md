@@ -11,7 +11,7 @@
 - **경계 확장 (Human 선택 A, 같은 세션):** TASK-013이 실제로 호출하는 서버 경로를 클라이언트 사용 패턴과 대조했다. 대상은 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs) `RpcService`·`UnaryRpc`·`AckRpc`·`SubscribeRpc`·`SubscriptionStream`·`status`, [hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs) `Subscription::next/ack/expire`·`offer` Gap·`request`/`Command`, [receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) `push`/`handoff`, core `Replay::seek` generation이다. RV-053~055가 여기서 나왔다. `types`·`wire` 변환 전체와 원격 통합 시험은 다시 검토하지 않았다.
 - **정적 확인:** `cargo fmt --check` Pass, `cargo clippy -p dot-logger-client -p dot-logger-cli --all-targets --all-features -- -D warnings` Pass. 소스가 EV-025와 같으므로 테스트·Miri는 다시 실행하지 않았다. 아래 반례는 코드 정독으로 도출했고 실행 재현은 처리담당 Red 시험에 맡긴다.
 - **종합 판정:** Pass (P2 2, P3 8). P1 없음. 데이터 손실, ACK 선행, RT 침해 결함은 확인하지 못했다.
-- **상태:** Open
+- **상태:** In Progress — 2026-10-31 #010 반입·판정 완료, 구현/실행 검증 전
 
 ### 확인한 긍정 사항
 
@@ -34,16 +34,16 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-046 | P2 | [`RemoteSubscription::handoff`](../../../crates/dot-logger-client/src/transport.rs#L590-L593) | 만료·세대 폐기·소비자 거절을 모두 `ConsumerRejected`로 합치고, CLI는 이를 `io_or_transport`/exit4로 표시함 | 사전 거절과 소비자 거절을 구분하고 CLI 분류를 명시 | — | Open |
-| RV-047 | P3 | [`Context::validate` tail](../../../crates/dot-logger-cli/src/commands.rs#L48-L66) | `external-bytes` 2GiB 상한과 `tail_plan` 검증이 연결 뒤에 실행되어 RV-039 유형의 입력 오류 가림이 남음 | tail 입력 검사를 모두 preflight로 이동 | — | Open |
-| RV-048 | P3 | [local replay limit](../../../crates/dot-logger-cli/src/commands.rs#L381-L384) | 정확히 `limit`개 기록을 재생해도 Limit/exit3. query는 후속 기록이 있을 때만 Limit | 후속 기록 존재 여부로 판정하거나 의미를 문서화 | — | Open |
-| RV-049 | P3 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L228-L252) (TASK-012 `4f79119`) | 포화 시 초과 연결을 10ms에 1개씩만 거절해, permit이 반환된 뒤 backlog 뒤의 정상 연결이 약 N×10ms 지연될 수 있음 | wake당 유한 batch 거절 또는 trade-off 문서화·측정 | — | Open |
-| RV-050 | P3 | [token `MetadataValue`](../../../crates/dot-logger-client/src/transport.rs#L263) | bearer 값이 sensitive로 표시되지 않음(HPACK 색인 대상, Debug 출력 가능) | parse 후 `set_sensitive(true)` 적용 | — | Open |
-| RV-051 | P3 | [`path`](../../../crates/dot-logger-client/src/transport.rs#L196-L207)·[`codec::method`](../../../crates/dot-logger-client/src/codec.rs#L58) | 문자열 method 대응이 누락되면 조용히 GetStatus로 라우팅됨 | variant별 경로를 한 곳의 exhaustive match로 관리 | — | Open |
-| RV-052 | P3 | [`recover`](../../../crates/dot-logger-cli/src/commands.rs#L410-L420) | open한 descriptor를 재검사하지 않고 path metadata 길이로 safe_offset을 비교함. `open_snapshot`의 RV-043 조치와 일관되지 않음 | 열린 파일 `metadata()`로 종류·길이 재검사 | — | Open |
-| RV-053 | P2 | [`SubscriptionStream` idle lease](../../../crates/dot-logger/src/adapters/remote/server.rs#L446-L450)·[`RemoteSubscription::next`](../../../crates/dot-logger-client/src/transport.rs#L525-L538)·[`ReceiverConfig::ttl`](../../../crates/dot-logger-client/src/receiver.rs#L18-L19) | heartbeat가 없어 조용한 구독은 min(client timeout, ttl) 뒤 종료된다. 다시 구독하면 그 사이 기록이 Gap 없이 보이지 않는다. client 문서는 ttl이 서버 idle lease를 겸한다는 점을 밝히지 않는다 | idle 대기와 기록 deadline 분리, 또는 heartbeat/lease 문서화 (프로토콜 변경은 Human 판단) | — | Open |
-| RV-054 | P3 | [server `status`](../../../crates/dot-logger/src/adapters/remote/server.rs#L95-L106)·[client `rpc_error`](../../../crates/dot-logger-client/src/transport.rs#L148-L161) | host Corrupt가 InvalidArgument를 거쳐 client InvalidInput(exit2)이 되고, tonic 크기 상한 OutOfRange는 Transport(exit4)가 됨. 대응표가 계약 문서에 없음 | 손실 없는 status 대응과 API 문서화 | — | Open |
-| RV-055 | P3 | [`RemoteHub::request`](../../../crates/dot-logger/src/adapters/remote/hub.rs#L524-L527)·[CLI posted_host_io](../../../crates/dot-logger-cli/src/output.rs#L166-L172) | host가 응답 없이 Command를 Drop하면 Gone이 된다. 변경 명령(ApplyConfig/RunCheck)이 이 경우 `gone_or_expired`로 표시되고 `completion_unconfirmed` 표시가 빠짐 | 응답 없는 Drop을 Gone과 구분하거나, 변경 명령의 Gone에 불명 표시 추가 | — | Open |
+| RV-046 | P2 | [`RemoteSubscription::handoff`](../../../crates/dot-logger-client/src/transport.rs#L590-L593) | 만료·세대 폐기·소비자 거절을 모두 `ConsumerRejected`로 합치고, CLI는 이를 `io_or_transport`/exit4로 표시함 | 사전 거절과 소비자 거절을 구분하고 CLI 분류를 명시 | 수용 | In Progress |
+| RV-047 | P3 | [`Context::validate` tail](../../../crates/dot-logger-cli/src/commands.rs#L48-L66) | `external-bytes` 2GiB 상한과 `tail_plan` 검증이 연결 뒤에 실행되어 RV-039 유형의 입력 오류 가림이 남음 | tail 입력 검사를 모두 preflight로 이동 | 수용 | In Progress |
+| RV-048 | P3 | [local replay limit](../../../crates/dot-logger-cli/src/commands.rs#L381-L384) | 정확히 `limit`개 기록을 재생해도 Limit/exit3. query는 후속 기록이 있을 때만 Limit | 후속 기록 존재 여부로 판정하거나 의미를 문서화 | 수용 | In Progress |
+| RV-049 | P3 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L228-L252) (TASK-012 `4f79119`) | 포화 시 초과 연결을 10ms에 1개씩만 거절해, permit이 반환된 뒤 backlog 뒤의 정상 연결이 약 N×10ms 지연될 수 있음 | wake당 유한 batch 거절 또는 trade-off 문서화·측정 | 부분 수용 — 영향 조건 보정, 최적화 보류 | In Progress |
+| RV-050 | P3 | [token `MetadataValue`](../../../crates/dot-logger-client/src/transport.rs#L263) | bearer 값이 sensitive로 표시되지 않음(HPACK 색인 대상, Debug 출력 가능) | parse 후 `set_sensitive(true)` 적용 | 수용 | In Progress |
+| RV-051 | P3 | [`path`](../../../crates/dot-logger-client/src/transport.rs#L196-L207)·[`codec::method`](../../../crates/dot-logger-client/src/codec.rs#L58) | 문자열 method 대응이 누락되면 조용히 GetStatus로 라우팅됨 | variant별 경로를 한 곳의 exhaustive match로 관리 | 수용 | In Progress |
+| RV-052 | P3 | [`recover`](../../../crates/dot-logger-cli/src/commands.rs#L410-L420) | open한 descriptor를 재검사하지 않고 path metadata 길이로 safe_offset을 비교함. `open_snapshot`의 RV-043 조치와 일관되지 않음 | 열린 파일 `metadata()`로 종류·길이 재검사 | 수용 — 열린 descriptor 재검사 | In Progress |
+| RV-053 | P2 | [`SubscriptionStream` idle lease](../../../crates/dot-logger/src/adapters/remote/server.rs#L446-L450)·[`RemoteSubscription::next`](../../../crates/dot-logger-client/src/transport.rs#L525-L538)·[`ReceiverConfig::ttl`](../../../crates/dot-logger-client/src/receiver.rs#L18-L19) | heartbeat가 없어 조용한 구독은 min(client timeout, ttl) 뒤 종료된다. 다시 구독하면 그 사이 기록이 Gap 없이 보이지 않는다. client 문서는 ttl이 서버 idle lease를 겸한다는 점을 밝히지 않는다 | idle 대기와 기록 deadline 분리, 또는 heartbeat/lease 문서화 (프로토콜 변경은 Human 판단) | 수용 — 기존 계약 내 조치와 프로토콜 결정을 분리 | In Progress |
+| RV-054 | P3 | [server `status`](../../../crates/dot-logger/src/adapters/remote/server.rs#L95-L106)·[client `rpc_error`](../../../crates/dot-logger-client/src/transport.rs#L148-L161) | host Corrupt가 InvalidArgument를 거쳐 client InvalidInput(exit2)이 되고, tonic 크기 상한 OutOfRange는 Transport(exit4)가 됨. 대응표가 계약 문서에 없음 | 손실 없는 status 대응과 API 문서화 | 수용 — 대응표 및 호환 시험 필요 | In Progress |
+| RV-055 | P3 | [`RemoteHub::request`](../../../crates/dot-logger/src/adapters/remote/hub.rs#L524-L527)·[CLI posted_host_io](../../../crates/dot-logger-cli/src/output.rs#L166-L172) | host가 응답 없이 Command를 Drop하면 Gone이 된다. 변경 명령(ApplyConfig/RunCheck)이 이 경우 `gone_or_expired`로 표시되고 `completion_unconfirmed` 표시가 빠짐 | 응답 없는 Drop을 Gone과 구분하거나, 변경 명령의 Gone에 불명 표시 추가 | 수용 — CLI의 보수적 불명 표시 우선 | In Progress |
 
 ---
 
@@ -64,9 +64,9 @@
 - **심각도 근거:** ACK·데이터 안전성은 유지된다(어느 경우에도 ACK 없음). 그러나 공개 API 진단과 CLI exit 계약이 틀리므로 P2로 판단했다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용** (2026-10-31 #010 반입).
+- 처리 내용: core ReceivedRecord::handoff는 세대/TTL 사전 거절 시 consumer를 호출하지 않지만 transport는 모든 실패를 ConsumerRejected로 합친다. CLI도 명시 분기 없이 Io로 내린다. consumer 호출 여부를 구분해 사전 거절은 기존 Remote(Gone), 실제 소비 거절은 ConsumerRejected로 유지하는 안을 우선한다. Disconnected/StaleConnection 대응도 명시한다.
+- 검증 근거: 현재 코드 정독 대조. 세대 폐기·TTL 만료에서 consumer 미호출/ACK0·Gone, 실제 소비 거절에서 ConsumerRejected/ACK0 및 CLI exit3/소비 출력 오류 보존을 Red→Green으로 확인한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-047: tail 입력 검사가 연결 뒤로 밀림 (P3)
 
@@ -77,9 +77,9 @@
 - **처리 제안:** 2GiB 상한과 `tail_plan` 검증을 `validate`의 tail 분기로 옮긴다. `remote()`의 중복 검사는 방어용으로 남겨도 된다. Red: 연결할 수 없는 endpoint와 3GiB 입력 → 기대 exit2.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용** (2026-10-31 #010 반입).
+- 처리 내용: Context::validate tail에는 external 2GiB 상한과 tail_plan 검사가 없고 remote의 연결 뒤 분기에 남아 있다. 전체 tail 정적 검증을 연결 전으로 이동하는 기존 RV-039 방향을 적용한다.
+- 검증 근거: 현재 코드 정독 대조. 도달 불가 endpoint+3GiB external 및 plan 거절 입력이 연결 오류보다 먼저 exit2를 내는 Red와 경계값 회귀를 준비한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-048: local replay의 정확한 limit 도달을 Limit으로 판정 (P3)
 
@@ -89,9 +89,9 @@
 - **처리 제안:** 다음 `poll` 결과가 End/Stopped인지 확인한 뒤 판정하거나(대기 시간이 필요한 Ready면 Limit), 현재 의미를 ui_spec/README에 "limit 도달 = 부분 결과"로 명시한다. remote tail은 `stopped:"record_limit"`으로 성공 처리하므로 세 명령의 limit 의미를 함께 정리할 것을 권한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용** (2026-10-31 #010 반입).
+- 처리 내용: local replay는 정확히 limit 도달 즉시 stop/Limit이며 README의 “전체 선택을 끝내기 전에”와 어긋난다. 다음 poll로 End/Stopped와 추가 기록/Waiting을 구분하는 방향을 채택한다. 추가 기록은 출력하지 않고 원본/reader를 정리한다. tail의 명시 기록 수 수락 후 정상 종료는 유지한다.
+- 검증 근거: 현재 코드 정독 대조. limit-1/정확히 limit/limit+1과 미래 due 기록에서 출력 건수·exit0/3·reader 정리를 Red→Green으로 확인한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-049: 포화 admission 냉각으로 거절 처리량이 100건/s에 고정됨 (P3, TASK-012 후속)
 
@@ -102,9 +102,9 @@
 - **처리 제안:** wake마다 유한 개수(예: 32~64)의 초과 연결을 거절한 뒤 냉각에 들어가도록 해서 CPU 상한과 backlog 회복을 함께 확보한다. 또는 이 trade-off를 문서에 명시하고 TASK-022 실측 항목에 포화 회복 시간을 추가한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **부분 수용 — 영향 조건 보정, 최적화 보류** (2026-10-31 #010 반입).
+- 처리 내용: 포화 중 초과 연결을 10ms당 하나 거절하는 구조는 확인했다. 그러나 permit이 반환되면 다음 accept는 그 연결을 정상 입장시키므로 “반환 뒤에도 앞선 N개를 반드시 거절해 N×10ms”라는 일반식은 성립하지 않는다. 잔여 냉각(설정 10ms, 실제 스케줄링 지연 별도)과 포화가 반복되는 동안의 backlog 지연으로 범위를 한정한다. 유한 batch 수치는 실측 없이 고정하지 않는다.
+- 검증 근거: 현재 코드 정독 대조. 후속 TASK-022의 일반 네트워크 포화/permit 반환 후 회복 시험에서 거절률·지연·CPU를 측정한 뒤 batch 필요성을 판단한다. 이번 반입은 성능 시험이나 최적화 구현이 아니다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-050: bearer metadata의 sensitive 미표시 (P3)
 
@@ -114,9 +114,9 @@
 - **처리 제안:** parse 직후 `set_sensitive(true)`를 적용한다. 단위 시험에서 `is_sensitive()`를 확인한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용** (2026-10-31 #010 반입).
+- 처리 내용: token parse 뒤 sensitive 설정이 없는 것을 확인했다. set_sensitive(true)와 clone 시 보존을 적용하는 내부 보강이다. 전체 인증 시간 특성이나 비밀값 완전 비노출을 추가 보장하지 않는다.
+- 검증 근거: 현재 코드 정독 대조. 생성 metadata의 is_sensitive와 auth 요청 복사 후 flag 보존을 검증한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-051: 문자열 method 라우팅의 조용한 fallback (P3)
 
@@ -126,9 +126,9 @@
 - **처리 제안:** method 이름·RPC 경로·기대 reply kind를 한 곳의 exhaustive match(또는 private enum)에서 관리한다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용** (2026-10-31 #010 반입).
+- 처리 내용: codec::method는 exhaustive지만 transport::path는 문자열 wildcard를 GetStatus로 보낸다. 현재 variant 누락은 없으며 향후 누락 방지 차원의 내부 정리로 수용한다. ManagementRequest 기반 exhaustive 라우팅을 한 곳에서 관리한다.
+- 검증 근거: 현재 코드 정독 대조. 모든 현재 variant의 method/path/응답 kind 정합성과 기존 transport 회귀를 확인한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-052: recover의 열린 descriptor 재검사 누락 (P3)
 
@@ -138,9 +138,9 @@
 - **처리 제안:** open한 `file.metadata()`로 `is_file`·길이를 다시 확인하고 safe_offset을 비교한다. 참고로 open 자체가 FIFO 교체로 막히는 잔여 위험은 두 경로 모두 남아 있으며, CLI의 `spawn_blocking`은 취소할 수 없어 deadline을 넘겨 대기할 수 있다. Unix `O_NONBLOCK` open 후 정규 파일 확인 같은 보강을 선택 검토한다(필수 아님).
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용 — 열린 descriptor 재검사** (2026-10-31 #010 반입).
+- 처리 내용: recover의 파일 종류/길이 검사가 open 전 path metadata만 사용하는 것을 확인했다. open 뒤 file.metadata의 종류·길이를 출력 파일 생성 전에 검사한다. path 불변성은 host 책임으로 유지한다. 선택적인 Unix O_NONBLOCK 도입은 이번 기본 조치에 포함하지 않는다.
+- 검증 근거: 현재 코드 정독 대조. 열린 descriptor의 종류·길이/safe_offset 검증 및 독립 create_new·원본 불변 회귀를 준비한다. FIFO 교체/open 대기 취소는 이 보강만으로 해결됐다고 주장하지 않는다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-053: 조용한 구독의 강제 종료와 재구독 사이의 보이지 않는 누락 (P2, 서버 경계)
 
@@ -158,9 +158,9 @@
 - **심각도 근거:** ACK·데이터 무결성은 지켜진다. 다만 계획된 실시간 화면 사용(US-005)에서 누락이 표시되지 않을 수 있고, 공개 설정의 의미가 숨어 있으므로 P2로 판단했다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용 — 기존 계약 내 조치와 프로토콜 결정을 분리** (2026-10-31 #010 반입).
+- 처리 내용: client next의 모든 오류 시 close, ttl→age_ms 전달, server idle timer 종료 및 구독 간 transfer 비연속을 확인했다. 우선 ttl의 이중 의미·next timeout/종료·재구독 간 Gap 미보장 문서를 보강하고 idle 대기와 기록 수명을 분리하는 클라이언트안을 조사/검증한다. subscribe가 auth(...timeout)으로 전송하는 grpc-timeout도 함께 점검해야 하며 next의 close만 바꿔 장기 tail이 해결됐다고 선언하지 않는다. 자동 재연결/재전송은 도입하지 않는다.
+- 검증 근거: 현재 코드 정독 대조. 희소 기록·유휴·부분 조각 대기 취소·명시 cancel·서버 lease 만료·재구독 경계의 Red를 먼저 만든다. tonic Streaming::message의 cancel-safety와 실제 RPC deadline을 확인한 뒤 동작을 바꾼다. heartbeat/lease wire 변경은 아래 승인 안건으로 남기며 지속 tail/재구독 연속성은 미해결이다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-054: gRPC status 대응의 정보 손실과 계약 문서 부재 (P3, 서버 경계)
 
@@ -173,9 +173,9 @@
 - **처리 제안:** 서버 `Corrupt → data_loss`, 클라이언트 `DataLoss → Corrupt`·`OutOfRange → Limit`로 대응시킨다. 기존 `invalid_argument`는 계속 `InvalidInput`으로 받아 하위 호환을 유지한다. 대응표를 API 계약에 적는다. 크기 협상은 후속 판단(P3 이하)으로 둔다.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용 — 대응표 및 호환 시험 필요** (2026-10-31 #010 반입).
+- 처리 내용: server Corrupt→InvalidArgument, client DataLoss/OutOfRange→Transport를 확인했다. Corrupt→DataLoss→Corrupt와 OutOfRange→Limit 대응 및 API 표를 조치안으로 채택한다. 기존 InvalidArgument→InvalidInput은 유지한다. 메시지 크기 협상은 별도 후속이며 새 필드를 도입하지 않는다.
+- 검증 근거: 현재 코드 정독 대조. Corrupt 왕복/CLI exit4, InvalidInput/exit2, OutOfRange/Limit exit3 및 기존 status 회귀를 준비한다. status 대응 변경 전후 호환을 명시한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ### RV-055: 응답 없는 Command Drop과 변경 명령의 완료 불명 표시 누락 (P3, 서버 경계)
 
@@ -185,9 +185,9 @@
 - **처리 제안:** hub가 응답 없는 Drop을 `Transport`(또는 별도 불명 의미)로 반환해 capability `Gone`과 구분한다. 또는 CLI가 변경 명령의 `Gone`에도 `completion_unconfirmed`를 붙인다. Red: 시험 host가 ApplyConfig Command를 respond 없이 Drop → 기대 불명 표시.
 
 #### [처리담당]
-- 판정 결과:
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: **수용 — CLI의 보수적 불명 표시 우선** (2026-10-31 #010 반입).
+- 처리 내용: hub request의 응답 없는 oneshot 종료는 Gone이고 Output은 Gone에 completion_unconfirmed를 붙이지 않는다. 우선 ApplyConfig/RunCheck 등 게시된 변경 명령의 Gone에도 완료 불명 표시를 추가해 성공/미적용을 추정하지 않는 방향을 채택한다. 전체 Gone 의미나 wire를 바꾸지 않는다.
+- 검증 근거: 현재 코드 정독 대조. host가 ApplyConfig Command를 respond 없이 Drop하는 Red에서 gone_or_expired와 completion_unconfirmed 동시 표시를 확인한다. 읽기 전용 capability Gone 및 정상 Unsupported 응답은 기존 분류를 유지한다. **구현·새 시험·EV 추가 전이며 미해결**이다.
 
 ---
 
@@ -220,3 +220,14 @@
 2. RV-053은 처리 방식에 따라 권한이 다르다. (a) 클라이언트 동작과 (b) 문서는 기존 위임 안에서 조치할 수 있다. (c) heartbeat/lease 프로토콜 변경은 Human 판단을 받은 뒤 진행한다.
 3. RV-047~052·054·055는 같은 세션에서 묶어 처리하거나, 판정(수용/보류/기각)과 근거를 처리담당 영역에 기록한다. RV-054의 status 대응 변경은 API 계약 문서도 함께 갱신한다. RV-049는 TASK-022 실측 항목과 연결할 수 있다.
 4. 이 리뷰는 native·실앱·PC 실측의 수락을 뜻하지 않는다. TASK-013 상태(로컬 완료/native T3 이월)는 바꾸지 않는다.
+
+## 7. 반입 결과·승인 경계 — 2026-10-31 #010
+
+이번 요청은 진행현황 파악·기존 리뷰 반입·승인 안건 보고다. 새 리뷰 회차나 개선 구현 착수로 확대하지 않았다. 리뷰어의 원문/Pass(P2 2·P3 8)는 보존하며, 처리담당 판정은 수용9건·부분 수용1건(RV-049)이다. 모든 항목은 실행 검증 전 In Progress이며 Resolved/Closed가 아니다.
+
+- 형상: EV-025 results.json의 source_sha256 92개와 현재 파일 SHA-256 불일치0. 기존 검사15개 exit0/Miri32 근거를 유지하며 같은 성공 시험은 재실행하지 않았다. 이번 반례는 실행 재현 전 정적 판정이다.
+- 우선순위 권고: RV-046·RV-053 진단/문서·수명 확인 → RV-047/048/050/051/052/054/055 묶음 회귀 → RV-049 포화 회복 실측. TASK-014는 그 뒤의 개발 후보이며 이번 요청으로 착수하지 않았다.
+- **재승인 불필요(A):** 기존 목표 안의 오류 분류·preflight·limit·sensitive·라우팅·descriptor·status·불명 표시 및 RV-053 문서/클라이언트 세부 조치. 새 구현의 Red→Green·필요 회귀 후 기존 위임으로 AI가 수락/마감·단위별 커밋/푸시한다. 이번 반입 자체는 개선 구현 완료가 아니다.
+- **승인 후보(H/J), RV-053:** 장기 유휴 tail을 위해 heartbeat frame 또는 lease 분리 필드를 wire에 도입할지 결정한다. 기존 wire 유지+timeout/불연속 명시를 우선 권고하며, 이는 장기 tail 완성이나 구독 사이 기록 복원과 동등하지 않다. heartbeat를 선택하면 서버/client/proto 두 사본·버전 호환·API·메모리/타이머 예산·시험 영향을 구체화하고 ADR 승격을 검토한다. heartbeat만으로 재구독 사이 Gap/복원을 보장할 수도 없다. 현재 새 프로토콜 도입 승인은 받지 않았으며 프로토콜을 변경하지 않았다.
+- 승인 근거: [권한 매트릭스](../../01_cowork_protocol/decision_authority_matrix.md)의 요구사항/범위 H·핵심 사용자 동작 및 오류 전략 J, 같은 문서의 2026-10-31 지속 위임(A 세부 조치). TASK-013 EV-025 수락·TASK-022 local-pc-v1 수치·ADR-011 정책은 재승인하지 않는다.
+- native 공개 후(T3)·실앱/LAN/RSS·PC 성능/RT/UPS/24h·Gate4/5 미완료는 그대로다. T1/T2/T3 새 트리거는 이번 요청에서 확인되지 않았다.

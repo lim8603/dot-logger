@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-023 로컬 Pass·REV-018/019 Closed·TASK-013 착수 승인, native/실측 후속 |
+| 다음 액션 | EV-023 로컬 수락 유지·REV-022 반입: RV-049/053/054/055 조치·판정 후속; native/실측 잔여 |
 | 의존 | TASK-010·TASK-006 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -70,3 +70,9 @@ Human 「프로젝트 브리핑하고, 리뷰 반입하고, 승인 해야 하는
 ## REV-019 조치·수락 및 TASK-013 전환 — 2026-10-31 #007
 
 Human 기존 로컬 구현 승인·모든 권한 위임·다음 착수 요청으로 REV-018 Closed를 반영하고, RV-036 timer 대기·RV-037 고정 credential 비교·RV-038 연결 수명 지침을 조치했다. [EV-023](../../05_verification/verification_evidence.md#ev-023) source70개/검사9개 exit0·두 Rust16feature·Miri25 Pass·commit blob70개 일치(`4f79119`) 후 AI의 위임된 마감 판단으로 REV-019도 Closed다. 이전 승인 대기/미구현 문구는 당시 이력이다. 로컬 Human 리뷰 완료를 전체 Task/TC·native/PC 수락 완료로 확대하지 않는다. 다음 TASK-013에 착수한다.
+
+## REV-022 반입 — 2026-10-31 #010
+
+[REV-022](../../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md)을 코드와 대조하여 Open→In Progress로 반입했다. RV-046~055 수용9건·부분 수용1건(RV-049 영향 조건 보정, 최적화 실측 후 판단)이다. 처리담당 영역에 방향·첫 Red/회귀·승인 경계를 기록했으며 구현/새 시험은 수행하지 않았다. 기존 EV-025 source92개와 현재 파일 hash 불일치0, EV-023/025의 기존 로컬 수락은 유지한다. 이번 반입으로 새 지적을 해결/마감하거나 native·실앱·성능을 수락하지 않는다.
+
+다음 개발 순서는 RV-046/053(P2) 우선 조치 후 나머지 개선/회귀를 권고한다. RV-053 문서/클라이언트 세부는 기존 위임 안이며 heartbeat/lease wire 변경만 H/J 판단 후 진행한다. 자동 reconnect·재전송/구독 간 복원은 도입하지 않았다. 상세와 권한 근거는 REV-022 §7을 따른다.

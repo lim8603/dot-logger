@@ -10,7 +10,7 @@
 | MS-002 | 제한된 수집 코어 | Build | In Progress | TASK-002·TASK-003·TASK-004·TASK-005·TASK-006 | RT 수집·원본 수명·fanout·완료를 대역으로 증명 | 8~14 | [상세](milestones/MS-002.md) |
 | MS-003 | 파일 영속성과 보존 | Build | In Progress | TASK-007·TASK-008·TASK-009 | 다중 파일 기록·회전·이벤트·복구 완성 | 6~9 | [상세](milestones/MS-003.md) |
 | MS-004 | 조회·재생·클라이언트 | Build | In Progress | TASK-010·TASK-011·TASK-012·TASK-013 | Rust API/CLI로 실제 기록 활용 | 7~12 | [상세](milestones/MS-004.md) |
-| MS-005 | 운영 관측·조절·간편 점검 | Build | Planned | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
+| MS-005 | 운영 관측·조절·간편 점검 | Build | In Progress | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
 | MS-006 | 외부 연동과 긴급 기록 | Build | Planned | TASK-019·TASK-020·TASK-021·TASK-026 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
 | MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
 
@@ -43,3 +43,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-31 ADR-011: 현재 PC 실측/UPS 시뮬레이션 수락·native 공개 완료 후 이월 승인. TASK-022 환경/수락 프로필 준비로 MS-007 In Progress이며 Phase Build는 유지하고 종합 시험/Verify 진입/Gate4·5 Pass를 선언하지 않는다.
 
 2026-10-31 TASK-013 EV-025: Rust native client/CLI·오프라인·취소/ACK·화면 API 계약 로컬 구현/리뷰 수락 완료(소스29e55da, 검사15개·Miri32). MS-004의 로컬 조회·재생·원격·클라이언트 근거를 연결했으며 native/다른 OS·실앱/성능 후속 때문에 MS-004 In Progress·Gate4/5 미완료를 유지한다. 다음 개발 후보 TASK-014는 이번 요청 범위에서 착수하지 않았다.
+
+2026-10-31 TASK-014 EV-027: 고정 계측·유한 이력/대상 합계·fixture 로컬 구현/검증·REV-023 위임 수락. MS-005 In Progress, 비용/RT/실앱/native·TASK-015~017은 미완료이며 다음 후보 TASK-015는 미착수다.

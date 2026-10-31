@@ -115,3 +115,11 @@ reader-owned permit은 active→closed 회전을 따라 삭제를 막고, 실제
 ### TASK-011 재생 데이터 수명 — 2026-10-30
 
 Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page/blob 버퍼를 공유하며 최대1건의 미전달 descriptor만 유지한다. inline은 frame borrow 동안만 유효하고 blob은 원본 범위·현재 seek generation으로 검사한다. seek는 미전달 prefetch를 폐기하지만 이미 전달된 데이터를 취소한 것으로 보고하지 않는다. End의 마지막 blob read를 위해 snapshot을 보유하며 stop/Drop/terminal 오류에서 실제 reader close 뒤에만 읽기 permit/예약을 반환한다. 시계는 mono ns·양수 유리수 배속이고 OS timer/worker는 후속이다. 상세 [API §14.2](interface_contract.md#142-task-011-로컬-재생-api--2026-10-30), 검증 EV-018.
+
+## TASK-014 계측 데이터 — 2026-10-31
+
+- CaptureCounts: accepted/rejected/skipped/accepted_bytes/acquire_rejected·overflowed. producer 수 고정, 임의 record/string label 없음. 원본 대여 실패는 제출 결과와 별도이며 재시도마다 즉시 판정을 집계한다.
+- Sample: session_id/revision/epoch/at_ns와 ingress·전체/필수 CompletionTotals. 301개 고정 ring으로 300초 구간+기준 표본을 보존한다.
+- Window: 실제 from_ns/to_ns·session/revision/epoch와 누적 counter 차. 10/60/300초 선택만 제공하며 시간 누락/reset/포화에서 값을 꾸미지 않는다.
+- Observation: Observed·Stale·Unavailable(reason). 미계측은 owner telemetry()의 None, 미제공 completion/다른 session·revision/누락 이력은 명시 사유다. 동시 atomics는 전체 시점 일관성을 약속하지 않으며 배출 후 정확 대조한다.
+- 대상별 CompletionTotals의 assignment는 선택 target, records/expired_records는 session 전체다. 원본 물리 bytes·durable bytes로 accepted_bytes를 해석하지 않는다. reset은 receipt·completion을 변경하지 않는다.

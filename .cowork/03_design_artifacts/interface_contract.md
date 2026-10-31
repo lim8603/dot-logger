@@ -572,6 +572,12 @@ CLI `dot-logger`는 explicit remote 또는 offline manifest를 받는다. schema
 
 RT는 producer-local 고정 카운터만 갱신하고, 관리 경로는 고정 atomic snapshot을 읽어 1초마다 집계하는 안이다. 상세 지연 histogram은 샘플링 또는 시험 모드로 분리한다. 채널 ID는 등록된 유한 집합이고 문자열 label·record ID를 지표 label로 늘리지 않는다. 기본 이력은 10/60/300초 추세에 필요한 고정 ring이며 raw 관측 무제한 보관은 없다.
 
+TASK-014 로컬 API(2026-10-31): CaptureOwner::enable_telemetry는 scope 전에 producer 수만큼의 128B 정렬 고정 counter와 301개 sample(300초+기준 표본)을 control 잔여 예산에 예약한다. 기본은 비활성이며 telemetry()의 None은 미계측이다. enable은 중복 호출해 재예약하지 않는다. RT는 유일 Producer의 small/raw 제출 결과 accepted/rejected/skipped·accepted_bytes 및 별도의 acquire_rejected만 relaxed atomic load/store로 갱신한다. 동시 조회는 서로 가까운 시점의 카운터가 섞일 수 있고 생산자 종료/배출 뒤에는 정확 일치한다. 카운터에는 payload publication 순서를 맡기지 않으며 CAS/대기/할당/클록 호출을 추가하지 않는다. try_acquire 실패는 제출 거절과 별도이고 GeneralProducer 재시도는 각 즉시 판정마다 집계한다.
+
+scope.telemetry()의 빌린 관리 핸들은 producer별 조회 및 sample(at_ns,completion)를 제공한다. host가 최소1초 간격으로 구동하고 session/revision·counter epoch·관측 시각·전체/필수 completion 결과를 함께 보존한다. completion 미제공/다른 session·revision, 불충분/누락 구간, 포화는 Unavailable이며 2초 초과 최신 표본은 Stale다. 10/60/300초 window는 보존된 실제 시간 구간의 카운터 차이며 검증된 처리 능력·추정치는 만들지 않는다. sample/이력 Mutex는 관리 경로에만 있고 RT는 접근하지 않는다. count는 포화 표시 후 절대 wrap하지 않는다.
+
+reset_telemetry는 모든 핸들이 끝난 독점 owner에서만 epoch를 checked 증가시키고 counter/이력만 비운다. receipt sequence·completion의 session 누적 결과는 바꾸지 않는다. Completion::target_totals(id)는 기존 live/retired 권위에서 지정 target assignment만 집계하며 records/expired_records는 여전히 session 전체 값이다. fixed target 목록 밖 ID는 None이다. telemetry metadata는 control 예약에 포함되며 overhead fixture는 examples/telemetry_overhead.rs다. CLI/status runtime backend·자동1초 worker·검증 능력/추정/설정 변경은 후속 Task이며 ≤5% 비용·실제 RT/PC/OS 달성은 이 로컬 API 수락과 별도다.
+
 보고서 값은 `Observed`, `Validated(profile_id)`, `Estimated(assumptions)`, `Unavailable(reason)`, `Stale`로 구분한다. 부하율의 분모는 동일 장비/기능/부하 조합의 검증된 완료 능력이다. 포화 예상은 가용 bytes와 slots 각각의 양의 순증가율로 계산해 먼저 오는 한계를 표시한다. 거절/폐기로 큐가 정체한 경우 Overloaded를 유지한다. 순환 보존 창과 디스크 소진 시간을 다른 필드로 둔다.
 
 `RunCheck`는 dry-run 계획에서 시간·CPU worker 수·RAM·총 쓰기 bytes·디스크 reserve·상대 수신자·완료 경계를 먼저 보여준다. 실행은 명시 요청이다. 어느 예산이 먼저 소진되거나 운영 오류/공간 reserve 침범·취소가 오면 신규 부하를 중단하고 진행 중 IO를 정리한다. 결과는 Pass/Fail/Aborted/Inconclusive이며 짧은 점검을 24시간/UPS 검증으로 바꾸지 않는다. 사용자가 지정한 전용 시험 디렉터리만 만들고 지운다.

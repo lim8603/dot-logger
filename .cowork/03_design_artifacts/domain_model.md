@@ -156,3 +156,7 @@ ADR-007~009와 상세설계·MS 계획은 승인됐다. 세부 수집/소유권/
 `TreatEqually`를 선택하면 Important 전용 수집 예약을 0으로 두고 동일 FIFO/신규 거절 계약을 적용한다. 중요도 metadata는 보존할 수 있지만 우선 수락 효과는 없다. `PrioritizeImportant`에서는 quota의 Normal 한도와 Important 예약을 모두 검사한다. 일반 대기 옵션은 두 정책 모두에 적용 가능하나 RT 핸들에는 적용하지 않는다. 설정 조합은 TC-002에서 교차 검증한다.
 
 소형 중요 이벤트와 대용량 Important 원본은 풀/슬롯 quota를 분리한다. 단일 record가 허용 최대값/잔여 bytes보다 크면 슬롯 여유와 관계없이 거절한다. 한 생산자의 모든 대여 loan도 그 quota에 포함한다.
+
+## TASK-014 로컬 관측 — 2026-10-31
+
+CaptureOwner가 명시 enable로 producer 고정 counter와 유한 이력을 control 예산에 소유한다. RT Producer는 자기 counter의 relaxed atomic 값만 갱신하고 관리 핸들은 host가 최소1초 간격으로 호출하는 sample/window를 제공한다. 동시 표본은 근접 시점 혼합이며 quiescent 배출 후 수량은 정확하다. Counter reset은 scope 밖 owner 독점 접근으로 epoch를 증가시키고 capture receipt/Completion session 결과는 유지한다. 대상별 결과는 Completion의 live/retired 권위를 재사용해 accepted와 fanout assignment를 섞지 않는다. 자동 worker/status backend·능력/예측은 후속이며 API§15·TASK-014를 따른다.

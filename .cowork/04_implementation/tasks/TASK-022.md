@@ -104,3 +104,7 @@ Human 「20ms를 10ms로 줄일 수있을까?」에 따라 합성 제어 주기�
 ## REV-022 RV-049 포화 회복 실측 후속 — 2026-10-31
 
 일반 네트워크 프로필에서 포화 중 초과 연결 거절률/CPU, permit 반환 후 다음 accept 및 backlog 회복 지연을 구분해 측정한다. 현재 10ms 냉각/연결 상한은 유지한다. permit 반환 뒤에도 N개를 반드시 거절한다는 N×10ms 일반식은 사용하지 않는다. 유한 batch 최적화는 이 측정 뒤 판단하며 이번 EV-026 기능 회귀를 처리량/지연 실측으로 승격하지 않는다.
+
+## TASK-014 계측 비용 실측 후속 — 2026-10-31
+
+examples/telemetry_overhead.rs의 enabled/disabled·순서 반전 fixture를 실제 검증 프로필에서 release/CPU·작업 부하·반복 조건을 고정해 실행한다. 기본 계측 완료 처리량 비용≤5%와 계측 포함 RT 지연은 미측정 목표다. EV-027의 128회 debug smoke/할당0은 비용 또는 RT 목표 Pass가 아니다. raw acquisition 거절과 제출 결과, GeneralProducer 재시도 판정 수를 구분해 조건/카운터를 기록한다.

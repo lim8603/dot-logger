@@ -1,9 +1,9 @@
 # dot-logger
 
 로보틱스 프로젝트에 내장할 Rust 로깅·텔레메트리 라이브러리입니다.
-현재 TASK-007까지 구성 검증, 소형/원본 수집, 유한 분배, 완료 추적·제어와
-Protobuf 봉투·MCAP 파일 writer·chunk 인덱스를 구현했습니다.
-로컬 실제 파일 쓰기와 명시 sync를 검증했으며, worker 기동·회전/복구·조회/재생·실장비 검증은 후속 작업입니다.
+구성 검증, 소형/원본 수집, 유한 분배, 완료 추적·제어, MCAP 회전/복구,
+조회/재생, gRPC·Rust client/CLI와 운영 계측·리포트의 로컬 구현을 제공합니다.
+실제 운영 worker·dot-probe 연동과 PC/RT 성능·다른 OS/native 검증은 후속 작업입니다.
 
 개발 도구체인은 `rust-toolchain.toml`의 Rust 1.96.0, 최소 지원 Rust 버전은 1.85입니다.
 `Cargo.lock`으로 직접·간접 의존성을 고정합니다.
@@ -92,3 +92,30 @@ MCAP 0.26.0은 압축 의존성 보안 수정에 따라 승인됐습니다(ADR-0
 일반 경로의 `storage::recover_segment`는 변경이 멈춘 원본을 `Read + Seek`로 읽고 독립된 빈 sink에 복구한다. 호출자는 원래 session/revision/channel 등록, `RecoveryOptions`의 입력 크기·record/chunk 한도와 출력 `WriterConfig`, 취소 표시를 제공한다. 현재 제품의 `dot-logger/1` 무압축·nonzero chunk CRC 형식을 대상으로 하며, 완전한 chunk의 길이/CRC/참조/봉투/생산자 sequence를 모두 검사한 뒤 복사한다. 손상 뒤를 재동기화하지 않고 `RecoveryReport`로 검증 prefix와 제외 suffix/원인을 보고한다. 원본/사용자 opaque payload를 보존하고 새 표준 summary/보조 인덱스를 만든 뒤 새 파일을 sync한다. 과거 프로세스의 Written/Synced 응답은 복원하거나 추정하지 않는다.
 
 `recover_to_store`는 새 파일 생성→복구/file sync→close→이름 확정→directory sync를 구동한다. `SegmentStore`의 배타적 namespace·기존 파일 덮어쓰기 금지 계약이 필요하며, 기본 `FileStore`의 directory sync는 Unix만 지원한다. 실패한 active/이름 확정 파일은 조사용으로 남고 자동 삭제/재시도·성공 catalog 등록은 하지 않는다. 호스트는 원본을 읽기 전용으로 열고 복구 중 변경되지 않도록 보장하며, 대상별 IO 오류를 기존 completion 실패 보고와 연결한다. 자동 시작 시 디렉터리 발견/재개·worker·StorageDegraded 계측·실제 전원 차단/다른 OS 검증은 별도 후속이다.
+
+### 운영 계측과 여유·보존 리포트 (TASK-014/015)
+
+`CaptureOwner::enable_telemetry`로 고정 카운터와 301개 이력을 명시 활성화하고,
+관리 스레드에서 `Telemetry::sample`을 구동합니다. `Telemetry::window(10/60/300)`의
+`Observed(Window)`를 `telemetry::report::ReportInput::from_window`에 전달한 뒤
+`Report::build(input, profile, now_ns)`로 순수 계산합니다. 실제 사용은
+[`tc_009_telemetry.rs`](crates/dot-logger/tests/tc_009_telemetry.rs)의 window 연결 예제를 참조합니다.
+
+입력 건수는 전체 생산자/채널, 완료 건수는 지정 출력의 assignment 단위입니다.
+호스트가 같은 session/revision/epoch·측정 구간의 `OutputDelta`, 물리 `BufferTrend`,
+`DiskTrend`를 공급해야 합니다. 수집하지 않은 값은 `Unavailable`이며 payload bytes를
+실제 점유량으로 대체하지 않습니다. 원본 참조 유지·작업/회수 예약은 해당 물리 자원 관측에
+포함하고 독립 큐/풀은 별도 리포트로 계산합니다. 지연 계측·물리 gauge 수집·자동 worker와
+CLI 운영 metrics backend는 이 계산 API가 구현하지 않습니다.
+
+`capacity::Profile`은 호스트가 확보한 검증 근거를 가리킵니다. 같은 장비/OS/feature·부하/codec/fanout·
+revision·출력·완료 경계와 현재 세션의 유효 구간이 일치해야 부하율을 계산합니다.
+분모는 global ingress와 비교 가능한 완료 능력이며 fanout assignment 합계를 그대로 쓰지 않습니다.
+관측·검증·가정 기반 추정·미측정·만료는 `Value`로 구분합니다. 폐기로 큐가 안정돼도
+`Overloaded`가 유지되며 의도적 필터 생략은 별도입니다.
+
+버퍼 bytes/slots 한계, 출력/회수 정지 가정의 흡수 시간, filesystem reserve/출력 quota의
+소진 시간, 순환 보존 추정과 실제 보존 timestamp span을 따로 제공합니다. 물리 파일 쓰기·삭제와
+filesystem 여유 변화는 다른 관측입니다. `NoGrowth`는 양의 증가가 관측되지 않았다는 뜻이고,
+`AtLimit`는 이미 여유가 없는 상태입니다. 유한 시간이 u64 ns를 넘으면 `BeyondRange`로 표시합니다.
+안정 합성 입력의 계산 검증은 실제 PC/RT 예측 오차≤20%나 계측 비용≤5% 달성을 뜻하지 않습니다.

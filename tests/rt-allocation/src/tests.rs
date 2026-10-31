@@ -1312,3 +1312,43 @@ fn telemetry_preallocation_and_rotating_history_stay_inside_control_reservation(
     assert_eq!((live, peak), (0, 0));
     assert_eq!(telemetry.history_len(), 301);
 }
+
+#[test]
+fn management_report_build_has_no_hidden_heap_or_worker_allocation() {
+    use dot_logger::{
+        completion::Boundary,
+        telemetry::{CaptureCounts, Window, capacity::*, report::*},
+    };
+    let window = Window {
+        session_id: 42,
+        revision: 1,
+        epoch: 1,
+        from_ns: 0,
+        to_ns: 10_000_000_000,
+        counts: CaptureCounts {
+            accepted: 10,
+            ..CaptureCounts::default()
+        },
+    };
+    let input = ReportInput::from_window(
+        window,
+        Conditions {
+            environment_id: 1,
+            workload_id: 2,
+            revision: 1,
+            target_id: 10,
+            boundary: Boundary::Written,
+        },
+    );
+    let calls = allocator::observe(|| {
+        for _ in 0..1024 {
+            let r = std::hint::black_box(Report::build(
+                std::hint::black_box(input),
+                None,
+                10_000_000_000,
+            ));
+            assert_eq!(r.load, Value::Unavailable(Reason::MissingCapacity));
+        }
+    });
+    assert_eq!(calls, (0, 0));
+}

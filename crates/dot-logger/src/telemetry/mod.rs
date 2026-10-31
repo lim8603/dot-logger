@@ -2,9 +2,12 @@
 //!
 //! Capture only updates producer-local atomics. Sampling/history locks are general
 //! path operations and never run inside capture. Missing data is not reported as
-//! zero. Rates, device capacity, forecasts and runtime workers are later tasks.
+//! zero. Management report arithmetic uses explicitly supplied evidence; runtime
+//! workers and device validation remain the host's responsibility.
 mod aggregate;
+pub mod capacity;
 mod counters;
+pub mod report;
 
 use crate::completion::Completion;
 pub use aggregate::{Sample, TelemetryError, Window};
@@ -14,6 +17,8 @@ pub(crate) use counters::{Bank, CounterCell};
 /// Why an observation cannot be supplied; never a numeric zero.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Unavailable {
+    /// The host has not supplied the required resource/output observation.
+    MissingMeasurement,
     /// No completion registry was supplied.
     MissingCompletion,
     /// ID was not registered before capture.

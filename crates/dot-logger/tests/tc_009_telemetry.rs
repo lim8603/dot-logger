@@ -206,3 +206,53 @@ fn concurrent_management_reads_never_modify_producer_counts() {
         assert_eq!(observed(t.producer(0)).skipped, 128);
     });
 }
+
+#[test]
+fn report_consumes_retained_window_and_preserves_unmeasured_resources() {
+    use dot_logger::telemetry::{capacity::*, report::*};
+    let mut owner = CaptureOwner::new(&plan(), 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    owner.enable_telemetry().unwrap();
+    owner.scope(|mut s| {
+        let t = s.telemetry().unwrap();
+        let (mut p, mut r) = s.next().unwrap();
+        t.sample(0, None).unwrap();
+        for second in 1..=10 {
+            accepted(p.try_record_small(meta(), &[1, 2, 3]).unwrap());
+            r.try_read(&mut [0; 16]).unwrap().unwrap();
+            t.sample(second * 1_000_000_000, None).unwrap();
+        }
+        let window = observed(t.window(10));
+        let input = ReportInput::from_window(
+            window,
+            Conditions {
+                environment_id: 100,
+                workload_id: 200,
+                revision: 1,
+                target_id: 10,
+                boundary: Boundary::Written,
+            },
+        );
+        let report = Report::build(input, None, 10_000_000_000);
+        assert_eq!(
+            report.accepted_rate,
+            Value::Observed(Rate {
+                amount: 10,
+                elapsed_ns: 10_000_000_000
+            })
+        );
+        assert_eq!(
+            report.accepted_bytes_rate,
+            Value::Observed(Rate {
+                amount: 30,
+                elapsed_ns: 10_000_000_000
+            })
+        );
+        assert_eq!(report.load, Value::Unavailable(Reason::MissingCapacity));
+        assert_eq!(
+            report.buffer_limit,
+            Value::Unavailable(Reason::MissingMeasurement)
+        );
+        assert_eq!(report.window.epoch, t.epoch());
+        assert_eq!(report.window.session_id, 42);
+    });
+}

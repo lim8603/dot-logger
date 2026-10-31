@@ -313,6 +313,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )
     })?;
+    report_contract();
     #[cfg(feature = "remote")]
     remote_contract(&plan)?;
     println!(
@@ -379,4 +380,36 @@ fn remote_contract(
     drop((receiver, hub, inbox));
     assert_eq!(budget.used_bytes(), 0);
     Ok(())
+}
+
+// Keep the report facade usable without network/runtime/compression features.
+fn report_contract() {
+    use dot_logger::{
+        completion::Boundary,
+        telemetry::{CaptureCounts, Window, capacity::*, report::*},
+    };
+    let window = Window {
+        session_id: 42,
+        revision: 1,
+        epoch: 1,
+        from_ns: 0,
+        to_ns: 10_000_000_000,
+        counts: CaptureCounts::default(),
+    };
+    let input = ReportInput::from_window(
+        window,
+        Conditions {
+            environment_id: 1,
+            workload_id: 2,
+            revision: 1,
+            target_id: 10,
+            boundary: Boundary::Written,
+        },
+    );
+    let r = Report::build(input, None, window.to_ns);
+    assert_eq!(r.capacity, Value::Unavailable(Reason::MissingCapacity));
+    assert_eq!(
+        r.disk_exhaustion,
+        Value::Unavailable(Reason::MissingMeasurement)
+    );
 }

@@ -545,6 +545,27 @@ CLI `dot-logger`는 explicit remote 또는 offline manifest를 받는다. schema
 
 [SDK/화면 계약](../../crates/dot-logger-client/README.md)·[CLI/선언 예제](../../crates/dot-logger-cli/README.md)·[native Query→Replay 예제](../../crates/dot-logger-client/examples/remote_query_replay.rs)·[TASK-013](../04_implementation/tasks/TASK-013.md)·EV-025/REV-021을 따른다. CLI/화면은 같은 native logical 결과를 사용하며 실제 dot-probe 화면 적용은 TASK-020/026이다. CLI10·transport7·실제 파일/프로세스/취소와 영향 Miri32는 로컬 범위이고 다른 OS/native·LAN/RSS/PC/RT/UPS는 잔여다.
 
+### 14.5 REV-022 오류·구독 대기 보강 — 2026-10-31
+
+- `next`의 로컬 wait timeout만으로 구독/미완성 decoder를 버리지 않는다. 같은 owner에서 명시 재대기할 수 있다. 서버 TimedOut(lease 만료) 등 원격 오류·명시 cancel·연결 오류는 종료이며 그 뒤 next는 None이다. tonic0.13.1의 message/poll_next가 decoder 상태를 Streaming에 보관하는 것을 소스 대조하고 실제 TCP 분할 시험으로 확인한다. grpc-timeout은 이 버전의 server response future(handshake)를 제한하며 서버 idle lease를 대체하지 않는다.
+- ReceiverConfig ttl은 조립/미수락 기록 수명과 요청 idle lease를 겸한다. 서버 max_age로 제한된다. heartbeat/lease 분리 wire는 추가하지 않는다. 별도 구독 사이의 기록은 연속 transfer/Gap으로 추정하거나 복원하지 않는다. 화면 호스트는 종료/재구독 경계를 불연속으로 표시한다. 장기 유휴 tail/재구독 복원은 후속이며 이번 조치의 수락 범위 밖이다.
+- handoff는 소비자 미호출의 TTL/세대 사전 거절을 Remote(Gone)으로, 실제 소비자 거절을 ConsumerRejected로 구분한다. 모두 ACK 없음이다. 소비자 수락 뒤 ACK 불명은 기존 AcknowledgementUnknown이다.
+- CLI replay의 정확한 limit=전체 선택 완료는 성공, 추가 기록이 있으면 Limit이다. tail의 명시 건수 수락/ACK 뒤 성공 및 전체 기한은 유지한다. recover는 열린 descriptor의 정규 파일 여부/길이를 출력 생성 전에 재검사하며 불변 path는 host 책임이다.
+
+| 서버/native 오류 또는 gRPC status | gRPC / client 결과 | CLI |
+|---|---|---|
+| Corrupt | DataLoss / Corrupt | invalid_data / exit4 |
+| InvalidInput / 기존 InvalidArgument | InvalidArgument / InvalidInput | invalid_input / exit2 |
+| Limit / 메시지 OutOfRange | ResourceExhausted 또는 OutOfRange / Limit | limit / exit3 |
+| PermissionDenied | PermissionDenied·Unauthenticated / PermissionDenied | permission_denied / exit2 |
+| Version | FailedPrecondition / Version | incompatible_protocol / exit4 |
+| TimedOut | DeadlineExceeded / TimedOut | deadline / exit3 |
+| Gone | NotFound / Gone | gone_or_expired / exit3 |
+| Unsupported | Unimplemented / Unsupported | unsupported / exit2 |
+| 기타 status | Transport | io_or_transport / exit4 |
+
+게시를 시도한 변경 명령 ApplyConfig/RunCheck/Replay의 Gone에도 CLI는 completion_unconfirmed를 붙인다. host Command가 respond 없이 Drop한 것과 capability 부재를 기존 wire에서 구분할 수 없기 때문에 보수적으로 표시한다. 이 표시는 자동 재시도나 실제 IO 종료/미적용의 증거가 아니다. 새 client는 이전 InvalidArgument를 계속 InvalidInput으로 수용하지만, 이전 client는 새 DataLoss를 Transport로 볼 수 있다(성공으로 오인하지 않음). 크기 협상은 추가하지 않는다.
+
 ## 15. 설정·운영 계측·점검 계약안
 
 `validate_config(base_revision, patch)`는 차이·예산·정보 손실·재시작 필요 여부를 반환한다. `apply_config`는 명시 요청만 수행하고 revision 불일치면 Conflict다. 라우팅/필터는 producer 경계에서 적용하며 모든 생산자가 같은 순간에 바뀐다는 보장을 하지 않는다. 응답은 posted revision과 per-producer applied revision을 분리한다. old plan을 처리 중이면 추가 업데이트는 RevisionBusy다.

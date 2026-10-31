@@ -628,6 +628,15 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 
 미실행/후속: GitHub 공개 후(T3) native·다른 OS/실제 dot-probe 화면/운영 보안·TASK-016/017 관리 backend·fresh advisory update·LAN/RSS/PC 성능/RT/UPS/24h. CLI의 Unavailable/Unsupported와 file sync/namespace sync 구분을 유지한다. TASK-013은 로컬 구현 완료/native 잔여로 In Progress, MS-004/Gate4·5 미완료다. 후속 TASK-014 자동 착수 없음.
 
+<a id="ev-026"></a>
+### EV-026 — REV-022 client/CLI·server 오류 및 구독 대기 조치
+
+- 형상: `b3c08bd`, [source92개·검사14개·로그 hash](../06_evolution/imported_context/rev_022_fixes_2026-10-31/results.json)·[재현 script](../06_evolution/imported_context/rev_022_fixes_2026-10-31/verify.py)·[commit blob92개 일치](../06_evolution/imported_context/rev_022_fixes_2026-10-31/commit.json).
+- TDD: [transport/CLI Red6개](../06_evolution/imported_context/rev_022_fixes_2026-10-31/red.json) → Green. handoff 사전 거절·유휴 local next owner 보존·Corrupt/과대응답 진단·tail preflight·정확 limit·host Command Drop 불명 표시. 추가 실제 TCP 분할 대기 만료/재대기 후 CRC/ACK 검증.
+- 2026-10-31 로컬 Linux / Rust1.85.0·1.96.0 각각16feature/consumer·workspace·기본 client·clippy/rustdoc -D warnings, fmt·CLI 예제 검사14개 exit0. transport11·CLI13·수신수명3·codec1, 영향 Miri strict provenance8seeds×4=32 Pass. dependency/lock·wire 두 사본·core unsafe 변경0.
+- [REV-022 §8](reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md#8-조치검증-및-위임-수락--2026-10-31-011) RV-046~055 로컬 조치/판정 수락 및 Closed. RV-049 최적화는 TASK-022 실측 뒤, RV-053 서버 lease 초과 유휴/재구독 연속성은 TASK-020 화면 수락 후속이다. heartbeat/lease wire 변경은 하지 않았다.
+- 기존 승인을 재요청하지 않고 AI 위임 수락한다. native 공개 후(T3)·실앱/장기 tail/LAN/RSS/PC/RT/UPS/24h·구버전 바이너리 교차 검증·Gate4/5는 잔여다. cached audit는 dependency 불변으로 기존 EV-025를 재사용하며 fresh audit는 수행하지 않았다.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.

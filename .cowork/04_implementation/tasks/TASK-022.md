@@ -100,3 +100,7 @@ Human 「20ms를 10ms로 줄일 수있을까?」에 따라 합성 제어 주기�
 10ms 조정 보고 뒤 Human 「승인」을 local-pc-v1 수치 프로필 수락으로 반영했다. 주기/기한10ms·주기당 합성500µs, 안전 루프10ms·200µs, 메모리2GiB·P3 120초×3회·cap160GiB/reserve64GiB·UPS 모의3초/8·64MiB 및 위 표의 조건을 확정했다. 앞선 Draft/승인 대기는 당시 이력이다. approval=Approved·execution=NotRun이며 구현/부팅/실행 결과를 승인으로 대신하지 않는다.
 
 [승인 프로필 스냅샷/사전 점검](../../06_evolution/imported_context/task_022_profile_2026-10-31/approval-checks.json)에서 선언 Valid exit0·준비 점검 exit2, 승인 대기 이유 제거를 확인했다. 선행 성능 harness·실앱 통합/UPS adapter 및 RT 부팅/capability 확인은 잔여다. TASK-022 In Progress·TC-011/012 NotRun·Gate4/5 Not Ready 유지. 기존 조건을 재승인받지 않고 다음 준비에서 사용한다.
+
+## REV-022 RV-049 포화 회복 실측 후속 — 2026-10-31
+
+일반 네트워크 프로필에서 포화 중 초과 연결 거절률/CPU, permit 반환 후 다음 accept 및 backlog 회복 지연을 구분해 측정한다. 현재 10ms 냉각/연결 상한은 유지한다. permit 반환 뒤에도 N개를 반드시 거절한다는 N×10ms 일반식은 사용하지 않는다. 유한 batch 최적화는 이 측정 뒤 판단하며 이번 EV-026 기능 회귀를 처리량/지연 실측으로 승격하지 않는다.

@@ -123,3 +123,7 @@ Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page
 - Window: 실제 from_ns/to_ns·session/revision/epoch와 누적 counter 차. 10/60/300초 선택만 제공하며 시간 누락/reset/포화에서 값을 꾸미지 않는다.
 - Observation: Observed·Stale·Unavailable(reason). 미계측은 owner telemetry()의 None, 미제공 completion/다른 session·revision/누락 이력은 명시 사유다. 동시 atomics는 전체 시점 일관성을 약속하지 않으며 배출 후 정확 대조한다.
 - 대상별 CompletionTotals의 assignment는 선택 target, records/expired_records는 session 전체다. 원본 물리 bytes·durable bytes로 accepted_bytes를 해석하지 않는다. reset은 receipt·completion을 변경하지 않는다.
+
+### TASK-016 revision 전환과 비교 — 2026-11-01
+
+Completion RecordSlot은 accepted record의 revision과 target 선택을 보존한다. posted revision과 producer별 applied revision은 분리하며, 두 bank 외의 무제한 plan 이력을 만들지 않는다. Sample은 안정 revision 또는 RevisionTransition 미가용 상태를 보존하고 서로 다른 session/revision/epoch의 구간을 합치지 않는다. Snapshot은 원래 Report/profile provenance·application_input_id·Window와 선택 Resources(동일 Window/measurement_scope_id)를 보존한다. Comparison의 signed-magnitude RateChange는 after-before의 정확한 u128 유리수이며 intentional skip·거절·출력 실패/폐기/Unknown은 구분한다. MCAP 봉투/파일의 단일 revision은 유지하고 새 revision은 명시 budget/별도 writer로 기록한다.

@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-10-26 |
-| 다음 액션 | old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-01 |
+| 다음 액션 | EV-030 로컬 수락·REV-027 Closed; runtime backend/실측/실앱/native 후속, 다음 TASK-017 |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -21,19 +21,31 @@
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger/src/control/config_update.rs; telemetry/compare.rs`. 아직 생성된 코드 경로가 아니다.
+구현 경로: `crates/dot-logger/src/control/config_update.rs` · `crates/dot-logger/src/telemetry/compare.rs`. capture/completion/routing/pool/telemetry와 단일 revision writer budget을 연결했다.
 
 첫 실패/리뷰 조건: **old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-009`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 최소 구현 후 관련 `TC-009`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] 필터/샘플링/기존 route 적용·기존 수락 불변·입력 조건 차이와 손실 분리 비교.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] 필터/샘플링/기존 route 적용·기존 수락 불변·입력 조건 차이와 손실 분리 비교.
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] Human 착수 승인·기존 위임에 따른 AI 로컬 구현/개발 자가 점검 수락. 직접 Human 추가 리뷰/실측 완료를 뜻하지 않는다.
 
-테스트 정의: [TC-009](../../05_verification/test_case.md#tc-009). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+테스트 정의: [TC-009](../../05_verification/test_case.md#tc-009). 설정 변경13개·비교3개·실제 파일 writer1개·RT allocator1개 추가, EV-030/source542c6e6·source102개·검사10개·Miri496 Pass. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+
+## 현재 계약과 검증 범위
+
+- [API §15.2](../../03_design_artifacts/interface_contract.md#152-task-016-로컬-설정-변경전후-비교--2026-11-01): 명시 enable/validate/apply·현재값 preview·posted/per-producer ack·old plan Busy·Conflict·checked revision·고정 예산.
+- runtime 최소 level/Normal sampling/기존 target route. Important sampling 우회·raw 동일 loan 반환·기존 수락 route 보존. idle poll/forget 강제 회수 없음.
+- 전환 표본은 RevisionTransition, 혼합 revision Window 금지. Report/Snapshot 비교는 입력·장비·boundary·scope 차이와 skipped/용량 거절/출력 손실을 분리한다.
+- 단일 revision MCAP 파일은 새 명시 budget/별도 writer로 연결한다. 자동 worker/원격 ApplyConfig·Compare 운영 backend/CLI runtime·실앱/native·실제 PC/RT 비용/오차는 미완료다.
+- 새 H/J 결정 없음: 승인된 두 세대/생산자 경계·기존 target 범위 구현이며 새 ADR/의존성/wire를 만들지 않았다.
+
+## 로컬 수락·후속
+
+[EV-030](../../05_verification/verification_evidence.md#ev-030)·[REV-027](../../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) Closed. source `542c6e65999de69ea8f682b4418de1c0fa730990`·검사10개/Miri496·source102개 commit blob 일치. native/운영 backend/실앱·실제 PC/RT 비용/오차 후속이 남아 Task는 In Progress, TC-009 전체 Partial·MS-005 In Progress·Gate4/5 Not Ready를 유지한다. 다음 후보 TASK-017은 Planned/미착수다.

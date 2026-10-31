@@ -592,6 +592,20 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 버퍼 예측은 `remaining_bytes/양의 물리 bytes 순증가율`, `remaining_slots/양의 slots 순증가율`의 빠른 한계다. 출력/회수 정지 가정은 순증가율 대신 gross 물리 유입률을 쓴다. filesystem은 free-reserve와 net free 감소율, 출력 quota는 quota 잔여와 written-deleted 순증가율을 독립 계산해 빠른 것을 고른다. 순환 보존은 보호/pin을 뺀 재사용 byte 예산/gross 물리 쓰기율 모델이며 실제 retained timestamp span과 분리하고 구간 내 완전한 연속 보존을 보장하지 않는다. Forecast는 AtLimit(잔여0), AfterNs(양수·ns 올림), NoGrowth(증가율0/음수·무한 여유 아님), BeyondRange(양수지만 u64 ns 초과)다. BeyondRange보다 먼저 도달하는 알려진 유한/AtLimit 한계를 유지한다. 안정 합성 step simulation은 계산 시나리오 검증이며 PC/RT 예측 오차≤20%·계측 비용≤5% 실측은 별도다.
 
+### 15.2 TASK-016 로컬 설정 변경·전후 비교 — 2026-11-01
+
+`CaptureOwner::enable_config_updates(&routing)`는 추적 owner와 일치하는 초기 route에 한해 scope 전에 두 고정 policy/route bank·생산자 ack/cutoff/소비 watermark·수명 계수를 control 잔여 예산에 예약한다. 채널별 샘플링 위상은 owner가 보유한 생산자별 고정 배열이다. `scope.config_updates()`의 `ConfigUpdates`는 `channel_policy(base, channel)`·`route_targets(base, channel, buffer)`로 현재 값을 읽고, `validate_config(base, &ConfigPatch)`로 실제 변경 개수·정보 손실·재시작 필요·고정 예약 bytes를 확인한다. validate는 게시/IO/자동 적용을 하지 않는다. 최소 level·양수 sample_every와 기존 target 집합 route만 live 변경하며 schema/importance mapping·생산자/target 수·풀/worker/긴급 계획은 고정이다. memory 변경은 dry-run에서 restart_required, apply에서 RestartRequired다. 중복/미등록/0 간격·빈 실효 변경·feedback 한도 초과는 InvalidPatch, 짧은 route buffer는 무변경 BufferTooSmall이다.
+
+`apply_config`는 관리 Mutex로 직렬화하고 base 불일치는 Conflict, 이전 세대가 남으면 RevisionBusy, 최대 revision은 RevisionExhausted로 무변경 반환한다. 게시된 u64와 `producer_revision(id)`의 per-producer ack는 별개다. 각 small/raw 제출 또는 `Producer::apply_pending_config()`가 acquire한 posted 정책으로 전환하며, idle 생산자는 직접 poll하기 전 이전 revision을 유지한다. 모든 생산자의 ack와 최종 old accepted_seq까지의 ingress 소비, old completion terminal, old RawRecord/공유 Delivery의 실제 Drop를 모두 확인한 뒤에만 이전 bank를 재사용한다. forget한 guard/idle producer의 강제 회수나 timeout 성공 추정은 없다. RT에서는 고정 배열·원자 load/store와 기존 완료 예약만 사용하고 새 lock/할당/해제/IO/clock/콜백/대기 루프는 없다. 관리 guard의 증감은 일반 경로다.
+
+샘플링은 유효하고 level 필터를 통과한 Normal **제출 시도**의 첫 건과 매 N번째를 유지한다. 채널·생산자별 위상은 revision 전환 때 0으로 초기화하고 scope 재대여로 초기화하지 않는다. 잘못된 schema/길이/loan ownership은 생략으로 숨기지 않으며, raw 실패/생략은 같은 loan을 반환한다. Important는 샘플링을 우회하지만 명시 level 필터는 적용한다. sampling은 앱의 생성 주기/계산을 변경하지 않으며 skipped는 용량/계약/수명 거절과 별도다. 수락한 record는 그 revision과 route를 영구 보존하고 Completion slot의 revision/대상 선택을 해당 수락 시점에 고정한다.
+
+계측 `sample`은 관리 게시 직렬화 안에서 revision을 붙인다. 생산자/old record/완료/실제 guard가 전환 중이면 capture/output 모두 Unavailable(RevisionTransition)다. History는 session/revision/epoch가 다른 표본이나 전환 표본을 가로질러 Window를 만들지 않으며, 새 안정 baseline 뒤 10/60/300초가 필요하다. Completion::revision()은 초기 등록 식별자이고 Sample::revision은 현재 안정 revision이다. 누적 카운터/완료 합계는 session 전체를 보존하며 reset을 암묵 수행하지 않는다.
+
+`Router::writer_budget_for_revision(target, revision)`은 현재/직전으로 유지된 revision을 명시한 단일 revision writer budget이다. 기존 writer에 새 revision을 섞지 않으며 호스트가 이전 writer를 끝내고 해당 revision 파일을 별도로 열어야 한다. session/revision 고정 snapshot/recovery/replay 계약은 유지한다. 파일 생성/회전 자동 worker·원격 ApplyConfig/Compare 운영 backend·CLI runtime 연결은 후속이며 현재 proxy의 Unsupported를 성공으로 바꾸지 않는다.
+
+`telemetry::compare::Comparison::build(Snapshot, Snapshot)`은 두 Report의 profile provenance/revision/실제 Window·완료/실패/폐기/Unknown·모든 거절 범주를 보존한다. application_input_id는 로거 이전의 앱 생성 조건이며 앱에서 주기/생성 작업을 바꾸면 새 ID를 부여한다. session/epoch·장비/OS/feature·workload·앱 생성·target/완료 boundary·자원 측정 scope 차이, 겹치거나 잘못된 구간은 Differences에 모두 남기고 수치 차이는 Unavailable(IncomparableConditions)다. 서로 다른 revision 자체는 의도한 비교이므로 거절하지 않는다. Observed accepted/bytes/완료/의도적 skip/capacity 거절 시도율과 실제 주입 CPU ns/구간, latency/memory 차이는 정수 부호+u128 유리수로 계산한다. stale/미제공/예측 수치를 관측 절감으로 바꾸지 않고 Resources는 정확한 Window·측정 scope가 필요하다. 실제 CPU/메모리/지연 수집은 호스트 책임이고 처리량 감소만으로 앱 작업 절감을 주장하지 않는다.
+
 `RunCheck`는 dry-run 계획에서 시간·CPU worker 수·RAM·총 쓰기 bytes·디스크 reserve·상대 수신자·완료 경계를 먼저 보여준다. 실행은 명시 요청이다. 어느 예산이 먼저 소진되거나 운영 오류/공간 reserve 침범·취소가 오면 신규 부하를 중단하고 진행 중 IO를 정리한다. 결과는 Pass/Fail/Aborted/Inconclusive이며 짧은 점검을 24시간/UPS 검증으로 바꾸지 않는다. 사용자가 지정한 전용 시험 디렉터리만 만들고 지운다.
 
 `Compare`는 before/after의 profile/revision/window·완료/지연/손실·의도적 생략·CPU/메모리를 대조한다. 다른 장비·부하/측정 경계는 비비교 가능으로 표시한다. 입력 자체를 조절하는 코드는 사용자 앱의 책임이며 로거의 샘플링은 기록량만 바꾼다. FR-015 추천은 제안 기능으로 명시하고 자동 적용을 하지 않는다.

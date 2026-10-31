@@ -160,3 +160,7 @@ ADR-007~009와 상세설계·MS 계획은 승인됐다. 세부 수집/소유권/
 ## TASK-014 로컬 관측 — 2026-10-31
 
 CaptureOwner가 명시 enable로 producer 고정 counter와 유한 이력을 control 예산에 소유한다. RT Producer는 자기 counter의 relaxed atomic 값만 갱신하고 관리 핸들은 host가 최소1초 간격으로 호출하는 sample/window를 제공한다. 동시 표본은 근접 시점 혼합이며 quiescent 배출 후 수량은 정확하다. Counter reset은 scope 밖 owner 독점 접근으로 epoch를 증가시키고 capture receipt/Completion session 결과는 유지한다. 대상별 결과는 Completion의 live/retired 권위를 재사용해 accepted와 fanout assignment를 섞지 않는다. 자동 worker/status backend·능력/예측은 후속이며 API§15·TASK-014를 따른다.
+
+## TASK-016 로컬 실행 연결 — 2026-11-01
+
+설정 게시에는 owner-held 두 policy/route bank와 생산자별 고정 sampling 위상·ack/cutoff를 사용한다. 공유 bank는 atomic 필드로 게시하고 RT는 유일 Producer의 호출 경계에서 revision을 채택한다. 관리 게시만 Mutex를 사용한다. old accepted_seq의 ingress watermark·completion terminal과 원본/출력 guard를 함께 확인해 bank를 회수한다. 승인된 두 세대·생산자 경계 적용 계약의 구현 세부이며 새 runtime/프로토콜/의존성을 채택하지 않는다. 상세 API §15.2, 원격/자동 worker·실측/실앱/native 후속은 유지한다.

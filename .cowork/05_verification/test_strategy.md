@@ -10,7 +10,7 @@
 | 관련 Milestone / Task | MS-001~007 / TASK-001~026(계획 승인) |
 | 상태 | TDD 개발 방식 Approved — 2026-10-25 Human 「응 그렇게 하는 것으로, 최종 승인」 |
 | 승인 범위 | 실패 테스트 → 최소 구현 → 리팩토링. 실제 장비의 통합·성능·전원 차단 검증 병행 |
-| 현재 단계 | Build — TASK-011 Human 승인·EV-019 로컬 Pass, TASK-022 현재 PC 프로필 준비. UPS 시뮬레이션 수락·native 공개 후 이월(ADR-011) |
+| 현재 단계 | Build — TASK-012 EV-022 로컬 Pass·REV-018 Human 리뷰 대기, TASK-022 local-pc-v1 수치 프로필 Approved. UPS 시뮬레이션 수락·native 공개 후 이월(ADR-011) |
 | 갱신 | 2026-10-31 / AI |
 
 ## 1. TDD 개발 순서
@@ -105,3 +105,11 @@ TASK-007 리뷰 수정 [EV-011](verification_evidence.md#ev-011)은 배치 Writt
 UPS는 모의 입력·기한/지연·최대 보호량·순위·off/on·중복/더 이른 기한·오류/부분 완료·진행 IO 수명과 실제 파일 sync/중단·복구를 검증해 '시뮬레이션 합격(승인된 대체 판정)'으로 보고한다. 실물 UPS/물리 전원 차단은 필수 수락 조건에서 제외한다. 24시간·메모리 예산·P0 대비 완전 경로·소프트웨어 통합 요구는 유지한다.
 
 native GAP-004는 저장소 공개 완료 후 6 contracts+audit+raw-memory를 당시 source hash로 실행하는 승인된 이월이다. 공개 전 구현/로컬 검증·준비는 진행하며 현재 미실행을 Pass로 바꾸지 않는다. 현 Task 상태/시험 결과는 개별 근거로 판단한다. 이번 작업은 수락 기준·환경 조사이며 제품 성능/UPS/24h 시험을 실행한 것은 아니다.
+
+## 9. 현재 PC 수치 프로필 Approved — 2026-10-31
+
+[TASK-022](../04_implementation/tasks/TASK-022.md#현재-pc-수치-프로필-초안--2026-10-31)의 local-pc-v1은10ms 주기/기한 조정 뒤 Human 「승인」으로 확정한 수치 수락 조건이다. [TOML](../../test-profiles/local-pc.toml)의 경로/CPU·예산·기간·합성 제어·UPS 모의 조건을 짝 P0/off-on 실행 전 고정한다. 120초×3회·RAM2배·최종 sync·160GiB cap/64GiB reserve와 2GiB 배분은 실행 가능한 선언으로 점검했으며 성능은 Not Run이다. 실제 dot-probe20ms/안전10ms 코드를 참조했으며 Human 요청으로 합성 control 주기/기한은10ms로 조정했다. 주기당 작업500µs·기타 표의 기준을 함께 수락했다. generic/RT·선행 harness 미구현·미통합/공개 후 native를 분리하고 문서/사전 검사 통과를 TC-012 전체 합격으로 사용하지 않는다. 확정된 수치는 반복 승인 없이 사용하며 변경되는 새 H/J 결정만 검토한다. [EV-021](verification_evidence.md#ev-021) 참조.
+
+## 10. TASK-012 원격 adapter 검증 — 2026-10-31
+
+[EV-022](verification_evidence.md#ev-022)은 실제 loopback TCP/TLS와 native receiver/host queue를 연결해 전송과 수신 인계 ACK를 구별한다. malformed Authorization/이전 generation/native reply capacity/요청 blob 길이 반례를 Red→Green으로 기록했다. 고정 external authority·receiver permit·실제 host Command 수명/timeout·response/fragment schema 한도를 검사하고 파일Written/원본 수명·기존RT0/0을 회귀한다. 원격 코어 hub 초기화+receiver의 요청 bytes와 전체 Tokio/TLS/HTTP2/runtime RSS·LAN 처리량을 구분한다. backend의 실제 Query/ReadBlob/Replay/Completion은 bounded host inbox를 통해 native primitive에 연결하며 ApplyConfig/RunCheck/Compare backend 자체와 CLI는 후속 Task다. 두 Rust각16feature/독립 소비자/allocator·lint/doc/fmt·proto9message83field·영향Miri48을 최종 source70개로 고정했다. Native 공개 후(T3)·TC-007 전체/실제 앱/성능 시험은 후속이다.

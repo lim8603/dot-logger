@@ -19,11 +19,11 @@
 | TASK-005 | 분배·출력 격리·예산 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-31 | EV-004 로컬 Pass·Human 승인 유지; native는 공개 완료 후(T3) 실행 | TASK-004 | [상세](tasks/TASK-005.md) | 1~2 |
 | TASK-006 | 완료 추적·명시 sync·종료 | MS-002 | INT-001 | US-001·005 | AI | In Progress | 2026-10-31 | EV-009 최신 수정분 로컬 Pass·Human 승인; native는 공개 완료 후(T3) 실행 | TASK-005 | [상세](tasks/TASK-006.md) | 2~3 |
 | TASK-007 | MCAP 봉투·writer·인덱스 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | EV-011 로컬 Pass·Human 승인·REV-008 Closed; native는 공개 완료 후(T3) 실행 | TASK-006 | [상세](tasks/TASK-007.md) | 2~3 |
-| TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | REV-009/010 Human 리뷰·현재 PC 실측, native는 공개 완료 후(T3) | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
+| TASK-008 | 회전·순환·이벤트 보호 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-007 | [상세](tasks/TASK-008.md) | 2~3 |
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | EV-014/015 로컬 Pass·Human 승인; 현재 PC 대체 실측·모의 장애, native 공개 후 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
-| TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | REV-013/014 Human 리뷰·현재 PC 조회/IO 실측, native 공개 완료 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
-| TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-019 로컬 Pass·Human 승인; 현재 PC 실제 시계/IO 실측, native 공개 후 | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
-| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | 느린 구독자·잘못된 조각·ACK 전 disconnect·인증 없는 비-loopback | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
+| TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
+| TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
+| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-022 로컬 Pass·REV-018 Human 리뷰 → TASK-013, native 공개 후 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
 | TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | Planned | 2026-10-26 | CLI JSON schema·exit code·query→replay 사용자 흐름과 Ctrl-C | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 폐기로 안정된 큐 Overloaded·미측정 분모·음수/0 증가율 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
@@ -33,7 +33,7 @@
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 동일 timestamp 충돌·timeout 이후 unknown·부분 batch 오류 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 일반 tracing을 RT 경로로 사용하지 않음·화면 client 데이터 흐름 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-31 | ADR-011 UPS 시뮬레이션 수락: off/기한/순위/진행 IO·복구 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |
-| TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-10-31 | PC/UPS 수락 확정·환경 수집 → RT 부팅/P0·제어 부하/기한/경로/예산 구체화 | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
+| TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-10-31 | local-pc-v1 Approved·선행 harness 준비; RT 부팅/capability 확인 뒤 실행 | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절 | TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | 현재 PC24h/장애·UPS 시뮬레이션·native/OS 교환 공개 후 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-26 | 문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치 | TASK-024 | [상세](tasks/TASK-025.md) | 1~2 |
@@ -41,6 +41,6 @@
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 
-TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consumer/예제/lint/doc/fmt·allocator8·Miri776. REV-009 Resolved·최신 구현 Human 리뷰/native·장비는 대기다.
+TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consumer/예제/lint/doc/fmt·allocator8·Miri776. REV-009/010은 2026-10-31 Human 승인·Closed, 현재 PC 실측/native 후속은 잔여다.
 
 2026-10-31 Human 승인 ADR-011: 현재 PC 실측을 실제 장치 시험 대체 근거로 수락, UPS 시뮬레이션 판정, GitHub native는 공개 완료 후 진행한다. TASK-022는 환경/수락 프로필 준비로 In Progress이며 현재 generic 실행/RT 설치를 구분했다. TASK-004~011의 실행 근거·Human 리뷰 상태는 개별 유지하며 이번 정책 변경만으로 미실행 시험/Task를 일괄 Pass/Done으로 바꾸지 않는다.

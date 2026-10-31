@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-019 로컬 Pass·Human 승인; 현재 PC 실제 시계/IO 실측, native 공개 후 |
+| 다음 액션 | EV-020 Human 승인·현재 PC 실측 준비, native 공개 후(T3) |
 | 의존 | TASK-010 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -34,7 +34,8 @@
 - [x] 가상시계로 deterministic 순서·실제 파일 replay·결측·bounded prefetch 검증.
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [x] Human 리뷰 완료 — 2026-10-31 최종 구현 승인. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 리뷰 완료 — EV-018/019의 2026-10-31 최종 구현 승인 유지.
+- [x] REV-017/EV-020 추가 조치 Human 리뷰 — 2026-10-31 승인. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-006](../../05_verification/test_case.md#tc-006). 제품 코드·테스트 실행 결과: [EV-018](../../05_verification/verification_evidence.md#ev-018). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -84,3 +85,13 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `9660d7d`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. [커밋 대조](../../06_evolution/imported_context/task_011_review_fixes_2026-10-31/commit.json)·[소스 게시 근거](../../06_evolution/imported_context/task_011_review_fixes_2026-10-31/push.json). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
 
 TASK-011 Human 승인·REV-015/016 Closed, ADR-011 Accepted를 유지한다. 현재 PC 실측/UPS 시뮬레이션을 수락하며 native는 공개 완료 후(T3) 진행한다. 다음 시작점은 TASK-022의 실행 커널 확인·P0/제어 부하/기한/경로/예산 프로필 준비다. 현재 generic 실행/RT 설치를 구분하며 재부팅·부트 변경은 수행하지 않았다. TASK-008/010 Human 리뷰·PC 실측/UPS/24h 미실행·Gate4/5 Not Ready는 잔여다. 검증/수락/마감 문서는 별도 docs(cowork)·[skip ci] 커밋으로 게시하며 세션 종료 후 새 Task를 자동 착수하지 않는다.
+
+## REV-017 반입·추가 조치 — 2026-10-31
+
+RV-029는 MSRV1.85 보존을 위해 query 예약 함수에만 deprecated 경고 억제, RV-030은 성분 Eq 유지·`Speed::is_equivalent` 비율 비교, RV-031은 variant별 Display 및 원 Query/IO 진단 보존으로 조치했다. 기존 배속 제어/anchor·소유권·오류 분류/terminal 정리·RT/unsafe·의존성은 유지한다. [REV-017](../../05_verification/reviews/REV-017_TASK-011_FINAL_REVIEW.md)의 처리담당 판정과 [EV-020](../../05_verification/verification_evidence.md#ev-020)에 두 Rust 검증10개·Miri14 단일 seed·source54개 hash를 기록했다.
+
+REV-017 Resolved·이번 추가 조치 Human 승인 대기, 기존 EV-018/019 승인·REV-015/016 Closed는 유지한다. 미커밋·미게시이며 TASK-008/010 리뷰·PC 성능/실제 timer·UPS 시뮬레이션·native 공개 후(T3) 잔여, TASK-011/MS-004 In Progress·Gate4/5 Not Ready다. TASK-012 자동 착수 없음.
+
+## 후속 Human 승인 — 2026-10-31
+
+Human 「승인, 다음작업 진행하자」로 EV-020의 구현/조치 최종 리뷰를 승인했다. 관련 리뷰 Closed·Human 리뷰 체크 완료. 앞선 승인 대기 본문은 이력이며 현재 PC 실측/UPS 시뮬레이션·native 공개 후(T3) 잔여로 In Progress를 유지한다. 다음 작업은 TASK-022 프로필 구체화다.

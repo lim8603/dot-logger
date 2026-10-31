@@ -4,7 +4,7 @@
 * **일자 / 리뷰어:** 2026-10-30 / AI ([code-review skill](../../../.agents/skills/code-review/SKILL.md))
 * **대상 Task / 기준 커밋:** [TASK-008](../../04_implementation/tasks/TASK-008.md) / commit [`7388145`](../../../crates/dot-logger/src/storage/retention.rs) (`71b3e2c` 대비 회전·보존·이벤트 보호 추가 구현분, EV-012 기준 소스 49개)
 * **종합 판정:** Conditional (Pass 조건부 수용 — P1 0건, P2 1건, P3 2건)
-* **진행 상태:** Resolved (2026-10-30 RV-012 계약 유지/위험 명시·TASK-010 연결, RV-013/014 수정·EV-013 로컬 Pass; Human 최종 구현 리뷰 대기)
+* **진행 상태:** Closed — 2026-10-31 Human 최종 구현 승인 (EV-012/013)
 
 ---
 
@@ -12,9 +12,9 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-012 | P2 | [`catalog.rs:285-350`](../../../crates/dot-logger/src/storage/catalog.rs#L285-L350)<br>[`ReadPin`](../../../crates/dot-logger/src/storage/catalog.rs#L101-L107) | `ReadPin` 누수 시 만료(deadline) 후에도 파일 삭제가 영구 차단되는 고립(Orphaned Pin) 리스크 | `expire_pins` 검토 또는 TASK-010(Active Reader) 연계 강제 회수 정책 정립 | 현 계약 유지·위험 문서화·TASK-010 연결 | Resolved(로컬) |
-| RV-013 | P3 | [`retention.rs:476-479`](../../../crates/dot-logger/src/storage/retention.rs#L476-L479) | `SegmentLog::append` 회전 시 `room(now, false)` 중복 호출로 여유 공간 IO 조회 1회 낭비 | `if rotated.is_none() { self.room(now, false)?; }` 분기로 중복 IO 제거 | 수정·회귀 Pass | Resolved(로컬) |
-| RV-014 | P3 | [`retention.rs:47-68`](../../../crates/dot-logger/src/storage/retention.rs#L47-L68) | `FileStore::new`의 심볼릭 링크 방어(`symlink_metadata` 검사)의 보안 의도 rustdoc 명시 부재 | rustdoc 주석에 session 디렉터리 symlink traversal 방어 불변식 보강 | 수정·회귀 Pass | Resolved(로컬) |
+| RV-012 | P2 | [`catalog.rs:285-350`](../../../crates/dot-logger/src/storage/catalog.rs#L285-L350)<br>[`ReadPin`](../../../crates/dot-logger/src/storage/catalog.rs#L101-L107) | `ReadPin` 누수 시 만료(deadline) 후에도 파일 삭제가 영구 차단되는 고립(Orphaned Pin) 리스크 | `expire_pins` 검토 또는 TASK-010(Active Reader) 연계 강제 회수 정책 정립 | 현 계약 유지·위험 문서화·TASK-010 연결 | Closed |
+| RV-013 | P3 | [`retention.rs:476-479`](../../../crates/dot-logger/src/storage/retention.rs#L476-L479) | `SegmentLog::append` 회전 시 `room(now, false)` 중복 호출로 여유 공간 IO 조회 1회 낭비 | `if rotated.is_none() { self.room(now, false)?; }` 분기로 중복 IO 제거 | 수정·회귀 Pass | Closed |
+| RV-014 | P3 | [`retention.rs:47-68`](../../../crates/dot-logger/src/storage/retention.rs#L47-L68) | `FileStore::new`의 심볼릭 링크 방어(`symlink_metadata` 검사)의 보안 의도 rustdoc 명시 부재 | rustdoc 주석에 session 디렉터리 symlink traversal 방어 불변식 보강 | 수정·회귀 Pass | Closed |
 
 ---
 
@@ -78,3 +78,7 @@
 ## 최종 처리 결과 — 2026-10-30
 
 [EV-013](../verification_evidence.md#ev-013) / [source49개·명령/로그 hash](../../06_evolution/imported_context/task_008_review_fixes_2026-10-30/results.json): 보존 통합17개(신규2)·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt, 보존 Miri16×8=128회 Pass다. RV-012의 잔여 위험은 문서와 TASK-010 체크에 명시했으며 토큰 유실을 자동 복구한 것은 아니다. Human 구현 리뷰/native·장비는 잔여로 Conditional/Resolved를 유지한다. 새 REV를 만들어 처리 이력을 분산하지 않았고 제품 수정은 리뷰 전용 세션이 아닌 개발 세션 #003에서 수행했다. commit/push는 수행하지 않았다.
+
+## Human 최종 구현 승인 — 2026-10-31
+
+Human 「승인, 다음작업 진행하자」로 직전 보고의 TASK-008 REV-009/010, TASK-010 REV-013/014, TASK-011 REV-017 구현·리뷰 조치를 수락했다. 본 리뷰와 해당 RV 항목은 Closed다. EV-012/013의 검증 근거 및 현재 구현 범위를 승인하며, 앞선 Resolved/승인 대기 본문은 승인 전 이력으로 보존한다. 낮은 ReadPin 유실의 강제 회수 없음·실제 reader close 뒤 반환 계약과 native 공개 후(T3)·현재 PC 실측/UPS 시뮬레이션 잔여는 유지한다. Task/MS 및 Gate4/5 완료를 뜻하지 않는다. 다음 작업은 TASK-022 프로필 구체화이며 커밋/푸시는 수행하지 않았다.

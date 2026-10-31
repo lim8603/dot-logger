@@ -5,15 +5,15 @@
 - 일자/리뷰어: 2026-10-30 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
 - 대상: TASK-009 승인/게시 소스fe03468·문서aee3830 위 TASK-010 query·pin 수명·통합/API consumer/allocator·CI recipe 변경.
 - 판정: Conditional — 최초 행동 Red6개 후 조회/정렬/페이지/blob/공유 예약·읽기 수명 구현. 최종 EV-016 로컬 Pass, Human 최종 리뷰/native·실장비 잔여.
-- 상태: Resolved — In Progress 조치→EV-016 최종 로컬 Pass. 리뷰 전용 세션이 아니며 제품 수정은 Human의 다음 Task 진행 지시에 따른다.
+- 상태: Closed — 2026-10-31 Human 최종 구현 승인 (EV-016/017)
 
 ## 리뷰·처리 요약
 
 | ID | 중요도 | 위치/문제 | 처리 | 상태 |
 |---|---|---|---|---|
-| RV-018 | P2 | Snapshot의 만료 판정이 각 호출의 now만 검사하여 과거 now를 넘기면 이미 만료된 cursor를 다시 읽을 수 있음 | 최대 관측 시각 Cell로 만료를 단조롭게 유지, 결정적 Red→Green 회귀 | Resolved |
-| RV-019 | P2 | `read_blob` 만료가 §14의 Gone 계약 대신 공통 Expired를 반환 | blob 경로의 만료를 Gone으로 매핑, 만료 후 과거 now 재시도까지 Red→Green 회귀 | Resolved |
-| RV-020 | P2 | 설정한 frame body 상한 초과를 CorruptData로 뭉뚱그려 입력 파일 손상과 자원 한도를 구분하지 못함 | scan_stop에서 Limit/Unsupported/CorruptData를 분리, body 한도 반례 Red→Green | Resolved |
+| RV-018 | P2 | Snapshot의 만료 판정이 각 호출의 now만 검사하여 과거 now를 넘기면 이미 만료된 cursor를 다시 읽을 수 있음 | 최대 관측 시각 Cell로 만료를 단조롭게 유지, 결정적 Red→Green 회귀 | Closed |
+| RV-019 | P2 | `read_blob` 만료가 §14의 Gone 계약 대신 공통 Expired를 반환 | blob 경로의 만료를 Gone으로 매핑, 만료 후 과거 now 재시도까지 Red→Green 회귀 | Closed |
+| RV-020 | P2 | 설정한 frame body 상한 초과를 CorruptData로 뭉뚱그려 입력 파일 손상과 자원 한도를 구분하지 못함 | scan_stop에서 Limit/Unsupported/CorruptData를 분리, body 한도 반례 Red→Green | Closed |
 
 ## RV-018 상세
 
@@ -69,3 +69,7 @@
 [EV-016](../verification_evidence.md#ev-016)·[source53개/명령/로그 hash](../../06_evolution/imported_context/task_010_2026-10-30/results.json)로 고정했다. 최종 matrix9+Miri1=검사10개 exit0, source53개가 두 실행/현재 작업 트리와 일치한다. 두 Rust16 features/독립 실제 파일 consumer·예제·clippy/rustdoc/fmt·allocator10 및 Miri128×8=1024 Pass다. query256B/8MiB peak11143/25176199 ≤ external 예약110776/67217592 bytes, 잔여0·기존 RT0/0을 유지한다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. Human 최종 구현 승인 전 Closed로 바꾸지 않는다. native/장비·closed summary scan 생략 최적화/재생/remote/CLI 미구현 범위를 유지한다.
 
 후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `8bbec13`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. [커밋 대조](../../06_evolution/imported_context/task_010_2026-10-30/commit.json). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
+
+## Human 최종 구현 승인 — 2026-10-31
+
+Human 「승인, 다음작업 진행하자」로 직전 보고의 TASK-008 REV-009/010, TASK-010 REV-013/014, TASK-011 REV-017 구현·리뷰 조치를 수락했다. 본 리뷰와 해당 RV 항목은 Closed다. EV-016/017의 검증 근거 및 현재 구현 범위를 승인하며, 앞선 Resolved/승인 대기 본문은 승인 전 이력으로 보존한다. 낮은 ReadPin 유실의 강제 회수 없음·실제 reader close 뒤 반환 계약과 native 공개 후(T3)·현재 PC 실측/UPS 시뮬레이션 잔여는 유지한다. Task/MS 및 Gate4/5 완료를 뜻하지 않는다. 다음 작업은 TASK-022 프로필 구체화이며 커밋/푸시는 수행하지 않았다.

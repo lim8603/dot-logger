@@ -8,7 +8,7 @@
   - Safe Rust 100% (신규 `unsafe` 0건), RT 경로 오염 없음 (RT 제로 할당·무대기 불변식 유지)
   - 외부 파티션 사전 예약(`QueryBudget`), 유한 페이지/인라인/블롭 한도 관리, Reader-owned permit drop 순서 안전성 및 회전 추적 완결
   - Miri 1024회 및 1.85.0/1.96.0 듀얼 툴체인 matrix 검증 완료
-- **상태:** Resolved (2026-10-30 RV-021~023 조치·EV-017 로컬 Pass, Human 최종 구현 리뷰 대기)
+- **상태:** Closed — 2026-10-31 Human 최종 구현 승인 (EV-016/017)
 
 ---
 
@@ -16,9 +16,9 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-021 | P2 | [`query/mod.rs:569-587`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L569-L587)<br>[`Snapshot::page`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L556-L646) | `Cursor` 페이지 조회마다 전체 rows 재순회, 재필터링 및 $O(N \log N)$ 재정렬 수행 | 고정 버퍼 무할당 원칙은 충족하나 대용량 시 오버헤드 완화를 위해 연속 커서 감지 재사용 또는 `sort_by_cached_key` 최적화 제안 | 수용 — 동일 Query 정렬 재사용 | Resolved |
-| RV-022 | P3 | [`query/mod.rs:188-198`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L188-L198)<br>[`Payload::Inline`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L190-L195) | `Payload::Inline`의 내부 버퍼 `offset` 필드가 public으로 노출되어 내부 구조 노출 | 불투명(opaque) 접근자로 캡슐화하거나 `Page::inline` 경유 접근 권장 rustdoc 명시 | 수용 — Page::inline 안내 | Resolved |
-| RV-023 | P3 | [`query/mod.rs:405-410, 428`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L405-L410)<br>[`QueryConfig::read_bytes`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L67) | `Snapshot::new` 초기 스캔 시 source 전액 차감으로 인한 `read_bytes` 고갈 가능성 | `read_bytes`가 초기 전체 스캔 + 후속 재판독 바이트 합계임을 rustdoc에 명확히 안내 | 수용 — scan+재읽기 예산 명시 | Resolved |
+| RV-021 | P2 | [`query/mod.rs:569-587`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L569-L587)<br>[`Snapshot::page`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L556-L646) | `Cursor` 페이지 조회마다 전체 rows 재순회, 재필터링 및 $O(N \log N)$ 재정렬 수행 | 고정 버퍼 무할당 원칙은 충족하나 대용량 시 오버헤드 완화를 위해 연속 커서 감지 재사용 또는 `sort_by_cached_key` 최적화 제안 | 수용 — 동일 Query 정렬 재사용 | Closed |
+| RV-022 | P3 | [`query/mod.rs:188-198`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L188-L198)<br>[`Payload::Inline`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L190-L195) | `Payload::Inline`의 내부 버퍼 `offset` 필드가 public으로 노출되어 내부 구조 노출 | 불투명(opaque) 접근자로 캡슐화하거나 `Page::inline` 경유 접근 권장 rustdoc 명시 | 수용 — Page::inline 안내 | Closed |
+| RV-023 | P3 | [`query/mod.rs:405-410, 428`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L405-L410)<br>[`QueryConfig::read_bytes`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs#L67) | `Snapshot::new` 초기 스캔 시 source 전액 차감으로 인한 `read_bytes` 고갈 가능성 | `read_bytes`가 초기 전체 스캔 + 후속 재판독 바이트 합계임을 rustdoc에 명확히 안내 | 수용 — scan+재읽기 예산 명시 | Closed |
 
 ---
 
@@ -119,3 +119,7 @@
 ## 개발 세션 검증 요약 — 2026-10-30
 
 EV-017 검사14개 exit0: 두 Rust core/all-features workspace·독립 실제 파일 API consumer·clippy/rustdoc·allocator10·fmt, 영향 Miri query10+retention18×8=224 Pass. 기능 보존 회귀를 리팩토링 전후 확인했으며 실제 장비 성능 수락은 하지 않았다. code-review 스킬 기준 자가 점검에서 RT/unsafe/public ownership·오류 의미 변경 없음, 캐시의 query 일치/실패 시 무효화·bounded buffer를 확인했다. Human 최종 구현 리뷰/native GAP-004·장비는 잔여이며 Closed로 올리지 않는다.
+
+## Human 최종 구현 승인 — 2026-10-31
+
+Human 「승인, 다음작업 진행하자」로 직전 보고의 TASK-008 REV-009/010, TASK-010 REV-013/014, TASK-011 REV-017 구현·리뷰 조치를 수락했다. 본 리뷰와 해당 RV 항목은 Closed다. EV-016/017의 검증 근거 및 현재 구현 범위를 승인하며, 앞선 Resolved/승인 대기 본문은 승인 전 이력으로 보존한다. 낮은 ReadPin 유실의 강제 회수 없음·실제 reader close 뒤 반환 계약과 native 공개 후(T3)·현재 PC 실측/UPS 시뮬레이션 잔여는 유지한다. Task/MS 및 Gate4/5 완료를 뜻하지 않는다. 다음 작업은 TASK-022 프로필 구체화이며 커밋/푸시는 수행하지 않았다.

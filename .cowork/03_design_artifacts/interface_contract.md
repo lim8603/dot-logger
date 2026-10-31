@@ -497,7 +497,7 @@ RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연
 
 `replay::{Replay, Speed, ReplayState, ReplayPoll, ReplayFrame, ReplayPayload, Transition, ReplayError}`는 `Snapshot<Read+Seek>`을 소유하는 일반 동기식 offline API다. 자동 timer/worker/전송을 시작하지 않으며 RT 수집에 대기를 전파하지 않는다. host는 snapshot/pin과 같은 단조 ns clock domain의 now를 제공하고 Replay는 최대 관측값으로 역행을 막는다. `new`는 mono Query만 허용하고 시작 시각에 query.from을 anchor로 사용한다. leading gap을 포함한 원래 mono 간격과 `(mono,producer,seq,segment,offset)` 순서를 보존한다. 실시간/SourceTime 재생 변환은 추정하지 않는다.
 
-`Speed::new(numerator:u32, denominator:u32)`는 양수 유리수 배속(0.5/1/2 포함)을 표현하며 0 성분은 거절한다. `Speed::REALTIME`은 1/1이며 `numerator()`/`denominator()`는 약분 없이 입력 성분을 돌려주고 Display는 `분자/분모`(예: `6/4`)로 표시한다. `ReplayPoll`·`ReplayFrame`·`ReplayPayload`는 일반 경로 진단을 위한 Debug를 제공한다. 정수 u128 산술과 deadline ceil을 사용하고 u64 deadline 표현을 넘으면 Limit으로 중단한다. `pause`/`resume`는 시계 진행을 멈추고 이어가며 반복 호출은 idempotent다. `set_speed`는 현재 정수 ns media 위치를 유지하고 전환 때 1ns 미만 소수부는 내림한다.
+`Speed::new(numerator:u32, denominator:u32)`는 양수 유리수 배속(0.5/1/2 포함)을 표현하며 0 성분은 거절한다. `Speed`의 `Eq/PartialEq`는 입력 성분을 비교하고 `is_equivalent(&other)`는 u64 교차곱으로 비율을 비교한다(1/1과 2/2는 성분 불일치·비율 일치). `Speed::REALTIME`은 1/1이며 `numerator()`/`denominator()`는 약분 없이 입력 성분을 돌려주고 Display는 `분자/분모`(예: `6/4`)로 표시한다. `ReplayPoll`·`ReplayFrame`·`ReplayPayload`는 일반 경로 진단을 위한 Debug를 제공한다. 정수 u128 산술과 deadline ceil을 사용하고 u64 deadline 표현을 넘으면 Limit으로 중단한다. `pause`/`resume`는 시계 진행을 멈추고 이어가며 반복 호출은 idempotent다. `set_speed`는 현재 정수 ns media 위치를 유지하고 전환 때 1ns 미만 소수부는 내림한다.
 
 `poll(now_ns, consumer_ready, cancel)`는 최대1건만 prefetch한다. 기존 Snapshot의 사전 예약 page/order/blob 버퍼와 추가 heap 없는 controller metadata를 사용하며 shared external 예약은 그대로다. 아직 due가 아니거나 소비자가 준비되지 않았으면 `Waiting { due_ns, late_ns }`, paused면 읽기 없이 Paused다. Ready는 원 receipt/metadata·borrowed inline 또는 blob descriptor·generation·late_ns를 반환한다. 늦은 실제 전달만큼 offline 시계를 늦춰 후속 간격을 보존한다. blocked 상태에서 pause/배속 전환으로 media 위치가 미전달 레코드를 넘었어도, 전달 시 그 레코드 위치로 재기준화해 나머지를 몰아서 보내지 않는다. repeated blocked poll은 원본을 재읽거나 read 예산을 다시 소비하지 않는다. 데이터/범위가 없거나 끝나면 End이며 빈 범위에서 손실 건수를 추정하지 않는다.
 
@@ -505,7 +505,25 @@ RV-021~023 조치: 동일 질의(시간축·범위·채널·최소 level)가 연
 
 큰 payload는 원본 descriptor를 유지하고 `read_blob(generation, handle, offset, length, now_ns, cancel)`로 같은 Snapshot의 개별/누적 예산 안에서 읽는다. 이전 seek generation은 StaleGeneration으로 거절한다. inline/page 재사용과 blob의 Gone/원 IO/한도 판정은 query 경로를 사용한다. lifecycle 검사에서 이미 관측한 만료/취소는 `ReplayError::Query(Expired/Cancelled)`로 terminal stop한다. 실제 IO 중 발생한 원인도 반환 후 terminal stop하며 실제 reader close 뒤에만 pin과 reservation을 반환한다. `stop`/Drop은 미전달 descriptor를 버리고 실제 reader를 닫는다. stop은 idempotent·terminal이며 End는 마지막 blob read를 위해 stop/Drop까지 snapshot을 보유한다.
 
-검증은 [TASK-011](../04_implementation/tasks/TASK-011.md)과 EV-018·[EV-019](../05_verification/verification_evidence.md#ev-019)에 기록한다. 실제 timer 지터·p95/수집 IO 간섭·native/OS/장비·remote/live/CLI는 별도 후속이다.
+`ReplayError`의 Display는 variant별 설명을 출력하며 Query는 기존 QueryError 표시와 원 IO 정보를 유지한다. 오류 분류/terminal 정리 및 배속 전환 동작은 유지한다. 검증은 [TASK-011](../04_implementation/tasks/TASK-011.md)과 EV-018·[EV-019](../05_verification/verification_evidence.md#ev-019)·[EV-020](../05_verification/verification_evidence.md#ev-020)에 기록한다. 실제 timer 지터·p95/수집 IO 간섭·native/OS/장비·remote/live/CLI는 별도 후속이다.
+
+### 14.3 TASK-012 원격 어댑터·host 관리 경계 — 2026-10-31
+
+`adapters::remote`는 선택 `remote` feature의 일반 경로다. `ServerConfig`는 기본 disabled/loopback/익명 read-only, `RemoteServer::bind`와 host 소유 Tokio runtime의 `serve(shutdown)`으로 명시 시작한다. 외부 bind는 인증 credential과 실제 TLS identity가 모두 있어야 한다. read/manage token을 분리하고 ApplyConfig/RunCheck는 Manage만 허용한다. 잘못된 인증 헤더는 익명으로 낮추지 않는다. 원격 입력에는 파일 경로를 받지 않고 native capability ID/고정 필터·기한/예산만 사용한다. secret 타입은 Debug를 제공하지 않으며 전송 오류는 credential을 출력하지 않는다. 테스트 PEM은 fixture 전용이며 운영 인증 정보가 아니다.
+
+[logger.proto](../../proto/logger.proto)의 `dot_logger.remote.v1.Logger`는 GetStatus/Query/ReadBlob/Replay/GetCompletion/ApplyConfig/RunCheck/Compare·Subscribe·Ack를 제공한다. major1, 16-byte LE session/schema ID, 16-byte LE signed query bounds, enum validation·encoded message cap을 적용한다. `scripts/check-remote-protocol.py`로 checked-in prost 필드/태그/반복·optional 종류를 schema와 대조하며 protoc는 설치 시 compiler 검증도 한다. schema를 빌드 때 자동 생성하거나 core에 네트워크 의존을 강제하지 않는다.
+
+`RemoteHub::new(&QueryBudget, RemoteLimits)`는 query와 같은 세션 external authority에서 유한 예약을 먼저 얻는다. TCP 연결/handshake·동시 stream·command·subscription·queued+awaiting-ACK records/bytes·encoded message·record·age를 제한한다. 조각 payload는 최대256KiB이며 message cap에서 envelope 여유1024B를 뺀 크기도 적용한다. HTTP2 header/window/reset/frame·동시 연결/요청 한도를 명시한다. adapter buffer 예약은 Requested bytes의 보수적 상한이며 host callback/source/sink buffer 및 Tokio/TLS/HTTP2/runtime/allocator 내부·OS socket/cache headroom은 별도 worker/host 예산으로 기록한다. HTTP2 흐름제어를 전체 관리 메모리 한도로 주장하지 않는다.
+
+`RemoteHub::subscriptions`로 유한 ID 목록을 관측하고 `offer`/`offer_delivery`가 **일반 경로에서** payload를 복사한다. 채널/레벨/원본 opt-in을 검사하며 큐와 ACK 대기 항목의 bytes/records를 함께 차감한다. Gap 정책은 신규 기록을 버리고 구독 내 연속 transfer position의 first/last·reason=overflow를 보낸다. Gap 전까지 들어온 기록이 먼저 전달되며 미통지 gap이 있으면 신규 기록도 같은 연속 gap에 합친다. Disconnect 정책/record age/idle lease는 해당 stream만 종료하고 pending을 Unknown으로 한다. live mono 역행은 late로 표시하며 원본 receipt/revision/clock/schema를 유지한다. 미등록 생산자별 순서를 시간만으로 전역 순서라고 꾸미지 않는다.
+
+한 전송은 모든 조각을 stream에 제공한 뒤에도 Pending이며, **같은 실제 TCP 연결**에서 receipt/transfer/generation이 일치하는 Ack만 받는다. `Reassembler`는 공유 external 예약·동시 원본 수/bytes·TTL 안에서 total/record identity·generation·정확한 offset·전체 CRC를 검증한다. `ReceivedRecord`는 소비자가 handoff를 수락할 때만 Ack를 만든다. 거절/Drop/TTL/이전 generation은 ACK가 아니며 permit을 실제 소유자 수명까지 보유한다. `discard_generations`는 제한된 generation gate를 올려 incomplete·늦은 조각·ready지만 미인계인 이전 세대를 거절한다. 이미 소비자에게 인계되었거나 네트워크 in-flight인 bytes를 취소했다고 주장하지 않는다. seek를 처리하는 host는 해당 구독의 `RemoteHub::discard_generations`와 수신 generation gate를 함께 갱신한다.
+
+`RemoteDelivery::poll`은 원래 Delivery guard를 보관하면서 ReceiverAcknowledged/Unknown/명시 Dropped를 실제 completion에 게시한다. 보고 Busy는 guard를 유지하고 다음 host turn으로 넘긴다. 바이트 send 또는 Query 조회가 receiver 완료를 만들지 않으며 unreported Drop의 기존 Unknown 계약을 유지한다. 파일의 Written/Synced와 별도 경계다.
+
+관리 unary RPC는 유한 `CommandInbox`로 native `ManagementRequest`를 전달한다. host가 `Command::request`에 따라 실제 Snapshot/page/blob·Replay·Completion 또는 등록된 관리 기능을 실행하고 `respond`로 native reply를 돌려준다. 미구현 기능은 Unsupported로 명시한다. Query/ReadBlob/Replay의 handle/TTL·page/item/blob 권한/reader 종료는 host가 기존 primitive와 제한된 capability 목록으로 관리한다. timeout/취소는 대기만 끝내며 host Command가 살아 있으면 permit/예약을 회수하지 않는다. `cancelled`를 actual IO 종료로 해석하지 않는다. CLI/실제 설정 적용·RunCheck/Compare backend 자체는 TASK-013/016/017 및 관련 Task다. 관리 응답의 type/record 수·encoded bytes·소유한 Vec capacity 및 요청 blob length도 제한하며 과대 응답은 Limit이다.
+
+초기 로컬 근거와 자가 리뷰는 [TASK-012](../04_implementation/tasks/TASK-012.md)·[REV-018](../05_verification/reviews/REV-018_TASK-012.md)·[EV-022](../05_verification/verification_evidence.md#ev-022)에 기록한다. 실제 LAN 지연/처리량·network/runtime 전체 RSS·dot-probe 통합/운영 보안 정책·다른 OS/native는 별도 검증이며 core 소유권/RT·실제 저장 경로를 바꾸지 않는다.
 
 ## 15. 설정·운영 계측·점검 계약안
 

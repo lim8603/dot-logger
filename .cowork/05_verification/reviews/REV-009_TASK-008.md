@@ -5,13 +5,13 @@
 - 일자/리뷰어: 2026-10-30 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
 - 대상: `71b3e2c` 이후 TASK-008 구현, 로컬 소스 commit `7388145`(source49개·최종 hash/검증은 EV-012).
 - 판정: Conditional — 로컬 통합15개·두 Rust 각16 features/consumer/예제/lint/doc/fmt/allocator8·Miri776 Pass, Human 최종 구현 리뷰/native·장비 잔여.
-- 상태: Resolved — EV-012 로컬 수정/회귀 Pass, Human 최종 구현 리뷰 대기.
+- 상태: Closed — 2026-10-31 Human 최종 구현 승인 (EV-012/013)
 
 ## 리뷰·처리 요약
 
 | ID | 중요도 | 위치·문제 | 처리 | 상태 |
 |---|---|---|---|---|
-| RV-011 | P2 | retention `room`: unlink 성공 뒤 directory sync 실패하면 삭제된 파일이 live catalog에 잔존할 수 있음 | unlink 성공 즉시 catalog 제외, directory sync 실패는 Poisoned·오류 보고 | Resolved(로컬) |
+| RV-011 | P2 | retention `room`: unlink 성공 뒤 directory sync 실패하면 삭제된 파일이 live catalog에 잔존할 수 있음 | unlink 성공 즉시 catalog 제외, directory sync 실패는 Poisoned·오류 보고 | Closed |
 
 ## RV-011 상세
 
@@ -39,3 +39,7 @@ unlink와 directory sync는 서로 다른 관측이다. sync 실패 시 durable 
 [EV-012](../verification_evidence.md#ev-012)·[source49개/명령/로그 hash](../../06_evolution/imported_context/task_008_2026-10-30/results.json)를 확인했다. `97 tests × 8 seeds = 776` Miri 실행 모두 Pass이며 실제 파일 통합1개는 Miri 범위 밖의 일반 Linux 실행이다. 소스/manifest/lock 49개와 최종 검사10개의 source hash가 일치한다. 현재 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 최종 구현 Human 승인 전이므로 Closed로 승격하지 않는다.
 
 2026-10-30 로컬 커밋 `7388145`는 EV-012 source49개와 일치한다. 커밋·세션 종료 요청을 최종 구현 승인으로 확대하지 않으며 Resolved를 유지한다. 푸시는 수행하지 않았다.
+
+## Human 최종 구현 승인 — 2026-10-31
+
+Human 「승인, 다음작업 진행하자」로 직전 보고의 TASK-008 REV-009/010, TASK-010 REV-013/014, TASK-011 REV-017 구현·리뷰 조치를 수락했다. 본 리뷰와 해당 RV 항목은 Closed다. EV-012/013의 검증 근거 및 현재 구현 범위를 승인하며, 앞선 Resolved/승인 대기 본문은 승인 전 이력으로 보존한다. 낮은 ReadPin 유실의 강제 회수 없음·실제 reader close 뒤 반환 계약과 native 공개 후(T3)·현재 PC 실측/UPS 시뮬레이션 잔여는 유지한다. Task/MS 및 Gate4/5 완료를 뜻하지 않는다. 다음 작업은 TASK-022 프로필 구체화이며 커밋/푸시는 수행하지 않았다.

@@ -6,18 +6,18 @@
 |---|---|
 | 프로젝트 | dot-logger — 수집·분배·저장/복구·조회/재생·gRPC/ACK 로컬 검증, 클라이언트·운영/worker 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-012 EV-022 로컬 Pass·Human 리뷰 대기, TASK-022 수치 프로필 Approved |
+| 현재 Phase | Build — TASK-012 EV-022 로컬 Pass·REV-018/019 리뷰 대기, TASK-022 수치 프로필 Approved |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-004 In Progress — 조회·재생·클라이언트, MS-007은 TASK-022 프로필 준비 In Progress |
-| 활성 Task | TASK-012 In Progress — gRPC/ACK·host 관리 구현 로컬 Pass·Human 리뷰 / TASK-022 실행 준비 |
-| 미처리 리뷰 | [REV-018](../05_verification/reviews/REV-018_TASK-012.md) Resolved — RV-032~035 조치·EV-022 Pass·Human 최종 구현 리뷰 대기. REV-001~017 Closed |
+| 활성 Task | TASK-012 In Progress — gRPC/ACK·host 관리 구현 로컬 Pass·REV-019 코드리뷰 Open / TASK-022 실행 준비 |
+| 미처리 리뷰 | [REV-019](../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md) Open — RV-036~038 권고·Human 검토 대기, [REV-018](../05_verification/reviews/REV-018_TASK-012.md) Resolved. REV-001~017 Closed |
 | 상태 | Yellow — TASK-012 Human 리뷰·클라이언트/운영 후속·PC 실측/UPS·native 공개 후 잔여 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-31 / AI |
-| 세션 상태 | 종료 — TASK-012 로컬 Pass·REV-018 Human 리뷰 대기, 소스/문서 분리 게시 |
-| 최근 세션 | [2026-10-31 #004](../members/lim8603/workspace/session_logs/session_2026-10-31_004.md) — TASK-012 검증·소스/문서 게시 후 종료·Human 리뷰 대기 |
+| 세션 상태 | 종료 — TASK-012 로컬 Pass·REV-019 독립 코드리뷰 완료·Human 리뷰 대기 |
+| 최근 세션 | [2026-10-31 #005](../members/lim8603/workspace/session_logs/session_2026-10-31_005.md) — TASK-012 종합 코드리뷰 및 REV-019 Open 등록 |
 
 ## 현재 결정과 제약
 
@@ -82,6 +82,7 @@
 | [REV-016](../05_verification/reviews/REV-016_TASK-011_CODE_REVIEW.md) | TASK-011 | 2026-10-30 | 로컬 재생·시간 제어 심층 코드리뷰 / Pass (P2 1, P3 2) | Closed | 2026-10-31 RV-026 현 불변식상 overflow 불가·방어 정리, RV-027/028 진단 API 조치·EV-019 Pass·2026-10-31 Human 승인·native/장비 잔여 |
 | [REV-017](../05_verification/reviews/REV-017_TASK-011_FINAL_REVIEW.md) | TASK-011 | 2026-10-31 | 로컬 재생 구현 조치·안전성 최종 리뷰 / Pass (P2 1, P3 2) | Closed | RV-029 국소 경고 억제/RV-030 비율 비교/RV-031 오류 진단 조치·EV-020 Pass·2026-10-31 Human 추가 조치 승인 |
 | [REV-018](../05_verification/reviews/REV-018_TASK-012.md) | TASK-012 | 2026-10-31 | 원격 adapter 자가 리뷰 / Conditional (P2 4건 로컬 조치) | Resolved | RV-032~035 auth/세대/reply capacity/blob 길이 조치·EV-022 Pass·Human 최종 구현 리뷰 대기 |
+| [REV-019](../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md) | TASK-012 | 2026-10-31 | 원격 adapter·프로젝트 종합 심층 코드리뷰 / Pass (P2 2, P3 1) | Open | RV-036~038 관측·EV-022 통과 유지·Human 검토 대기 |
 
 ## 다음 시작점
 
@@ -142,6 +143,7 @@
 
 ## 최근 작업·이력
 
+- 2026-10-31 #005: 프로젝트 종합 심층 코드리뷰 수행·REV-019 등록(RV-036~038 관측, 제품 코드 미수정)·저장 및 원격 동기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_005.md).
 - 2026-10-31 #004: TASK-012 구현·EV-022 Pass·5f0ad83 소스/문서 분리 게시 후 종료·REV-018 Human 리뷰 대기 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_004.md).
 - 2026-10-31 #003: REV-017 조치/EV-020 Pass 후 TASK-008/010/011 승인·리뷰5건 Closed, TASK-022 10ms 수치 승인·EV-021 준비 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_003.md).
 - 2026-10-31 #002: TASK-011 최종 안전성 코드리뷰·REV-017 Open 등록(제품 미수정) — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_002.md).

@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-31 #012 / AI |
-| 세션 상태 | 작업 단위 보고 — TASK-015 로컬 구현/검증·위임 수락 완료; TASK-016 미착수 |
+| 세션 상태 | 종료 — Human 요청으로 마감. TASK-015 EV-028 로컬 수락·게시 완료; 다음 후보 TASK-016 Planned/미착수 |
 | 최근 세션 | [2026-10-31 #012](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md) — TASK-015 리포트 |
 
 ## 현재 결정과 제약
@@ -109,6 +109,7 @@
 
 ## 승인·권한 위임 상태 — 2026-10-31 #007
 
+- #012 종료: Human 「세션 마무리해줘」로 세션을 마감한다. TASK-015 로컬 수락/EV-028·REV-024 Closed와 기존 위임은 유지하며 이번 마감에서 TASK-016 구현이나 추가 시험을 시작하지 않는다.
 - #012 Human 「프로젝트 진행현황 파악하고, TASK-015 시작하자」로 승인된 TASK-015를 재개했다. 로컬 구현/검증·리뷰 조치 수락과 작업 단위별 커밋/푸시는 기존 위임으로 진행하며 TASK-016은 아직 구현하지 않았다. #011 종료 지시의 미착수 표시는 당시 이력이다.
 - Human의 기존 모든 권한/게시 위임과 #008 TASK-013 진행 지시를 유지한다. EV-025 검증 뒤 AI가 로컬 구현을 수락하고 REV-021을 마감했다. 같은 범위의 최종 승인 요청은 반복하지 않는다.
 - 구현/검증 결과와 위험·미완료를 보고하며, 미실행 native/PC 시험이나 제품 전체 수락을 임의로 Pass로 바꾸지 않는다. 공개 전환/선택 기능 자동 착수 지시로 확대하지 않는다.
@@ -167,7 +168,7 @@
 
 ## 최근 작업·이력
 
-- 2026-10-31 #012: TASK-015 리포트 TDD14·실제 window 연계·할당0/공개 consumer·EV-028 source100개/검사13개·Miri168·소스a247d01 로컬 수락·REV-024 Closed — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md).
+- 2026-10-31 #012: TASK-015 리포트 TDD14·실제 window 연계·할당0/공개 consumer·EV-028 source100개/검사13개·Miri168·소스a247d01 로컬 수락·REV-024 Closed·Human 요청으로 세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md).
 - 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
 - 2026-10-31 #010: 현황 파악·REV-022 반입·승인 경계 보고 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_010.md).
 - 2026-10-31 #009: 독립 리뷰 REV-022 Open 등록 — [리뷰](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md).

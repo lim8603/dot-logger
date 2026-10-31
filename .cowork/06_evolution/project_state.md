@@ -6,18 +6,18 @@
 |---|---|
 | 프로젝트 | dot-logger — 수집·분배·저장/복구·조회/재생·gRPC/ACK 로컬 검증, 클라이언트·운영/worker 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-012 EV-023 로컬 Pass·리뷰 Closed, TASK-013 착수·TASK-022 실행 준비 |
+| 현재 Phase | Build — TASK-013 EV-025 로컬 구현/리뷰 수락 완료·native 이월, 다음 후보 TASK-014 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-004 In Progress — 조회·재생·클라이언트, MS-007은 TASK-022 프로필 준비 In Progress |
-| 활성 Task | TASK-013 In Progress — EV-024 연결 수명 API 첫 단위 Pass / TASK-022 실행 준비; TASK-012 native/실측 잔여 |
-| 미처리 리뷰 | 없음 — REV-001~020 Closed. REV-020은 TASK-013 수신 수명 첫 단위의 개발 자가 점검이며 전체 Task는 진행 중 |
-| 상태 | Yellow — TASK-013 클라이언트/CLI·운영 후속·PC 실측/UPS·native 공개 후잔여 |
+| 활성 Task | TASK-013 In Progress — 로컬 DoD 완료/native 공개 후(T3) / TASK-022 실행 준비. TASK-014 미착수 |
+| 미처리 리뷰 | 없음 — REV-001~021 Closed. REV-021은 TASK-013 개발 자가 점검/조치 및 위임된 로컬 수락 |
+| 상태 | Yellow — 클라이언트/CLI 로컬 완료, 운영/실앱·PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-10-31 / AI |
-| 세션 상태 | 요청 범위 완료 — REV-019 조치/게시·TASK-013 첫 단위 구현/검증·게시 동기화 |
-| 최근 세션 | [2026-10-31 #007](../members/lim8603/workspace/session_logs/session_2026-10-31_007.md) — 위임·REV-019 조치·TASK-013 착수 |
+| 세션 상태 | TASK-013 요청 범위 로컬 완료·Task 목록 표 정비 완료·단위별 게시 동기화 |
+| 최근 세션 | [2026-10-31 #008](../members/lim8603/workspace/session_logs/session_2026-10-31_008.md) — TASK-013 로컬 구현/검증·Task 목록 정비 |
 
 ## 현재 결정과 제약
 
@@ -33,7 +33,7 @@
 
 - **TASK-012 현재 계약/형상:** remote 기본 disabled/loopback/read-only·외부 TLS/인증·bounded 구독/256KiB/수신 handoff ACK·Gap/Unknown·세대 gate·host inbox 연결. REV-019 조치 후 기준은 [EV-023](../05_verification/verification_evidence.md#ev-023) source70개/검사9개·Miri25 및 소스 `4f79119` commit blob 일치다. EV-022/5f0ad83는 이전 형상 이력이다. 포화 accept는10ms timer 대기, credential은 고정256B/길이 비교, receiver는 실제 연결별 소유/재생성한다. 실제 backend/CLI/운영 보안·native/실측은 후속이다. OS keyring 인증 사용·CI/계정/과금 조회/차단 재시도 없음.
 
-- **TASK-013 첫 단위:** [EV-024](../05_verification/verification_evidence.md#ev-024)의 source74개/검사12개·Miri24 및 소스 `ded6372`가 현재 통합 workspace 검증 snapshot이다. client 기본core/remote opt-in·opaque 연결 identity·이전 조각/인계/ACK 차단·실제 owner 종료까지 예약 보존을 구현했다. transport/CLI는 아직 없다. EV-023은 TASK-012 조치 snapshot이며 이후 workspace/lock 등록은 EV-024로 구분한다.
+- **TASK-013 현재 형상:** [EV-025](../05_verification/verification_evidence.md#ev-025) source92개/검사15개·Miri32·소스 `29e55da` commit blob일치가 현재 workspace 근거다. 명시 native TCP/TLS/취소·bounded 구독/인계 ACK·one-shot 연결/Unknown·read-only 파일 factory·CLI JSON/exit/Ctrl-C/query→replay·독립 복구·예제/화면 계약을 로컬 검증했다. source와 동일한 성공 시험은 반복하지 않는다. CLI runtime 지표는 Unavailable, 운영 backend는 Unsupported이며 실제 dot-probe/다른 OS/native·성능은 후속이다. EV-024는 첫 수신 수명 단위 이력이다.
 
 - **TASK-022 승인 기준:** local-pc-v1의10ms 주기/기한·500µs 합성 연산·2GiB·P3 120초×3회·160GiB cap/64GiB reserve·UPS 모의3초/8·64MiB는 Human 승인 완료다. [EV-021](../05_verification/verification_evidence.md#ev-021)은 프로필 준비/승인 근거이며 실제 성능/RT/UPS는 NotRun이다.
 
@@ -62,7 +62,7 @@
 | TASK-010 | 시간·채널 조회/active snapshot | AI | In Progress | 2026-10-31 | EV-016/017 Human 승인·현재 PC 조회/IO 실측, native 공개 후(T3) |
 | TASK-011 | 재생 시간과 취소 제어 | AI | In Progress | 2026-10-31 | EV-020 Human 승인·현재 PC 실제 시계/IO 실측, native 공개 후 |
 | TASK-012 | gRPC 구독·ACK·관리 서버 | AI | In Progress | 2026-10-31 | EV-023 로컬 Pass·REV-018/019 Closed·TASK-013 착수, native/실측 잔여 |
-| TASK-013 | Rust 클라이언트와 CLI | AI | In Progress | 2026-10-31 | EV-024 수신 수명 API 첫 단위 Pass·REV-020 Closed; 실제 transport/CLI 후속 |
+| TASK-013 | Rust 클라이언트와 CLI | AI | In Progress | 2026-10-31 | EV-025 로컬 DoD/리뷰 완료·REV-021 Closed, native 공개 후(T3)·실앱/성능 후속 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -89,16 +89,17 @@
 | [REV-018](../05_verification/reviews/REV-018_TASK-012.md) | TASK-012 | 2026-10-31 | 원격 adapter 자가 리뷰 / Conditional (P2 4건 로컬 조치) | Closed | RV-032~035 조치·EV-022 Pass·2026-10-31 Human 로컬 구현 수락, native/실측 후속 |
 | [REV-019](../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md) | TASK-012 | 2026-10-31 | 원격 adapter·프로젝트 종합 심층 코드리뷰 / Pass (P2 2, P3 1) | Closed | RV-036~038 조치·EV-023 검사9개/Miri25 Pass·Human 위임에 따른 AI 마감 |
 | [REV-020](../05_verification/reviews/REV-020_TASK-013_RECEIVER_START.md) | TASK-013 첫 단위 | 2026-10-31 | 연결 수명 API 개발 자가 점검 / Pass | Closed | EV-024 통합3개·검사12개·Miri24 Pass·위임된 첫 단위 수락, transport/CLI 후속 |
+| [REV-021](../05_verification/reviews/REV-021_TASK-013_CLIENT_CLI.md) | TASK-013 로컬 구현 | 2026-10-31 | client/CLI 개발 자가 점검·조치 / Pass | Closed | RV-039~045 조치·EV-025 검사15개/Miri32·위임된 AI 로컬 수락, native/실앱 후속 |
 
 ## 다음 시작점
 
-1. TASK-013 첫 수신 수명 단위는 EV-024 source74개/검사12개·Miri24 Pass·소스ded6372 commit blob일치, REV-020 Closed다. 다음은 실제 transport의 endpoint/TLS/token/버전·bounded 요청/stream·동일 연결 ACK send 수명, 이후 CLI JSON/exit/Ctrl-C·query→replay/오프라인/예제다. 이번 “착수까지” 요청은 첫 단위까지 처리했다.
-2. REV-018은 Human 기존 구현 수락, REV-019는 EV-023 Pass 후 위임된 AI 검증/마감 판단으로 Closed다. TASK-012 native/실측은 잔여다. 이미 승인된 범위 재승인 없이 단위별 검증·소스/문서 분리 커밋·pull/원격 hash 확인 후 push한다.
-3. TASK-022 local-pc-v1 수치 승인 유지. 선행 harness/실앱/UPS 구현·RT 부팅 확인 후 실측, native는 공개 완료 후T3다. 현재 PC/UPS/OS·Gate4/5 완료는 선언하지 않는다.
+1. TASK-013 로컬 구현·수락은 EV-025/29e55da로 완료했다. 마지막 문서 단계의 task_registry.md 정비도 완료: UTF-8 정상, 헤더/데이터12열 대 구분선13열 오류를12열로 수정, 26개 Task 보존·실제 렌더 table0→1 확인. 위임에 따라 소스/문서 분리 게시·원격 hash/디스크 일치를 확인하며 다음 개발은 TASK-014 후보로 남긴다.
+2. 다음 개발 후보는 TASK-014 운영 계측/유한 집계다. TASK-013까지 요청한 이번 범위에서는 새 Task를 자동 착수하지 않는다. 후속 지시가 오면 기존 위임 안에서 진행한다.
+3. TASK-004~013의 native는 GitHub 공개 완료 후(T3), TASK-022 local-pc-v1 실측은 선행 harness/실앱/UPS 구현·RT 부팅 확인 뒤다. 현재 PC/RT/UPS/OS·MS-004/Gate4/5 완료를 선언하지 않는다.
 
 ## 승인·권한 위임 상태 — 2026-10-31 #007
 
-- TASK-012 기존 로컬 구현 수락·REV-019 조치/검증 및 마감 판단·TASK-013 착수·향후 작업 단위별 커밋/푸시까지 Human이 승인·위임했다. 같은 범위의 최종 승인 요청을 반복하지 않는다.
+- Human의 기존 모든 권한/게시 위임과 #008 TASK-013 진행 지시를 유지한다. EV-025 검증 뒤 AI가 로컬 구현을 수락하고 REV-021을 마감했다. 같은 범위의 최종 승인 요청은 반복하지 않는다.
 - 구현/검증 결과와 위험·미완료를 보고하며, 미실행 native/PC 시험이나 제품 전체 수락을 임의로 Pass로 바꾸지 않는다. 공개 전환/선택 기능 자동 착수 지시로 확대하지 않는다.
 
 ## 새 세션 재개 메모
@@ -108,7 +109,7 @@
 - TASK-022 수치 Approved·EV-021(프로필 준비/승인)과 EV-022(TASK-012 제품 로컬 Pass)을 구분한다. TASK-008/010/011/012 로컬 리뷰·TASK-022 수치 승인은 완료됐다. TASK-013 개발/후속 검증은 별도다.
 - 개발1.96.0·MSRV1.85·nightly-2026-10-26 Miri 고정, dependency/lock·RT 무할당/무대기·private unsafe 경계를 유지한다. 전역 rustup default는 바꾸지 않았다.
 - 완료/종료·writer 배치/재시도 의미는 API§13·TASK-006~008을 따른다. 낮은 ReadPin 유실/forget·종료 불명 background IO는 강제 회수하지 않고 reader-owned permit만 실제 reader 종료 후 반환한다.
-- 자동 startup 발견/기존 namespace 재개·worker/StorageDegraded/CLI·운영 연동은 후속이다. remote/live bounded adapter는 EV-022 로컬 범위이며 자동 운영 worker를 시작하지 않는다. 실제 성능·timer·UPS·24h·다른 OS/native·TC 전체·MS-002/003·Gate4/5 완료를 선언하지 않는다. source/sink host 메모리와 OS cache는 logger 예약 밖이다.
+- 자동 startup 발견/기존 namespace 재개·운영 worker/StorageDegraded·실앱 연동은 후속이다. remote/client/CLI는 EV-025 로컬 범위이며 자동 운영 worker를 시작하지 않는다. 실제 성능·RT·UPS·24h·다른 OS/native·TC 전체·MS-002/003/004·Gate4/5 완료를 선언하지 않는다. decoder/runtime/source/sink·host 메모리와 OS cache는 logger 예약 밖이다.
 
 ## 선택 로딩
 
@@ -126,7 +127,7 @@
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
 | T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토 | 공개 전환 또는 첫 외부 배포를 요청할 때 | INT-001 / 공개 준비 | 2026-10-28 Human 논의 |
-| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~012 | 2026-10-31 Human 검증 시점 결정 |
+| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~013 | 2026-10-31 Human 검증 시점 결정 |
 
 범위 밖 백로그 B: 없음. 현재 T1/T2/T3는 미도래. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
 
@@ -139,7 +140,7 @@
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~012 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~013 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
 | GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
 | RV-015~017 | 최종 sync 취소는 EV-014, 방어적 슬라이싱/스택 포맷은 EV-015에서 반영·REV-011/012 Closed·Human 승인 | native·장비 검증 대기 |
@@ -155,8 +156,8 @@
 
 ## 최근 작업·이력
 
+- 2026-10-31 #008: TASK-013 native client/CLI·파일/취소/ACK 로컬 구현·EV-025 Pass·REV-021 수락 및 Task 목록 정비 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_008.md).
 - 2026-10-31 #007: Human 위임 반영·REV-019 EV-023 조치/마감·TASK-013 EV-024 수신 수명 API 첫 단위 검증 및 단위별 게시 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_007.md).
 - 2026-10-31 #006: 프로젝트 브리핑·REV-019 반입/판정·승인 업무 정리·저장 문제 Antigravity 원인으로 정정 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_006.md).
-- 2026-10-31 #005: 프로젝트 종합 심층 코드리뷰 수행·REV-019 등록(RV-036~038 관측, 제품 코드 미수정)·저장 및 원격 동기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_005.md).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

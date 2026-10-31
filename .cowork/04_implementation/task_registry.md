@@ -1,7 +1,8 @@
 # Task 목록과 실행 계획
 
+- 현재(2026-10-31): TASK-013 EV-025 로컬 구현/위임 수락 완료·native 이월, 다음 개발 후보 TASK-014는 Planned/미착수다. TASK-022 수치 Approved·실측 준비를 유지한다. 아래 과거 승인 기록은 당시 이력이다.
 - INT-001 / 2026-10-28 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
-- 담당 AI는 승인된 실행 담당이며 Human이 H/J 결정·리뷰를 맡는다. solo 모드를 유지한다.
+- 담당 AI는 승인된 실행 담당이며 Human은 프로젝트 오너다. 2026-10-31 모든 권한/게시 위임에 따라 승인된 목표의 구현·검증·로컬 수락/마감·단위별 커밋/푸시는 AI가 수행·보고한다. 같은 범위의 재승인은 받지 않으며 solo를 유지한다.
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
 - TASK-006도 2026-10-28 Human 「다음 진행하자」로 착수. 선행 TASK-004/005 구현·로컬 Pass·Human 승인을 근거로 native 후속 검증 상태에서 개발을 진행했다. 완료/제어 EV-005 로컬 Pass·Human 리뷰 승인 이력은 보존한다. 최신 RV-001~005 수정은 EV-009 로컬 Pass·2026-10-29 Human 승인/native 대기다.
 - 2026-10-29 Human 「승인」으로 TASK-006 최신 수정분과 native 이월 상태의 TASK-007 진행을 승인했다. TASK-007은 RV-006~010 수정·EV-011 로컬 Pass, 당시 최신 구현 Human 리뷰/native 대기였다. 2026-10-30 최신 구현 Human 승인 완료, native는 잔여다.
@@ -11,7 +12,7 @@
 - TASK-018은 FR-015 범위 승인이 추가로 필요하며 Must 완료의 필수 의존에 포함하지 않는다.
 
 | Task ID | 제목 | MS | Intent | Story | 담당 | 상태 | 갱신 | 다음 액션 | 의존 | 상세 | 인일 초안 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|---|---|---|
 | TASK-001 | 상세설계 합의와 Gate 3 정렬 | MS-001 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-10-26 | 없음 — 설계 기준선 승인·Gate 3 Pass | 없음 | [상세](tasks/TASK-001.md) | 1~2 |
 | TASK-002 | workspace와 플랫폼·설정 계약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | 완료 — EV-001·Human 리뷰·native CI Pass | TASK-001 | [상세](tasks/TASK-002.md) | 1~2 |
 | TASK-003 | 소형 RT 수집과 중요 예약 | MS-002 | INT-001 | US-001·005 | AI | Done | 2026-10-27 | EV-002 로컬/native CI Pass·Human 리뷰 승인; 다음 TASK-004 | TASK-002 | [상세](tasks/TASK-003.md) | 2~3 |
@@ -23,8 +24,8 @@
 | TASK-009 | 중단 복구와 I/O 장애 | MS-003 | INT-001 | US-002·005 | AI | In Progress | 2026-10-31 | EV-014/015 로컬 Pass·Human 승인; 현재 PC 대체 실측·모의 장애, native 공개 후 | TASK-008 | [상세](tasks/TASK-009.md) | 2~3 |
 | TASK-010 | 시간·채널 조회와 active snapshot | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-009 | [상세](tasks/TASK-010.md) | 2~3 |
 | TASK-011 | 재생 시간과 취소 제어 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | Human 구현 승인·현재 PC 실측 준비, native 공개 후(T3) | TASK-010 | [상세](tasks/TASK-011.md) | 1~2 |
-| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-023 로컬 Pass·REV-018/019 Closed·TASK-013 착수 승인, native/실측 잔여 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
-| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-024 수신 수명 API 첫 단위 Pass; 실제 transport/CLI·query→replay/Ctrl-C 후속 | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
+| TASK-012 | gRPC 구독·ACK·관리 서버 | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-023 로컬 Pass·REV-018/019 Closed·EV-025 client/CLI 회귀; native/실측 후속 | TASK-010·TASK-006 | [상세](tasks/TASK-012.md) | 2~4 |
+| TASK-013 | Rust 클라이언트와 CLI | MS-004 | INT-001 | US-003·005 | AI | In Progress | 2026-10-31 | EV-025 로컬 DoD/REV-021 수락 완료; native 공개 후(T3)·실앱/성능 후속, TASK-014 미착수 | TASK-011·TASK-012 | [상세](tasks/TASK-013.md) | 2~3 |
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 수락/거절/생략/대상별 결과 합계·counter reset·누락 지표 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | 폐기로 안정된 큐 Overloaded·미측정 분모·음수/0 증가율 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | old plan 처리 중 재변경 Busy·부분 producer 적용·base revision 충돌 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |
@@ -44,3 +45,5 @@
 TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consumer/예제/lint/doc/fmt·allocator8·Miri776. REV-009/010은 2026-10-31 Human 승인·Closed, 현재 PC 실측/native 후속은 잔여다.
 
 2026-10-31 Human 승인 ADR-011: 현재 PC 실측을 실제 장치 시험 대체 근거로 수락, UPS 시뮬레이션 판정, GitHub native는 공개 완료 후 진행한다. TASK-022는 환경/수락 프로필 준비로 In Progress이며 현재 generic 실행/RT 설치를 구분했다. TASK-004~011의 실행 근거·Human 리뷰 상태는 개별 유지하며 이번 정책 변경만으로 미실행 시험/Task를 일괄 Pass/Done으로 바꾸지 않는다.
+
+2026-10-31 TASK-013: [EV-025](../05_verification/verification_evidence.md#ev-025) source92개/검사15개·두 Rust각16feature·CLI10/transport7·Miri32 Pass, [REV-021](../05_verification/reviews/REV-021_TASK-013_CLIENT_CLI.md) RV-039~045 조치 및 위임된 AI 로컬 수락 완료다. native/실앱/성능 잔여 때문에 Task/MS 상태는 In Progress를 유지한다. 다음 TASK-014는 이번 요청으로 자동 착수하지 않았다.

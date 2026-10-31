@@ -41,3 +41,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-10-31 구현 계약 확인 후 Human 「승인」으로 TASK-011 최종 구현 승인·REV-015/016 Closed·Human 리뷰 체크 완료를 반영했다. TASK-008/010 Human 리뷰와 native GAP-004·장비/실제 timer·remote/CLI는 잔여이며 TASK-011/MS-004 In Progress를 유지한다. TASK-012는 자동 착수하지 않는다.
 
 2026-10-31 ADR-011: 현재 PC 실측/UPS 시뮬레이션 수락·native 공개 완료 후 이월 승인. TASK-022 환경/수락 프로필 준비로 MS-007 In Progress이며 Phase Build는 유지하고 종합 시험/Verify 진입/Gate4·5 Pass를 선언하지 않는다.
+
+2026-10-31 TASK-013 EV-025: Rust native client/CLI·오프라인·취소/ACK·화면 API 계약 로컬 구현/리뷰 수락 완료(소스29e55da, 검사15개·Miri32). MS-004의 로컬 조회·재생·원격·클라이언트 근거를 연결했으며 native/다른 OS·실앱/성능 후속 때문에 MS-004 In Progress·Gate4/5 미완료를 유지한다. 다음 개발 후보 TASK-014는 이번 요청 범위에서 착수하지 않았다.

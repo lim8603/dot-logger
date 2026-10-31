@@ -529,13 +529,21 @@ REV-019 보강: 연결 한도 초과 TCP는 기존처럼 닫되 이후 accept �
 
 초기 로컬 근거와 자가 리뷰는 [TASK-012](../04_implementation/tasks/TASK-012.md)·[REV-018](../05_verification/reviews/REV-018_TASK-012.md)·[EV-022](../05_verification/verification_evidence.md#ev-022)에 기록한다. 실제 LAN 지연/처리량·network/runtime 전체 RSS·dot-probe 통합/운영 보안 정책·다른 OS/native는 별도 검증이며 core 소유권/RT·실제 저장 경로를 바꾸지 않는다.
 
-### 14.4 TASK-013 클라이언트 수신 수명 API — 2026-10-31 첫 단위
+### 14.4 TASK-013 native client·CLI API — 2026-10-31
 
-`dot-logger-client`는 기본 core-only이며 remote feature에서 `ClientReceiver`·`ReceiverConfig`·`ConnectionId`·`PendingRecord`·`Acknowledgement`·`ClientError`를 제공한다. 자체 runtime/socket/worker는 시작하지 않는다. 호스트가 실제 연결 후 `begin_connection(&QueryBudget, config)`을 호출하고 해당 transport가 가진 opaque identity를 push/세대 갱신/end/ACK 추출에 전달한다. identity는 Arc allocation으로 구분하며 이전 owner/token이 남은 동안 새 연결과 동일해질 수 없다. 이미 연결된 상태의 begin이나 잘못된 구성/예약 실패는 기존 상태를 바꾸지 않는다.
+`dot-logger-client` 기본 feature는 `Cancellation`·`OfflineConfig`·`OfflineSource`·`open_snapshot`이며 remote는 opt-in이다. remote는 기존 저수준 `ClientReceiver`·opaque `ConnectionId`·`PendingRecord`·`Acknowledgement`·`ReceiverConfig`에 `RemoteConfig`·`RemoteClient`·`RemoteSubscription`·`RemoteEvent`를 제공한다. 모든 작업은 일반 경로이며 host 소유 Tokio에서 원격 호출을 실행한다. 자체 runtime/애플리케이션 worker/daemon을 시작하지 않는다.
 
-`push`는 연결 identity를 검사한 뒤 core Reassembler의 offset/CRC/TTL/세대/예산 검사를 사용한다. `handoff`는 현재 연결의 owner만 core consumer handoff로 넘기고 거절 시 원래 owner를 반환한다. `end_connection`은 잘못된 연결 identity로 현재 연결을 종료하지 않으며 미완성 버퍼만 정리한다. 외부 PendingRecord의 실제 Drop 전에는 원래 예약을 강제 회수하지 않는다.
+RemoteConfig는 finite endpoint/operation deadline/encoded cap과 명시 bearer/CA/TLS 이름이다. 평문은 literal loopback IP만, HTTPS는 명시 CA, 외부 주소는 token도 필요하다. userinfo/임의 RPC 경로/불량 token을 거절하고 config/secret에 Debug를 제공하지 않는다. gRPC 원문·credential·임의 payload는 오류에 노출하지 않는다. `request(ManagementRequest, &Cancellation)`는 기존 native ManagementReply만 반환하며 wire/runtime 타입을 공개 계약에 강제하지 않는다. reply version/kind/metadata/개수/요청 blob 길이·완료 boundary/재생 generation도 대조한다.
 
-ACK는 성공한 소비 인계 뒤에도 원래 연결 identity를 보유한다. `take_ack`로 현재 transport identity와 대조한 바로 뒤 그 연결에 전송해야 하며, 인계와 추출 사이의 disconnect/reconnect는 ACK를 거절한다. 이미 추출된 native ACK와 수락된 consumer 데이터를 취소했다고 주장하지 않는다. 실제 전송/취소 경쟁·TLS/token/endpoint·CLI JSON/exit/Ctrl-C·query/replay는 후속 구현이다. identity/receipt metadata·transport decode/consumer buffer는 별도 host headroom이다. gate 한도/연결 재생성 계약은 §14.3을 따른다. [TASK-013](../04_implementation/tasks/TASK-013.md)·EV-024/REV-020은 이 첫 단위의 근거다.
+RemoteClient는 one-shot TCP connector와 실제 IO close/waker guard를 사용한다. 자동 재연결/재전송하지 않으며 새 연결은 새 client다. parent disconnect/Drop은 해당 실제 연결을 닫는다. `subscribe`는 유한 records/record bytes/TTL과 공유 QueryBudget을 예약하고 같은 실제 연결에 stream·receiver·ACK owner를 묶는다. `next`는 완전 검증 record/Gap만 반환하고 ACK하지 않는다. `handoff` consumer가 유한 소비 큐/출력을 수락한 뒤 그 연결로 ACK하며 서버 확인 전 완료를 주장하지 않는다. consumer 거절은 ACK가 없고 인계 뒤 확인 실패는 AcknowledgementUnknown이다. stream Drop은 해당 구독을 종료하고 외부 owner의 예약은 실제 Drop까지 유지한다. 이미 인계/추출/전송된 데이터나 ACK를 소급 취소하지 않는다.
+
+저수준 ClientReceiver는 실제 연결별 begin/push/세대/end/ACK 추출에 같은 opaque identity를 검사한다. Arc identity가 남은 동안 새 연결과 동일해질 수 없다. 실패/중복 begin은 기존 상태를 바꾸지 않고 stale/foreign end가 현재 연결을 닫지 않는다. host seek와 수신 generation gate는 함께 갱신하며 gate 한도를 이유로 살아 있는 연결의 gate만 초기화하지 않는다. §14.3의 ACK/Unknown·generation·실제 owner 종료 계약을 유지한다.
+
+`open_snapshot`은 원래 session/revision/등록 순서·독립 read-only 일반 파일·명시 source/index/page/blob/read 예산과 caller mono clock/deadline으로 Snapshot<File>을 만든다. active는 완전 chunk safe_offset이 필요하고 불변 prefix/경로 교체 방지는 host 책임이다. Snapshot/Replay native API의 cursor/blob identity·expiry·실제 reader 종료 뒤 반환을 사용한다. Cancellation은 같은 AtomicBool을 동기 core에 연결하며 진행 중 OS/host IO 강제 종료를 뜻하지 않는다.
+
+CLI `dot-logger`는 explicit remote 또는 offline manifest를 받는다. schema_version1 NDJSON/human 출력·고정 exit0(유한 요청/관측 완료)/2(입력·권한·미지원)/3(부분·취소·기한·한도·Gone/만료·ACK 불명)/4(IO/통신/불량 응답)를 사용한다. 원래 ID는 hex, lossless 큰 정수/시각·sequence/capability는 문자열이다. bounded output은 summary 공간을 보존하고 tail의 stdout write/flush 성공 후에만 ACK한다. config validate는 offline 선언/예약 검증, runtime 지표는 Unavailable, 후속 관리 backend는 Unsupported다. offline 복구는 단일 전체 source·create_new/file sync/namespace_synced:false·오류 파일 보존이다. CLI/SDK가 OS IO 종료나 성능을 추정하지 않는다.
+
+[SDK/화면 계약](../../crates/dot-logger-client/README.md)·[CLI/선언 예제](../../crates/dot-logger-cli/README.md)·[native Query→Replay 예제](../../crates/dot-logger-client/examples/remote_query_replay.rs)·[TASK-013](../04_implementation/tasks/TASK-013.md)·EV-025/REV-021을 따른다. CLI/화면은 같은 native logical 결과를 사용하며 실제 dot-probe 화면 적용은 TASK-020/026이다. CLI10·transport7·실제 파일/프로세스/취소와 영향 Miri32는 로컬 범위이고 다른 OS/native·LAN/RSS/PC/RT/UPS는 잔여다.
 
 ## 15. 설정·운영 계측·점검 계약안
 

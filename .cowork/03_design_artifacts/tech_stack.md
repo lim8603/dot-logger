@@ -16,7 +16,7 @@
 | 봉투·통신 | Protobuf·gRPC | tonic 0.13.1 / prost 0.13.5 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
-| 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4·JSON 출력 | Human 선택·ADR-009 | 독립 GUI 제외, native 클라이언트 테스트 |
+| 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4.6.6·serde 1.0.229/serde_json 1.0.154 | Human 선택·ADR-009·EV-025 | 로컬 CLI10/transport7·두 Rust Pass, 실제 dot-probe/다른 OS 후속 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
 | 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
@@ -55,3 +55,5 @@ ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그
 TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기존 lock의 package/version 집합은 유지하고 TLS dependency edge만 연결했다. host 소유 Tokio runtime·실제 TLS/read-manage 권한·bounded RPC는 EV-022 로컬 검증이며 core consumer의 네트워크 격리는 두 Rust16feature로 회귀했다. LAN 성능·native 공개 후 검증은 별도다.
 
 2026-10-31 REV-019 보강(EV-023): 기존 TLS 간접 의존 subtle2.6.1을 remote 전용 직접 의존으로 pin해 고정256B credential/길이 비교에 사용한다. package/version 집합·MSRV/기술 계열·인증 정책은 유지한다. 전체 RPC constant-time/실제 공격 내성의 정량 증거는 아니다.
+
+2026-10-31 TASK-013 EV-025: native client/CLI를 clap4.6.6·기존 serde1.0.229/JSON1.0.154, 기존 tonic/tower0.5.3/hyper-util0.1.21·Tokio1.51.6 signal로 구현했다. MSRV1.85/개발1.96 로컬 검증 완료, 기존 package/version 교체0. 로컬 CLI package1개·외부6개(anstyle/clap/clap_builder/clap_lex/errno/signal-hook-registry)를 추가했으며 결과 JSON에 정확한 pin·license/rust_version metadata가 있다. cached audit 취약점/unsound0·기존 paste 경고1, fresh DB 갱신은 미실행이다. core/default client의 선택 normal/build 그래프 격리와 RT allocator를 유지한다. 단일 실제 TCP/명시 CA/token·자동 reconnect/retry 없음·native DTO/CLI 출력 계약을 API §14.4에 기록했다.

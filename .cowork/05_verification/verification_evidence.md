@@ -607,6 +607,27 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 개발 자가 점검 [REV-020](reviews/REV-020_TASK-013_RECEIVER_START.md) Pass·위임된 첫 단위 수락/마감 Closed. TASK-013/MS-004 In Progress·Gate4/5 Not Ready 유지. 상위 Task 완료 체크를 채우지 않는다.
 - 미구현/미검증: 실제 client socket/재연결·endpoint/TLS/token/버전·요청/stream transport·CLI JSON/exit/Ctrl-C·query→replay/오프라인 파일/예제/dot-probe. raw ACK 추출 후 실제 연결로 보내는 경쟁/수명은 transport 구현에서 검증해야 한다. native 공개 후(T3)·PC 성능/RT/UPS/LAN/RSS/다른 OS는 별도다.
 
+<a id="ev-025"></a>
+### EV-025 — TASK-013 native client/CLI·오프라인·취소/ACK 사용자 경로
+
+- 대상: 소스 `29e55da0b2dbf46848fc3e413ff6777a79999f64`, [source92개/검사15개/로그 hash](../06_evolution/imported_context/task_013_2026-10-31/results.json)·[재현 script](../06_evolution/imported_context/task_013_2026-10-31/verify.py)·[commit blob92개 일치](../06_evolution/imported_context/task_013_2026-10-31/commit.json). EV-024는 첫 수신 수명 단위의 이전 형상이다. 기존 core/unsafe 제품 소스 변경0이다.
+- 실행: 2026-10-31 / AI / 로컬 Linux x86_64 / Rust1.85.0·1.96.0 / Miri nightly-2026-10-26. 다른 OS/native/장비 수락을 뜻하지 않는다.
+- TDD: transport 공개 API 부재와 CLI exit/JSON 행동 Red 후 구현. 개발 자가 점검 RV-039~045의 사전 입력 검사·등록 중복·모순/불량 완료 응답·재생 generation·일반 파일·인증 env·Gone 분류 Red→Green을 [REV-021](reviews/REV-021_TASK-013_CLIENT_CLI.md)에 보존했다.
+
+| 검증 | 결과/범위 |
+|---|---|
+| 두 Rust 각16feature·선택 core/client 그래프 | Pass — core/remote/DB/tracing/zstd·독립 실제 파일 consumer/remote consumer·RT allocator core10/remote11. CLI를 포함한 workspace metadata 대신 선택 normal/build graph를 검사해 격리 유지 |
+| 두 Rust workspace·기본 client | Pass — client codec1/기존 수신수명3/transport7·별도 CLI process10과 기존 core/소켓/TLS/파일/완료 회귀. client 기본 feature에서 네트워크 강제 없음 |
+| 실제 transport | 8MiB32조각·CRC·인계 전 Pending/후 ACK·Gap/consumer 거절/disconnect Unknown·인계 뒤 취소 AckUnknown, TLS/Read/Manage/비밀값 비노출, 실제 host Command 취소 뒤 permit 유지/완료 후 재사용 |
+| CLI 실제 사용자 경로 | 버전 NDJSON/고정 exit0/2/3/4·원래 read-only 파일 Query/Blob→remote Replay start/pause/resume/seek/stop·offline query/timed replay·실제 Ctrl-C/정리·출력 cap·stdout 성공만 ACK/닫힌 파이프 Unknown·독립 복구/source bytes 불변·등록 검증/Gone 표시 |
+| clippy/rustdoc/fmt·schema | 두 Rust -D warnings Pass·fmt Pass. 서버/client 두 사본 각각9message83field·protoc Pass. SDK 예제 all-targets compile·CLI JSON 선언 예제 유효 |
+| 영향 Miri | strict provenance·8seeds: 기존 수신 수명3×8=24+codec1×8=8, 총32 Pass. 실제 socket/TLS/process/OS file/signal은 native 로컬 실행이며 Miri 범위 밖 |
+| cached audit/의존 | cargo-audit0.22.2 `--no-fetch --deny unsound --json` exit0, 캐시 DB1378 advisory·취약점0/unsound0·기존 paste 경고1. DB last-commit/updated는 출력 null, fresh online update 미실행. 기존 package/version 교체0, CLI 로컬1개·외부6개(anstyle1.0.14/clap4.6.6/clap_builder4.6.6/clap_lex1.1.0/errno0.3.14/signal-hook-registry1.4.8) 추가·MIT OR Apache-2.0 선언/MSRV 근거 결과 JSON |
+
+검사 전후 source92개 동일·commit blob92개 일치. 원본 `.log.gz`와 공백 정규화 `.log`의 hash를 구분한다. 코드리뷰 기준의 개발 자가 점검 REV-021은 위임된 AI 로컬 수락으로 Closed다. Task 목록의 12열 헤더/데이터 대 13열 구분선 오류를 12열로 수정했고 UTF-8·26개 Task 보존·실제 Markdown 렌더 table0→1/헤더12/데이터312 cell을 확인했다. [원본/수정 hash·renderer 근거](../06_evolution/imported_context/task_013_2026-10-31/task-registry-repair.json)를 보존했다. Git/원격 동기화는 세션 로그를 따른다.
+
+미실행/후속: GitHub 공개 후(T3) native·다른 OS/실제 dot-probe 화면/운영 보안·TASK-016/017 관리 backend·fresh advisory update·LAN/RSS/PC 성능/RT/UPS/24h. CLI의 Unavailable/Unsupported와 file sync/namespace sync 구분을 유지한다. TASK-013은 로컬 구현 완료/native 잔여로 In Progress, MS-004/Gate4·5 미완료다. 후속 TASK-014 자동 착수 없음.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.

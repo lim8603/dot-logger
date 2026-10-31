@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/dot-logger", "tests/api-consumer", "tests/rt-allocation"]
+members = ["crates/dot-logger", "crates/dot-logger-client", "tests/api-consumer", "tests/rt-allocation"]
 default-members = ["crates/dot-logger"]
 resolver = "3"
 

@@ -224,6 +224,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dot-logger-client"
+version = "0.1.0"
+dependencies = [
+ "dot-logger",
+]
+
+[[package]]
 name = "dot-logger-rt-allocation"
 version = "0.1.0"
 dependencies = [

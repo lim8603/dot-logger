@@ -1,0 +1,107 @@
+# TASK-022 Human-approved profile. Declarations do not start a workload.
+id = "local-pc-v1"
+approval = "Approved"
+execution = "NotRun"
+scope = "current Ubuntu PC; synthetic control; simulated UPS"
+
+[storage]
+parent = "/data/build"
+run_prefix = "dot-logger-verification-"
+filesystem = "ext4"
+file_limit_bytes = 1073741824 # 1 GiB
+run_limit_bytes = 171798691840 # 160 GiB, including framing and rotations
+reserve_bytes = 68719476736 # 64 GiB kept free
+block_bytes = 1048576
+sync_interval_ms = 1000
+final_file_and_directory_sync = true
+
+[memory]
+input_mib = 64
+raw_mib = 1408
+output_mib = 256
+external_mib = 128
+control_mib = 64
+worker_mib = 128
+total_mib = 2048
+comparison_mib = [512, 2048, 4096]
+
+[measurement]
+warmup_seconds = 10
+repetitions = 3
+measured_seconds = 120
+minimum_ram_multiples = 2
+minimum_p3_seconds = 60
+minimum_recorded_bytes = 119500496896 # 2 * observed MemTotal
+metadata_headroom_bytes = 17179869184
+report_individual_runs = true
+
+[control]
+workload = "synthetic fixed-work loop; actual dot-probe integration is TASK-026"
+period_us = 10000
+deadline_us = 10000
+calibration_work_us = 500
+safety_period_us = 10000
+safety_deadline_us = 10000
+safety_calibration_work_us = 200
+control_cpu = 2
+safety_cpu = 3
+reserved_smt_cpus = [10, 11]
+worker_cpus = [4, 5, 6, 7, 12, 13, 14, 15]
+housekeeping_cpus = [0, 1, 8, 9]
+generic_policy = "SCHED_OTHER"
+rt_policy = "SCHED_FIFO"
+control_priority = 70
+safety_priority = 80
+additional_deadline_misses = 0
+
+[p0]
+storage_tool = "paired simple-file Rust writer (TASK-023; not implemented)"
+control_tool = "paired fixed-work control loop (TASK-023; not implemented)"
+scheduler_diagnostic = "cyclictest (diagnostic only)"
+same_cpu_workload_sync_rotation_and_completion = true
+tcp = "deferred until remote implementation and declared two-host path"
+
+[p1]
+payload_bytes = 256
+records_per_second = 100000
+producer_counts = [1, 4, 8, 16, 32]
+file_counts = [1, 4, 16]
+
+[p3]
+raw_channels = 4
+raw_payload_bytes = 8388608
+raw_records_per_channel_second = 30
+small_payload_bytes = 256
+small_records_per_second = 100000
+producers = 32
+files = 16
+registered_channels = 128
+compression = false
+checksum = true
+index = true
+
+[p5]
+requests_per_second = 1
+clients = 1
+page_records = 1000
+page_bytes = 262144
+p95_ms = 200
+concurrent_with = "P3"
+
+[ups]
+enabled_by_default = false
+simulation_window_ms = 3000
+signal_delays_ms = [0, 50, 250, 1000]
+safety_margin_ms = 200
+protection_bytes = [8388608, 67108864]
+rank1_max_bytes = 50331648
+rank2_max_bytes = 16777216
+earlier_deadline_ms = 1500
+implementation = "TASK-021/024; not implemented"
+
+[readiness]
+performance_harness = "NotImplemented"
+actual_dot_probe_control = "NotIntegrated"
+ups_adapter = "NotImplemented"
+rt_boot = "RequiredForRTRows"
+native = "DeferredUntilPublic"

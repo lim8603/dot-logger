@@ -1153,3 +1153,105 @@ fn query_and_replay_pages_and_large_blobs_stay_inside_external_reservation() {
         std::fs::remove_file(path).unwrap();
     }
 }
+
+#[cfg(feature = "remote")]
+#[test]
+fn remote_receiver_and_hub_buffers_stay_in_shared_external_reservation() {
+    use dot_logger::{
+        adapters::remote::*,
+        capture::{CaptureReceipt, CapturedRecord},
+        query::QueryBudget,
+    };
+    use std::time::{Duration, Instant};
+    for max in [256, 8 * 1024 * 1024] {
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 260 * 1024 * 1024,
+                input_bytes: 1024 * 1024,
+                raw_bytes: 0,
+                output_bytes: 1024 * 1024,
+                external_bytes: 256 * 1024 * 1024,
+                control_bytes: 1024 * 1024,
+                worker_bytes: 1024 * 1024,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 2,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let payload = vec![9; max];
+        let record = CapturedRecord {
+            receipt: CaptureReceipt {
+                session_id: 42,
+                producer_id: 0,
+                accepted_seq: 1,
+            },
+            metadata: RecordMetadata {
+                channel_id: 7,
+                schema_id: 99,
+                schema_version: 1,
+                mono_ns: 1,
+                real_ns: 1,
+                source_time: None,
+                level: Level::Info,
+                importance: Some(Importance::Normal),
+            },
+            revision: 1,
+            payload_len: max,
+        };
+        let checksum = Chunk::single(1, 1, 1, record, &payload, true).checksum;
+        let budget = QueryBudget::new(&plan);
+        let mut concrete = 0;
+        let (remaining, peak) = allocator::observe_memory(|| {
+            let limits = RemoteLimits {
+                connections: 1,
+                subscriptions: 1,
+                commands: 1,
+                message_bytes: MAX_CHUNK_BYTES + 1024,
+                record_bytes: max,
+                subscription_records: 2,
+                subscription_bytes: max * 2,
+                max_age: Duration::from_secs(10),
+                request_timeout: Duration::from_secs(1),
+            };
+            let (hub, inbox) = RemoteHub::new(&budget, limits).unwrap();
+            let mut receiver = Reassembler::new(&budget, 1, max, Duration::from_secs(10)).unwrap();
+            concrete = budget.used_bytes();
+            for (i, bytes) in payload.chunks(MAX_CHUNK_BYTES).enumerate() {
+                let mut chunk = Chunk::single(1, 1, 1, record, bytes, true);
+                chunk.total = max as u64;
+                chunk.offset = (i * MAX_CHUNK_BYTES) as u64;
+                chunk.checksum = checksum;
+                if let Some(ready) = receiver.push(chunk, Instant::now()).unwrap() {
+                    let ready = ready.handoff(|_, _| false).err().unwrap();
+                    let ack = ready
+                        .handoff(|r, data| r.receipt == record.receipt && data == payload)
+                        .ok()
+                        .unwrap();
+                    assert_eq!(ack.transfer, 1);
+                }
+            }
+            drop((receiver, hub, inbox));
+        });
+        assert_eq!(remaining, 0);
+        assert_eq!(budget.used_bytes(), 0);
+        assert!(peak > 0 && peak <= concrete as i128);
+        println!(
+            "remote core payload={max}: peak={peak}, reservation={concrete}, final delta={remaining}"
+        );
+    }
+}

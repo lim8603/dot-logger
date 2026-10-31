@@ -627,3 +627,53 @@ fn empty_selection_gaps_bad_axis_and_schedule_overflow_are_explicit() {
         assert_eq!(r.state(), ReplayState::Stopped);
     });
 }
+
+#[test]
+fn speed_equivalence_preserves_components_and_handles_u32_products() {
+    let one = Speed::REALTIME;
+    let unreduced = Speed::new(u32::MAX, u32::MAX).unwrap();
+    assert_ne!(one, unreduced);
+    assert!(one.is_equivalent(&unreduced));
+    assert!(
+        Speed::new(3, 2)
+            .unwrap()
+            .is_equivalent(&Speed::new(6, 4).unwrap())
+    );
+    let fast = Speed::new(u32::MAX, u32::MAX - 1).unwrap();
+    assert!(fast.is_equivalent(&fast));
+    assert!(!fast.is_equivalent(&one));
+    assert!(!one.is_equivalent(&fast));
+    assert_eq!(unreduced.numerator(), u32::MAX);
+    assert_eq!(unreduced.denominator(), u32::MAX);
+}
+
+#[test]
+fn replay_error_display_explains_failures_and_preserves_io_diagnostics() {
+    for (error, explanation) in [
+        (ReplayError::InvalidInput, "non-mono filter or invalid rate"),
+        (
+            ReplayError::InvalidState,
+            "operation is incompatible with the current replay state",
+        ),
+        (
+            ReplayError::Limit,
+            "scheduling deadline or seek generation limit exceeded",
+        ),
+        (
+            ReplayError::StaleGeneration,
+            "blob reference predates the current seek generation",
+        ),
+    ] {
+        assert_eq!(error.to_string(), explanation);
+    }
+    let error = ReplayError::Query(QueryError::Io(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "replay file access denied",
+    )));
+    let message = error.to_string();
+    assert!(message.starts_with("replay query failed: query error:"));
+    assert!(message.contains("replay file access denied"));
+    assert!(
+        matches!(error, ReplayError::Query(QueryError::Io(ref e)) if e.kind() == io::ErrorKind::PermissionDenied)
+    );
+}

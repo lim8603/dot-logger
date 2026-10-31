@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+remote = ["dot-logger/remote"]
+
 [dependencies]
 dot-logger = { path = "../../crates/dot-logger", default-features = false }
 

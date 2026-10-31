@@ -1,0 +1,117 @@
+syntax = "proto3";
+package dot_logger.remote.v1;
+// IDs are capabilities, never filesystem paths. Times are 16-byte LE signed integers.
+// Request/Reply shapes are shared; the selected RPC fixes the operation.
+message Source {
+  sint64 ticks = 1;
+  uint64 clock_domain = 2;
+}
+message Record {
+  bytes session = 1;
+  uint32 producer = 2;
+  uint64 sequence = 3;
+  uint32 channel = 4;
+  bytes schema = 5;
+  uint32 schema_version = 6;
+  uint64 revision = 7;
+  uint64 mono = 8;
+  sint64 real = 9;
+  Source source = 10;
+  uint32 level = 11;
+  uint32 importance = 12;
+  uint64 payload_length = 13;
+}
+message QueryMessage {
+  uint32 basis = 1;
+  uint64 clock_domain = 2;
+  bytes from = 3;
+  bytes to = 4;
+  optional uint32 channel = 5;
+  uint32 minimum_level = 6;
+}
+message Request {
+  uint32 major = 1;
+  uint64 handle = 2;
+  uint64 cursor = 3;
+  QueryMessage query = 4;
+  Record record = 5;
+  uint32 target = 6;
+  uint32 boundary = 7;
+  uint64 offset = 8;
+  uint32 length = 9;
+  uint64 generation = 10;
+  uint32 action = 11;
+  uint64 from = 12;
+  uint32 numerator = 13;
+  uint32 denominator = 14;
+  bytes data = 15;
+  uint64 other = 16;
+}
+message Item {
+  Record record = 1;
+  bytes inline = 2;
+  uint64 blob = 3;
+}
+message Reply {
+  uint32 major = 1;
+  uint32 kind = 2;
+  bytes session = 3;
+  uint64 revision = 4;
+  uint64 handle = 5;
+  uint64 cursor = 6;
+  uint64 generation = 7;
+  uint32 state = 8;
+  repeated Item items = 9;
+  bytes data = 10;
+  uint32 confirmed = 11;
+  uint32 outcome = 12;
+  uint32 reason = 13;
+}
+message SubscribeRequest {
+  uint32 major = 1;
+  optional uint32 channel = 2;
+  uint32 minimum_level = 3;
+  bool originals = 4;
+  bool disconnect = 5;
+  uint32 records = 6;
+  uint64 bytes = 7;
+  uint64 age_ms = 8;
+}
+message Frame {
+  uint32 major = 1;
+  uint64 subscription = 2;
+  uint64 transfer = 3;
+  uint64 generation = 4;
+  Record record = 5;
+  uint64 total = 6;
+  uint64 offset = 7;
+  uint32 checksum = 8;
+  bytes data = 9;
+  bool original = 10;
+  bool late = 11;
+  uint64 gap_first = 12;
+  uint64 gap_last = 13;
+  uint32 kind = 14;
+  uint32 gap_reason = 15; // 1 = overflow of the bounded application queue
+}
+message AckRequest {
+  uint32 major = 1;
+  uint64 subscription = 2;
+  uint64 transfer = 3;
+  uint64 generation = 4;
+  bytes session = 5;
+  uint32 producer = 6;
+  uint64 sequence = 7;
+}
+service Logger {
+  rpc GetStatus(Request) returns (Reply);
+  rpc Query(Request) returns (Reply);
+  rpc ReadBlob(Request) returns (Reply);
+  rpc Replay(Request) returns (Reply);
+  rpc GetCompletion(Request) returns (Reply);
+  rpc ApplyConfig(Request) returns (Reply);
+  rpc RunCheck(Request) returns (Reply);
+  rpc Compare(Request) returns (Reply);
+  rpc Subscribe(SubscribeRequest) returns (stream Frame);
+  rpc Ack(AckRequest) returns (Reply);
+}

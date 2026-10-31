@@ -26,3 +26,6 @@ pub mod query;
 
 /// Caller-driven offline replay, bounded prefetch and generation-based control.
 pub mod replay;
+
+/// Optional general-path output and network adapters.
+pub mod adapters;

@@ -313,9 +313,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )
     })?;
+    #[cfg(feature = "remote")]
+    remote_contract(&plan)?;
     println!(
         "tracked admission/routing/MCAP file sync/shutdown passed; {} bytes reserved",
         plan.reserved_bytes()
     );
+    Ok(())
+}
+
+#[cfg(feature = "remote")]
+fn remote_contract(
+    plan: &dot_logger::config::ValidatedConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use dot_logger::{
+        adapters::remote::*,
+        capture::{CaptureReceipt, CapturedRecord, Importance},
+        query::QueryBudget,
+    };
+    let budget = QueryBudget::new(plan);
+    let limits = RemoteLimits {
+        connections: 1,
+        subscriptions: 1,
+        commands: 1,
+        message_bytes: 4096,
+        record_bytes: 256,
+        subscription_records: 2,
+        subscription_bytes: 512,
+        max_age: Duration::from_secs(1),
+        request_timeout: Duration::from_secs(1),
+    };
+    let (hub, inbox) = RemoteHub::new(&budget, limits)?;
+    let pending_bind = RemoteServer::bind(ServerConfig::default(), hub.clone());
+    drop(pending_bind);
+    let mut receiver = Reassembler::new(&budget, 1, 256, Duration::from_secs(1))?;
+    let record = CapturedRecord {
+        receipt: CaptureReceipt {
+            session_id: 42,
+            producer_id: 0,
+            accepted_seq: 1,
+        },
+        metadata: RecordMetadata {
+            channel_id: 7,
+            schema_id: 99,
+            schema_version: 1,
+            mono_ns: 1,
+            real_ns: 1,
+            source_time: None,
+            level: Level::Info,
+            importance: Some(Importance::Normal),
+        },
+        revision: 1,
+        payload_len: 3,
+    };
+    let ready = receiver
+        .push(
+            Chunk::single(1, 1, 1, record, b"ack", false),
+            Instant::now(),
+        )?
+        .ok_or("incomplete receiver")?;
+    let ack = ready
+        .handoff(|r, data| r.receipt == record.receipt && data == b"ack")
+        .map_err(|_| "receiver refused")?;
+    assert_eq!(ack.receipt, record.receipt);
+    drop((receiver, hub, inbox));
+    assert_eq!(budget.used_bytes(), 0);
     Ok(())
 }

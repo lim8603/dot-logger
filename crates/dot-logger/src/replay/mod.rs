@@ -9,6 +9,8 @@ use std::io::{Read, Seek};
 use std::sync::atomic::AtomicBool;
 
 /// Finite positive rational playback rate; e.g. 1/2, 1/1 or 2/1.
+/// Components are preserved: equality compares the supplied numerator and
+/// denominator. Use [`Speed::is_equivalent`] to compare playback rates.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Speed {
     numerator: u32,
@@ -29,6 +31,12 @@ impl Speed {
             numerator,
             denominator,
         })
+    }
+    /// Compare rates without changing their original components.
+    pub fn is_equivalent(&self, other: &Self) -> bool {
+        // Two u32 factors always fit in u64, including u32::MAX squared.
+        u64::from(self.numerator) * u64::from(other.denominator)
+            == u64::from(other.numerator) * u64::from(self.denominator)
     }
     /// Positive numerator as supplied, without reducing the ratio.
     pub fn numerator(&self) -> u32 {
@@ -72,7 +80,17 @@ pub enum ReplayError {
 }
 impl std::fmt::Display for ReplayError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "replay error: {self:?}")
+        match self {
+            Self::InvalidInput => f.write_str("non-mono filter or invalid rate"),
+            Self::InvalidState => {
+                f.write_str("operation is incompatible with the current replay state")
+            }
+            Self::Limit => f.write_str("scheduling deadline or seek generation limit exceeded"),
+            Self::StaleGeneration => {
+                f.write_str("blob reference predates the current seek generation")
+            }
+            Self::Query(error) => write!(f, "replay query failed: {error}"),
+        }
     }
 }
 impl std::error::Error for ReplayError {}

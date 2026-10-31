@@ -107,7 +107,7 @@ struct Ledger {
     used: AtomicUsize,
     limit: usize,
 }
-struct Reservation {
+pub(crate) struct Reservation {
     state: Arc<Ledger>,
     bytes: usize,
 }
@@ -117,7 +117,8 @@ impl Drop for Reservation {
     }
 }
 impl QueryBudget {
-    /// Create once per session; other external adapters must use disjoint reservations.
+    /// Create once per session and share this authority with query/remote adapters.
+    /// All their reservations are charged to the same external partition.
     pub fn new(plan: &ValidatedConfig) -> Self {
         Self {
             state: Arc::new(Ledger {
@@ -130,7 +131,10 @@ impl QueryBudget {
     pub fn used_bytes(&self) -> usize {
         self.state.used.load(Ordering::Acquire)
     }
-    fn reserve(&self, bytes: usize) -> Result<Reservation, QueryError> {
+    // try_update requires Rust 1.95; keep fetch_update for MSRV 1.85.
+    // Nightly deprecates the alias. Suppress only this reservation operation.
+    #[allow(deprecated)]
+    pub(crate) fn reserve(&self, bytes: usize) -> Result<Reservation, QueryError> {
         self.state
             .used
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| {

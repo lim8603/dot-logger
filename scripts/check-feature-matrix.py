@@ -5,6 +5,7 @@ import argparse
 import itertools
 import json
 import subprocess
+import sys
 
 FEATURES = ("remote", "influxdb", "tracing-adapter", "compression-zstd")
 
@@ -14,6 +15,7 @@ def main():
     parser.add_argument("--toolchain", default="1.96.0")
     args = parser.parse_args()
     cargo = ["cargo", f"+{args.toolchain}"]
+    subprocess.run([sys.executable, "scripts/check-remote-protocol.py"], check=True)
     for enabled in itertools.product((False, True), repeat=len(FEATURES)):
         features = [name for name, active in zip(FEATURES, enabled) if active]
         print(f"TC-001: {args.toolchain}: {','.join(features) or 'default/core'}", flush=True)
@@ -44,6 +46,8 @@ def main():
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer"], check=True)
     subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation"], check=True)
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger", "--example", "scoped_capture"], check=True)
+    subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer", "--features", "remote"], check=True)
+    subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation", "--features", "remote"], check=True)
     print("TC-001: all 16 feature combinations and independent core consumer passed", flush=True)
 
 

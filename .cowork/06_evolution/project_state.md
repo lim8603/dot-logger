@@ -11,7 +11,7 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-004 In Progress — 조회·재생·클라이언트, MS-007은 TASK-022 프로필 준비 In Progress |
 | 활성 Task | TASK-013 In Progress — 로컬 DoD 완료/native 공개 후(T3) / TASK-022 실행 준비. TASK-014 미착수 |
-| 미처리 리뷰 | [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) Open — TASK-013 client/CLI·TASK-012 `4f79119` 독립 리뷰 Pass(P2 1, P3 6). REV-001~021 Closed |
+| 미처리 리뷰 | [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) Open — TASK-013 client/CLI·TASK-012 `4f79119` ·서버 경계 독립 리뷰 Pass(P2 2, P3 8). REV-001~021 Closed |
 | 상태 | Yellow — 클라이언트/CLI 로컬 완료, 운영/실앱·PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
@@ -90,11 +90,11 @@
 | [REV-019](../05_verification/reviews/REV-019_TASK-012_PROJECT_CODE_REVIEW.md) | TASK-012 | 2026-10-31 | 원격 adapter·프로젝트 종합 심층 코드리뷰 / Pass (P2 2, P3 1) | Closed | RV-036~038 조치·EV-023 검사9개/Miri25 Pass·Human 위임에 따른 AI 마감 |
 | [REV-020](../05_verification/reviews/REV-020_TASK-013_RECEIVER_START.md) | TASK-013 첫 단위 | 2026-10-31 | 연결 수명 API 개발 자가 점검 / Pass | Closed | EV-024 통합3개·검사12개·Miri24 Pass·위임된 첫 단위 수락, transport/CLI 후속 |
 | [REV-021](../05_verification/reviews/REV-021_TASK-013_CLIENT_CLI.md) | TASK-013 로컬 구현 | 2026-10-31 | client/CLI 개발 자가 점검·조치 / Pass | Closed | RV-039~045 조치·EV-025 검사15개/Miri32·위임된 AI 로컬 수락, native/실앱 후속 |
-| [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) | TASK-013 `29e55da`·TASK-012 `4f79119` | 2026-10-31 | 독립 Read-Only 리뷰 / Pass (P2 1, P3 6) | Open | RV-046 handoff 사전 거절/CLI exit 오분류(P2), RV-047~052 preflight·limit·admission 냉각·token sensitive·라우팅·recover 재검사. 후속 개발 세션 조치 |
+| [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) | TASK-013 `29e55da`·TASK-012 `4f79119` | 2026-10-31 | 독립 Read-Only 리뷰·서버 경계 확장 / Pass (P2 2, P3 8) | Open | RV-046 handoff 사전 거절/CLI exit 오분류(P2), RV-053 조용한 구독 종료·재구독 누락 미표시(P2), RV-047~052·054·055 preflight·limit·admission 냉각·token·라우팅·recover·status 대응·Command Drop. 후속 개발 세션 조치, RV-053 프로토콜안은 Human 판단 |
 
 ## 다음 시작점
 
-0. 2026-10-31 #009 리뷰 세션: REV-022 Open(RV-046~052). 다음 개발 세션은 RV-046(P2)부터 TDD로 조치하고 RV-047~052를 판정한다. TASK-014 착수 전 처리 순서는 Human 지시를 따른다.
+0. 2026-10-31 #009 리뷰 세션: REV-022 Open(RV-046~055, 서버 경계 확장 포함). 다음 개발 세션은 RV-046·053(P2)부터 TDD로 조치하고 나머지를 판정한다. RV-053 heartbeat/lease 프로토콜 변경은 Human 판단 사항이다. TASK-014 착수 전 처리 순서는 Human 지시를 따른다.
 1. 세션 종료. TASK-013 로컬 구현·수락 EV-025/29e55da와 Task 목록 복구는 게시 완료했고 소스92개·표26개 Task/12열·원격/디스크 일치를 확인했다. 새 세션의 다음 개발 후보는 TASK-014이며 종료 후 자동 착수하지 않는다.
 2. 다음 개발 후보는 TASK-014 운영 계측/유한 집계다. TASK-013까지 요청한 이번 범위에서는 새 Task를 자동 착수하지 않는다. 후속 지시가 오면 기존 위임 안에서 진행한다.
 3. TASK-004~013의 native는 GitHub 공개 완료 후(T3), TASK-022 local-pc-v1 실측은 선행 harness/실앱/UPS 구현·RT 부팅 확인 뒤다. 현재 PC/RT/UPS/OS·MS-004/Gate4/5 완료를 선언하지 않는다.
@@ -158,7 +158,7 @@
 
 ## 최근 작업·이력
 
-- 2026-10-31 #009: 리뷰 전용 세션 — TASK-013 client/CLI·TASK-012 `4f79119` 독립 리뷰, [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) Open 등록. 제품 코드 미수정.
+- 2026-10-31 #009: 리뷰 전용 세션 — TASK-013 client/CLI·TASK-012 `4f79119`·서버 경계 독립 리뷰, [REV-022](../05_verification/reviews/REV-022_TASK-013_INDEPENDENT_REVIEW.md) Open 등록. 제품 코드 미수정.
 - 2026-10-31 #008: TASK-013 native client/CLI·파일/취소/ACK 로컬 구현·EV-025 Pass·REV-021 수락 및 Task 목록 정비 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_008.md).
 - 2026-10-31 #007: Human 위임 반영·REV-019 EV-023 조치/마감·TASK-013 EV-024 수신 수명 API 첫 단위 검증 및 단위별 게시 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_007.md).
 - 2026-10-31 #006: 프로젝트 브리핑·REV-019 반입/판정·승인 업무 정리·저장 문제 Antigravity 원인으로 정정 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_006.md).

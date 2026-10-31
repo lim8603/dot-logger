@@ -1,4 +1,4 @@
-# [REV-022] TASK-013 클라이언트·CLI 및 TASK-012 후속 조치 독립 코드리뷰
+# [REV-022] TASK-013 클라이언트·CLI 및 TASK-012 후속 조치·서버 경계 독립 코드리뷰
 
 ## 1. 개요
 
@@ -7,9 +7,10 @@
 - **대상 형상:** 소스 `29e55da` (HEAD `5f214ae`는 문서 변경만 포함)
   - TASK-013: `ded6372`·`29e55da`의 [client](../../../crates/dot-logger-client/src/) `cancel`·`receiver`·`transport`·`codec`·`offline`, [CLI](../../../crates/dot-logger-cli/src/) `main`·`args`·`commands`·`model`·`output`
   - TASK-012 후속: `4f79119`(RV-036/037/038 조치)의 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) diff 및 서버↔클라이언트 wire 경계
-- **TASK-012 범위 판단:** `4f79119..29e55da` 사이에 `crates/dot-logger` 변경은 없다. TASK-012 본 구현(`5f0ad83`)은 REV-019에서 독립 리뷰를 마쳤으므로 다시 검토하지 않았다. REV-019 이후 자가 검증만 거친 조치 diff `4f79119`와 TASK-013이 사용하는 계약 경계만 포함했다.
+- **TASK-012 범위 판단:** `4f79119..29e55da` 사이에 `crates/dot-logger` 변경은 없다. TASK-012 본 구현(`5f0ad83`)은 REV-019에서 독립 리뷰를 마쳤으므로 전체를 다시 검토하지 않았다. REV-019 이후 자가 검증만 거친 조치 diff `4f79119`와 TASK-013이 사용하는 계약 경계만 포함했다.
+- **경계 확장 (Human 선택 A, 같은 세션):** TASK-013이 실제로 호출하는 서버 경로를 클라이언트 사용 패턴과 대조했다. 대상은 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs) `RpcService`·`UnaryRpc`·`AckRpc`·`SubscribeRpc`·`SubscriptionStream`·`status`, [hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs) `Subscription::next/ack/expire`·`offer` Gap·`request`/`Command`, [receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) `push`/`handoff`, core `Replay::seek` generation이다. RV-053~055가 여기서 나왔다. `types`·`wire` 변환 전체와 원격 통합 시험은 다시 검토하지 않았다.
 - **정적 확인:** `cargo fmt --check` Pass, `cargo clippy -p dot-logger-client -p dot-logger-cli --all-targets --all-features -- -D warnings` Pass. 소스가 EV-025와 같으므로 테스트·Miri는 다시 실행하지 않았다. 아래 반례는 코드 정독으로 도출했고 실행 재현은 처리담당 Red 시험에 맡긴다.
-- **종합 판정:** Pass (P2 1, P3 6). P1 없음. 데이터 손실, ACK 선행, RT 침해 결함은 확인하지 못했다.
+- **종합 판정:** Pass (P2 2, P3 8). P1 없음. 데이터 손실, ACK 선행, RT 침해 결함은 확인하지 못했다.
 - **상태:** Open
 
 ### 확인한 긍정 사항
@@ -19,6 +20,13 @@
 - **연결 식별:** `ConnectionId(Arc<()>)`는 old owner가 살아 있는 동안 할당이 유지되어 포인터 재사용 충돌이 없다. one-shot connector는 재연결 시 오류를 반환한다.
 - **ACK 순서:** CLI tail은 stdout `write_all`+`flush`가 성공한 뒤에만 consumer true를 반환하고 ACK를 보낸다. 출력 cap/IO 실패 시 ACK를 보내지 않는다.
 - **TASK-012 RV-037 조치:** `Credential::matches`는 고정 256B 비교와 길이 `ct_eq`를 사용하며 stored length를 노출하지 않는다. 여러 token 중 `find`의 조기 종료로 일치한 index가 시간에 드러날 수 있지만, 이는 조치 문서가 밝힌 "primitive 보호, 전체 RPC 시간 특성 미주장"에 포함된다.
+- **서버↔클라이언트 계약 일치 (경계 확장):**
+  - replay generation: core는 `seek`만 generation을 +1 하며, 클라이언트 RV-042 precondition(seek=+1, 그 외 동일)과 맞는다.
+  - `late` 플래그: 서버는 첫 미전송 기록이 다 보내질 때까지 다른 기록 조각을 끼워 넣지 않는다. 그래서 같은 기록의 조각들이 같은 `late` 값을 가지며, receiver의 조각 간 header 일치 검사와 충돌하지 않는다.
+  - ACK: 서버 `peer` 일치 검사는 one-shot 단일 연결 ACK와 맞는다.
+  - Gap: 큐에 있던 기록을 먼저 보낸 뒤 연속 범위로 Gap을 보내는 순서가 클라이언트 `gap_reason==1`·범위 검사와 맞는다.
+  - 크기 상한: ReadBlob 길이는 host `respond`와 클라이언트가 모두 검사한다. Page 항목 1000개 상한도 양쪽이 같다.
+  - 만료 시 ACK: 서버 만료 뒤 ACK가 Gone으로 거절되면 클라이언트는 `AcknowledgementUnknown`을 반환하고, 서버도 Unknown으로 처리한다. 양쪽 모두 성공을 주장하지 않는다.
 
 ---
 
@@ -33,6 +41,9 @@
 | RV-050 | P3 | [token `MetadataValue`](../../../crates/dot-logger-client/src/transport.rs#L263) | bearer 값이 sensitive로 표시되지 않음(HPACK 색인 대상, Debug 출력 가능) | parse 후 `set_sensitive(true)` 적용 | — | Open |
 | RV-051 | P3 | [`path`](../../../crates/dot-logger-client/src/transport.rs#L196-L207)·[`codec::method`](../../../crates/dot-logger-client/src/codec.rs#L58) | 문자열 method 대응이 누락되면 조용히 GetStatus로 라우팅됨 | variant별 경로를 한 곳의 exhaustive match로 관리 | — | Open |
 | RV-052 | P3 | [`recover`](../../../crates/dot-logger-cli/src/commands.rs#L410-L420) | open한 descriptor를 재검사하지 않고 path metadata 길이로 safe_offset을 비교함. `open_snapshot`의 RV-043 조치와 일관되지 않음 | 열린 파일 `metadata()`로 종류·길이 재검사 | — | Open |
+| RV-053 | P2 | [`SubscriptionStream` idle lease](../../../crates/dot-logger/src/adapters/remote/server.rs#L446-L450)·[`RemoteSubscription::next`](../../../crates/dot-logger-client/src/transport.rs#L525-L538)·[`ReceiverConfig::ttl`](../../../crates/dot-logger-client/src/receiver.rs#L18-L19) | heartbeat가 없어 조용한 구독은 min(client timeout, ttl) 뒤 종료된다. 다시 구독하면 그 사이 기록이 Gap 없이 보이지 않는다. client 문서는 ttl이 서버 idle lease를 겸한다는 점을 밝히지 않는다 | idle 대기와 기록 deadline 분리, 또는 heartbeat/lease 문서화 (프로토콜 변경은 Human 판단) | — | Open |
+| RV-054 | P3 | [server `status`](../../../crates/dot-logger/src/adapters/remote/server.rs#L95-L106)·[client `rpc_error`](../../../crates/dot-logger-client/src/transport.rs#L148-L161) | host Corrupt가 InvalidArgument를 거쳐 client InvalidInput(exit2)이 되고, tonic 크기 상한 OutOfRange는 Transport(exit4)가 됨. 대응표가 계약 문서에 없음 | 손실 없는 status 대응과 API 문서화 | — | Open |
+| RV-055 | P3 | [`RemoteHub::request`](../../../crates/dot-logger/src/adapters/remote/hub.rs#L524-L527)·[CLI posted_host_io](../../../crates/dot-logger-cli/src/output.rs#L166-L172) | host가 응답 없이 Command를 Drop하면 Gone이 된다. 변경 명령(ApplyConfig/RunCheck)이 이 경우 `gone_or_expired`로 표시되고 `completion_unconfirmed` 표시가 빠짐 | 응답 없는 Drop을 Gone과 구분하거나, 변경 명령의 Gone에 불명 표시 추가 | — | Open |
 
 ---
 
@@ -131,6 +142,53 @@
 - 처리 내용:
 - 검증 근거:
 
+### RV-053: 조용한 구독의 강제 종료와 재구독 사이의 보이지 않는 누락 (P2, 서버 경계)
+
+#### [리뷰어]
+- **위치:** [server.rs#L446-L450](../../../crates/dot-logger/src/adapters/remote/server.rs#L446-L450), [transport.rs#L525-L538](../../../crates/dot-logger-client/src/transport.rs#L525-L538), [transport.rs#L421-L436](../../../crates/dot-logger-client/src/transport.rs#L421-L436), [receiver.rs#L18-L19](../../../crates/dot-logger-client/src/receiver.rs#L18-L19)
+- **발견한 문제:**
+  1. 서버 `SubscriptionStream`은 event가 없는 상태로 `age`가 지나면 stream을 `TimedOut`으로 끝낸다. 이 동작은 API 계약에 "idle lease"로 적혀 있다. 클라이언트는 `ReceiverConfig::ttl`을 그대로 `age_ms`로 보내는데, `ttl` 문서는 "incomplete/unaccepted record age"라고만 설명한다. 그래서 수신 TTL을 짧게 잡으면 서버 idle lease도 함께 짧아진다는 사실을 호출자가 알 수 없다.
+  2. 클라이언트 `next()`는 `RemoteConfig::timeout`(기본 5초)을 다음 기록 deadline으로 쓰고, 오류가 나면 구독을 닫는다. 기록이 드문 채널이라면 기록이 오지 않은 것만으로 구독이 끝난다.
+  3. 프로토콜에 heartbeat frame이 없으므로, 지속 tail(dot-probe 실시간 화면)은 재구독 루프에 기댈 수밖에 없다. 새 구독은 transfer 번호가 1부터 새로 시작하고 이전 구독과 이어지지 않는다. 따라서 끊긴 사이 host `offer`가 `Gone`이 된 기록은 클라이언트에 Gap으로 나타나지 않는다. host는 실패를 알지만 수신 측 화면은 누락을 표시할 수 없다.
+- **반례:** 기록 간격이 6초인 채널을 기본 설정으로 구독한다. `next()`가 5초에 TimedOut을 반환하고 구독이 닫힌다. 재구독하기 전에 offer된 기록은 클라이언트 쪽에 Gap 없이 사라진다.
+- **처리 제안 (택1 또는 조합):**
+  - (a) 클라이언트: `next()`의 TimedOut이 구독을 닫지 않게 한다. tonic `Streaming::message`의 cancel-safety를 확인한 뒤 시험으로 고정한다. 또는 idle 대기 상한을 기록 deadline과 분리한 설정으로 둔다.
+  - (b) 문서: `ReceiverConfig::ttl`·README·API §14.4에 "ttl = 서버 idle lease 겸 미수락 기록 수명"과 "재구독 간 누락은 Gap으로 표시되지 않음"을 명시한다.
+  - (c) 프로토콜: idle heartbeat frame 또는 lease 분리 필드를 추가한다. wire/계약 변경이므로 H/J 판단 사항이며, ADR 승격 기준을 검토한다.
+- **심각도 근거:** ACK·데이터 무결성은 지켜진다. 다만 계획된 실시간 화면 사용(US-005)에서 누락이 표시되지 않을 수 있고, 공개 설정의 의미가 숨어 있으므로 P2로 판단했다.
+
+#### [처리담당]
+- 판정 결과:
+- 처리 내용:
+- 검증 근거:
+
+### RV-054: gRPC status 대응의 정보 손실과 계약 문서 부재 (P3, 서버 경계)
+
+#### [리뷰어]
+- **위치:** [server.rs#L95-L106](../../../crates/dot-logger/src/adapters/remote/server.rs#L95-L106), [transport.rs#L148-L161](../../../crates/dot-logger-client/src/transport.rs#L148-L161)
+- **발견한 문제:**
+  - 서버는 `Corrupt`와 `InvalidInput`을 모두 `invalid_argument`로 보낸다. 클라이언트는 이를 `InvalidInput`으로 받으므로, host가 원본 손상을 `Corrupt`로 응답해도 CLI는 `invalid_input`/exit2(사용자 입력 오류)로 표시한다.
+  - 메시지가 tonic decode/encode 상한을 넘으면 `OutOfRange`가 되고, 클라이언트 `_ => Transport`를 거쳐 `io_or_transport`/exit4가 된다. 예를 들어 서버 `message_bytes`가 클라이언트 `--message-bytes`보다 크면 큰 Page 응답이 Limit이 아니라 IO 실패로 보인다. Query 요청에는 클라이언트 상한을 서버에 알릴 필드가 없다.
+  - status 대응표는 [interface_contract](../../03_design_artifacts/interface_contract.md)에 없다.
+- **처리 제안:** 서버 `Corrupt → data_loss`, 클라이언트 `DataLoss → Corrupt`·`OutOfRange → Limit`로 대응시킨다. 기존 `invalid_argument`는 계속 `InvalidInput`으로 받아 하위 호환을 유지한다. 대응표를 API 계약에 적는다. 크기 협상은 후속 판단(P3 이하)으로 둔다.
+
+#### [처리담당]
+- 판정 결과:
+- 처리 내용:
+- 검증 근거:
+
+### RV-055: 응답 없는 Command Drop과 변경 명령의 완료 불명 표시 누락 (P3, 서버 경계)
+
+#### [리뷰어]
+- **위치:** [hub.rs#L524-L527](../../../crates/dot-logger/src/adapters/remote/hub.rs#L524-L527), [output.rs#L166-L172](../../../crates/dot-logger-cli/src/output.rs#L166-L172)
+- **발견한 문제:** host가 `respond` 없이 `Command`를 Drop하면 oneshot이 닫혀 `Gone`이 된다. host panic이나 계약 위반이 이런 경우다. 그런데 `Gone`은 만료된 snapshot/blob capability에도 쓰인다. CLI는 `Gone`을 `gone_or_expired`/exit3으로 표시하고 `posted_host_io: completion_unconfirmed`를 붙이지 않는다. 그래서 `config apply`/`check run`이 실제로 일부 적용됐을 수 있는데도 "적용 여부 불명"이라는 표시가 빠진다.
+- **처리 제안:** hub가 응답 없는 Drop을 `Transport`(또는 별도 불명 의미)로 반환해 capability `Gone`과 구분한다. 또는 CLI가 변경 명령의 `Gone`에도 `completion_unconfirmed`를 붙인다. Red: 시험 host가 ApplyConfig Command를 respond 없이 Drop → 기대 불명 표시.
+
+#### [처리담당]
+- 판정 결과:
+- 처리 내용:
+- 검증 근거:
+
 ---
 
 ## 4. 파일 변경표 (리뷰 대상)
@@ -141,6 +199,7 @@
 | 생성 | [client receiver.rs](../../../crates/dot-logger-client/src/receiver.rs) | 연결 식별·handoff/take_ack — 이상 없음 |
 | 생성 | [CLI commands.rs](../../../crates/dot-logger-cli/src/commands.rs)·[main.rs](../../../crates/dot-logger-cli/src/main.rs)·[output.rs](../../../crates/dot-logger-cli/src/output.rs)·[model.rs](../../../crates/dot-logger-cli/src/model.rs)·args.rs | preflight·limit·출력 cap·종료 분류·복구 — RV-046/047/048/052 |
 | 수정 | [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) (`4f79119`) | 포화 admission 냉각·고정 길이 credential 비교·gate 수명 문서 — RV-049 |
+| 기존 (경계 확장) | [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs) RPC/stream·[hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs) 구독/ACK/command | 클라이언트 사용 패턴과 대조 — RV-053/054/055 |
 
 ## 5. 클래스(타입) 검토표
 
@@ -152,9 +211,12 @@
 | 생성 | client receiver | ClientReceiver·ConnectionId·PendingRecord·Acknowledgement | Arc 식별·stale 거절 양호 |
 | 생성 | CLI | Context·Output·Failure | preflight 누락(RV-047), `_ => Io` fallback(RV-046) |
 | 수정 | core remote(private) | Incoming·Credential | 냉각 처리량(RV-049), 비교 primitive 양호 |
+| 기존 | core remote(private) | SubscriptionStream·Subscription·RpcService | idle lease/heartbeat 부재(RV-053), status 대응(RV-054). late·Gap·ACK peer 계약은 일치 |
+| 기존 | core remote | RemoteHub·Command | 응답 없는 Drop의 Gone 처리(RV-055) |
 
 ## 6. 다음 액션
 
 1. 후속 개발 세션에서 RV-046을 먼저 조치한다. Red → Green → 기존 transport7/CLI10 회귀 순서로 진행하며, 공개 오류 variant를 바꾸면 API §14.4를 함께 갱신한다.
-2. RV-047~052는 같은 세션에서 묶어 처리하거나, 판정(수용/보류/기각)과 근거를 처리담당 영역에 기록한다. RV-049는 TASK-022 실측 항목과 연결할 수 있다.
-3. 이 리뷰는 native·실앱·PC 실측의 수락을 뜻하지 않는다. TASK-013 상태(로컬 완료/native T3 이월)는 바꾸지 않는다.
+2. RV-053은 처리 방식에 따라 권한이 다르다. (a) 클라이언트 동작과 (b) 문서는 기존 위임 안에서 조치할 수 있다. (c) heartbeat/lease 프로토콜 변경은 Human 판단을 받은 뒤 진행한다.
+3. RV-047~052·054·055는 같은 세션에서 묶어 처리하거나, 판정(수용/보류/기각)과 근거를 처리담당 영역에 기록한다. RV-054의 status 대응 변경은 API 계약 문서도 함께 갱신한다. RV-049는 TASK-022 실측 항목과 연결할 수 있다.
+4. 이 리뷰는 native·실앱·PC 실측의 수락을 뜻하지 않는다. TASK-013 상태(로컬 완료/native T3 이월)는 바꾸지 않는다.

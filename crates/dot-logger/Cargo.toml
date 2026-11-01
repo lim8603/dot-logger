@@ -28,6 +28,9 @@ subtle = { workspace = true, optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 # The raw payload cell is the only audited production unsafe boundary.
 # Other workspace packages retain forbid; this package denies unsafe everywhere
 # except the private pool/storage module.
@@ -46,3 +49,8 @@ path = "../../examples/scoped_capture.rs"
 [[example]]
 name = "telemetry_overhead"
 path = "../../examples/telemetry_overhead.rs"
+
+[[example]]
+name = "general_logs"
+path = "../../examples/general_logs.rs"
+required-features = ["tracing-adapter"]

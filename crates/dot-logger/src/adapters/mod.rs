@@ -3,3 +3,5 @@
 pub mod influxdb;
 #[cfg(feature = "remote")]
 pub mod remote;
+#[cfg(feature = "tracing-adapter")]
+pub mod tracing;

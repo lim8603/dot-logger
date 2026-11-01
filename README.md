@@ -61,7 +61,7 @@ custom sink 버퍼는 어댑터 예산이며, 실제 worker와 allocator 내부 
 | `tracing-adapter` | tracing·log, 일반 로그 어댑터 |
 | `compression-zstd` | MCAP의 zstd 압축 |
 
-선택 feature의 구현·수락 범위는 모듈별 계약과 검증 근거를 따릅니다. `tracing-adapter`는 아직 의존성 호환 검사 단계입니다.
+선택 feature의 구현·수락 범위는 모듈별 계약과 검증 근거를 따릅니다. `tracing-adapter`는 일반 경로의 명시적 tracing/log 인코딩·수집 연결을 제공합니다.
 MCAP 제품 파일 API는 `storage` 모듈에 있으며, 독립 consumer는 실제 파일 생성·마감·sync 후 임시 파일을 정리합니다.
 
 `storage::SegmentLog`는 bytes·단조시간·메시지 수·인덱스 bytes/chunk 상한에 따라 파일을 회전합니다.
@@ -175,3 +175,27 @@ Docker 접근/고정 image 다운로드가 필요합니다. 일반 `cargo test`�
 `DeliveryAttempt::result()`로 write 결과를 확인하고 `publish()`로 원 receipt의 `DatabaseAcknowledged`/실패/폐기/Unknown을 게시합니다. Busy이면 같은 Attempt를 유지하고 publish만 다시 호출합니다. HTTP를 재제출하지 않습니다. 완료를 게시한 뒤에도 실제 Attempt Drop까지 원본을 유지합니다. `into_delivery()`는 identity/runtime/Busy의 미시도 guard만 복구할 수 있습니다. 미게시 Drop은 Unknown입니다.
 
 파일 출력은 별도 host worker에서 진행합니다. 로컬 시험은 DB 정지·포화 중 파일6건/3508B·원문/metadata 보존·Written 완료를 확인했고, DB는 in-flight1/8B·추가5건 Capacity drop을 분리 표시했습니다. paired file-phase ns는 기능 관측이며 처리량/RT/≤5% 비용 수락이 아닙니다. 공유 raw 풀이 모두 고갈되면 새 수집도 거절될 수 있습니다. 실앱·정량 성능/장기·다른 OS/native는 후속입니다. [API§14.8](.cowork/03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).
+
+### 일반 로그 입력 어댑터 (TASK-020 S1)
+
+`adapters::tracing::{tracing_event, log_record}`는 애플리케이션의 기존 subscriber/sink에서
+호출하는 일반 경로 훅입니다. 전역 subscriber/logger·스레드·큐·시계를 자동 등록하지 않습니다.
+호스트가 제공한 scratch에 `{"target":"...","fields":{"name":"value"}}` UTF-8 JSON을
+인코딩합니다. 모든 필드 값은 텍스트이며 typed 수치 데이터는 별도 수치 API를 사용합니다.
+tracing 이벤트 자신의 필드만 보존하며 span context·log key-values는 포함하지 않습니다.
+문자열은 그대로 JSON escape하고 나머지 tracing 값은 Debug, log 메시지는 Display로 표현합니다.
+
+`EncodedLog::capture`는 기존 `Producer`에 한 번 제출하며 수준만 source에서 변환합니다.
+호스트가 제공한 시각·채널·schema·중요도는 유지합니다. filter/sampling의 Skipped와
+Capacity/Closing 등 기존 결과를 그대로 반환하며, 수락 receipt는 입력 수락만 의미합니다.
+로그 수준 Error는 Important로 자동 승격하지 않습니다.
+버퍼 부족은 `EncodeError::TooLarge`, 사용자 formatter 실패는 `Formatting`으로 전체 거절하며
+잘린 이벤트를 제출하지 않습니다. scratch는 호스트 worker 메모리 예산에 포함해야 합니다.
+사용자 Debug/Display는 할당·대기·재귀를 할 수 있으므로 이 훅에는 RT 계약을 적용하지 않습니다.
+
+```sh
+cargo run --locked -p dot-logger --features tracing-adapter --example general_logs
+```
+
+이 예제는 일반 로그→수집/소비까지입니다. 파일·DB·구독/조절 비교 통합 예제(S2),
+구독 종료/재연결 화면 불연속 예제(S3), 실제 지속 dot-probe 적용(TASK-026)은 후속입니다.

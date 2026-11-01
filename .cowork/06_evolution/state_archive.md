@@ -397,3 +397,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 ## #014 최근 이력 이관
 
 - 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
+
+## 2026-11-01 #002 종료 — 최근 이력 포인터 정리
+
+- 2026-10-31 #012 TASK-015 완료 상세는 [당시 세션 로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md)와 [EV-028](../05_verification/verification_evidence.md#ev-028)에 보존한다. 공유 상태의 최근 이력은 #002·#014·#013 세 회차로 유지한다.

@@ -15,8 +15,8 @@
 | 상태 | Yellow — 클라이언트/계측 로컬 수락, 운영 backend/실앱·비용/PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #002 TASK-016 로컬 수락 / AI |
-| 세션 상태 | 진행 — TASK-016 구현/검증/로컬 수락 보고. TASK-017 Planned/미착수 |
+| 갱신 | 2026-11-01 / #002 종료 / AI |
+| 세션 상태 | 종료 — 2026-11-01 Human 「세션 마무리」. TASK-016 로컬 수락·REV-027 Closed, 다음 TASK-017 Planned/미착수 |
 | 최근 세션 | [2026-11-01 #002](../members/lim8603/workspace/session_logs/session_2026-11-01_002.md) — TASK-016 설정 변경/비교·EV-030·REV-027 Closed |
 
 ## 현재 결정과 제약
@@ -89,7 +89,7 @@
 ## 다음 시작점
 
 1. **TASK-016 로컬 구현·검증·자가 점검 수락 완료.** EV-030/source542c6e6·source102개·검사10개·Miri496·REV-027 Closed, native/운영 backend/실앱/실측 이월 유지. API §15.2의 ack/old plan/단일 revision 파일과 전환 계측·비교 조건을 다음 소비자에서 유지한다.
-2. **다음 개발 후보 TASK-017(예산 제한 간편 점검)은 Planned/미착수.** 상세/API §15/TC-010에서 dry-run 무부하·쓰기/시간 예산 선도달·수신자 없음·취소부터 조사/TDD한다. 이번 요청은 TASK-016 작업 단위까지 수행했으며 TASK-017 제품 코드를 만들지 않았다. 새 H/J 결정이 생길 때만 판단을 받는다.
+2. **다음 개발 후보 TASK-017(예산 제한 간편 점검)은 Planned/미착수.** 상세/API §15/TC-010에서 dry-run 무부하·쓰기/시간 예산 선도달·수신자 없음·취소부터 조사/TDD한다. 2026-11-01 Human 「세션 마무리」로 #002를 종료했다. TASK-017 제품 코드는 미착수다. 새 H/J 결정이 생길 때만 판단을 받는다.
 3. RV-049 포화 회복 실측은 TASK-022, RV-053 server lease/재구독 화면 불연속은 TASK-020 후속이다. ApplyConfig/Compare 원격 운영 backend·CLI runtime 연결/자동 worker도 실앱 통합과 함께 명시 구동한다.
 4. native는 공개 후(T3), 실제 PC/RT 오차·비용/UPS/실앱·TC-009/010 전체/MS-005/Gate4·5는 미완료. 새 T1/T2/T3 도래 근거 없음.
 
@@ -144,10 +144,8 @@
 
 - 2026-11-01 #002: TASK-016 EV-030/source542c6e6·source102개·검사10개·Miri496·REV-027 Closed·기존 위임 로컬 수락. 다음 TASK-017 Planned/미착수 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_002.md)·[근거](../05_verification/verification_evidence.md#ev-030).
 
-
 - 2026-10-31 #014: REV-025 거절 범주·압력/시도 부하·host 끝점 정렬·poison 복구 Red→Green, EV-029/eaf736c·검사14개/Miri224·source101개 blob일치 위임 수락/Closed, 2026-11-01 Human 요청으로 종료·TASK-016 Planned — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_014.md).
 
 - 2026-10-31 #013: TASK-014/015(`b3c08bd..a247d01`) 독립 Read-Only 리뷰. fmt/clippy/workspace test Pass. REV-025 Open (P2 1·P3 2), 제품 코드 미수정, Human 요청으로 종료 — [리뷰](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-10-31_013.md).
-- 2026-10-31 #012: TASK-015 리포트 TDD14·실제 window 연계·할당0/공개 consumer·EV-028 source100개/검사13개·Miri168·소스a247d01 로컬 수락·REV-024 Closed·Human 요청으로 세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

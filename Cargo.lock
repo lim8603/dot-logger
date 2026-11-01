@@ -274,6 +274,7 @@ dependencies = [
  "dot-logger",
  "hyper-util",
  "prost",
+ "serde_json",
  "tokio",
  "tonic",
  "tower",

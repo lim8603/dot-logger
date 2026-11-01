@@ -20,6 +20,13 @@ hyper-util = { workspace = true, optional = true }
 [lints]
 workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [[example]]
 name = "remote_query_replay"
+required-features = ["remote"]
+
+[[example]]
+name = "dot_probe_bridge"
 required-features = ["remote"]

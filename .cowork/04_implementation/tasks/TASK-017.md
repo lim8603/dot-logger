@@ -66,7 +66,7 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 - [x] 실제 Linux statvfs·원 OS 오류/checked available bytes, probe 뒤 시간/취소 재검사. 안전한 rustix1.1.4·lock 신규2개, 제품 unsafe/RT 변경 없음.
 - [x] 원래 Report/profile·session/revision/구간/조건·만료를 native로 원문 보존하고 CLI 요약에 출처를 표시. 합성 결과를 capacity로 승격하지 않음.
 - [x] 실제 CLI→TCP/gRPC→host→MCAP footer/sync/close/cleanup. read/manage·단일 사용·메시지 부족 pre-IO·timeout 중 pacing 취소·기존 경로 보존·Fail/Inconclusive exit 구분 검증.
-- [ ] 생산/실앱 전체: 아래 #007의 단일 snapshot/loopback ACK는 수락. 고정 routed backend·지속 수집/화면·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS 잔여.
+- [ ] 생산/실앱 전체: #007 snapshot/ACK 및 #008 고정 routed backend(EV-035)는 수락. 지속 수집/화면·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS 수락 잔여.
 
 S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기존 종료·수락 범위를 실제 장비 능력 검증으로 확대하지 않는다. 자동 worker/상시 서버·임의 remote 경로·무제한 실행·FR-015/TASK-018은 도입하지 않는다.
 

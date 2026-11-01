@@ -15,8 +15,8 @@
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #008 작업 단위 수락 / AI |
-| 세션 상태 | 작업 단위 수락 — TASK-017 로컬 기능 잔여 처리, 통합/환경 수락 조건 유지 |
+| 갱신 | 2026-11-01 / #008 종료 / AI |
+| 세션 상태 | 종료 — Human 「세션마무리」. TASK-017 로컬 수락·통합/환경 대기 유지 |
 | 최근 세션 | [2026-11-01 #008](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md) — TASK-017 고정 routed RunCheck·잔여 조건 정리 |
 
 ## 현재 결정과 제약
@@ -150,7 +150,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 통합/환경 수락 잔여를 정렬했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md)·[EV-035](../05_verification/verification_evidence.md#ev-035).
+- 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 잔여 조건 동기화 후 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md)·[EV-035](../05_verification/verification_evidence.md#ev-035).
 - 2026-11-01 #007: S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

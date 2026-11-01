@@ -8,8 +8,11 @@ pub struct NumericQuery {
     /// Fixed startup channel. Event channels are not numeric queries.
     pub channel: u32,
     /// Inclusive Unix nanoseconds, without clock conversion.
+    /// Must be greater than `i64::MIN + 1` and less than `to_ns`; the lower
+    /// boundary defensively excludes Flux `time()` conversion edge values.
     pub from_ns: i64,
-    /// Exclusive Unix nanoseconds.
+    /// Exclusive Unix nanoseconds, greater than `from_ns` and less than
+    /// `i64::MAX`, excluding the upper Flux `time()` conversion edge value.
     pub to_ns: i64,
     /// Positive complete-result row limit, at most 1024.
     pub max_rows: usize,

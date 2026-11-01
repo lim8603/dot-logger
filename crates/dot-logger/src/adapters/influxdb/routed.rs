@@ -77,6 +77,22 @@ pub struct RoutedWriter {
 impl RoutedWriter {
     /// Validate fixed schema/type and DatabaseAcknowledged target contracts.
     /// No connection, runtime or worker is started during registration.
+    ///
+    /// # Preconditions
+    ///
+    /// Registration requires all of the following:
+    /// - `target` exists in `completion.targets()`.
+    /// - The writer and completion registry have the same session ID.
+    /// - The target's selected and supported completion boundary includes
+    ///   [`Boundary::DatabaseAcknowledged`].
+    /// - No previous HTTP body owner remains active in the writer.
+    /// - Schemas cover every configured channel exactly once, with matching
+    ///   channel IDs and encodings and nonzero schema versions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProjectionError::InvalidConfig`] if a precondition fails or
+    /// the shared external budget cannot reserve the registration metadata.
     pub fn new(
         writer: Writer,
         completion: Completion<'_>,

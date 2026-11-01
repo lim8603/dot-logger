@@ -724,4 +724,19 @@ S1 대역 검증은 [EV-037](../05_verification/verification_evidence.md#ev-037)
 
 근거: [v2 query API/dialect](https://docs.influxdata.com/influxdb/v2/api/query/), [annotated CSV](https://docs.influxdata.com/influxdb/v2/reference/syntax/annotated-csv/), [Flux limit의 table별 의미](https://docs.influxdata.com/flux/v0/stdlib/universe/limit/), [2.9.1 릴리즈](https://docs.influxdata.com/influxdb/v2/reference/release-notes/influxdb/). serde_json1.0.154는 기존 고정 버전의 influxdb 선택 직접 의존으로 연결했다.
 
-[EV-038](../05_verification/verification_evidence.md#ev-038)·[REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md)에서 실제 write/query·동일 시각 병합/adapter 거절·실제 partial type failure/남은 유효 행을 대조했다. 다음 S3 Delivery/완료·원본 수명·DB 장애의 파일 영향 계측, 이후 통합/환경 수락은 별도다.
+[EV-038](../05_verification/verification_evidence.md#ev-038)·[REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md)에서 실제 write/query·동일 시각 병합/adapter 거절·실제 partial type failure/남은 유효 행을 대조했다. S3 Delivery/완료·원본 수명·DB 장애의 파일 영향은 §14.8/EV-039에서 로컬 검증을 추가했다. 통합/환경 수락은 별도다.
+
+
+### 14.8 TASK-019 S3 원 Delivery·DB 완료·파일 격리 — 2026-11-01
+
+`RoutedWriter::new(Writer, Completion, target, Vec<ProjectionSchema>)`는 원 session·초기 revision·DB API 완료 target 및 채널별 원 schema ID/version/field type을 고정한다. `ProjectionEncoding::{I64Le,F64Le,BoolByte,Utf8Event}`를 명시하여 숫자/작은 이벤트만 변환한다. 원 receipt/channel/real ns를 사용하고 원 metadata·payload를 바꾸지 않는다. 이미지 등 불명 bytes를 자동 변환/전송하지 않으며 live revision 전환·schema migration은 지원하지 않는다.
+
+- **원본/실제 IO:** `write_delivery(Delivery,cancel)`은 host 소유 **일반 worker의 동기식 한 건 처리**다. 기존 Tokio 안에서의 호출은 Runtime 오류/미시도로 원 guard를 반환한다. 명시 실행마다 전용 current-thread runtime에서 기존 유한 write를 구동하고, runtime/로컬 IO의 실제 정리가 끝나기까지 원 Delivery를 소유한다. `shutdown_background/timeout`으로 진행 IO를 남기고 원본을 회수하지 않는다. DNS 같은 blocking 작업의 OS 종료가 늦으면 정리가 TTL을 넘을 수 있으며 원격 write rollback/완료를 추정하지 않는다. 등록 시 runtime/worker를 만들지 않고 daemon/자동 소비 loop를 추가하지 않는다. runtime/DNS/OS 자원은 host worker headroom이다.
+- **결과/게시 분리:** 반환 `DeliveryAttempt`는 원 guard·native write 결과·정해진 Update를 보유한다. 204→Confirmed(DatabaseAcknowledged), 최초 definitive rejection→Failed(IoFailure), attempted timeout/부분 실패/단절/취소→Unknown, 미시도 취소→Dropped(Cancelled), 미시도 TTL→Dropped(Expired), schema/payload/write preflight 실패→Failed(AdapterFailure)다. identity/runtime/기존 Busy는 update=None·게시 없음이다. 초기 취소는 schema decode/runtime 생성/HTTP보다 먼저 처리한다.
+- **Busy/재제출:** `publish()`만 completion을 bounded nonblocking 갱신한다. Busy이면 같은 owner를 유지하고 이 메서드만 재시도한다. HTTP 재시도/원 시각 변경 없음. 미게시 Drop은 기존 Delivery Unknown fallback이며 게시 성공도 원본 해제를 뜻하지 않는다. 실제 Attempt Drop 후 target permit/원본 회수 가능하다. `into_delivery()`는 update=None인 identity/runtime/Busy의 미시도 guard만 복구하고 terminal/실제 시도 owner는 Err(Self)로 유지하여 DB 재제출을 막는다.
+- **예산/격리:** schema metadata는 같은 external authority에서 `len*sizeof(ProjectionSchema)+sizeof(RoutedWriter)`를 추가 예약하며 len≤128·writer 채널과 정확히 일치시킨다. per-call 한 건·기존 target retained bytes/queue/pending·공유 원본 슬롯·외부 예산을 그대로 사용한다. 파일 target과 DB worker는 독립 경로로 처리한다. 느린 DB가 보유하는 공유 원본은 finite target 한도에 제한되며 전체 원본 풀이 고갈될 수 있는 점까지 완전 격리로 표현하지 않는다.
+- **로컬 파일 영향 관측:** 같은 원본6건을 DB 비활성/정지·포화로 각각 실제 MCAP에 기록했다. 각6건/3508B·원 payload/receipt/schema/mono·real ns/순서 동일, file Written 완료. DB 정지 중 원본8B/1건만 in-flight, 이후5건 DB Capacity drop을 표시하면서 파일6건/마감/독립 read를 완료했다. DB 취소 뒤 socket EOF/전용 runtime 종료→Unknown 게시→원 guard Drop/회수1을 확인했다. file phase ns를 원문 로그에 기록하되 단일 쌍의 기능 관측으로 지연/처리량 우월·≤5% 비용·RT/장기 성능을 판정하지 않는다.
+
+근거: [Tokio runtime shutdown](https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html#shutdown)과 고정1.51.6의 로컬 runtime source를 확인했다. 공개 API는 외부 runtime/wire 타입을 강제 노출하지 않으며 별도 mutable owner와 scoped runtime은 승인된 비RT adapter 구현 세부다. [EV-039](../05_verification/verification_evidence.md#ev-039)·[REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md). 실제 OSS2.9.1에서도 원 capture→DB ACK/원 completion→query receipt/ns와 실제 DB type failure→Unknown/원본 회수를 대조했다.
+
+S1/S2/S3 로컬 기능은 수락했으나 실제 dot-probe/지속 앱·화면/설정 통합(TASK-020/026), PC/RT/RSS/정량 성능·장기/UPS 및 공개 후 native(T3)는 미완료다. Task/MS/TC 전체·Gate4/5 완료로 승격하지 않는다.

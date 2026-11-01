@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~038 |
+| 버전 | 2026-11-01 / EV-001~039 |
 
 ---
 
@@ -777,12 +777,23 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **기능 관측:** 원 numeric int/float/bool·receipt/session·Unix ns, i64 MIN/MAX·u64 MAX/u32 MAX 정확 대조. 채널/time/session scope·empty range·global max_rows+1/응답 bytes·동일 authority 공유 budget·결과/HTTP body 수명을 확인했다. late error/foreign/type/duplicate/out-of-range/NaN·chunked 초과/truncation·진행 취소/요청 timeout/전체 TTL은 부분 성공을 반환하지 않는다. 실제 DB duplicate write가 기존 integer field를 병합하는 동작을 확인했으며 adapter는 같은/과거 timestamp를 사전 거절한다. 실제 type conflict partial은 Unknown/재시도 없음이며 valid bool 행·원 receipt는 조회에서 남아 있었다.
 - **한계/다음:** S3 원 Delivery/projection·DatabaseAcknowledged/Unknown 및 원본/진행 IO 수명·DB 실패의 파일 영향 계측은 미구현/미검증. fresh/exclusive namespace 의무와 별도 writer/재시작 collision 조사 미지원 유지. 조회 상한은 application 결과/대기 예산이며 DB engine CPU/RAM/IO hard cap·원격 rollback/DB disk 내구성 아님. 다른 버전/OS·실앱·PC/RT/RSS/성능/native(T3)는 잔여다.
 
+<a id="ev-039"></a>
+## EV-039 — TASK-019 S3 원 Delivery·DB 완료·로컬 파일 격리
+
+- **판정:** S3 로컬 기능/파일 영향 관측 Pass·위임 수락, [REV-037](reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) RV-076~078 Closed. S1/S2/S3 로컬 기능 완료, TASK-019 In Progress·TC-008 Partial·MS-006/Gate4/5 미완료. [API§14.8](../03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).
+- **형상/환경:** 2026-11-01 #012 AI·현재 Linux generic PC·Rust1.96/MSRV1.85. 소스 `5bd70dc`·[최종12개 명령/원문·소스114개 hash/commit blob 대조](../06_evolution/imported_context/task_019_routed_2026-11-01/results.json). 신규 의존성/RT/자체 unsafe·core routing/completion 제어 로직·제품 remote transport 변경 없음. completion과 client proxy는 시험 코드만 보강했다.
+- **원본/완료:** 명시 schema ID/version·I64Le/F64Le/BoolByte/Utf8Event·원 target/session/초기 revision, metadata.real_ns/receipt/bytes 불변. host 일반 worker의 동기 한 건 처리·private runtime 실제 IO 정리 뒤 DeliveryAttempt 반환. 원 guard·native 결과/정해진 Update·게시/소유권 수명을 유지하고 Busy는 publish만 재시도한다. nested runtime/foreign target 미시도 guard만 복구, terminal guard 복구 금지. ACK→DatabaseAcknowledged, rejection/Unknown/초기 cancel/schema failure·미게시 Drop을 분리했다.
+- **Red→Green:** API 부재 compile Red; terminal recovery 계약 Red→Err(Self) 유지(RV-076), 초기 cancel+bad scalar가 AdapterFailure인 Red→decode/runtime/HTTP 전 NotSent/Dropped(Cancelled)(RV-077). 최초 MSRV 회귀에서 기존 proxy 자식 미합류/예약40976384B 잔여를 관측(RV-078), 양 방향 join 뒤 기존0 검사 유지·두 Rust각5회/최종 전체 Pass. 실패 원문은 results.json의 pre_fix_evidence로 보존한다.
+- **파일 영향 관측:** [paired 조건/수치](../06_evolution/imported_context/task_019_routed_2026-11-01/file-isolation.json)·[원문 뷰](../06_evolution/imported_context/task_019_routed_2026-11-01/routed.log). DB route off와 stall/saturation에서 같은 원본6건을 실제 MCAP에 기록, 각각6건/3508B·원 payload/receipt/schema/mono·real ns/순서·Written 완료 대조. DB stalled1/raw8B·추가5건 Capacity drop을 명시하면서 file 마감/독립 read가 DB 취소/응답보다 먼저 완료됨을 확인했다. DB cancel 뒤 local socket EOF/runtime 종료→Unknown 게시→Attempt Drop/raw 회수1. file phase ns는238318/off·203995/stalled의 단일 쌍 기능 관측으로 지연/처리량 우월·비용≤5%/RT 수락이 아니다.
+- **최종 검사:** 신규 routed6+private completion Busy1 포함 Rust1.96/MSRV1.85 workspace각401 Pass/실제 DB4개 명시 ignore. 16 feature/독립 core consumer·RT allocator·MSRV influx-only·fmt/clippy/core-client API rustdoc(-D warnings)·diff Pass. 실제 OSS2.9.1 digest pin harness각4개 Pass/cleanup0: 원 capture→DB ACK/원 completion→query identity/ns와 실제 DB type failure(400/422·시도1)→Unknown/원본 회수 포함. [개발 Rust 환경](../06_evolution/imported_context/task_019_routed_2026-11-01/final-live-1.96/environment.json)·[MSRV 환경](../06_evolution/imported_context/task_019_routed_2026-11-01/final-live-1.85/environment.json). 새 Miri/native 실행 없음.
+- **수락 한계/다음:** shared raw pool이 모두 고갈되면 수집도 거절될 수 있어 완전한 간섭 격리를 주장하지 않는다. OS/DNS/local blocking cleanup은 TTL 뒤 실제 종료까지 기다릴 수 있으며 remote rollback/DB disk 내구성/전체 RSS cap 아님. dot-probe 지속 앱/화면/설정·PC/RT/RSS/정량 성능·UPS/장기·다른 OS/native(T3)는 잔여. 다음 개발 후보 TASK-020, 선택 TASK-018은 FR-015 별도 승인 대기로 미착수다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2 EV-037/038 유한 write/query·실제 DB 로컬 하위 수락, S3 Delivery/파일 격리 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

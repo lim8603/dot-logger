@@ -709,4 +709,19 @@ receiver `next`/완전 조립 뒤에도 원 receipt는 Pending이고 routing gua
 
 공식 근거: [v2 write API](https://docs.influxdata.com/influxdb/v2/api/write/), [line protocol 타입·중복점 규칙](https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/). `bytes`는 기존 lockfile의1.12.1을 influxdb 선택 직접 의존으로 고정했다. 승인된 ADR-009 방향 안의 내부 구현이며 새 DB 계열/배포 버전 채택이 아니다.
 
-S1 대역 검증은 [EV-037](../05_verification/verification_evidence.md#ev-037)이다. S2 배포 버전 pin/제한 수치 query/실제 DB write-query 대조, S3 실제 Delivery 및 `DatabaseAcknowledged`·Unknown/원본 수명/파일 격리 계측은 미구현·미수락이다. Task/TC-008 전체와 Gate4/5는 미완료다.
+S1 대역 검증은 [EV-037](../05_verification/verification_evidence.md#ev-037)이다. S2 DB pin/수치 query·실제 대조는 아래 §14.7·EV-038로 추가했다. S3 실제 Delivery 및 `DatabaseAcknowledged`·Unknown/원본 수명/파일 격리 계측은 미구현·미수락이다. Task/TC-008 전체와 Gate4/5는 미완료다.
+
+
+### 14.7 TASK-019 S2 제한 수치 query·실제 DB 검증 — 2026-11-01
+
+`Writer::query_numeric(NumericQuery, cancel)`은 일반 host Tokio runtime에서 같은 writer의 고정 measurement/device/channel/session에 대한 int/float/bool을 조회한다. 이벤트/원본/임의 Flux·DB 변경·자동 retry는 제공하지 않는다. 기존 파일 조회와 별도 기능이다.
+
+- **범위/반환:** 원 Unix ns의 `[from_ns,to_ns)`·단일 고정 수치 채널·max_rows1..1024·response256B..1MiB를 명시한다. `NumericPage`는 원 `NumericScope`(session/measurement/device/channel)·원 Query·순서대로 검증한 `NumericPoint`(원 receipt/real_ns/typed value)를 보존하며 빈 결과나 Writer Drop 후에도 출처가 남는다. int/uint identity를 float로 변환하지 않는다.
+- **요청/응답:** `/api/v2/query`에 JSON Flux와 `dialect.annotations=[datatype,group,default]`를 명시한다. quoted bucket/device는 Flux quote/backslash escape, `${` interpolation은 API 입력 거절이다. 필터→typed receipt pivot→session 필터→global group/sort→`max_rows+1`→고정 numeric/receipt map을 사용한다. 추가 행은 Limit이며 일부 행만 성공으로 반환하지 않는다. HTTP200 뒤에도 CSV 전체 EOF·고정8열 schema/type·원 session·유효 receipt·범위·strictly increasing ns를 검사한다. late error/foreign/malformed/NaN·truncation은 실패다. 범용 CSV/임의 schema 지원이 아니며 고정 숫자/hex cell에서 quote는 거절한다.
+- **예산/수명:** 같은 session reservation authority에서 `max_rows*sizeof(NumericPoint)+max_response_bytes+64KiB`를 따로 예약한다. 응답 buffer/row/request·유한 metadata/headroom을 포함하며 CSV 열은 고정 배열8개다. query request body도 실제 마지막 HTTP body owner까지 예약을 유지하고 반환 Page는 실제 Drop까지 자기 예약을 유지한다. Writer/원 QueryBudget handle Drop은 살아 있는 Page/body의 예산을 회수하지 않는다. HTTP/TLS/runtime/OS 내부는 별도 host headroom이다.
+- **기한/오류:** 단일 요청이며 응답 읽기까지 기존 request timeout/전체 TTL·협력 cancel을 적용한다. parse 전/후도 기한/취소를 검사한다. QueryError는 InvalidInput/Limit/Cancelled/TimedOut/Http(status)/Transport/Corrupt이고 URL/token/server body를 넣지 않는다. 조회 실패가 앞선 write API ACK를 지우거나 원격 query rollback/완료를 증명하지 않는다. 서버의 query CPU/RAM/IO hard cap을 약속하지 않는다.
+- **실제 DB 프로필:** 승인된 v2 계열의 로컬 기능 시험은 **InfluxDB OSS2.9.1 Linux amd64**, `influxdb@sha256:a66a9e8b2c93f58bec088c17ff5876540caa095436df5a66e908bdbdb6a36205`로 고정했다. `/health` version도 확인한다. `scripts/check-influxdb.py`가 loopback 임시 port·독립 tmpfs namespace·2CPU/512MiB/128pids container를 생성하고 무작위 일회 token을 HTTP setup·child 환경으로만 전달한다. 기존 DB/volume/설정 업그레이드 없이 성공/실패 모두 자신이 만든 container/volume만 정리한다. token은 evidence에 저장하지 않는다. 다른 OS/DB 버전·v3 호환이나 성능 수락이 아니다.
+
+근거: [v2 query API/dialect](https://docs.influxdata.com/influxdb/v2/api/query/), [annotated CSV](https://docs.influxdata.com/influxdb/v2/reference/syntax/annotated-csv/), [Flux limit의 table별 의미](https://docs.influxdata.com/flux/v0/stdlib/universe/limit/), [2.9.1 릴리즈](https://docs.influxdata.com/influxdb/v2/reference/release-notes/influxdb/). serde_json1.0.154는 기존 고정 버전의 influxdb 선택 직접 의존으로 연결했다.
+
+[EV-038](../05_verification/verification_evidence.md#ev-038)·[REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md)에서 실제 write/query·동일 시각 병합/adapter 거절·실제 partial type failure/남은 유효 행을 대조했다. 다음 S3 Delivery/완료·원본 수명·DB 장애의 파일 영향 계측, 이후 통합/환경 수락은 별도다.

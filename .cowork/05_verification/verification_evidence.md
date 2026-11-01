@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~037 |
+| 버전 | 2026-11-01 / EV-001~038 |
 
 ---
 
@@ -766,14 +766,25 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **계약 확인:** 새 독점 namespace/고정 session·device/channel/schema·원 real ns/receipt, equal/older 시각을 producer/batch 간 거절. preflight 실패는 상태/IO 변경 없음, 시도한 Unknown은 high-water 유지. 동일 encoded retry·partial422/연결 종료/timeout/진행 취소 Unknown·처음401 Rejected·204 API ACK·Retry-After overflow/TTL·입력/공유 budget/encoded body 상한·민감 header/redirect 차단을 확인했다. transport body clone이 local owner Drop 뒤 예약4096B를 유지하고 마지막 Drop 뒤0으로 반환하는 순수 수명 시험 포함.
 - **미실행/다음:** 실제 DB 배포 버전 pin·제한 수치 query/실제 write-query·기존 DB/재시작 충돌 탐지·Router Delivery/DatabaseAcknowledged와 파일 장애 격리 계측·실앱/PC/RT/RSS/성능/native는 미완료. out-of-order도 보수 거절하며 timestamp를 변조하지 않는다. HTTP/TLS/runtime/OS 메모리는 별도 headroom, 원격 rollback·DB disk 내구성 보장 아님. Miri/native 새 실행 없음. S2 실제 DB 검증, S3 Delivery/파일 연결을 다음 시작점으로 둔다. TC/MS 전체·Gate4/5 Not Ready 유지.
 
+<a id="ev-038"></a>
+## EV-038 — TASK-019 S2 제한 수치 query·OSS2.9.1 실제 DB
+
+- **판정:** S2 로컬 구현/실제 DB 기능 대조 Pass·기존 위임 수락, [REV-036](reviews/REV-036_TASK-019_NUMERIC_QUERY.md) RV-075 Closed. [TASK-019](../04_implementation/tasks/TASK-019.md)·[API§14.7](../03_design_artifacts/interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01). S3/통합·Task/MS/TC 전체와 Gate4/5 미완료.
+- **형상/환경:** 2026-11-01 #011 AI·현재 Linux generic PC·Rust1.96/MSRV1.85. 소스 `7d2076a`, [명령/로그·소스111개 hash/commit blob 대조](../06_evolution/imported_context/task_019_query_2026-11-01/results.json). 기존 serde_json1.0.154 선택 직접 edge만 추가, version 교체 없음. RT/자체 unsafe·기존 file/routing/completion 구현 불변, query 예약 helper는 기존 ledger를 재사용한다.
+- **DB pin/수명:** OSS2.9.1 Linux amd64 `influxdb@sha256:a66a9e8b2c93f58bec088c17ff5876540caa095436df5a66e908bdbdb6a36205`, health v2.9.1 확인. 자기 소유 loopback 임시 port·tmpfs·2CPU/512MiB/128pids container, random setup credential/child env, token 비저장·로그 redaction, 모든 수행 실패/성공의 cleanup0·마지막 task container 잔여0. [개발 Rust 실제 환경](../06_evolution/imported_context/task_019_query_2026-11-01/final-live-1.96/environment.json)·[MSRV 실제 환경](../06_evolution/imported_context/task_019_query_2026-11-01/final-live-1.85/environment.json). 기존 DB/volume/운영 설정 업그레이드나 외부 서비스 배포 아님.
+- **Red→Green:** query API 부재 compile Red, 실제 plain Flux 응답은 annotation이 없어 live3개 Corrupt Red. JSON explicit datatype/group/default dialect로 수정 후 두 Rust 실제 DB각3개 Pass. 기본 응답과 최종 schema를 synthetic CSV 원문/읽기용 뷰로 보존했다. 결과 제약을 낮추거나 typed 검증을 생략하지 않았다.
+- **최종 검사:** Rust1.96/MSRV1.85 workspace/all-features 각각394 Pass·실제 DB3개 명시 ignore, 별도 harness에서 각3개 Pass. 신규 query TCP/입력/상한/취소9개 포함. 개발 Rust16 feature 조합·독립 core consumer/RT allocator·MSRV influx-only·fmt/clippy(-D warnings)/core-client API rustdoc(-D warnings)/diff Pass. 소스/committed blob111개 동일, Miri/native 새 실행 없음.
+- **기능 관측:** 원 numeric int/float/bool·receipt/session·Unix ns, i64 MIN/MAX·u64 MAX/u32 MAX 정확 대조. 채널/time/session scope·empty range·global max_rows+1/응답 bytes·동일 authority 공유 budget·결과/HTTP body 수명을 확인했다. late error/foreign/type/duplicate/out-of-range/NaN·chunked 초과/truncation·진행 취소/요청 timeout/전체 TTL은 부분 성공을 반환하지 않는다. 실제 DB duplicate write가 기존 integer field를 병합하는 동작을 확인했으며 adapter는 같은/과거 timestamp를 사전 거절한다. 실제 type conflict partial은 Unknown/재시도 없음이며 valid bool 행·원 receipt는 조회에서 남아 있었다.
+- **한계/다음:** S3 원 Delivery/projection·DatabaseAcknowledged/Unknown 및 원본/진행 IO 수명·DB 실패의 파일 영향 계측은 미구현/미검증. fresh/exclusive namespace 의무와 별도 writer/재시작 collision 조사 미지원 유지. 조회 상한은 application 결과/대기 예산이며 DB engine CPU/RAM/IO hard cap·원격 rollback/DB disk 내구성 아님. 다른 버전/OS·실앱·PC/RT/RSS/성능/native(T3)는 잔여다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2 EV-037/038 유한 write/query·실제 DB 로컬 하위 수락, S3 Delivery/파일 격리 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
+| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |

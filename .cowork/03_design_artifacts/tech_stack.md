@@ -15,7 +15,7 @@
 | 저장 매체 | SSD | 현재 PC의 CT1000T500SSD8(루트), HP EX950 512GB 2개(/data/build·/data/db)·ext4 | ADR-004·011 | 시험별 대상 경로 고정·실측으로 판정, 제품 사양으로 처리량 추정 금지 |
 | 봉투·통신 | Protobuf·gRPC | tonic 0.13.1 / prost 0.13.5 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
-| 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
+| 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query; 로컬 기능 pin OSS2.9.1/Linux amd64 | ADR-009·EV-038 | digest/health version 고정 실제 DB write/query·중복/partial 검증. Delivery/파일 격리·다른 버전/OS·실앱·성능 잔여, v3 호환 미선언 |
 | 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4.6.6·serde 1.0.229/serde_json 1.0.154 | Human 선택·ADR-009·EV-025 | 로컬 CLI10/transport7·두 Rust Pass, 실제 dot-probe/다른 OS 후속 |
 | Linux 공간 관측 구현 | rustix | =1.1.4, std/fs·Linux target 한정; linux-raw-sys0.12.1 lock | TASK-017 S3·API §15.5·EV-033, 승인된 OS probe의 내부 구현 | 일반 경로 statvfs·원 OS 오류, 다른 OS는 Unsupported; 실제 성능 인증 아님 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
@@ -60,3 +60,6 @@ TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기
 2026-10-31 TASK-013 EV-025: native client/CLI를 clap4.6.6·기존 serde1.0.229/JSON1.0.154, 기존 tonic/tower0.5.3/hyper-util0.1.21·Tokio1.51.6 signal로 구현했다. MSRV1.85/개발1.96 로컬 검증 완료, 기존 package/version 교체0. 로컬 CLI package1개·외부6개(anstyle/clap/clap_builder/clap_lex/errno/signal-hook-registry)를 추가했으며 결과 JSON에 정확한 pin·license/rust_version metadata가 있다. cached audit 취약점/unsound0·기존 paste 경고1, fresh DB 갱신은 미실행이다. core/default client의 선택 normal/build 그래프 격리와 RT allocator를 유지한다. 단일 실제 TCP/명시 CA/token·자동 reconnect/retry 없음·native DTO/CLI 출력 계약을 API §14.4에 기록했다.
 
 2026-11-01 TASK-017 S3 EV-033: 안전한 OS 공간 조회의 구현 세부로 Linux target에 rustix1.1.4(std/fs)를 고정했다. 기존 package 버전 교체 없이 rustix/linux-raw-sys 2개를 추가하고 own unsafe·subprocess·RT 경로 변경은 없다. 원래 OS 오류·checked available blocks×fragment size·불가능한 카운터 거절을 사용한다. [공식 문서](https://docs.rs/rustix/1.1.4/rustix/fs/fn.statvfs.html)·로컬 소스의 MSRV1.63을 확인했고 프로젝트 MSRV1.85 workspace 회귀를 별도 실행한다. Rust/API/아키텍처·platform tier 변경이 아니며 되돌릴 수 있는 host adapter 세부라 새 ADR로 승격하지 않았다. 새 의존성의 audit와 실제 실행 근거는 EV-033을 따른다.
+
+
+2026-11-01 TASK-019 S2 EV-038: 승인 v2 계열의 **로컬 기능 시험 프로필**을 OSS2.9.1/Linux amd64 image digest `sha256:a66a9e8b2c93f58bec088c17ff5876540caa095436df5a66e908bdbdb6a36205`와 `/health` v2.9.1로 고정했다. [API§14.7](interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01)의 격리 tmpfs/loopback/유한 container에서 실행하며 사용자 기존 DB 업그레이드/운영 배포가 아니다. serde_json1.0.154를 기존 lock 그대로 선택 직접 의존에 추가했다. ADR-009의 v2/제한 query 방향 안의 되돌릴 수 있는 시험/adapter 세부이며 신규 계열/MSRV/저장 계약 변경은 없다. 다른 DB/OS·실앱/성능·공개 후 native는 후속이다.

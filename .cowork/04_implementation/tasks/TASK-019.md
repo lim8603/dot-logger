@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S1 유한 write 로컬 수락; S2 배포 버전 pin·제한 수치 query·실제 DB 대조 |
+| 다음 액션 | S2 OSS2.9.1 pin·제한 수치 query·실제 DB 대조 수락; 다음 S3 Delivery/완료·파일 격리 |
 | 의존 | TASK-006·TASK-007 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -52,8 +52,22 @@
 | 단계 | 상태 | 다음 결과 |
 |---|---|---|
 | S1 유한 typed projection·HTTP write | 로컬 구현/검증·위임 수락 | EV-037/REV-035 Closed |
-| S2 실제 DB 및 제한 수치 query | 미착수 | 승인 계열 v2의 배포 버전 pin·전용 격리 namespace·write/query 대조·서버 partial/type/동일 시각 동작 검증 |
+| S2 실제 DB 및 제한 수치 query | 로컬 구현/실제 DB 기능 검증·위임 수락 | EV-038/REV-036 Closed; OSS2.9.1 Linux amd64 digest pin·query/receipt/ns·partial/동일 시각 대조 |
 | S3 Router Delivery·완료·파일 격리 | 미착수 | 원 record schema/identity projection·DatabaseAcknowledged/Unknown·원본/예약 수명·실패 DB가 파일 경로에 주는 영향 계측 |
 | 통합/환경 수락 | 미완료 | TASK-020/026 실앱·TASK-022 실제 PC·공개 후 native(T3) |
 
 S1은 Task 전체 완료가 아니며 MS-006 In Progress·TC-008 Partial·Gate4/5 Not Ready를 유지한다.
+
+
+## S2 제한 수치 query·실제 DB 대조 — 2026-11-01 #011
+
+[API§14.7](../../03_design_artifacts/interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01)·[EV-038](../../05_verification/verification_evidence.md#ev-038)·[REV-036](../../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md). 승인된 v2/제한 query 방향 안의 구현이며 사용자 기존 DB를 변경하지 않았다.
+
+- [x] OSS2.9.1/Linux amd64 image digest pin·health v2.9.1 확인. 임시 loopback port·tmpfs·2CPU/512MiB·128pids·일회 token을 사용하는 자기 소유 container만 생성/정리한다. 정확한 pin·재현 명령은 API/EV 근거에 있다.
+- [x] 원 session/measurement/device/channel·receipt·Unix ns·typed int/float/bool 조회. half-open 범위·행≤1024·응답≤1MiB·기한/취소, 별도 같은-authority external 예약·원 Page/body 수명, 고정 numeric CSV schema·late error/부분 응답 거절.
+- [x] 기능 부재 compile Red·실제 query dialect 불일치 Red → 명시 JSON annotations와 엄격한 parser로 Green. 신규 TCP/실패/예산9개, 실제 DB3개: typed write/query·i64/u64/u32 경계/정확 ns·같은 시각 병합과 adapter 거절·partial type conflict 뒤 유효 bool 행 보존.
+- [x] 두 Rust workspace394개씩(실제 DB3개는 일반 회귀에서 ignore), 별도 실제 DB 시험3개씩·16 feature/독립 core·RT allocator·fmt/clippy/API docs 검증. 최종 명령/형상은 EV-038을 따른다.
+- [ ] S3 원 Router Delivery/schema projection·DatabaseAcknowledged/Unknown·실제 원본/IO 수명과 파일 영향 계측.
+- [ ] 통합/환경 수락: TASK-020/026 실앱·PC/RT/RSS/비용·공개 후 native(T3), TC-008/MS 전체·Gate4/5 미완료.
+
+이후 브리핑에서는 위 표의 S1/S2/S3/통합·환경 **전체 단계**를 완료/현재/미착수/대기로 구분해 보여준다. 이는 사용자 선호를 [소통 규칙](../../01_cowork_protocol/communication_convention.md)에 반영한 것이다.

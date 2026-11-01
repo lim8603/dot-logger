@@ -751,3 +751,13 @@ S1/S2/S3 로컬 기능은 수락했으나 실제 dot-probe/지속 앱·화면/�
 `EncodedLog::capture`는 `Producer::try_record_small`에 한 번만 제출한다. 외부 source 수준으로 `metadata.level`만 대체하며 host channel/schema/version·mono/real/source time·importance를 유지한다. Fatal은 외부 두 API에 없고 Error를 Important로 자동 승격하지 않는다. schema/slot 크기는 호스트가 명시 등록한다. Skipped/기존 오류·수락 receipt는 원래 의미이며 출력/DB 완료를 추정하지 않는다. 재시도·자동 출력은 없다.
 
 사용자 Debug/Display는 할당/대기/재귀할 수 있으므로 scratch bytes 상한은 CPU/시간·RT 안전 보장이 아니다. 호스트의 기존 일반 경로 subscriber/sink에서만 사용하고 재귀 로그를 피한다. core RT API/원자성/소유권/오류/완료 계약과 ADR-009의 기술 선택은 변경하지 않는다. S2 통합 비교·S3 화면 불연속 예제·TASK-026 지속 실앱/PC·RT/native는 별도 잔여다. [TASK-020](../04_implementation/tasks/TASK-020.md).
+
+## 14.10 TASK-020 S2 유한 통합·설정 비교 예제 — 2026-11-01
+
+client의 `integration-example` 선택 feature는 기존 remote/influxdb/tracing-adapter를 enable하고 `dot_probe_pipeline` 예제/공유 시험을 제공한다. 제품 공개 API/wire·core/RT/unsafe는 변경하지 않는다. plan은 환경·파일·DB·bind를 건드리지 않는다. run은 환경으로 받은 DB·새 독점 measurement와 자기 소유 임시 MCAP·실제 loopback 서버만 사용한다. logger 명시 예산32MiB, raw64B·payload≤512B·수신 큐1·phase별 생성30건·파일 읽기≤2MiB·신규 입력 실시간 기한≤30초다. 런타임/OS RSS나 성능 수락이 아니다.
+
+한 session/epoch의 **가상 mono 시계**에서 0~10초/11~21초의 1초 간격 sample을 만들고 실제 capture/target_totals를 quiescent 상태에서 대조한다. 실제 HTTP/ACK/admission/정리는 Instant 시계다. 첫 phase는 로그·I64 수치·합성 raw 각10건을 수락하여 file/receiver30건·DB(log/numeric)20건을 처리한다. `validate_config→apply_config→producer ack` 뒤 Info 로그10건·Normal 수치5건을 의도적으로 생략하고 raw10건·수치5건을 file/receiver로 전달한다. DB RoutedWriter는 initial revision 계약이므로 phase2 DB route를 명시 off하여 할당0건을 유지한다. live DB revision 지원을 우회/추가하지 않는다.
+
+파일은 revision별 별도 writer budget/lease이며 close 후 독립 MCAP 읽기에서 원 capture receipt/metadata/revision/payload를 대조한다. 완료는 Written이고 file sync가 과거 Synced 응답을 대신하지 않는다. DB는 원 receipt/time/schema projection을 사용하고 선택 query에서 이전 수치10건의 receipt/Unix ns/값을 대조한다. raw를 DB로 자동 해석하지 않는다. 구독은 완전 조립 후 1슬롯 소비 큐 인계만 ACK하며 Full은 미ACK·연결 종료/Unknown이다. phase별 target 차분은 checked terminal counters·final pending·busy/overflow 검사를 사용한다.
+
+Report/Comparison은 원 window와 selected FILE/Written을 보존한다. JSON의 두 phase에도 원 session/epoch/revision/from/to·environment/workload/target/boundary/application_input ID를 내보낸다. fanout 변경은 workload 조건 차이로 남기고 인과적 rate/CPU 절감은 Unavailable이다. 가상 시계의 rate는 실제 처리량/RT 측정이 아니다. 순차 일반 경로 예제라 DB 지연과 독립된 지속 파일 처리율을 약속하지 않는다. `Ok(report)`는 결과 수집이며 `is_complete`가 모든 입력/선택 경계/query/정리를 검사한다. CLI0은 고정 기능 프로필 수락, 3은 결과 미달, 4는 입력/IO/검증 오류다. server/실제 IO·원 guard·파일을 정리한 뒤 external0을 검사한다. S3 화면 불연속·TASK-026 지속 실앱/PC·RT/UPS/장기/native는 별도 잔여다. [TASK-020](../04_implementation/tasks/TASK-020.md)·[REV-040](../05_verification/reviews/REV-040_TASK-020_PIPELINE.md).

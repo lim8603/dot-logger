@@ -442,3 +442,10 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_011.md).
 
 - **TASK-013 기능 기준:** EV-025/source29e55da 뒤 [EV-026](../05_verification/verification_evidence.md#ev-026)/b3c08bd로 handoff·진단/CLI·유휴 next를 보강했다(검사14개/Miri32). local wait timeout은 같은 구독 유지, server lease/명시 cancel은 종료한다. ttl은 record/idle lease 겸용, 별도 구독 간 Gap 연속성은 미보장이고 TASK-020 화면에서 불연속 표시한다. 현재 workspace는 REV-025 EV-029/eaf736c로 전체 회귀했다. CLI runtime metrics Unavailable·config apply/compare backend Unsupported·실앱/native/성능 후속은 유지한다. 점검 host/CLI는 EV-033 범위다.
+
+
+## #019 — 2026-11-01 #015 R1/R2 상태 인덱스 이관
+
+- 2026-11-01 #012: TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037로 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_012.md).
+
+- **TASK-019 현재 계약:** S1/S2/S3 [EV-037~039](../05_verification/verification_evidence.md#ev-039)/소스`5bd70dc`·[REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) Closed. 새 독점 namespace·equal/older timestamp 거절·typed write/query·원 schema/receipt/real ns·실제 로컬 IO 종료와 원 guard/게시 수명을 유지한다. DB 정지·포화 중 MCAP6건/3508B·원문 보존 관측, 정량 성능 수락 아님. 실앱/환경/native 잔여. 전체 단계 표는 [TASK-019](../04_implementation/tasks/TASK-019.md)·[API§14.8](../03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).

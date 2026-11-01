@@ -131,7 +131,7 @@ TASK-011 하위 [EV-018](verification_evidence.md#ev-018): 가상시계 replay10
 ### TC-007 — 원격·Rust API·CLI 사용자 경로
 
 - 관련: MS-004·006 / FR-005·006·010·013 / NFR-002·004·007
-- 상태: 부분 실행 — TASK-012/013 원격·CLI 및 TASK-020 S1 일반 로그 입력 로컬 Pass, 통합/화면/실앱/native·성능 후속 / 최근 실행: 2026-11-01 / EV: EV-022~026·040
+- 상태: 부분 실행 — TASK-012/013 원격·CLI 및 TASK-020 S1/S2 일반 로그/통합 비교 로컬 Pass, 화면/실앱/native·성능 후속 / 최근 실행: 2026-11-01 / EV: EV-022~026·040~041
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -151,6 +151,8 @@ TASK-013 현재 하위 [EV-025](verification_evidence.md#ev-025): native transpo
 
 <a id="tc-008"></a>
 TASK-020 S1 [EV-040](verification_evidence.md#ev-040): 일반 경로 tracing/log 인코딩·명시 수집 연결 신규8개, 실제 scoped subscriber 5수준·own fields/JSON·문자열/수치 text·overflow/formatter failure·native capture identity/시각/중요도·포화/종료·Skipped/schema/slot 검증 Pass. 두 Rust workspace각409개/16features·독립 consumer/RT allocator·예제·fmt/clippy/doc Pass. S2 파일/DB/구독·조절 비교 및 S3 화면 불연속 예제·TASK-026 지속 실앱/PC·RT/native는 미완료다. TC 전체 Partial 유지.
+
+TASK-020 S2 [EV-041](verification_evidence.md#ev-041): 실제 MCAP 독립 읽기45·loopback 소비 큐45·DB original numeric query10, before 수락30/skip0/DB20→after 수락15/의도적 skip15/DB할당0. session/epoch/조건 JSON 보존·DB transport Unknown·큐 Full의 미ACK/Unknown·초기 취소/기한·입력/런타임 경계 검증. 두 Rust workspace각413개, 별도 고정 실제DB각5개+CLI·정리0 Pass. 가상 session 시계의 기능 예제이며 변경 fanout의 인과적 비교는 Unavailable, S3 화면·지속 실앱/PC·RT/native 잔여로 TC 전체 Partial 유지.
 
 ### TC-008 — DB 매핑·충돌·재시도
 
@@ -296,3 +298,5 @@ TASK-008/010/011 최종 구현 리뷰 승인으로 REV-009/010/013/014/017 Close
 2026-10-31 local-pc-v1 수치 프로필 Approved. TC-011/012 제품 실행은 NotRun, [EV-021 승인 점검](verification_evidence.md#ev-021)은 선언 유효성/준비 잔여만 기록한다.
 
 2026-11-01 #014 MS-006 추적: TASK-020 S1 일반 로그 입력은 EV-040으로 구현/검증했다(FR-001/002/004/006/017·NFR-004의 해당 하위 경로). S2/S3·TASK-026과 실제 통합/환경이 남아 해당 MS 전체 체크는 유지한다.
+
+2026-11-01 #015 MS-006 추적: TASK-020 S2 파일·DB·구독/조절 비교 하위는 EV-041로 수락했다. S3·TASK-026 실앱/화면·환경이 남아 해당 MS 전체 체크는 유지한다.

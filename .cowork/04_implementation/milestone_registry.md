@@ -57,3 +57,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-11-01 #005: TASK-017 S2 합성 파일 실제 실행·시간/쓰기/reserve/취소·footer/sync/close/소유 namespace 정리와 결과 분류를 [EV-032](../05_verification/verification_evidence.md#ev-032)·소스1cae3b9·REV-030 Closed로 로컬 수락했다. workspace347·MSRV 관련40·Miri24 Pass. S3 Report/CLI/운영 host·실제 free probe/실앱/PC/RT/native 후속이 남아 Task/MS/TC 전체·Gate4/5 미완료를 유지한다.
 
 2026-11-01 #006: TASK-017 S3 로컬 운영 host/PlanCheck·RunCheck/CLI·실제 Linux free probe·원 Report/profile 연결을 [EV-033](../05_verification/verification_evidence.md#ev-033)·REV-031 Closed로 수락했다. workspace357/core288·MSRV workspace357·Miri16·audit Pass. 생산 capture/routing/실제 수신자·dot-probe/실앱·PC/RT/UPS/장기/native가 남아 S3 전체·Task/MS/TC·Gate4/5 미완료 유지.
+
+2026-11-01 #007: TASK-017 S3 실제 raw capture/routing·loopback TCP receiver 큐/ACK·dot-probe tick export snapshot을 [EV-034](../05_verification/verification_evidence.md#ev-034)·REV-032 Closed/소스cf8fa25로 첫 연결 수락했다. 신규7개·Rust1.96/MSRV workspace 각364 Pass. routed RunCheck 운영 backend·지속 실앱/화면·PC/RT/UPS/장기/native 후속으로 MS-005/Task/TC 전체·Gate4/5 미완료 유지.

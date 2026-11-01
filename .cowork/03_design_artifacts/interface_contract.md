@@ -674,3 +674,13 @@ TASK-004 게시 후 native CI는 GitHub 계정 결제/지출 한도로 8개 job 
 ## 검증 방법·시점 갱신 — 2026-10-31
 
 [ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 §12/16 및 UPS·복구의 실물/실제 차단 필수 시험은 모의 신호·기한/지연·실제 파일 IO와 중단/재개/복구 시뮬레이션으로 대체 수락한다. 실제 장치 시험은 현재 Ubuntu PC 실측을 사용하고 GitHub native는 공개 완료 후 진행한다. 이전 실물 필수/장비 미확정 표기는 이 범위에서 대체하며 API·예산·순위·partial/오류 의미는 유지한다. 실행 중 generic/설치된 PREEMPT_RT는 TASK-022에 구분하며 커널별 시험 결과를 혼합하지 않는다.
+
+### 15.6 TASK-017 S3 생산 모듈·dot-probe export snapshot 연결 — 2026-11-01
+
+명시 실행 예제 `dot-logger-client/examples/dot_probe_bridge.rs`는 dot-probe `PROBE_TICK_REPORT` JSON 한 건을 일반 host에서 import한다. `--plan <path>`는 파일 접근/clock·listener·worker/부하 없이 한도를 표시하고 `--run <path>`만 source read와 실제 연결을 수행한다. source는 exporter가 관리하는 신뢰된 일반 파일이며 handle 하나에서 최대64KiB+1을 읽어 상한을 재검사한다. thread1..128·이름≤128B·양수 interval_us·u64 ticks를 확인하고 원문을 변경하지 않는다. 누적 tick 수치를 logger session clock·fresh runtime Window/Report·capacity Profile로 재해석하지 않는다. 원 export에 freshness/boot ID가 없어 Unavailable이다.
+
+전용 logger session/revision1·raw64KiB 슬롯1·target10 필수 REMOTE/ReceiverAcknowledged·route/shared1·수신 큐1을 선언하고 production `try_record_raw → Router → offer_delivery → TCP/gRPC → next/handoff`를 실행한다. logger budget16MiB(외부8MiB·worker headroom4MiB)·current-thread runtime1을 사용하되 실제 전체 RSS 측정/상한 증명으로 보지 않는다. 신규 capture와 수신 큐 인계는 시작 후2초/취소를 재검사한다. 이미 진행 중인 IO·ACK settlement/close는 실제 종료까지 소유하며 settlement 관측 상한3초를 별도로 둔다. 파일 read/OS IO의 hard deadline을 주장하지 않는다.
+
+receiver `next`/완전 조립 뒤에도 원 receipt는 Pending이고 routing guard는 원본 슬롯을 보존한다. 소비 큐 `try_send` 성공 뒤 같은 연결의 ACK를 서버가 확인하고 `RemoteDelivery::poll`이 실제 완료를 게시해야 Pass다. 큐 거절/연결 종료는 Unknown·Inconclusive, 큐 인계 후 ACK 불명은 AcknowledgementUnknown과 실제 데이터 소유권을 보존한다. 취소는 Aborted, 운영/형태/transport 오류는 별도 Err/CLI4이며 성공으로 치환하지 않는다. CLI preview/Pass0·불충분3이다. 부모 client/stream·hub/server 실제 close를 기다린 뒤 외부 예약 반환과 원본 회수를 관측한다.
+
+[EV-034](../05_verification/verification_evidence.md#ev-034)는 실제 app export·생산 모듈·실제 loopback socket/큐 ACK의 **단일 snapshot** 근거다. `CheckHost`/RunCheck의 routed backend 등록·remote 관리 권한 연결은 후속이며 §15.5의 file backend 의미는 바꾸지 않는다. dot-probe 내장 수집/화면·off/on·장비 capacity/LAN/PC/RT/UPS/장기/native·TASK-020/026 전체를 수락하지 않고 T1 첫 적용 완료도 선언하지 않는다. core/RT/unsafe·공개 wire/오류/완료 계약·아키텍처 변경이 없어 새 ADR 승격 대상이 아니다.

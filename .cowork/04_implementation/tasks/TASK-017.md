@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S3 로컬 host/free probe·Report/profile·CLI 연결 수락(EV-033); 다음 생산 capture/routing·실제 수신자/실앱·실측/native |
+| 다음 액션 | S3 생산 모듈/실제 ACK·dot-probe export snapshot EV-034 수락; 다음 고정 host routed RunCheck 등록·지속 수집/화면·실측/native |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -66,6 +66,17 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 - [x] 실제 Linux statvfs·원 OS 오류/checked available bytes, probe 뒤 시간/취소 재검사. 안전한 rustix1.1.4·lock 신규2개, 제품 unsafe/RT 변경 없음.
 - [x] 원래 Report/profile·session/revision/구간/조건·만료를 native로 원문 보존하고 CLI 요약에 출처를 표시. 합성 결과를 capacity로 승격하지 않음.
 - [x] 실제 CLI→TCP/gRPC→host→MCAP footer/sync/close/cleanup. read/manage·단일 사용·메시지 부족 pre-IO·timeout 중 pacing 취소·기존 경로 보존·Fail/Inconclusive exit 구분 검증.
-- [ ] 생산 capture/routing/실제 수신자 ACK·dot-probe 실앱·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS.
+- [ ] 생산/실앱 전체: 아래 #007의 단일 snapshot/loopback ACK는 수락. 고정 routed backend·지속 수집/화면·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS 잔여.
 
 S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기존 종료·수락 범위를 실제 장비 능력 검증으로 확대하지 않는다. 자동 worker/상시 서버·임의 remote 경로·무제한 실행·FR-015/TASK-018은 도입하지 않는다.
+
+## S3 생산 모듈·실앱 snapshot 연결 첫 단위 — 2026-11-01 #007
+
+- [EV-034](../../05_verification/verification_evidence.md#ev-034)·[REV-032](../../05_verification/reviews/REV-032_TASK-017_ROUTED_BRIDGE.md) Closed, 기존 위임으로 이 실행 단위만 로컬 수락. 다음은 고정 host의 routed RunCheck 등록/출처·실앱 지속 수집 및 화면 연결이다.
+- [실행 예제](../../../crates/dot-logger-client/examples/dot_probe_bridge.rs)·[host 흐름](../../../crates/dot-logger-client/examples/support/dot_probe.rs)·[통합 시험](../../../crates/dot-logger-client/tests/routed_check.rs). core/RT/unsafe·dot-probe 제품 코드·wire 변경 없음. serde_json은 이미 고정된 workspace 버전의 예제/시험 dev 의존만 추가했다.
+- [x] 실제 `CaptureOwner/Producer::try_record_raw` 수락 receipt·`Router` Delivery guard·`RemoteHub::offer_delivery`·실제 TCP/gRPC 수신/조립·1슬롯 소비 큐 인계/ACK·원 receipt ReceiverAcknowledged·raw 회수·실제 연결 종료/예약 반환을 연결했다. 수신/조립만으로 Pending이 바뀌지 않고 raw 슬롯이 유지된다.
+- [x] 입력≤64KiB/128 thread, 슬롯1·logger budget16MiB·current-thread worker1·2초 신규 수집/인계 구간. 취소/수신자 없음/시간 부족 무수집, 큐 포화/연결 종료 Unknown, 소비 수락 후 ACK 불명도 원 데이터는 유지하되 완료 추정 없음. 명시 `--plan` 무부하, `--run` 별도 실행.
+- [x] 실제 dot-probe `269d348`의 `robot-serve` 실행·기존 `PROBE_TICK_REPORT` export 1,618B 생성·SIGTERM 정상 종료(exit0) 후 해당 원문을 전달했다. SafetyThread120/ControlThread60/battery_main24 ticks는 입력 내용이며 logger 비용/RT 달성 근거로 쓰지 않는다. [원문·명령·결과](../../06_evolution/imported_context/task_017_routed_2026-11-01/results.json).
+- [x] 신규7개 Red→Green, Rust1.96/MSRV1.85 workspace 각364·fmt/clippy/doc/protocol/core 의존 분리·실제 예제 실행 Pass. 개발 자가 점검 미해결 P1/P2/P3 없음.
+- [ ] `CheckHost::register/run`/PlanCheck·RunCheck는 EV-033 합성 file backend를 유지한다. 이번 예제는 별도 명시 실행이며 routed 운영 backend 등록/remote 권한 통합·자동 worker는 미구현이다.
+- [ ] export snapshot 연결은 dot-probe 내장 상시 capture·기존 화면·off/on 비교·TASK-020/026 첫 적용 완료가 아니다. T1은 미도래다. source freshness/boot identity·capacity/network/RSS 측정은 Unavailable. LAN·실제 PC/RT 오차/비용·UPS/장기/native(T3)/다른 OS 및 Task/MS/TC 전체·Gate4/5 미완료 유지.

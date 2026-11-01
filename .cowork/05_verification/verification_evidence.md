@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~032 |
+| 버전 | 2026-11-01 / EV-001~034 |
 
 ---
 
@@ -727,12 +727,22 @@ TASK-022 환경/프로필 준비를 시작했다. 아직 수행하지 않은 실
 
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
 
+<a id="ev-034"></a>
+## EV-034 — TASK-017 S3 생산 모듈·실앱 export snapshot 연결
+
+- **판정:** 로컬 단일 snapshot 실행 Pass·기존 위임 수락, [REV-032](reviews/REV-032_TASK-017_ROUTED_BRIDGE.md) Closed. [API §15.6](../03_design_artifacts/interface_contract.md#156-task-017-s3-생산-모듈dot-probe-export-snapshot-연결--2026-11-01)·[TASK-017](../04_implementation/tasks/TASK-017.md). S3/Task/MS/TC 전체·Gate4/5 미완료.
+- **대상/환경:** 2026-11-01 #007 AI·현재 Linux PC/generic kernel·Rust1.96/MSRV1.85. [소스 hash/실행 명령/결과](../06_evolution/imported_context/task_017_routed_2026-11-01/results.json)의 base/source commit과6개 source hash로 변경 단위를 고정한다. core/RT/unsafe·dot-probe 제품 코드 변경 없음.
+- **Red→Green:** 지원 모듈 부재·소비 수락 후 ACK 불명 관측 API 부재 compile Red(exit101) → 신규7개 통합 Pass. 실제 raw capture receipt → Router Delivery → 실제 TCP/gRPC 조립 → 1슬롯 큐 try_send → ACK 게시/원 receipt Complete·raw 회수1·외부 예약0. 큐 포화/연결 종료 Unknown, 이미 인계 뒤 연결 종료도 데이터 보존/AcknowledgementUnknown·미완료를 검증했다. 수신자 없음/취소/시간 부족 무수집·형태/64KiB 입력 한계·원문 불변·multi-chunk 포함.
+- **실앱 source:** dot-probe `269d34838fe98a6cba47facaf2ccc7a45e3343b8`의 `robot-serve`를 빌드/실행, 격리 data 경로/loopback ephemeral lower axis·기존 `PROBE_TICK_REPORT` 사용, SIGTERM 종료0. export1618B·SafetyThread120/ControlThread60/battery_main24 ticks. [실제 원문](../06_evolution/imported_context/task_017_routed_2026-11-01/app_ticks.json)을 읽어 원문 동일/accepted1/ack1/완료/raw 회수1/외부0을 확인했다. tick 수·overruns0은 그 snapshot의 내용이며 logger 비용/장비 수락 값이 아니다.
+- **검증:** workspace/all-features364개, MSRV workspace364개, fmt/clippy(-D warnings)/rustdoc(-D warnings)/protocol·client core 의존 격리 Pass. 실제 preview(없는 path/무접근)0·실제 export run0, 미존재 source/사용법 오류4. 검사11개 exit0 또는 기대 exit4. 결과/로그는 위 JSON과 인접 파일에 보존한다.
+- **수락 한계:** 별도 실행 export snapshot/loopback ACK 예제다. CheckHost/RunCheck는 EV-033 file backend를 유지하며 routed 운영 backend 등록·상시 in-process capture/화면·off/on 비교·TASK-020/026 전체 적용은 후속(T1 미도래). logger budget16MiB·슬롯1·2초 admission/3초 settlement 선언은 전체 RSS/OS IO hard deadline이 아니다. freshness/boot identity·capacity/network/RSS Unavailable, LAN·PC/RT 비용/오차·UPS/장기·native(T3)/다른 OS·새 Miri 실행을 Pass로 바꾸지 않는다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, 생산 점검·운영 free probe/backend·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033 운영 free probe/host·EV-034 생산 모듈/실앱 snapshot 수락, routed 운영 backend·지속 실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

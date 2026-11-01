@@ -306,31 +306,60 @@ fn telemetry_never_labels_a_transition_or_cross_revision_delta_as_stable() {
         let u = s.config_updates().unwrap();
         let (mut a, _) = s.next().unwrap();
         let (mut b, _) = s.next().unwrap();
-        t.sample(0, Some(c)).unwrap();
+        for sec in 0..=10 {
+            t.sample(sec * 1_000_000_000, Some(c)).unwrap();
+        }
+        let Observation::Observed(before) = t.window(10) else {
+            panic!("stable before window")
+        };
         u.apply_config(1, &patch()).unwrap();
         a.apply_pending_config();
         assert_eq!(
-            t.sample(1_000_000_000, Some(c)).unwrap().capture,
+            t.sample(11_000_000_000, Some(c)).unwrap().capture,
             Observation::Unavailable(Unavailable::RevisionTransition)
         );
         b.apply_pending_config();
-        let sample = t.sample(2_000_000_000, Some(c)).unwrap();
+        let sample = t.sample(12_000_000_000, Some(c)).unwrap();
         assert_eq!(sample.revision, 2);
-        for sec in 3..=10 {
+        for sec in 13..=20 {
             t.sample(sec * 1_000_000_000, Some(c)).unwrap();
         }
         assert_eq!(
             t.window(10),
             Observation::Unavailable(Unavailable::IncompleteWindow)
         );
-        for sec in 11..=12 {
+        for sec in 21..=22 {
             t.sample(sec * 1_000_000_000, Some(c)).unwrap();
         }
         let Observation::Observed(window) = t.window(10) else {
             panic!("window")
         };
         assert_eq!(window.revision, 2);
-        assert_eq!(window.from_ns, 2_000_000_000);
+        assert_eq!(window.from_ns, 12_000_000_000);
+        // Only stable windows reach Report/Comparison; no synthetic transition
+        // counts are substituted when Telemetry::window returns Unavailable.
+        use dot_logger::telemetry::{
+            capacity::Conditions,
+            compare::{Comparison, Snapshot},
+            report::{Report, ReportInput},
+        };
+        let snapshot = |w: dot_logger::telemetry::Window| {
+            let conditions = Conditions {
+                environment_id: 1,
+                workload_id: 1,
+                revision: w.revision,
+                target_id: 10,
+                boundary: Boundary::Written,
+            };
+            Snapshot::new(
+                Report::build(ReportInput::from_window(w, conditions), None, w.to_ns),
+                1,
+            )
+        };
+        let comparison = Comparison::build(snapshot(before), snapshot(window));
+        assert!(comparison.differences.comparable());
+        assert_eq!(comparison.before.report.window.to_ns, 10_000_000_000);
+        assert_eq!(comparison.after.report.window.from_ns, 12_000_000_000);
     });
 }
 

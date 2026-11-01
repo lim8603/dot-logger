@@ -123,3 +123,18 @@ fn resources_require_exact_window_and_stale_measurements_are_not_zero() {
         Value::Unavailable(Reason::StaleMeasurement)
     );
 }
+
+#[test]
+fn stable_adjacent_windows_are_comparable_but_overlap_is_not() {
+    let before = snapshot(1, 100, 0);
+    let mut after = snapshot(2, 50, 0);
+    assert_eq!(before.report.window.to_ns, after.report.window.from_ns);
+    assert!(Comparison::build(before, after).differences.comparable());
+    after.report.window.from_ns -= 1;
+    let comparison = Comparison::build(before, after);
+    assert!(comparison.differences.invalid_window);
+    assert_eq!(
+        comparison.accepted_rate,
+        Value::Unavailable(Reason::IncomparableConditions)
+    );
+}

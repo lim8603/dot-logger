@@ -589,7 +589,11 @@ pub struct Producer<'owner> {
 
 impl<'owner> Producer<'owner> {
     /// Adopt a posted policy at this producer boundary. Fixed scans/stores only;
-    /// idle producers may poll explicitly. No global simultaneous change implied.
+    /// the host must arrange calls on the owning worker even while it is idle.
+    /// Without capture or this call, its acknowledgement stays old and later
+    /// updates can remain `RevisionBusy`. Polling does not drain old records,
+    /// finish completions or release raw/delivery guards. No worker is started
+    /// here and no global simultaneous change is implied.
     pub fn apply_pending_config(&mut self) -> u64 {
         if let Some(state) = self.updates {
             let revision = state.boundary(self.producer_id, self.write.sequence, self.revision);

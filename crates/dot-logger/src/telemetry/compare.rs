@@ -1,5 +1,12 @@
 //! General-path before/after observations. Logger filtering changes recording
 //! volume; it does not remove application-side input generation work.
+//!
+//! Build each report from an observed `Telemetry::window` in a stable revision.
+//! A `RevisionTransition` sample cannot form such a window: after all producer
+//! acknowledgements, old records/completions and payload guards settle, collect
+//! a new baseline and the full 10/60/300-second interval. Preserve that interval
+//! in the report; never relabel a transition as zero activity. This comparison
+//! cannot recover transition provenance from caller-constructed windows.
 use super::{
     Window,
     capacity::{Rate, Reason, Value},
@@ -47,6 +54,7 @@ pub struct Snapshot {
 }
 impl Snapshot {
     /// Preserve a report and explicitly mark unprovided host metrics unavailable.
+    /// The host must use a stable observed window; see the module guidance.
     pub fn new(report: Report, application_input_id: u128) -> Self {
         Self {
             report,

@@ -5,9 +5,9 @@
 | 역할/실행 모드 | 프로젝트 오너/Master, solo |
 | 활성 Intent/Milestone | INT-001 Approved / MS-005 In Progress |
 | 현재 담당 | TASK-017 In Progress — 고정 routed RunCheck 로컬 기능 구현 완료, 통합/환경 수락 대기 |
-| 리뷰 | 미처리 없음 — REV-001~033 Closed |
-| 갱신/세션 | 2026-11-01 / #008 종료 — Human 「세션마무리」 |
-| 로그 | [2026-11-01 #008](session_logs/session_2026-11-01_008.md) |
+| 리뷰 | [REV-034](../../../05_verification/reviews/REV-034_TASK-017_INDEPENDENT_REVIEW.md) Open (P3 2건 대기) |
+| 갱신/세션 | 2026-11-01 / #009 종료 — Human 「리뷰 세션 마감」 |
+| 로그 | [2026-11-01 #009](session_logs/session_2026-11-01_009.md) |
 
 [TASK-017](../../../04_implementation/tasks/TASK-017.md)·[EV-035](../../../05_verification/verification_evidence.md#ev-035) 기준으로 고정 routed 등록/원 Report·기존 CLI 권한·시계/취소·단일 사용·실제 앱 export host 실행을 연결했다. source/명령/원문은 EV의 results.json을 따른다. file backend/기존 bridge 소비자도 회귀 확인했다.
 

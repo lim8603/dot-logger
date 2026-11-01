@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-005 In Progress — 운영 계측, MS-004/007은 native·실앱/실측 후속 |
 | 활성 Task | TASK-017 In Progress — 로컬 기능 구현 완료; 지속 앱/화면·통합 실측/native 수락 대기 |
-| 미처리 리뷰 | 없음 — REV-033 고정 routed host 개발 자가 점검 Closed(EV-035) |
+| 미처리 리뷰 | [REV-034](../05_verification/reviews/REV-034_TASK-017_INDEPENDENT_REVIEW.md) Open — TASK-017 독립 코드리뷰 P3 2건(RV-071 target_id 노출, RV-072 24MiB 메모리 문서화) |
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #008 종료 / AI |
-| 세션 상태 | 종료 — Human 「세션마무리」. TASK-017 로컬 수락·통합/환경 대기 유지 |
-| 최근 세션 | [2026-11-01 #008](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md) — TASK-017 고정 routed RunCheck·잔여 조건 정리 |
+| 갱신 | 2026-11-01 / #009 종료 / AI |
+| 세션 상태 | 종료 — Human 「리뷰 세션 마감」. REV-034 Open(P3 2건 대기) |
+| 최근 세션 | [2026-11-01 #009](../members/lim8603/workspace/session_logs/session_2026-11-01_009.md) — TASK-017 routed RunCheck 독립 코드리뷰(REV-034 Open) |
 
 ## 현재 결정과 제약
 
@@ -82,22 +82,19 @@
 |---|---|---|---|
 | REV-001~017 | 코어·파일·조회·재생 | Closed | 로컬 조치·Human 수락 완료, native/PC 실측 이월은 유지 |
 | REV-018~022 | 원격·client·CLI | Closed | EV-026까지 수락. RV-049→TASK-022, RV-053→TASK-020 |
-| [REV-023](../05_verification/reviews/REV-023_TASK-014_TELEMETRY.md)·[REV-024](../05_verification/reviews/REV-024_TASK-015_REPORT.md) | 계측·리포트 개발 자가 점검 | Closed | EV-027/028 로컬 수락, 비용·오차·실앱/native 후속 |
-| [REV-025](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) | TASK-014/015 독립 리뷰 P2 1·P3 2 | Closed | EV-029/eaf736c·검사14개/Miri224·source101개 blob일치, 기존 위임 수락 |
-| [REV-026](../05_verification/reviews/REV-026_TASK-015_RV-060-062_REVIEW.md) | TASK-015 RV-060~062 조치·후속 형상 검증 | Closed | Pass (P1/P2/P3 0건), RV-060~062 조치 및 계약·RT 안전성 확인 완료, 수락 마감 |
-| [REV-027](../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) | TASK-016 설정/비교 개발 자가 점검 | Closed | EV-030/source542c6e6·검사10개/Miri496·source102개 blob일치·위임 로컬 수락 |
-| [REV-028](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md) | TASK-016 독립 코드리뷰 P3 2건 | Closed | RV-063/064 수용·API/rustdoc·설정13/비교4개·EV-031/5d447b4, 위임 수락 |
+| REV-023~028 | 계측·리포트·설정변경 자가/독립 리뷰 | Closed | EV-027~031 로컬 수락 마감, 비용·오차·실앱/native 후속 |
 | [REV-029](../05_verification/reviews/REV-029_TASK-017_PLAN_START.md) | TASK-017 S1 계획/예산 개발 자가 점검 | Closed | Pass·S1 계획/예산 로컬 수락(EV-031/0622a90), S2는 REV-030 참조 |
 | [REV-030](../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) | TASK-017 S2 합성 파일 실행/정리 개발 자가 점검 | Closed | Pass·신규 미해결 RV 없음, EV-032/1cae3b9·S2 로컬 수락·운영/생산/실측 후속 |
 | [REV-031](../05_verification/reviews/REV-031_TASK-017_CHECK_HOST.md) | TASK-017 S3 로컬 운영 host·CLI 개발 자가 점검 | Closed | RV-066~068 probe 기한/CLI exit/원 source session 조치, EV-033·로컬 연결 수락 |
 | [REV-032](../05_verification/reviews/REV-032_TASK-017_ROUTED_BRIDGE.md) | S3 생산 모듈/실제 ACK·실앱 snapshot 개발 자가 점검 | Closed | 신규7개·두 Rust workspace 각364/EV-034, 미해결 지적 없음 |
 | [REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md) | 고정 routed host·원 source/CLI 권한·시계 개발 자가 점검 | Closed | RV-069 호스트 deadline·RV-070 초기 OS 원인 보존 Red→Green, EV-035·기능 수락 |
+| [REV-034](../05_verification/reviews/REV-034_TASK-017_INDEPENDENT_REVIEW.md) | TASK-017 독립 코드리뷰 P3 2건 | Open | RV-071 target_id 노출, RV-072 24MiB 메모리 문서화 대기 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **TASK-017 로컬 기능 잔여는 EV-035로 처리했다.** 고정 routed RunCheck·원 source·CLI 권한/취소/단일 사용·실제 앱 export host 실행을 수락했다. file/bridge도 유지하며 미처리 리뷰는 없다.
+1. **REV-034 Open(P3 2건 RV-071/072) 처리 또는 후속 개발 세션 진행.** TASK-017 로컬 기능 구현은 EV-035로 완료 수락되었으며, 독립 코드리뷰 REV-034(Pass, Open)가 등록되었다. 후속 세션에서 P3 문서/상수 보강 조치 및 Closed를 진행할 수 있다.
 2. **통합/환경 수락 대기다.** 지속 수집/화면/off-on(TASK-020/026)은 TASK-019/021 등 선행 구현이 필요하다. 단일 snapshot은 첫 적용 완료가 아니며 T1 미도래다.
 3. 설정/비교 운영 backend·worker, RV-049/TASK-022·RV-053/TASK-020, PC/RT 비용/오차·UPS/장기·TC/MS·Gate4/5는 미완료다. RT 부팅/capability·공개 후 native(T3) 조건 유지. T2/T3 미도래, FR-015/TASK-018·임의 remote 경로/무제한 실행은 미착수다.
 

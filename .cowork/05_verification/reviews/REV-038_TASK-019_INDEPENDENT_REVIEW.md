@@ -25,7 +25,7 @@
   - `cargo test -p dot-logger-rt-allocation`: 15/15 Pass (RT 수집/대여/반환 경로의 할당/해제 0 불변식 완벽 보존)
   - Safe Rust 100% (신규 구현 내 `unsafe` 블록 0건)
 - **종합 판정:** **Pass** (P1 0건, P2 0건, P3 2건). RT 제약의 완전한 격리, 100% Safe Rust, 철저한 단조 시계 충돌 방어 및 선반영, 자원 수명 안전성 및 파일 장애 격리 계약 엄격 준수.
-- **상태:** **Open** (리뷰 세션 생성 → 후속 개발 세션 조치 대기)
+- **상태:** **Closed** (2026-11-01 #014 개발 세션에서 P3 문서 보강·검증 후 기존 위임으로 수락)
 
 ---
 
@@ -54,8 +54,8 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-079 | P3 | [`dot-logger/src/adapters/influxdb/routed.rs#L80-L128`](../../../crates/dot-logger/src/adapters/influxdb/routed.rs#L80-L128), `RoutedWriter::new` | `RoutedWriter::new` 실패 시 단일 `ProjectionError::InvalidConfig`만 반환되므로, 등록 실패 원인(세션 불일치, 타깃 미지원, 채널 수/타입 불일치, writer busy)을 사용자가 파악하기 어려움 | `RoutedWriter::new`의 상단 rustdoc에 등록 성공을 위한 선행조건(Preconditions) 5가지를 명시하여 호출자의 사전 유효성 검증을 안내 | 권고 (P3) | Open |
-| RV-080 | P3 | [`dot-logger/src/adapters/influxdb/numeric.rs#L124-L131`](../../../crates/dot-logger/src/adapters/influxdb/numeric.rs#L124-L131), `NumericQuery` 유효 범위 | `NumericQuery::from_ns`와 `to_ns`의 엄격한 경계 조건(`from_ns > i64::MIN + 1`, `to_ns < i64::MAX`)의 사유가 Flux 변환 방어 목적임을 사용자가 알기 어려움 | `NumericQuery` 구조체의 `from_ns`, `to_ns` 필드에 InfluxDB Flux `time()` 변환 한계 및 방어적 경계 조건에 대한 rustdoc 설명 보강 | 권고 (P3) | Open |
+| RV-079 | P3 | [`dot-logger/src/adapters/influxdb/routed.rs#L80-L128`](../../../crates/dot-logger/src/adapters/influxdb/routed.rs#L80-L128), `RoutedWriter::new` | `RoutedWriter::new` 실패 시 단일 `ProjectionError::InvalidConfig`만 반환되므로, 등록 실패 원인(세션 불일치, 타깃 미지원, 채널 수/타입 불일치, writer busy)을 사용자가 파악하기 어려움 | `RoutedWriter::new`의 상단 rustdoc에 등록 성공을 위한 선행조건(Preconditions) 5가지를 명시하여 호출자의 사전 유효성 검증을 안내 | 수용·문서 보강 | Closed |
+| RV-080 | P3 | [`dot-logger/src/adapters/influxdb/numeric.rs#L124-L131`](../../../crates/dot-logger/src/adapters/influxdb/numeric.rs#L124-L131), `NumericQuery` 유효 범위 | `NumericQuery::from_ns`와 `to_ns`의 엄격한 경계 조건(`from_ns > i64::MIN + 1`, `to_ns < i64::MAX`)의 사유가 Flux 변환 방어 목적임을 사용자가 알기 어려움 | `NumericQuery` 구조체의 `from_ns`, `to_ns` 필드에 InfluxDB Flux `time()` 변환 한계 및 방어적 경계 조건에 대한 rustdoc 설명 보강 | 수용·문서 보강 | Closed |
 
 ---
 
@@ -77,9 +77,9 @@
   - `RoutedWriter::new` 상단 rustdoc의 `# Errors` 또는 `# Preconditions` 섹션에 위 5대 필수 선행조건을 명시하여 호출자(상위 호스트 설정자)가 사전에 구성을 바르게 검증할 수 있도록 돕는다.
 
 #### [처리담당]
-- **판정 결과:** (후속 개발 세션에서 처리)
-- **처리 내용:** -
-- **검증 근거:** -
+- **판정 결과:** 수용·Closed.
+- **처리 내용:** `RoutedWriter::new` rustdoc에 5개 선행조건과 metadata 예약 실패 조건을 명시했다. 새 오류 variant나 동작 변경은 없다.
+- **검증 근거:** 소스 `d16c7e5`; `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`, `cargo fmt --check` exit0. [rustdoc 원문](../../06_evolution/imported_context/task_020_s1_2026-11-01/rev038-doc.log).
 
 ---
 
@@ -95,9 +95,9 @@
   - `NumericQuery::from_ns`에 `> i64::MIN + 1`, `NumericQuery::to_ns`에 `< i64::MAX` 범위 제약이 적용됨을 rustdoc 주석으로 명시하여 클라이언트가 쿼리 범위 생성 시 `InvalidInput` 에러를 겪지 않도록 가이드한다.
 
 #### [처리담당]
-- **판정 결과:** (후속 개발 세션에서 처리)
-- **처리 내용:** -
-- **검증 근거:** -
+- **판정 결과:** 수용·Closed.
+- **처리 내용:** `NumericQuery::from_ns`의 `> i64::MIN + 1`, `to_ns`의 `< i64::MAX`와 `from_ns < to_ns`를 필드 rustdoc에 명시했다. Flux `time()` 변환 경계 방어 목적을 설명하며 기존 입력 검증은 그대로다.
+- **검증 근거:** 소스 `d16c7e5`; 위 rustdoc/fmt exit0. 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
 
 ---
 
@@ -133,3 +133,7 @@
 | 신규 | `ProjectionSchema`, `ProjectionEncoding`, `ProjectionError` | 원본 캡처 스키마 매핑 및 고정 변환 명세 |
 | 신규 | `DeliveryAttempt` | 원본 `Delivery` 가드를 보존하는 IO 결과 래퍼 (터미널 재전송 방지 및 제한적 복구) |
 
+
+## 6. 개발 세션 조치·마감 — 2026-11-01 #014
+
+Human 「다음 작업 시작하자」로 반입했다. Open → In Progress → 문서 수정/rustdoc·fmt 확인으로 Resolved → 기존 구현·검증·리뷰 마감 위임으로 Closed 처리했다. 위 리뷰어 본문과 원래 구현 변경표는 리뷰 당시 이력이다. 이번 조치는 `routed.rs`/`numeric.rs`의 rustdoc만 변경했다. 수치상 성능·RT/native/실앱·Task 전체 수락으로 확대하지 않는다.

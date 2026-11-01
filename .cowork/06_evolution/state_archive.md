@@ -435,3 +435,10 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 잔여 조건 동기화 후 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md)·[EV-035](../05_verification/verification_evidence.md#ev-035).
 
 - **TASK-017 현재 계약:** EV-031~034·REV-029~032 수락에 [EV-035](../05_verification/verification_evidence.md#ev-035)/[REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md)를 추가했다. `CheckHost`의 고정 File/Routed 슬롯·단일 사용·원 source 검증·Read/Manage/응답 preflight·native evidence를 유지한다. client `SnapshotCheck`가 host-selected≤64KiB 한 건을 실제 raw/routing→TCP 수신 큐/ACK→원 receipt 완료·원본/예약 회수로 연결한다. host 원 session/revision/mono clock과 source Report/profile는 분리 보존한다. 예제2초/요구24MiB·허용32MiB, 물리 쓰기0이며 capacity/freshness/LAN/RSS 미측정이다. 로컬 기능 구현 잔여는 처리했으나 지속 수집/기존 화면/off-on(TASK-020/026)·통합 PC/RT/UPS/장기(TASK-021~024)·공개 후 native(T3)/다른 OS는 미수락이다. 전체 Task In Progress·TC Partial 유지. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.7](../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01).
+
+
+## #018 — 2026-11-01 #014 R1/R2 상태 인덱스 이관
+
+- 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_011.md).
+
+- **TASK-013 기능 기준:** EV-025/source29e55da 뒤 [EV-026](../05_verification/verification_evidence.md#ev-026)/b3c08bd로 handoff·진단/CLI·유휴 next를 보강했다(검사14개/Miri32). local wait timeout은 같은 구독 유지, server lease/명시 cancel은 종료한다. ttl은 record/idle lease 겸용, 별도 구독 간 Gap 연속성은 미보장이고 TASK-020 화면에서 불연속 표시한다. 현재 workspace는 REV-025 EV-029/eaf736c로 전체 회귀했다. CLI runtime metrics Unavailable·config apply/compare backend Unsupported·실앱/native/성능 후속은 유지한다. 점검 host/CLI는 EV-033 범위다.

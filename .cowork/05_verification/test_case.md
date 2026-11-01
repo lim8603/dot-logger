@@ -131,7 +131,7 @@ TASK-011 하위 [EV-018](verification_evidence.md#ev-018): 가상시계 replay10
 ### TC-007 — 원격·Rust API·CLI 사용자 경로
 
 - 관련: MS-004·006 / FR-005·006·010·013 / NFR-002·004·007
-- 상태: 부분 실행 — TASK-012/013 gRPC/native client/CLI·파일/취소/ACK 로컬 Pass, 실앱/native·성능 후속 / 최근 실행: 2026-10-31 / EV: EV-022~025
+- 상태: 부분 실행 — TASK-012/013 원격·CLI 및 TASK-020 S1 일반 로그 입력 로컬 Pass, 통합/화면/실앱/native·성능 후속 / 최근 실행: 2026-11-01 / EV: EV-022~026·040
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -150,6 +150,8 @@ TASK-013 착수 하위 [EV-024](verification_evidence.md#ev-024): ClientReceiver
 TASK-013 현재 하위 [EV-025](verification_evidence.md#ev-025): native transport7·CLI process10·codec1·수신 수명3, 실제 8MiB32조각/CRC/인계 ACK·Gap/Unknown·TLS/권한·host 취소 후 실제 Command permit 수명·독립 파일 Query/ReadBlob→Replay start/pause/resume/seek/stop·offline query/timed replay·실제 Ctrl-C·stdout 실패 시 미ACK·출력 cap·복구/source bytes 불변을 확인했다. 두 Rust각16feature/workspace/core/default client/allocator·lint/doc/fmt/proto 두 사본·cached audit·Miri32 Pass, REV-021 RV-039~045 조치/로컬 수락 Closed다. SDK/CLI 예제·화면 API 계약은 제공했으며 실제 dot-probe 적용·다른 OS/native 공개 후T3·운영 backend/보안·LAN/RSS/PC/RT/UPS는 잔여다. 앞선 EV-022~024의 CLI/transport 미완료는 당시 이력이다. TC-007 전체 완료로 올리지 않는다.
 
 <a id="tc-008"></a>
+TASK-020 S1 [EV-040](verification_evidence.md#ev-040): 일반 경로 tracing/log 인코딩·명시 수집 연결 신규8개, 실제 scoped subscriber 5수준·own fields/JSON·문자열/수치 text·overflow/formatter failure·native capture identity/시각/중요도·포화/종료·Skipped/schema/slot 검증 Pass. 두 Rust workspace각409개/16features·독립 consumer/RT allocator·예제·fmt/clippy/doc Pass. S2 파일/DB/구독·조절 비교 및 S3 화면 불연속 예제·TASK-026 지속 실앱/PC·RT/native는 미완료다. TC 전체 Partial 유지.
+
 ### TC-008 — DB 매핑·충돌·재시도
 
 - 관련: MS-006 / FR-004 / NFR-003·005
@@ -292,3 +294,5 @@ P3 최소60초 및 RAM2배 이상, 마지막 sync까지 시간 포함. P4 receiv
 TASK-008/010/011 최종 구현 리뷰 승인으로 REV-009/010/013/014/017 Closed. TC 전체 및 MS 체크는 로컬 하위 검증/미실행 경계를 유지한다. [EV-021](verification_evidence.md#ev-021)은 TASK-022 local-pc-v1 Draft의 선언 검토/준비 점검만 수행했다. TC-012/011 제품 성능·RT·UPS 시뮬레이션 실행은 Not Run이다. 수치 프로필은 [TASK-022](../04_implementation/tasks/TASK-022.md#현재-pc-수치-프로필-초안--2026-10-31)에서10ms 조정 뒤 Human 승인으로 확정했다.
 
 2026-10-31 local-pc-v1 수치 프로필 Approved. TC-011/012 제품 실행은 NotRun, [EV-021 승인 점검](verification_evidence.md#ev-021)은 선언 유효성/준비 잔여만 기록한다.
+
+2026-11-01 #014 MS-006 추적: TASK-020 S1 일반 로그 입력은 EV-040으로 구현/검증했다(FR-001/002/004/006/017·NFR-004의 해당 하위 경로). S2/S3·TASK-026과 실제 통합/환경이 남아 해당 MS 전체 체크는 유지한다.

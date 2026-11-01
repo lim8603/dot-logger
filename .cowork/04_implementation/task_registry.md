@@ -1,6 +1,6 @@
 # Task 목록과 실행 계획
 
-- 현재(2026-11-01 #012): TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037으로 수락했다. S1/S2/S3 로컬 기능 완료, 통합/환경·native는 잔여. 다음 개발 후보 TASK-020; TASK-018은 FR-015 별도 범위 승인 대기로 미착수.
+- 현재(2026-11-01 #014): REV-038 P3 두 건 Closed, TASK-020 S1 일반 로그 입력 EV-040/REV-039 로컬 수락. 다음 S2 통합 비교 예제·S3 화면 불연속, TASK-019 통합/환경·native 잔여. TASK-018은 별도 FR-015 승인 대기로 미착수.
 - INT-001 / 2026-10-28 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
 - 담당 AI는 승인된 실행 담당이며 Human은 프로젝트 오너다. 2026-10-31 모든 권한/게시 위임에 따라 승인된 목표의 구현·검증·로컬 수락/마감·단위별 커밋/푸시는 AI가 수행·보고한다. 같은 범위의 재승인은 받지 않으며 solo를 유지한다.
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
@@ -32,7 +32,7 @@
 | TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | 고정 routed RunCheck 로컬 구현/기능 검증 EV-035; 지속 앱/화면 TASK-020/026·통합 실측·native(T3) 수락 대기 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
 | TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | unknown hardware와 사용자 고정 설정에서 과신 추천/자동 적용 금지 | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-01 | S1/S2/S3 EV-037~039 수락; 통합/환경·native 후속, 다음 후보 TASK-020 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
-| TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 일반 tracing을 RT 경로로 사용하지 않음·화면 client 데이터 흐름 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
+| TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-01 | S1 EV-040 로컬 수락/REV-039 Closed; 다음 S2 통합 비교·S3 화면 불연속 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-31 | ADR-011 UPS 시뮬레이션 수락: off/기한/순위/진행 IO·복구 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-10-31 | local-pc-v1 Approved·선행 harness 준비; RT 부팅/capability 확인 뒤 실행 | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절 | TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |

@@ -4,20 +4,20 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger — InfluxDB S1/S2/S3 로컬 기능 수락, 실앱·정량 성능/native 후속 |
+| 프로젝트 | dot-logger — 일반 로그 입력 S1 수락, 통합 예제·실앱/환경 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-019 S3 EV-039 로컬 수락, MS-006 진행 |
+| 현재 Phase | Build — TASK-020 S1 EV-040 로컬 수락, MS-006 진행 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-006 In Progress — DB/외부 연동; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-019 In Progress — S1~S3 로컬 수락·통합/환경 대기; 다음 후보 TASK-020 |
-| 미처리 리뷰 | [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) (Open) — TASK-019 InfluxDB v2 어댑터 독립 코드리뷰 (P3 2건) |
+| 활성 Task | TASK-020 In Progress — S1 로컬 수락, 다음 S2 통합 비교 예제 |
+| 미처리 리뷰 | 없음 — REV-038 문서 조치·REV-039 S1 자가 점검 Closed |
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #013 종료 / AI |
-| 세션 상태 | 종료 — Human 「리뷰 세션 마무리」. REV-038 등록, 다음 후보 TASK-020 |
-| 최근 세션 | [2026-11-01 #013](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md) — TASK-019 독립 코드리뷰(REV-038) |
+| 갱신 | 2026-11-01 / #014 / AI |
+| 세션 상태 | S1 구현·검증·위임 수락 완료 — 다음 S2 |
+| 최근 세션 | [2026-11-01 #014](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md) — REV-038 조치·TASK-020 S1 |
 
 ## 현재 결정과 제약
 
@@ -33,7 +33,7 @@
 
 - **TASK-012 계약:** remote 기본 disabled/loopback/read-only·외부 TLS/인증·bounded 구독/256KiB·handoff ACK/Gap/Unknown·세대 gate·host inbox. EV-023 소스4f79119는 이전 기준, server 오류 조치·구독 경계는 [EV-026](../05_verification/verification_evidence.md#ev-026)/b3c08bd·API§14.5를 따른다. 포화10ms 냉각 유지·실측은 TASK-022. native/실앱·LAN/RSS/보안 수락은 후속이며 OS keyring·CI/계정/과금 조회/차단 재시도 없음을 유지한다.
 
-- **TASK-013 기능 기준:** EV-025/source29e55da 뒤 [EV-026](../05_verification/verification_evidence.md#ev-026)/b3c08bd로 handoff·진단/CLI·유휴 next를 보강했다(검사14개/Miri32). local wait timeout은 같은 구독 유지, server lease/명시 cancel은 종료한다. ttl은 record/idle lease 겸용, 별도 구독 간 Gap 연속성은 미보장이고 TASK-020 화면에서 불연속 표시한다. 현재 workspace는 REV-025 EV-029/eaf736c로 전체 회귀했다. CLI runtime metrics Unavailable·config apply/compare backend Unsupported·실앱/native/성능 후속은 유지한다. 점검 host/CLI는 EV-033 범위다.
+- **TASK-013:** EV-025/026 로컬 수락·최신 EV-029 회귀. local wait timeout은 같은 구독 유지, ttl은 record/idle lease 겸용·새 구독 간 Gap 연속성 미보장(TASK-020 S3). CLI runtime metrics Unavailable·config apply/compare Unsupported·실앱/native/성능 후속. [TASK-013](../04_implementation/tasks/TASK-013.md)·API§14.5.
 
 - **TASK-014/015 현재 계약·형상:** [EV-029](../05_verification/verification_evidence.md#ev-029) source101개/검사14개·Miri224·소스eaf736c commit blob일치, REV-025 Closed. EV-027/028의 계측·report 기반에 제출/대여 capacity/contract/lifecycle 범주를 추가하고 총계는 보존했다. 거절 중 capacity만 과부하로 사용하며 기존 출력 실패/자원 한계 판정은 유지한다. 부하율은 accepted+rejected_capacity **시도율**(재시도 포함·고유 입력/손실 아님)이다. acquire·계약/수명 거절·skip은 분자 제외. CounterCell128B/RT 할당·해제0, 추가 Sample 크기는 checked control 예약으로 검사한다. history_len은 Observation<usize>, 독점 reset은 이력/poison을 초기화한다.
 - **리포트/호스트 경계:** 실제 Window session/revision/epoch/구간·장비/부하/target/boundary와 검증 능력의 session clock/유효성을 유지한다. 물리 bytes/slots·출력정지·filesystem/quota·순환 보존/retained span을 분리한다. host는 성공 sample과 target_totals의 유한 이력에서 실제 from/to를 대조하고 terminal checked 차분·최종 pending을 공급한다. 누락/foreign/Busy/overflow는 Unavailable이며 가까운 시점 혼합/배출 후 정확 계약이다. 물리 gauge/출력 출처·capacity evidence·자동 worker/CLI runtime backend·실앱과 실제 PC/RT 오차≤20%·계측 비용≤5%·native는 후속이다. 상세 [TASK-014](../04_implementation/tasks/TASK-014.md)·[TASK-015](../04_implementation/tasks/TASK-015.md)·[API§15](../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안).
@@ -76,7 +76,8 @@
 | TASK-015 | 여유·병목·보존 시간 리포트 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 출력 정렬 조치 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 |
 | TASK-016 | revision 설정 변경과 전후 비교 | AI | In Progress | 2026-11-01 | EV-030 로컬 수락·REV-028 조치 Closed/EV-031; 운영 backend/실앱·PC/RT/native 후속 |
 | TASK-017 | 예산 제한 간편 점검 | AI | In Progress | 2026-11-01 | 고정 routed RunCheck EV-035로 로컬 기능 잔여 처리; 지속 앱/화면·통합 실측/native 수락 대기 |
-| TASK-019 | InfluxDB 어댑터와 충돌·장애 | AI | In Progress | 2026-11-01 | S1~S3 EV-037~039 로컬 수락; 통합/환경·native 후속·다음 후보 TASK-020 |
+| TASK-019 | InfluxDB 어댑터와 충돌·장애 | AI | In Progress | 2026-11-01 | S1~S3 EV-037~039 로컬 수락; REV-038 Closed·통합/환경/native 후속 |
+| TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-01 | S1 EV-040 로컬 수락·REV-039 Closed; 다음 S2 통합 비교·S3 화면 불연속 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -95,13 +96,14 @@
 | [REV-035](../05_verification/reviews/REV-035_TASK-019_INFLUX_WRITE.md) | TASK-019 S1 개발 자가 점검 | Closed | RV-073 타입별 field·RV-074 HTTP body 예약 수명·EV-037 로컬 수락 |
 | [REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md) | TASK-019 S2 개발 자가 점검 | Closed | RV-075 query dialect·실제 DB/typed query EV-038 수락 |
 | [REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) | TASK-019 S3 개발 자가 점검 | Closed | RV-076 terminal 복구·RV-077 초기 cancel·RV-078 proxy 자식 합류·EV-039 수락 |
-| [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) | TASK-019 InfluxDB v2 어댑터 독립 코드리뷰 | Open | RV-079(RoutedWriter 선행조건 doc)·RV-080(NumericQuery time 범위 doc) 조치 대기 |
+| [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) | TASK-019 독립 리뷰 문서 조치 | Closed | RV-079/080 rustdoc·fmt 확인, 소스d16c7e5 |
+| [REV-039](../05_verification/reviews/REV-039_TASK-020_TRACING_INPUT.md) | TASK-020 S1 일반 로그 입력 자가 점검 | Closed | RV-081 MSRV 예제 수명 수정·EV-040 수락 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **다음 개발 후보 TASK-020:** tracing 일반 경로 어댑터·dot-probe 통합 예제를 관련 Task/계약에서 확인하고 진행한다. TASK-019 S1~S3 EV-037~039 로컬 수락, 통합/환경/native 대기는 유지한다. 이번 S3 요청으로 TASK-020은 자동 착수하지 않았다. 브리핑은 전체 단계 표와 승인 대기로 건너뛴 Task/사유를 표시한다.
+1. **TASK-020 S2:** 대표 로그/수치/합성 raw의 파일·DB·구독/조절 비교 예제를 진행한다. S1 일반 입력 EV-040 수락, S2 통합 비교·S3 화면 불연속은 미착수, 실앱/환경/native는 대기다. [전체 단계](../04_implementation/tasks/TASK-020.md#단계별-실행--2026-11-01-014)를 브리핑하고 TASK-018의 별도 승인 대기 사유를 표시한다.
 2. **TASK-017 통합/환경 수락 유지:** REV-034 RV-071/072는 EV-036/source`a972229`로 Closed. 지속 앱/화면/off-on(TASK-020/026)은 TASK-019/021 선행 구현 후이며 snapshot 한 건은 첫 적용 완료가 아니므로 T1 미도래다.
 3. 설정/비교 backend·worker, RV-049/TASK-022·RV-053/TASK-020, PC/RT 비용/오차·UPS/장기·native/OS·Gate4/5 미완료. RT 부팅·공개 후 T3 조건 유지, T2 미도래. FR-015/TASK-018·임의 remote 경로/무제한 실행은 미착수다.
 
@@ -125,7 +127,7 @@
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
 | T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토 | 공개 전환 또는 첫 외부 배포를 요청할 때 | INT-001 / 공개 준비 | 2026-10-28 Human 논의 |
-| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019 | 2026-10-31 Human 검증 시점 결정 |
+| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019·020 | 2026-10-31 Human 검증 시점 결정 |
 
 범위 밖 백로그 B: 없음. 현재 T1/T2/T3는 미도래. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
 
@@ -138,7 +140,7 @@
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~017·019 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~017·019·020 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
 | GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
 | RV-015~017 | 최종 sync 취소는 EV-014, 방어적 슬라이싱/스택 포맷은 EV-015에서 반영·REV-011/012 Closed·Human 승인 | native·장비 검증 대기 |
@@ -154,10 +156,11 @@
 
 ## 최근 작업·이력
 
+- 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md).
+
 - 2026-11-01 #013: TASK-019 InfluxDB v2 어댑터 독립 코드리뷰를 수행하여 Pass 판정 및 REV-038(Open)을 등록했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md).
 
 - 2026-11-01 #012: TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037로 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_012.md).
 
-- 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_011.md).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

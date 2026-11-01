@@ -740,3 +740,14 @@ S1 대역 검증은 [EV-037](../05_verification/verification_evidence.md#ev-037)
 근거: [Tokio runtime shutdown](https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html#shutdown)과 고정1.51.6의 로컬 runtime source를 확인했다. 공개 API는 외부 runtime/wire 타입을 강제 노출하지 않으며 별도 mutable owner와 scoped runtime은 승인된 비RT adapter 구현 세부다. [EV-039](../05_verification/verification_evidence.md#ev-039)·[REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md). 실제 OSS2.9.1에서도 원 capture→DB ACK/원 completion→query receipt/ns와 실제 DB type failure→Unknown/원본 회수를 대조했다.
 
 S1/S2/S3 로컬 기능은 수락했으나 실제 dot-probe/지속 앱·화면/설정 통합(TASK-020/026), PC/RT/RSS/정량 성능·장기/UPS 및 공개 후 native(T3)는 미완료다. Task/MS/TC 전체·Gate4/5 완료로 승격하지 않는다.
+
+
+## 14.9 TASK-020 S1 일반 경로 tracing/log 입력 — 2026-11-01
+
+`tracing-adapter` 선택 feature의 `adapters::tracing::{tracing_event, log_record}`는 기존 애플리케이션 subscriber/sink에서 명시 호출하는 일반 경로 인코더다. 전역 subscriber/logger·worker·큐·시계 자동 등록은 없다. 호출자의 scratch를 빌려 완전한 UTF-8 JSON `{"target":"...","fields":{"name":"value"}}`을 생성한다. 필드 값은 모두 텍스트이며 tracing 원시 문자열은 그대로 JSON escape, 그 외 필드는 Debug, log 메시지는 Display로 표현한다. span context·log key-values·file/module/line은 수집하지 않으며 typed 수치는 별도 수치 경로를 쓴다.
+
+`EncodedLog`는 scratch의 불변 borrow와 변환한 Level을 보유한다. scratch 전체 길이가 출력 bytes 상한이며 초과 시 `EncodeError::TooLarge`, 사용자 formatter 실패는 `Formatting`으로 전체 거절한다. 실패 scratch의 partial prefix는 이벤트가 아니고 전송/제출하면 안 된다. overflow는 sticky라 formatter가 write 오류를 무시해도 성공으로 바뀌지 않는다. 텍스트 scratch의 할당/수명·worker 메모리 예산은 호스트 책임이다. 새 adapter-owned heap 예약은 없다.
+
+`EncodedLog::capture`는 `Producer::try_record_small`에 한 번만 제출한다. 외부 source 수준으로 `metadata.level`만 대체하며 host channel/schema/version·mono/real/source time·importance를 유지한다. Fatal은 외부 두 API에 없고 Error를 Important로 자동 승격하지 않는다. schema/slot 크기는 호스트가 명시 등록한다. Skipped/기존 오류·수락 receipt는 원래 의미이며 출력/DB 완료를 추정하지 않는다. 재시도·자동 출력은 없다.
+
+사용자 Debug/Display는 할당/대기/재귀할 수 있으므로 scratch bytes 상한은 CPU/시간·RT 안전 보장이 아니다. 호스트의 기존 일반 경로 subscriber/sink에서만 사용하고 재귀 로그를 피한다. core RT API/원자성/소유권/오류/완료 계약과 ADR-009의 기술 선택은 변경하지 않는다. S2 통합 비교·S3 화면 불연속 예제·TASK-026 지속 실앱/PC·RT/native는 별도 잔여다. [TASK-020](../04_implementation/tasks/TASK-020.md).

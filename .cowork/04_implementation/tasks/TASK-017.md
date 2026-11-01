@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S3 생산 모듈/실제 ACK·dot-probe export snapshot EV-034 수락; 다음 고정 host routed RunCheck 등록·지속 수집/화면·실측/native |
+| 다음 액션 | 고정 routed RunCheck 구현/기능 검증 EV-035; 지속 실앱/화면(TASK-020/026)·통합 실측(TASK-021~024)·공개 후 native(T3) 수락 대기 |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -78,5 +78,24 @@ S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기�
 - [x] 입력≤64KiB/128 thread, 슬롯1·logger budget16MiB·current-thread worker1·2초 신규 수집/인계 구간. 취소/수신자 없음/시간 부족 무수집, 큐 포화/연결 종료 Unknown, 소비 수락 후 ACK 불명도 원 데이터는 유지하되 완료 추정 없음. 명시 `--plan` 무부하, `--run` 별도 실행.
 - [x] 실제 dot-probe `269d348`의 `robot-serve` 실행·기존 `PROBE_TICK_REPORT` export 1,618B 생성·SIGTERM 정상 종료(exit0) 후 해당 원문을 전달했다. SafetyThread120/ControlThread60/battery_main24 ticks는 입력 내용이며 logger 비용/RT 달성 근거로 쓰지 않는다. [원문·명령·결과](../../06_evolution/imported_context/task_017_routed_2026-11-01/results.json).
 - [x] 신규7개 Red→Green, Rust1.96/MSRV1.85 workspace 각364·fmt/clippy/doc/protocol/core 의존 분리·실제 예제 실행 Pass. 개발 자가 점검 미해결 P1/P2/P3 없음.
-- [ ] `CheckHost::register/run`/PlanCheck·RunCheck는 EV-033 합성 file backend를 유지한다. 이번 예제는 별도 명시 실행이며 routed 운영 backend 등록/remote 권한 통합·자동 worker는 미구현이다.
+- [x] #008의 `register_routed/run_routed`·`handle_command`로 고정 routed backend/원 Report·기존 CLI 관리 권한을 연결했다(EV-035). EV-033 file backend와 별도 bridge 예제도 유지하며 자동 worker는 도입하지 않는다.
 - [ ] export snapshot 연결은 dot-probe 내장 상시 capture·기존 화면·off/on 비교·TASK-020/026 첫 적용 완료가 아니다. T1은 미도래다. source freshness/boot identity·capacity/network/RSS 측정은 Unavailable. LAN·실제 PC/RT 오차/비용·UPS/장기/native(T3)/다른 OS 및 Task/MS/TC 전체·Gate4/5 미완료 유지.
+
+
+## S3 고정 routed RunCheck 구현·잔여 조건 정리 — 2026-11-01 #008
+
+요청 「TASK-017 남은 업무 모두 끝내자」에 따라 미구현된 고정 routed backend를 연결하고 이 Task의 기능 시험을 완료했다. [EV-035](../../05_verification/verification_evidence.md#ev-035)·[REV-033](../../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md)·[API §15.7](../../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01). **Task 상태는 In Progress**다. 아래 별도 선행조건을 이번 기능 구현의 완료로 대체하지 않는다.
+
+- [x] 동일 고정 슬롯의 File/Routed 등록·서로 다른 scope preview·단일 실행, 실제 target/요구 메모리/source provenance 검증. file 호출자가 native `HostCheckEvidence::File`를 소비하도록 회귀 확인.
+- [x] `SnapshotCheck`를 client 생산 API로 제공: host-selected≤64KiB snapshot·1슬롯 큐·실제 raw/routing/원 receipt ACK·raw 회수·actual close/예약 반환. 원 source Report/profile와 check session/revision/monotonic clock 보존.
+- [x] Read preview/Manage run·작은 응답 예산 pre-IO 거절·remote waiter timeout 후 실제 무수집/정리·native evidence·재실행 Gone를 기존 CLI/TCP 경로에서 검증.
+- [x] 메모리 부족·foreign source/target/network/worker/boundary·수신자 없음·취소·호스트 시계 deadline 및 초기 OS 오류·미관측 구간을 검증. deadline 초과 수집/초기 원인 손실을 Red→Green으로 조치했다.
+- [x] 일반 PC 실제 파일 IO/space probe·운영 파일 보존 회귀와 실제 dot-probe exporter→`dot_probe_check` host 실행을 검증했다. logger 예산16MiB+host 입력/파서/큐/runtime 보수 headroom=backend24MiB, 예제 허용32MiB. file TC-010의16MiB 프로필과 구분하고 RSS/실측 capacity로 승격하지 않는다.
+
+| 남은 수락 조건 | 담당·연결 Task | 실행 조건/현재 상태 |
+|---|---|---|
+| 지속 in-process 수집·기존 화면·off/on·실제 첫 적용 | AI / TASK-020·026 | TASK-019/021 등 통합 선행 작업 후 실제 dot-probe adapter/화면 범위 확인 및 실행. 단일 export 전달은 첫 적용 완료가 아니며 T1 미도래 |
+| PC/RT 비용·오차·LAN/RSS·UPS·장기 성능 | AI / TASK-021~024·TASK-022 승인 프로필 | 제품 통합 harness와 유효 프로필 필요. 현재 generic 기능 IO 시험만 Pass. RT 부팅/capability 미확인, 재부팅/부트 설정 변경은 기존 보류 유지 |
+| native/다른 OS 수락 | AI / GAP-004·T3 | 저장소 공개 완료 후 source hash 고정 실행. 현재 트리거 미도래; 공개 전환/CI·계정 조회·차단 재시도하지 않음 |
+
+TASK-017의 로컬 기능 구현 잔여는 처리했으나 위 통합/환경 수락은 면제되지 않는다. S3 전체·Task/MS·TC 전체와 Gate4/5를 Done/Pass로 올리지 않는다. 선택 추천 FR-015/TASK-018·무제한/임의 원격 실행·상시 서버는 추가하지 않았다. 별도 Task의 명시 DoD는 현황의 담당 경계를 설명한 것이며 완료 기준을 삭제하거나 작업 범위를 변경한 것이 아니다.

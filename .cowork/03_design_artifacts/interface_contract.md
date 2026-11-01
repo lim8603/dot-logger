@@ -684,3 +684,14 @@ TASK-004 게시 후 native CI는 GitHub 계정 결제/지출 한도로 8개 job 
 receiver `next`/완전 조립 뒤에도 원 receipt는 Pending이고 routing guard는 원본 슬롯을 보존한다. 소비 큐 `try_send` 성공 뒤 같은 연결의 ACK를 서버가 확인하고 `RemoteDelivery::poll`이 실제 완료를 게시해야 Pass다. 큐 거절/연결 종료는 Unknown·Inconclusive, 큐 인계 후 ACK 불명은 AcknowledgementUnknown과 실제 데이터 소유권을 보존한다. 취소는 Aborted, 운영/형태/transport 오류는 별도 Err/CLI4이며 성공으로 치환하지 않는다. CLI preview/Pass0·불충분3이다. 부모 client/stream·hub/server 실제 close를 기다린 뒤 외부 예약 반환과 원본 회수를 관측한다.
 
 [EV-034](../05_verification/verification_evidence.md#ev-034)는 실제 app export·생산 모듈·실제 loopback socket/큐 ACK의 **단일 snapshot** 근거다. `CheckHost`/RunCheck의 routed backend 등록·remote 관리 권한 연결은 후속이며 §15.5의 file backend 의미는 바꾸지 않는다. dot-probe 내장 수집/화면·off/on·장비 capacity/LAN/PC/RT/UPS/장기/native·TASK-020/026 전체를 수락하지 않고 T1 첫 적용 완료도 선언하지 않는다. core/RT/unsafe·공개 wire/오류/완료 계약·아키텍처 변경이 없어 새 ADR 승격 대상이 아니다.
+
+
+### 15.7 TASK-017 고정 routed RunCheck — 2026-11-01
+
+- `CheckHost::register_routed(plan, target, Box<dyn RoutedCheckBackend>, source)`는 기존 고정 슬롯/checked 단일 사용 ID를 공유한다. file/routed source 검증은 같은 기준이며 revision·environment·workload·target·boundary·원 Report 재구성이 일치해야 한다. 원 source session/clock/profile는 전용 check session과 구분한다.
+- 새 trait은 신뢰된 일반 경로 host 확장점이다. `target_id`·실제 retained input을 포함한 `required_memory_bytes`를 등록 시 대조하고 단일 worker·LoopbackOnly·ReceiverAcknowledged를 요구한다. 원격 요청이 backend나 입력/경로를 생성하지 않는다. file `run`과 routed `run_routed`의 잘못된 타입 호출은 실행 없이 capability를 보존한다. 명시적인 실행의 preflight 실패/취소는 기존처럼 단일 사용이다.
+- client `diagnostics::SnapshotCheck`는 host-owned dot-probe export≤64KiB 한 건·target10·2초 admission/24MiB 요구량으로 실제 production capture/routing→TCP/gRPC→유한 소비 큐→ACK→원 receipt 완료·raw 회수·실제 종료/외부 예약 반환을 수행한다. 예제 허용32MiB는 제품 기본값이 아니다. 파일 IO0, network/RSS/capacity/freshness/boot ID는 미측정이다. 메모리 선언은 process RSS hard limit이 아니다.
+- 동일 session/revision과 host 원 monotonic clock으로 capture metadata를 만든다. 실제 시계/취소를 capture와 handoff 직전에 다시 관측한다. 정리까지 흐른 시간을 새 부하가 기한을 넘었다는 근거로 쓰지 않는다. 최초 시계 오류는 원 OS error·빈 구간/수집0의 Fail이며, 실행 중 오류도 이미 수락한 receipt/카운터를 지우지 않는다.
+- `handle_command`는 기존 Read/Manage·응답4096B headroom preflight·command permit·취소 관측을 양쪽 backend에 적용한다. native 반환은 `HostCheckEvidence::File(CheckEvidence)` / `Routed(RoutedCheckEvidence)`이며 summary의 scope를 구분한다. transport wire 변경은 없다. remote waiter 종료 후에도 native evidence는 실제 정리 뒤 반환한다.
+- 동기 host는 Tokio 밖 일반 worker에서 실행한다. 기존 async host는 별도 일반 worker를 사용해야 하며 중첩 runtime 호출은 panic 대신 오류다. 이 API는 상시 worker/데몬을 생성하지 않는다. 기존 file backend·별도 explicit bridge 예제도 유지한다.
+- 계약 검증: [EV-035](../05_verification/verification_evidence.md#ev-035). 지속 실앱/기존 화면/off-on(TASK-020/026), PC/RT 비용/오차·UPS/장기(TASK-021~024), 공개 후 native(T3)는 이 기능 시험의 수락 범위 밖이며 전체 완료 조건에서는 유지한다.

@@ -29,7 +29,7 @@
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-10-31 | EV-029 범주·이력 복구 수락/REV-025 Closed; 비용/실측/native 후속 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 정렬 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | EV-030 로컬 수락·REV-028 Closed/EV-031; backend/실앱/실측/native 후속 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |
-| TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | S3 생산 모듈/실제 ACK·dot-probe export snapshot EV-034 수락; routed host·지속 수집/화면·실측/native 후속 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
+| TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | 고정 routed RunCheck 로컬 구현/기능 검증 EV-035; 지속 앱/화면 TASK-020/026·통합 실측·native(T3) 수락 대기 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
 | TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | unknown hardware와 사용자 고정 설정에서 과신 추천/자동 적용 금지 | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 동일 timestamp 충돌·timeout 이후 unknown·부분 batch 오류 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 일반 tracing을 RT 경로로 사용하지 않음·화면 client 데이터 흐름 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
@@ -53,3 +53,5 @@ TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consume
 2026-10-31 #011 종료: Human 「다음 세션에서 TASK-015 시작하자」로 다음 세션 착수 승인. TASK-015는 Planned/미착수 유지, 선행 TASK-008/014 로컬 수락 근거로 재개하고 native/실측·Gate4/5 미완료는 유지한다.
 
 2026-10-31 #012: TASK-015 리포트·용량 근거·분리된 버퍼/디스크/보존 계산을 EV-028 source100개/검사13개·Miri168·소스a247d01로 위임 로컬 수락했다. [REV-024](../05_verification/reviews/REV-024_TASK-015_REPORT.md) RV-056~059 Closed. 실제 PC/RT/native·실앱 검증과 TASK-016/017은 후속이다.
+
+- 현재(2026-11-01 #008): TASK-017 고정 routed RunCheck·원 source·기존 CLI 권한/취소·실제 exporter host 실행은 EV-035/REV-033. 로컬 기능 구현 잔여 완료, 별도 통합/실측/native 수락 조건은 유지하여 In Progress다.

@@ -4,20 +4,20 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger — 간편 점검 S3 생산 모듈/실제 ACK·실앱 snapshot 연결, 지속 통합/실측 후속 |
+| 프로젝트 | dot-logger — 고정 routed RunCheck 로컬 기능 구현 완료, 통합 수락 대기 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-017 S3 raw/routing·ACK·실앱 snapshot EV-034 수락, MS-005 진행 |
+| 현재 Phase | Build — TASK-017 고정 routed RunCheck EV-035 수락, MS-005 진행 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-005 In Progress — 운영 계측, MS-004/007은 native·실앱/실측 후속 |
-| 활성 Task | TASK-017 In Progress — S3 snapshot/loopback ACK 수락, routed host·지속 수집/화면·실측 후속 |
-| 미처리 리뷰 | 없음 — REV-032 S3 생산 모듈/snapshot 개발 자가 점검 Closed(EV-034) |
+| 활성 Task | TASK-017 In Progress — 로컬 기능 구현 완료; 지속 앱/화면·통합 실측/native 수락 대기 |
+| 미처리 리뷰 | 없음 — REV-033 고정 routed host 개발 자가 점검 Closed(EV-035) |
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #007 종료 / AI |
-| 세션 상태 | 종료 — Human 「세션 마무리」. S3 첫 단위 수락 유지, routed RunCheck 통합 후속 |
-| 최근 세션 | [2026-11-01 #007](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md) — TASK-017 생산 모듈/ACK·실앱 snapshot |
+| 갱신 | 2026-11-01 / #008 작업 단위 수락 / AI |
+| 세션 상태 | 작업 단위 수락 — TASK-017 로컬 기능 잔여 처리, 통합/환경 수락 조건 유지 |
+| 최근 세션 | [2026-11-01 #008](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md) — TASK-017 고정 routed RunCheck·잔여 조건 정리 |
 
 ## 현재 결정과 제약
 
@@ -40,7 +40,7 @@
 
 - **TASK-016 로컬 계약:** EV-030/source542c6e6·source102개·검사10개·Miri496·소스/commit blob102개 일치, REV-027 개발 자가 점검 Pass/Closed·위임 수락. 명시 enable/preview/validate/apply와 두 bank·posted/per-producer ack·old accepted cutoff/완료/실제 raw·Delivery guard 해제 뒤 회수, Busy/Conflict/checked revision을 사용한다. level/Normal sampling/기존 target route만 live 변경하며 Important sampling 우회·같은 raw loan·과거 수락 route를 보존한다. 전환 Sample은 RevisionTransition, 혼합 revision Window 금지. Comparison은 원래 Report/profile/revision/구간·입력/장비/boundary/측정 scope 차이와 skip/거절/출력 손실을 분리한다. 단일 revision 파일은 명시 budget/별도 writer다. 운영 backend/CLI runtime/자동 worker·실앱/실제 PC·RT 비용/오차/native는 후속. [TASK-016](../04_implementation/tasks/TASK-016.md)·[API §15.2](../03_design_artifacts/interface_contract.md#152-task-016-로컬-설정-변경전후-비교--2026-11-01).
 
-- **TASK-017 현재 계약:** S1/S2·S3 host/CLI는 EV-031~033·REV-029~031 Closed. 고정 host/단일 사용·read/manage·실제 IO 종료/정리·원 Report/profile·Linux probe 계약은 유지한다. [EV-034](../05_verification/verification_evidence.md#ev-034)/[REV-032](../05_verification/reviews/REV-032_TASK-017_ROUTED_BRIDGE.md)로 실제 raw capture/routing→TCP receiver 큐/ACK→원 receipt 완료·raw/외부 예약 반환 및 dot-probe export snapshot1618B를 연결했다. 단일 snapshot/loopback 예제이며 routed RunCheck 등록·지속 수집/화면·off/on·PC/RT/UPS/장기/native(T3)/다른 OS 후속, capacity/freshness/RSS 추정 없음. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.6](../03_design_artifacts/interface_contract.md#156-task-017-s3-생산-모듈dot-probe-export-snapshot-연결--2026-11-01).
+- **TASK-017 현재 계약:** EV-031~034·REV-029~032 수락에 [EV-035](../05_verification/verification_evidence.md#ev-035)/[REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md)를 추가했다. `CheckHost`의 고정 File/Routed 슬롯·단일 사용·원 source 검증·Read/Manage/응답 preflight·native evidence를 유지한다. client `SnapshotCheck`가 host-selected≤64KiB 한 건을 실제 raw/routing→TCP 수신 큐/ACK→원 receipt 완료·원본/예약 회수로 연결한다. host 원 session/revision/mono clock과 source Report/profile는 분리 보존한다. 예제2초/요구24MiB·허용32MiB, 물리 쓰기0이며 capacity/freshness/LAN/RSS 미측정이다. 로컬 기능 구현 잔여는 처리했으나 지속 수집/기존 화면/off-on(TASK-020/026)·통합 PC/RT/UPS/장기(TASK-021~024)·공개 후 native(T3)/다른 OS는 미수락이다. 전체 Task In Progress·TC Partial 유지. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.7](../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01).
 
 - **TASK-022 승인 기준:** local-pc-v1의10ms 주기/기한·500µs 합성 연산·2GiB·P3 120초×3회·160GiB cap/64GiB reserve·UPS 모의3초/8·64MiB는 Human 승인 완료다. [EV-021](../05_verification/verification_evidence.md#ev-021)은 프로필 준비/승인 근거이며 실제 성능/RT/UPS는 NotRun이다.
 
@@ -73,7 +73,7 @@
 | TASK-014 | 운영 계측·유한 집계 | AI | In Progress | 2026-10-31 | EV-029 거절 범주·이력 복구 조치 수락/REV-025 Closed; 비용≤5%·PC/RT/native 후속 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 출력 정렬 조치 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 |
 | TASK-016 | revision 설정 변경과 전후 비교 | AI | In Progress | 2026-11-01 | EV-030 로컬 수락·REV-028 조치 Closed/EV-031; 운영 backend/실앱·PC/RT/native 후속 |
-| TASK-017 | 예산 제한 간편 점검 | AI | In Progress | 2026-11-01 | S3 생산 모듈/실제 ACK·실앱 snapshot EV-034 수락; routed host·지속 수집/화면·실측/native 후속 |
+| TASK-017 | 예산 제한 간편 점검 | AI | In Progress | 2026-11-01 | 고정 routed RunCheck EV-035로 로컬 기능 잔여 처리; 지속 앱/화면·통합 실측/native 수락 대기 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -91,18 +91,19 @@
 | [REV-030](../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) | TASK-017 S2 합성 파일 실행/정리 개발 자가 점검 | Closed | Pass·신규 미해결 RV 없음, EV-032/1cae3b9·S2 로컬 수락·운영/생산/실측 후속 |
 | [REV-031](../05_verification/reviews/REV-031_TASK-017_CHECK_HOST.md) | TASK-017 S3 로컬 운영 host·CLI 개발 자가 점검 | Closed | RV-066~068 probe 기한/CLI exit/원 source session 조치, EV-033·로컬 연결 수락 |
 | [REV-032](../05_verification/reviews/REV-032_TASK-017_ROUTED_BRIDGE.md) | S3 생산 모듈/실제 ACK·실앱 snapshot 개발 자가 점검 | Closed | 신규7개·두 Rust workspace 각364/EV-034, 미해결 지적 없음 |
+| [REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md) | 고정 routed host·원 source/CLI 권한·시계 개발 자가 점검 | Closed | RV-069 호스트 deadline·RV-070 초기 OS 원인 보존 Red→Green, EV-035·기능 수락 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **고정 host의 routed RunCheck 등록/출처 연결을 이어간다.** EV-034·REV-032 Closed로 실제 raw capture/routing·loopback 수신 큐/ACK·dot-probe tick export snapshot 첫 단위를 수락했다. CheckHost/RunCheck는 아직 EV-033 file backend이며 snapshot 예제를 운영 backend로 간주하지 않는다.
-2. **미처리 리뷰 없음.** 실제 dot-probe in-process 지속 수집·기존 화면·off/on 비교 및 전체 첫 적용(TASK-020/026)은 후속이다. T1 첫 적용 완료는 미도래이며 export freshness/boot ID·capacity/RSS/LAN 성능은 Unavailable이다.
-3. ApplyConfig/Compare 운영 backend·자동 worker, RV-049/TASK-022·RV-053/TASK-020, PC/RT 비용/오차·UPS/장기·native(T3), TC/MS 전체·Gate4/5는 미완료다. FR-015/TASK-018·임의 remote 경로/무제한 실행은 도입하지 않는다. T2/T3도 미도래다.
+1. **TASK-017 로컬 기능 잔여는 EV-035로 처리했다.** 고정 routed RunCheck·원 source·CLI 권한/취소/단일 사용·실제 앱 export host 실행을 수락했다. file/bridge도 유지하며 미처리 리뷰는 없다.
+2. **통합/환경 수락 대기다.** 지속 수집/화면/off-on(TASK-020/026)은 TASK-019/021 등 선행 구현이 필요하다. 단일 snapshot은 첫 적용 완료가 아니며 T1 미도래다.
+3. 설정/비교 운영 backend·worker, RV-049/TASK-022·RV-053/TASK-020, PC/RT 비용/오차·UPS/장기·TC/MS·Gate4/5는 미완료다. RT 부팅/capability·공개 후 native(T3) 조건 유지. T2/T3 미도래, FR-015/TASK-018·임의 remote 경로/무제한 실행은 미착수다.
 
 ## 승인·재개 제약
 
-기존 구현·검증·수락·작업 전환·작업 단위별 커밋/푸시 위임은 유지한다. 새 범위·공개 전환·선택 기능 자동 착수로 확대하지 않는다. native 공개 후(T3)·PC/RT/UPS/실앱·설정/비교·routed 점검 backend·지속 실앱 통합·Gate4/5 미완료 조건은 유지한다. 상세 승인/이전 에디터 진단 정정·과거 재개 메모는 [상태 아카이브](state_archive.md)의 #014 이관과 관련 Task/API를 따른다. 개발1.96.0·MSRV1.85·Miri nightly-2026-10-26 고정, 전역 rustup default/사용자 에디터 설정은 변경하지 않는다.
+기존 구현·검증·수락·작업 전환·작업 단위별 커밋/푸시 위임은 유지한다. 새 범위·공개 전환·선택 기능 자동 착수로 확대하지 않는다. native 공개 후(T3)·PC/RT/UPS/실앱·설정/비교·지속 실앱 통합·Gate4/5 미완료 조건은 유지한다. 상세 승인/이전 에디터 진단 정정·과거 재개 메모는 [상태 아카이브](state_archive.md)의 #014 이관과 관련 Task/API를 따른다. 개발1.96.0·MSRV1.85·Miri nightly-2026-10-26 고정, 전역 rustup default/사용자 에디터 설정은 변경하지 않는다.
 
 ## 선택 로딩
 
@@ -149,9 +150,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-01 #007: TASK-017 S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
-- 2026-11-01 #006: TASK-017 S3 로컬 운영 host/free probe·원 Report/profile·CLI를 수락하고 Human 요청으로 종료, 생산/실앱·실측 후속을 남겼다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_006.md)·[EV-033](../05_verification/verification_evidence.md#ev-033).
-- 2026-11-01 #005: TASK-017 S2 파일 실행/정리를 로컬 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_005.md)·[EV-032](../05_verification/verification_evidence.md#ev-032).
-
+- 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 통합/환경 수락 잔여를 정렬했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md)·[EV-035](../05_verification/verification_evidence.md#ev-035).
+- 2026-11-01 #007: S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

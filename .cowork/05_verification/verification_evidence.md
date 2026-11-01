@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~034 |
+| 버전 | 2026-11-01 / EV-001~035 |
 
 ---
 
@@ -737,12 +737,23 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** workspace/all-features364개, MSRV workspace364개, fmt/clippy(-D warnings)/rustdoc(-D warnings)/protocol·client core 의존 격리 Pass. 실제 preview(없는 path/무접근)0·실제 export run0, 미존재 source/사용법 오류4. 검사11개 exit0 또는 기대 exit4. 결과/로그는 위 JSON과 인접 파일에 보존한다.
 - **수락 한계:** 별도 실행 export snapshot/loopback ACK 예제다. CheckHost/RunCheck는 EV-033 file backend를 유지하며 routed 운영 backend 등록·상시 in-process capture/화면·off/on 비교·TASK-020/026 전체 적용은 후속(T1 미도래). logger budget16MiB·슬롯1·2초 admission/3초 settlement 선언은 전체 RSS/OS IO hard deadline이 아니다. freshness/boot identity·capacity/network/RSS Unavailable, LAN·PC/RT 비용/오차·UPS/장기·native(T3)/다른 OS·새 Miri 실행을 Pass로 바꾸지 않는다.
 
+<a id="ev-035"></a>
+## EV-035 — TASK-017 고정 routed RunCheck·원 source/CLI 연결
+
+- **판정:** 로컬 기능 구현/시험 Pass·기존 위임 수락, [REV-033](reviews/REV-033_TASK-017_ROUTED_HOST.md) Closed. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.7](../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01). 로컬 기능 잔여 처리 완료이며 통합/환경 수락이 남아 Task In Progress·TC-010 Partial·Gate4/5 Not Ready 유지.
+- **대상/환경:** 2026-11-01 #008 AI·Linux7.0.0-42-generic·Rust1.96/MSRV1.85. [명령/원문/소스 hash·commit](../06_evolution/imported_context/task_017_host_2026-11-01/results.json)에서 최종 검사(`checks`)와 자가 점검 전/중 보조 검사(`pre_review_checks`)를 구분한다. 소스 `56e7b9a`의109개 hash/commit blob 일치 확인. RT/원자성/unsafe·wire·dot-probe 제품 코드 변경 없음. 기존 고정 serde_json을 client remote 선택 의존으로 사용한다.
+- **Red→Green:** routed API 부재 compile Red; RV-069 호스트 시계가2초 넘었는데 accepted1인 실패 → capture/handoff 직전 원 clock admission 검사로 accepted0/Inconclusive·TimeBudget. RV-070 최초 errno13 소실 → 원 OS 오류/Observation·Fail·from/to None·수집0. raw/구독/소비 큐의 bounded 소유권·원 receipt·실제 종료를 확인했다.
+- **최종 검사:** Rust1.96 및 MSRV1.85 workspace/all-features **각374개**(문서 시험 포함), fmt/clippy(all-targets/all-features 및 core-only `-D warnings`)/rustdoc/protocol Pass. 신규 client7개·CLI3개, 기존 bridge7개·file/CLI/RT allocator 회귀 포함. 선택 의존 격리·무경로 preview0·없는 입력 run4·실앱 host/기존 bridge run0도 최종 코드에서 확인했다. 자가 점검 전/중 두 Rust16 feature 조합은 보조 이력이며 최종 코드의374개 회귀와 구분한다. 새 Miri/native 실행은 없음.
+- **원 source·권한·정리:** 고정 File/Routed 슬롯·단일 사용 ID, 원 Report/profile·foreign 조건/target/network/worker/boundary·메모리 요구량 검증. Read plan/Manage run, reply headroom 부족 시 무실행/ID 보존, remote waiter timeout 후 무수집/Aborted·native evidence·재사용 Gone. 기존 file scope/실제 free probe·전용 경로·운영 파일 불변도 회귀했다.
+- **실제 앱:** dot-probe269d348의 robot-serve를 빌드·격리 data/loopback ephemeral peer로2초 실행, SIGTERM/wait exit0. [새 원문1627B](../06_evolution/imported_context/task_017_host_2026-11-01/app_ticks.json)→`dot_probe_check`의 CheckHost/실제 raw/routing/TCP 큐/ACK에서 accepted1/ack1/Complete·raw회수1/external0/physical write0. 기존 명시 bridge도 같은 입력으로 Pass. 앱 저장소는 clean 유지, 첫 적용 완료가 아니며 T1 미도래.
+- **한계/미수락:** host-selected≤64KiB 단일 snapshot/loopback scope·2초 admission·logger16MiB+보수 host headroom=backend24MiB·예제 허용32MiB이며 RSS/OS IO hard limit·capacity/LAN 측정이 아니다. source freshness/boot identity·capacity/network/RSS Unavailable 유지. 지속 앱/기존 화면/off-on은 TASK-020/026의 선행 작업, PC/RT 비용/오차·UPS/장기는 TASK-021~024 통합 harness/RT 부팅, native/다른 OS는 공개 완료(T3) 조건이 남아 있다. Task 완료 기준을 삭제하거나 Pass로 대체하지 않는다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033 운영 free probe/host·EV-034 생산 모듈/실앱 snapshot 수락, routed 운영 backend·지속 실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
@@ -786,3 +797,5 @@ Human 「승인, 다음작업 진행하자」로 직전 승인 보고 3묶음을
 Human 세션 마감 및 커밋/푸시 요청으로 소스 `5f0ad83d171bcc1553691ed17d25f5b71ab1fac7`를 origin/main에 게시했다. EV-022 source70개/검사11개·Miri48·원본/뷰16쌍 hash 및 commit blob70개 일치를 재확인해 성공 시험은 반복하지 않았다. [커밋 근거](../06_evolution/imported_context/task_012_2026-10-31/commit.json)·[소스 게시 근거](../06_evolution/imported_context/task_012_2026-10-31/source-push.json). 앞선 미커밋/미게시 표기는 검증 당시 이력이다. 검증/승인/마감 문서는 별도 [skip ci] 커밋으로 게시하고 최종 문서 HEAD와 두 상태 파일의 원격 blob 일치는 세션 로그에 기록한다.
 
 REV-018 Resolved·TASK-012 최종 구현 Human 리뷰 대기, Task/MS In Progress·Yellow·Gate4/5 Not Ready와 TASK-022 수치 승인/제품 성능 NotRun을 유지한다. native/CI는 공개 후(T3), 실제 LAN/전체RSS/운영 backend/CLI·실앱/PC 실측/UPS는 후속이다. 상시 서버·새 Task·배포·계정/과금/CI 조회나 차단 재시도는 수행하지 않았다.
+
+- 현재(2026-11-01 #008): TASK-017 고정 routed RunCheck·원 source/CLI 권한·시계/취소·실제 exporter host 실행은 EV-035/REV-033 Closed로 수락. 로컬 기능 잔여 완료, Task In Progress/통합·환경 수락 대기는 유지.

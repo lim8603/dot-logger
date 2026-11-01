@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-005 In Progress — 운영 계측, MS-004/007은 native·실앱/실측 후속 |
 | 활성 Task | TASK-016 In Progress — EV-030 로컬 수락·운영 backend/실앱/PC·RT/native 후속; 다음 후보 TASK-017 |
-| 미처리 리뷰 | 없음 — REV-001~027 Closed. REV-027 TASK-016 개발 자가 점검 Pass/위임 로컬 수락; RV-049/TASK-022·RV-053/TASK-020 후속 |
+| 미처리 리뷰 | REV-028 Open — TASK-016 독립 코드리뷰 Pass (P3 2건: RV-063 유휴 생산자 poll 안내, RV-064 과도기 윈도우 배제 지침) |
 | 상태 | Yellow — 클라이언트/계측 로컬 수락, 운영 backend/실앱·비용/PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #002 종료 / AI |
-| 세션 상태 | 종료 — 2026-11-01 Human 「세션 마무리」. TASK-016 로컬 수락·REV-027 Closed, 다음 TASK-017 Planned/미착수 |
+| 갱신 | 2026-11-01 / #003 리뷰 세션 / AI |
+| 세션 상태 | 리뷰 세션 완료 — 2026-11-01 TASK-016 REV-028 독립 코드리뷰 Pass (Open, P3 2건) |
 | 최근 세션 | [2026-11-01 #002](../members/lim8603/workspace/session_logs/session_2026-11-01_002.md) — TASK-016 설정 변경/비교·EV-030·REV-027 Closed |
 
 ## 현재 결정과 제약
@@ -83,6 +83,7 @@
 | [REV-025](../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) | TASK-014/015 독립 리뷰 P2 1·P3 2 | Closed | EV-029/eaf736c·검사14개/Miri224·source101개 blob일치, 기존 위임 수락 |
 | [REV-026](../05_verification/reviews/REV-026_TASK-015_RV-060-062_REVIEW.md) | TASK-015 RV-060~062 조치·후속 형상 검증 | Closed | Pass (P1/P2/P3 0건), RV-060~062 조치 및 계약·RT 안전성 확인 완료, 수락 마감 |
 | [REV-027](../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) | TASK-016 설정/비교 개발 자가 점검 | Closed | EV-030/source542c6e6·검사10개/Miri496·source102개 blob일치·위임 로컬 수락 |
+| [REV-028](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md) | TASK-016 독립 코드리뷰 P3 2건 | Open | Pass (P1/P2 0건, P3 2건 RV-063/064), 제품 코드 미수정, 후속 개발 세션 조치 예정 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다. 과거 Resolved 상태와 현재 Closed를 혼동하지 않는다.
 
@@ -141,6 +142,8 @@
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
+
+- 2026-11-01 #003: TASK-016(`dd8680f..542c6e6`) 독립 Read-Only 코드리뷰. fmt/clippy/workspace test Pass. REV-028 Open (Pass, P3 2건 RV-063/064), 제품 코드 미수정 — [리뷰](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md).
 
 - 2026-11-01 #002: TASK-016 EV-030/source542c6e6·source102개·검사10개·Miri496·REV-027 Closed·기존 위임 로컬 수락. 다음 TASK-017 Planned/미착수 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_002.md)·[근거](../05_verification/verification_evidence.md#ev-030).
 

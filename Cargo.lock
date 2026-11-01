@@ -243,6 +243,7 @@ dependencies = [
  "reqwest",
  "rtrb",
  "rustix",
+ "serde_json",
  "subtle",
  "tokio",
  "tonic",

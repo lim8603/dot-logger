@@ -4,10 +4,15 @@
 //! device / channel namespace for this session. A per-channel high-water mark
 //! rejects equal and older real timestamps across all producers and batches.
 //! Restarting a writer does not discover existing DB points. No raw payload,
-//! file IO, spool, worker, query or exactly-once guarantee is provided here.
+//! file IO, spool, worker or exactly-once guarantee is provided here. Numeric
+//! queries use fixed scope, finite response/row/time limits and no retries.
+mod numeric;
 use crate::{
     capture::CaptureReceipt,
     query::{QueryBudget, Reservation},
+};
+pub use numeric::{
+    NumericPage, NumericPoint, NumericQuery, NumericScope, NumericValue, QueryError,
 };
 use reqwest::{
     Client, Url,

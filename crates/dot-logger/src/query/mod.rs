@@ -111,6 +111,17 @@ pub(crate) struct Reservation {
     state: Arc<Ledger>,
     bytes: usize,
 }
+#[cfg(feature = "influxdb")]
+impl Reservation {
+    // Reserve from the same session authority, including after its public handle
+    // is dropped. Every sibling owns its own charge until its actual Drop.
+    pub(crate) fn reserve_extra(&self, bytes: usize) -> Result<Self, QueryError> {
+        QueryBudget {
+            state: Arc::clone(&self.state),
+        }
+        .reserve(bytes)
+    }
+}
 impl Drop for Reservation {
     fn drop(&mut self) {
         self.state.used.fetch_sub(self.bytes, Ordering::Release);

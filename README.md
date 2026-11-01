@@ -154,4 +154,15 @@ filesystem 여유 변화는 다른 관측입니다. `NoGrowth`는 양의 증가�
 - HTTP 204는 API `Acknowledged`입니다. 400/422 부분 실패·응답 단절/timeout·진행 취소는 `Unknown`, 미시도 취소는 `NotSent`입니다. 재시도는 같은 encoded body를 사용합니다. HTTPS 또는 literal loopback HTTP, redirect/proxy/암묵 retry off, token은 sensitive header로만 유지하며 서버 오류 body를 보고서에 넣지 않습니다.
 - 공유 예약은 HTTP가 소유한 body의 마지막 해제까지 유지합니다. 이전 body가 남으면 `Busy`로 다음 배치를 막습니다. HTTP/TLS/runtime 내부와 OS/RSS는 별도 headroom이며, 원격 IO 취소/rollback을 추정하지 않습니다.
 
-현재 TCP 대역 시험은 실제 DB write/query 수락을 대신하지 않습니다. 배포 버전 pin·제한 수치 query·실제 DB 대조·Router Delivery/완료 연결·파일 장애 격리 계측·실앱/native는 후속입니다. [TASK-019](.cowork/04_implementation/tasks/TASK-019.md)·[API §14.6](.cowork/03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).
+S2는 OSS2.9.1/Linux amd64 digest 고정 DB에서 write/query를 대조했습니다. Router Delivery/완료 연결·파일 장애 격리 계측·실앱/native는 후속입니다. [TASK-019](.cowork/04_implementation/tasks/TASK-019.md)·[API §14.6](.cowork/03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).
+
+
+`Writer::query_numeric(NumericQuery, &AtomicBool)`은 고정 numeric 채널의 `[from_ns,to_ns)`를 조회합니다. max_rows≤1024·응답≤1MiB·request timeout/TTL·cancel을 적용하고, 원 session/measurement/device/channel·receipt·Unix ns·typed value를 `NumericPage`에 보존합니다. 행/bytes 상한·손상/late-error·부분 응답·기한 초과는 전체 실패이며 일부 결과를 성공처럼 반환하지 않습니다. 별도 query 예약은 Page와 실제 HTTP body 마지막 소유자까지 유지됩니다. DB engine의 CPU/RAM hard cap이나 원격 rollback을 뜻하지 않습니다. [API§14.7](.cowork/03_design_artifacts/interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01).
+
+재현 가능한 실제 DB 기능 시험(임시 loopback container·일회 credential·자기 자원 정리):
+
+```sh
+python3 scripts/check-influxdb.py --toolchain 1.96.0 --output /tmp/dot-logger-influx-check
+```
+
+Docker 접근/고정 image 다운로드가 필요합니다. 일반 `cargo test`에서는 실제 DB 시험3개를 명시 ignore하며 위 harness가 별도로 실행합니다. 기존 DB/volume/설정은 사용하지 않습니다. fixture/기능 성공을 파일 격리·실앱·장기/RT/성능/native 수락으로 확대하지 않습니다.

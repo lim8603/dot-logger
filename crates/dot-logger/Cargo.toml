@@ -8,7 +8,7 @@ publish.workspace = true
 [features]
 default = []
 remote = ["dep:tonic", "dep:tokio", "dep:subtle", "tonic/tls-ring"]
-influxdb = ["dep:reqwest", "dep:tokio", "dep:bytes"]
+influxdb = ["dep:reqwest", "dep:tokio", "dep:bytes", "dep:serde_json"]
 tracing-adapter = ["dep:tracing", "dep:log"]
 compression-zstd = ["mcap/zstd"]
 
@@ -20,6 +20,7 @@ tonic = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 subtle = { workspace = true, optional = true }

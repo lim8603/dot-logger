@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-006 In Progress — DB/외부 연동; MS-002~005/007 검증 후속 |
 | 활성 Task | TASK-019 In Progress — S1~S3 로컬 수락·통합/환경 대기; 다음 후보 TASK-020 |
-| 미처리 리뷰 | 없음 — REV-034~037/RV-071~078 Closed |
+| 미처리 리뷰 | [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) (Open) — TASK-019 InfluxDB v2 어댑터 독립 코드리뷰 (P3 2건) |
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #012 종료 / AI |
-| 세션 상태 | 종료 — Human 「세션 마무리」. TASK-019 로컬 수락·통합/환경 대기, 다음 후보 TASK-020 |
-| 최근 세션 | [2026-11-01 #012](../members/lim8603/workspace/session_logs/session_2026-11-01_012.md) — TASK-019 S3 원 Delivery/완료·파일 격리 |
+| 갱신 | 2026-11-01 / #013 종료 / AI |
+| 세션 상태 | 종료 — Human 「리뷰 세션 마무리」. REV-038 등록, 다음 후보 TASK-020 |
+| 최근 세션 | [2026-11-01 #013](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md) — TASK-019 독립 코드리뷰(REV-038) |
 
 ## 현재 결정과 제약
 
@@ -95,6 +95,7 @@
 | [REV-035](../05_verification/reviews/REV-035_TASK-019_INFLUX_WRITE.md) | TASK-019 S1 개발 자가 점검 | Closed | RV-073 타입별 field·RV-074 HTTP body 예약 수명·EV-037 로컬 수락 |
 | [REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md) | TASK-019 S2 개발 자가 점검 | Closed | RV-075 query dialect·실제 DB/typed query EV-038 수락 |
 | [REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) | TASK-019 S3 개발 자가 점검 | Closed | RV-076 terminal 복구·RV-077 초기 cancel·RV-078 proxy 자식 합류·EV-039 수락 |
+| [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) | TASK-019 InfluxDB v2 어댑터 독립 코드리뷰 | Open | RV-079(RoutedWriter 선행조건 doc)·RV-080(NumericQuery time 범위 doc) 조치 대기 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
@@ -153,10 +154,10 @@
 
 ## 최근 작업·이력
 
+- 2026-11-01 #013: TASK-019 InfluxDB v2 어댑터 독립 코드리뷰를 수행하여 Pass 판정 및 REV-038(Open)을 등록했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md).
+
 - 2026-11-01 #012: TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037로 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_012.md).
 
 - 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_011.md).
-
-- 2026-11-01 #010: REV-034 P3 조치·EV-036와 TASK-019 S1 유한 write·EV-037/REV-035를 위임 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_010.md).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

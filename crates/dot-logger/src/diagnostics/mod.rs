@@ -1,10 +1,18 @@
-//! Load-free check planning and caller-driven physical write admission.
+//! Load-free check plans and explicitly requested synchronous file checks.
 //!
-//! These general-path primitives neither run a check nor produce Pass/Fail or
-//! validated capacity. No filesystem access, clock reads, workers or network are
-//! triggered by `CheckPlan::build` or `CheckPlan::write_allowance`.
-//! The host must separately verify directory ownership/symlinks, runtime memory
-//! reservations, output capabilities and receiver identity before explicit run.
+//! `CheckPlan::build`/`write_allowance` perform no IO, clock reads, worker startup
+//! or network work. `CheckPlan::run_file` explicitly exercises a finite synthetic
+//! product-MCAP file in a dedicated namespace, then syncs, closes and cleans it.
+//! Results cover only the declared file scope, not capture/routing/remote work,
+//! hardware capacity, RT, UPS or long-duration behavior. The host supplies a real
+//! space probe, cancellation and a stable exclusively controlled trusted parent.
+mod file;
+mod run;
+pub use run::{
+    CheckIssue, CheckOutcome, CheckReport, CheckRuntime, CheckStage, CheckStartError, CheckStop,
+    FileCheck, FileCheckRuntime, FileWorkload,
+};
+
 use crate::completion::Boundary;
 use std::path::{Component, PathBuf};
 

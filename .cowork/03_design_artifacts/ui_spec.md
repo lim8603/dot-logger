@@ -44,7 +44,7 @@ Rust 클라이언트는 같은 결과 타입을 반환하며 dot-probe가 자체
 
 EV-025/REV-021로 Rust native client/server·CLI·offline query/timed replay·read-only source·Query/Blob→remote Replay 제어·Ctrl-C·stdout 인계 후 ACK·Gap/Unknown·권한/만료/한도 경로를 로컬 검증했다. [CLI 계약/예제](../../crates/dot-logger-cli/README.md)·[Rust/화면 어댑터 계약](../../crates/dot-logger-client/README.md)을 따른다. 출력은 schema_version1 NDJSON 또는 같은 논리 결과의 human text이며 큰 정수/시각/sequence/handle은 문자열, 128bit ID는 hex다.
 
-위 명령 표는 최종 사용자 범위다. 현재 config validate는 offline session 선언/메모리 예약만 검증하고 source content/runtime capability 판정은 하지 않는다. status의 운영 지표는 Unavailable이며 0/합격으로 채우지 않는다. config apply·check run·compare는 native host proxy다. TASK-016 로컬 설정/비교 API는 API §15.2이며 이를 호출하는 운영 backend·CLI runtime 연결과 TASK-017 점검은 후속이다. check plan은 backend 전에는 Unsupported다. config diff는 유한 선언의 차이 여부만 표시하고 값을 노출하지 않는다. offline replay는 start, 실행 중 제어는 Rust API 또는 remote host 제어다.
+위 명령 표는 최종 사용자 범위다. 현재 config validate는 offline session 선언/메모리 예약만 검증하고 source content/runtime capability 판정은 하지 않는다. status의 운영 지표는 Unavailable이며 0/합격으로 채우지 않는다. config apply·check run·compare는 native host proxy다. TASK-016 로컬 설정/비교 API는 API §15.2이며 이를 호출하는 운영 backend·CLI runtime 연결과 TASK-017 S1은 API §15.3의 무부하 로컬 계획/예산 판정만 제공하며 실제 점검 실행·CLI/runtime는 후속이다. check plan은 backend 전에는 Unsupported다. config diff는 유한 선언의 차이 여부만 표시하고 값을 노출하지 않는다. offline replay는 start, 실행 중 제어는 Rust API 또는 remote host 제어다.
 
 복구는 단일 전체 immutable source·독립 create_new 출력과 file sync를 지원하고 namespace sync를 주장하지 않는다. partial active prefix recovery는 Unsupported이며 오류 출력은 조사용으로 보존한다. excluded suffix는 교체 index/summary도 포함한다.
 

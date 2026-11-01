@@ -18,7 +18,7 @@
   - `cargo test --test tc_004_storage`: 22/22 Pass
   - RT 무할당 검증: `live_revision_boundary_sampling_raw_errors_and_drop_do_not_allocate` (0, 0) Pass
 - **종합 판정:** Pass (P1 0건, P2 0건, P3 2건). RT 제약, 동시성/원자성 안전성, 공개 API 격리가 완벽히 준수됨.
-- **상태:** Open (독립 리뷰 생성)
+- **상태:** Closed — 2026-11-01 #004 개발 세션에서 Open → In Progress → Resolved → Closed. RV-063/064 수용·문서/회귀 반영, EV-031·소스5d447b4, 기존 위임 로컬 수락.
 
 ---
 
@@ -46,8 +46,8 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-063 | P3 | [`control/config_update.rs#L258-L265`](../../../crates/dot-logger/src/control/config_update.rs#L258-L265), `State::ready` | 유휴 생산자(idle producer)가 `poll_config()`나 입력을 생성하지 않으면 `p.applied`가 갱신되지 않아 후속 `apply_config`가 `RevisionBusy`로 계속 대기할 수 있음 | 의도된 2세대 메모리 보호 설계이므로 코드는 유지하되, 상위 호스트/런타임 계층에서 유휴 생산자에 대한 주기적 poll 권장사항을 운영 문서화 | 제안 (후속 개발 세션 확인) | Open |
-| RV-064 | P3 | [`telemetry/compare.rs#L154-L159`](../../../crates/dot-logger/src/telemetry/compare.rs#L154-L159), `Differences::invalid_window` | 윈도우 시간 역전 검사(`b.window.to_ns > a.window.from_ns`) 외에, 전후 비교 시 설정 변경 과도기(`RevisionTransition`) 구간이 배제되어야 함을 호스트 가이드에 명시 필요 | `tc_009_compare` 시험 및 compare rustdoc에 과도기 윈도우 배제 지침을 명확히 보강 | 제안 (후속 개발 세션 확인) | Open |
+| RV-063 | P3 | [`control/config_update.rs#L258-L265`](../../../crates/dot-logger/src/control/config_update.rs#L258-L265), `State::ready` | 유휴 생산자(idle producer)가 `poll_config()`나 입력을 생성하지 않으면 `p.applied`가 갱신되지 않아 후속 `apply_config`가 `RevisionBusy`로 계속 대기할 수 있음 | 의도된 2세대 메모리 보호 설계이므로 코드는 유지하되, 상위 호스트/런타임 계층에서 유휴 생산자에 대한 주기적 poll 권장사항을 운영 문서화 | 수용·EV-031/5d447b4 | Closed |
+| RV-064 | P3 | [`telemetry/compare.rs#L154-L159`](../../../crates/dot-logger/src/telemetry/compare.rs#L154-L159), `Differences::invalid_window` | 윈도우 시간 역전 검사(`b.window.to_ns > a.window.from_ns`) 외에, 전후 비교 시 설정 변경 과도기(`RevisionTransition`) 구간이 배제되어야 함을 호스트 가이드에 명시 필요 | `tc_009_compare` 시험 및 compare rustdoc에 과도기 윈도우 배제 지침을 명확히 보강 | 수용·EV-031/5d447b4 | Closed |
 
 ---
 
@@ -78,9 +78,9 @@
   - 제품 코드의 수정은 불필요하며, 상위 계층 통합 문서(API§15.2 및 추후 CLI/통합 가이드)에 "유휴 생산자가 존재하는 경우 `poll_config()`를 주기적으로 구동하여 revision sync를 맞춰야 `RevisionBusy`를 해소할 수 있다"는 점을 명시합니다.
 
 #### [처리담당]
-- 판정 결과: (후속 개발 세션에서 판정)
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: 수용 / Closed (2026-11-01 #004, 기존 위임에 따른 AI 수락).
+- 처리 내용: API §15.2와 `Producer::apply_pending_config()` rustdoc에 소유 worker의 유휴 주기 호출 책임·ack 갱신 없을 때 RevisionBusy·old ingress/완료/실제 guard 별도 정리 조건을 명시했다. 리뷰의 `poll_config()`는 개념적 poll이며 실제 공개 API 이름은 `apply_pending_config()`다. 자동 worker/강제 회수는 추가하지 않았다.
+- 검증 근거: [EV-031](../verification_evidence.md#ev-031)·소스5d447b4. 기존 `producer_boundaries_apply_partially_and_idle_producer_keeps_busy` 포함 설정13개·비교4개 및 workspace/all-features 회귀 Pass.
 
 ---
 
@@ -106,9 +106,9 @@
   - compare 모듈 문서 및 API§15.2에 과도기 샘플(`RevisionTransition`)이 포함된 윈도우는 자동으로 `Unavailable`이 되므로, 전후 비교 윈도우는 설정 변경 완료 후 안정화된 구간에서 수집된 리포트를 사용해야 한다는 안내를 보강합니다.
 
 #### [처리담당]
-- 판정 결과: (후속 개발 세션에서 판정)
-- 처리 내용:
-- 검증 근거:
+- 판정 결과: 수용 / Closed (2026-11-01 #004, 기존 위임에 따른 AI 수락).
+- 처리 내용: compare 모듈/Snapshot rustdoc와 API §15.2에 안정 Observed Window만 사용하고 전환 Sample을 0/임의 Window로 바꾸지 않는 호스트 절차를 명시했다. 기존 전환 시험을 안정 before → RevisionTransition → IncompleteWindow → 새 baseline 이후 안정 after → Report/Comparison 종단으로 확장했다. `tc_009_compare`에 인접 구간 허용/겹침 거절을 추가했다. Comparison이 호출자 제작 Window의 과도기 이력을 자체 재검증한다고 표현하지 않는다.
+- 검증 근거: [EV-031](../verification_evidence.md#ev-031)·소스5d447b4. 설정13개·비교4개, MSRV1.85 동일 시험·workspace/all-features·fmt/clippy/rustdoc Pass.
 
 ---
 

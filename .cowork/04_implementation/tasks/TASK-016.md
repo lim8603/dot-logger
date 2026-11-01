@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | EV-030 로컬 수락·REV-027 Closed; runtime backend/실측/실앱/native 후속, 다음 TASK-017 |
+| 다음 액션 | REV-028 RV-063/064 Closed·EV-031; runtime backend/실측/실앱/native 후속, TASK-017 S1 착수 |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -49,3 +49,5 @@
 ## 로컬 수락·후속
 
 [EV-030](../../05_verification/verification_evidence.md#ev-030)·[REV-027](../../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) Closed. source `542c6e65999de69ea8f682b4418de1c0fa730990`·검사10개/Miri496·source102개 commit blob 일치. native/운영 backend/실앱·실제 PC/RT 비용/오차 후속이 남아 Task는 In Progress, TC-009 전체 Partial·MS-005 In Progress·Gate4/5 Not Ready를 유지한다. 다음 후보 TASK-017은 Planned/미착수다.
+
+2026-11-01 #004: 독립 리뷰 REV-028 RV-063/064 수용·조치·위임 수락/Closed. 실제 poll API `Producer::apply_pending_config()`의 유휴 worker 책임·old 자원 배출 조건, 전환 표본을 비교용 Window로 만들지 않는 호스트 절차를 API/rustdoc에 명시했다. 안정 before→전환/IncompleteWindow→안정 after→Report/Comparison과 인접/겹침 경계를 검증했다. [EV-031](../../05_verification/verification_evidence.md#ev-031)·소스5d447b4. TASK-017 S1을 후속 착수했으며 기존 운영/실측/native 잔여는 유지한다.

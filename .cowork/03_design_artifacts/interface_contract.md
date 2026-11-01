@@ -596,7 +596,7 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 `CaptureOwner::enable_config_updates(&routing)`는 추적 owner와 일치하는 초기 route에 한해 scope 전에 두 고정 policy/route bank·생산자 ack/cutoff/소비 watermark·수명 계수를 control 잔여 예산에 예약한다. 채널별 샘플링 위상은 owner가 보유한 생산자별 고정 배열이다. `scope.config_updates()`의 `ConfigUpdates`는 `channel_policy(base, channel)`·`route_targets(base, channel, buffer)`로 현재 값을 읽고, `validate_config(base, &ConfigPatch)`로 실제 변경 개수·정보 손실·재시작 필요·고정 예약 bytes를 확인한다. validate는 게시/IO/자동 적용을 하지 않는다. 최소 level·양수 sample_every와 기존 target 집합 route만 live 변경하며 schema/importance mapping·생산자/target 수·풀/worker/긴급 계획은 고정이다. memory 변경은 dry-run에서 restart_required, apply에서 RestartRequired다. 중복/미등록/0 간격·빈 실효 변경·feedback 한도 초과는 InvalidPatch, 짧은 route buffer는 무변경 BufferTooSmall이다.
 
-`apply_config`는 관리 Mutex로 직렬화하고 base 불일치는 Conflict, 이전 세대가 남으면 RevisionBusy, 최대 revision은 RevisionExhausted로 무변경 반환한다. 게시된 u64와 `producer_revision(id)`의 per-producer ack는 별개다. 각 small/raw 제출 또는 `Producer::apply_pending_config()`가 acquire한 posted 정책으로 전환하며, idle 생산자는 직접 poll하기 전 이전 revision을 유지한다. 모든 생산자의 ack와 최종 old accepted_seq까지의 ingress 소비, old completion terminal, old RawRecord/공유 Delivery의 실제 Drop를 모두 확인한 뒤에만 이전 bank를 재사용한다. forget한 guard/idle producer의 강제 회수나 timeout 성공 추정은 없다. RT에서는 고정 배열·원자 load/store와 기존 완료 예약만 사용하고 새 lock/할당/해제/IO/clock/콜백/대기 루프는 없다. 관리 guard의 증감은 일반 경로다.
+`apply_config`는 관리 Mutex로 직렬화하고 base 불일치는 Conflict, 이전 세대가 남으면 RevisionBusy, 최대 revision은 RevisionExhausted로 무변경 반환한다. 게시된 u64와 `producer_revision(id)`의 per-producer ack는 별개다. 각 small/raw 제출 또는 `Producer::apply_pending_config()`가 acquire한 posted 정책으로 전환하며, idle 생산자는 직접 poll하기 전 이전 revision을 유지한다. 호스트는 생산자를 소유한 worker의 유휴 주기에도 `Producer::apply_pending_config()`를 호출하도록 연결한다(별도 `poll_config` API는 없음). 관리 스레드가 Producer를 동시에 만지거나 worker를 이 API가 자동 기동하는 방식이 아니다. poll이 없으면 다음 apply의 RevisionBusy가 계속될 수 있다. ack가 모두 갱신돼도 old ingress/완료/실제 guard가 남으면 Busy이므로 해당 배출·해제를 별도로 구동하고 확인한다. 모든 생산자의 ack와 최종 old accepted_seq까지의 ingress 소비, old completion terminal, old RawRecord/공유 Delivery의 실제 Drop를 모두 확인한 뒤에만 이전 bank를 재사용한다. forget한 guard/idle producer의 강제 회수나 timeout 성공 추정은 없다. RT에서는 고정 배열·원자 load/store와 기존 완료 예약만 사용하고 새 lock/할당/해제/IO/clock/콜백/대기 루프는 없다. 관리 guard의 증감은 일반 경로다.
 
 샘플링은 유효하고 level 필터를 통과한 Normal **제출 시도**의 첫 건과 매 N번째를 유지한다. 채널·생산자별 위상은 revision 전환 때 0으로 초기화하고 scope 재대여로 초기화하지 않는다. 잘못된 schema/길이/loan ownership은 생략으로 숨기지 않으며, raw 실패/생략은 같은 loan을 반환한다. Important는 샘플링을 우회하지만 명시 level 필터는 적용한다. sampling은 앱의 생성 주기/계산을 변경하지 않으며 skipped는 용량/계약/수명 거절과 별도다. 수락한 record는 그 revision과 route를 영구 보존하고 Completion slot의 revision/대상 선택을 해당 수락 시점에 고정한다.
 
@@ -606,9 +606,19 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 `telemetry::compare::Comparison::build(Snapshot, Snapshot)`은 두 Report의 profile provenance/revision/실제 Window·완료/실패/폐기/Unknown·모든 거절 범주를 보존한다. application_input_id는 로거 이전의 앱 생성 조건이며 앱에서 주기/생성 작업을 바꾸면 새 ID를 부여한다. session/epoch·장비/OS/feature·workload·앱 생성·target/완료 boundary·자원 측정 scope 차이, 겹치거나 잘못된 구간은 Differences에 모두 남기고 수치 차이는 Unavailable(IncomparableConditions)다. 서로 다른 revision 자체는 의도한 비교이므로 거절하지 않는다. Observed accepted/bytes/완료/의도적 skip/capacity 거절 시도율과 실제 주입 CPU ns/구간, latency/memory 차이는 정수 부호+u128 유리수로 계산한다. stale/미제공/예측 수치를 관측 절감으로 바꾸지 않고 Resources는 정확한 Window·측정 scope가 필요하다. 실제 CPU/메모리/지연 수집은 호스트 책임이고 처리량 감소만으로 앱 작업 절감을 주장하지 않는다.
 
+비교 호스트 지침(RV-064): 변경 전 안정 Window의 Report를 보존하고 변경 뒤 `Telemetry::window`가 `Observed(Window)`를 반환한 구간만 새 Report로 만든다. 전환 Sample의 `Unavailable(RevisionTransition)`를 0으로 바꾸거나 임의 Window로 재포장하지 않는다. 모든 ack·old record/완료·guard가 정리된 뒤 새 baseline부터 10/60/300초를 수집해야 하며, 과도기를 포함하는 window 요청은 `Unavailable(IncompleteWindow)`다. Comparison은 전달받은 Report의 원본 시간/측정 상태를 비교할 뿐 호출자가 만든 Window의 전환 이력을 재검증하지 않는다. 안정 구간끼리 시간 경계가 접하는 것은 허용되며 임의의 추가 안정화 대기시간은 도입하지 않는다.
+
 `RunCheck`는 dry-run 계획에서 시간·CPU worker 수·RAM·총 쓰기 bytes·디스크 reserve·상대 수신자·완료 경계를 먼저 보여준다. 실행은 명시 요청이다. 어느 예산이 먼저 소진되거나 운영 오류/공간 reserve 침범·취소가 오면 신규 부하를 중단하고 진행 중 IO를 정리한다. 결과는 Pass/Fail/Aborted/Inconclusive이며 짧은 점검을 24시간/UPS 검증으로 바꾸지 않는다. 사용자가 지정한 전용 시험 디렉터리만 만들고 지운다.
 
 `Compare`는 before/after의 profile/revision/window·완료/지연/손실·의도적 생략·CPU/메모리를 대조한다. 다른 장비·부하/측정 경계는 비비교 가능으로 표시한다. 입력 자체를 조절하는 코드는 사용자 앱의 책임이며 로거의 샘플링은 기록량만 바꾼다. FR-015 추천은 제안 기능으로 명시하고 자동 적용을 하지 않는다.
+
+### 15.3 TASK-017 S1 로컬 계획·예산 판정 — 2026-11-01
+
+`diagnostics::CheckPlan::build(CheckSpec)`는 시간 ns·물리 총 쓰기 bytes·RAM·disk reserve·CPU worker 수와 session/revision·장비/부하 ID·전용 절대 경로·완료 경계·수신자 범위를 보존하는 무부하 선언 검증이다. 0 시간/쓰기/RAM/worker/필요 메모리와 RAM 초과·상대/루트/상위 탐색 경로는 거절한다. `required_memory_bytes`는 plan/path·buffer/stack/metadata를 포함한 호스트의 계산 선언이며 실제 예약/측정 증명이 아니다. plan은 IO/clock/worker/network를 구동하거나 filesystem 존재·symlink/소유권·실제 예약·출력 capability를 확인하지 않는다. 경로를 삭제할 권한도 부여하지 않는다. 기본 예산값은 없으며 TC fixture를 제품 기본값으로 승격하지 않는다.
+
+`CheckPlan::write_allowance(Progress)`는 host의 실제 elapsed·물리 written+outstanding 예약 bytes·outstanding 미쓰기 예약을 차감한 최신 filesystem free·취소를 받아 신규 예약 가능한 최대 bytes를 반환한다. cancelled → reserve → time → bytes 우선순위는 같은 관측 시점의 사유 선택일 뿐 사건 선후 추정이 아니다. 물리 쓰기는 payload만이 아니라 봉투/index/footer와 최종 배출 비용을 포함하고 삭제 bytes를 누적 총 쓰기에서 빼지 않는다. 호스트는 예약을 직렬화하고 indivisible write가 allowance를 넘지 않도록 하며, finalization 예산을 먼저 남긴다. 계산은 stateless이며 실제 공간/메모리 예약이나 IO 취소가 아니다. 공유 filesystem의 다른 프로세스 경쟁과 진행 중 OS IO의 강제 시간 상한은 보장하지 않는다.
+
+`NetworkPlan`은 UnavailableNoReceiver / LoopbackOnly / RemoteUnmeasured(peer_id) 선언을 구분하고 실제 성능·수신 확인·Validated 능력을 만들지 않는다. 수신자가 없으면 네트워크 결과는 미측정으로 남기며 loopback을 원격 인증으로 바꾸지 않는다. S1은 plan·admission primitive만 구현했다. 실제 명시 run·전용 경로 배타 소유/정리·부하 재현·실제 IO drain/sync/close·Pass/Fail/Aborted/Inconclusive·CLI/runtime/원격 RunCheck 연결은 TASK-017 S2 이후다. 기존 check plan/run proxy의 Unsupported를 성공으로 바꾸지 않는다.
 
 ## 16. 동기화·긴급 동작의 구체안
 

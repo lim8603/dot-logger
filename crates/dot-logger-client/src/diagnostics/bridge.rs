@@ -20,7 +20,7 @@ pub type Error = Box<dyn StdError + Send + Sync>;
 
 /// Maximum raw snapshot bytes, also the single source/queue/pool slot limit.
 pub const MAX_SNAPSHOT_BYTES: usize = 64 * 1024;
-const TARGET: u32 = 10;
+const TARGET: u32 = dot_logger_client::diagnostics::SnapshotCheck::TARGET_ID;
 const REVISION: u64 = 1;
 
 /// Explicit receiver decision after complete assembly, before ACK.

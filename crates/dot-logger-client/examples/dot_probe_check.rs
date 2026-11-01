@@ -26,9 +26,10 @@ fn execute() -> Result<u8, bridge::Error> {
             "{}",
             serde_json::json!({"schema":"dot_logger.check.v1","kind":"plan",
             "scope":"production_capture_loopback_snapshot","records":1,"max_snapshot_bytes":65536,
-            "duration_ns":"2000000000","memory_bytes":"33554432","required_memory_bytes":"25165824",
+            "duration_ns":"2000000000","memory_bytes":"33554432",
+            "required_memory_bytes":SnapshotCheck::REQUIRED_MEMORY_BYTES.to_string(),
             "write_bytes":"1","physical_write_bytes":0,"disk_reserve_bytes":"0","workers":1,
-            "target":10,"boundary":"ReceiverAcknowledged","network":"LoopbackOnly",
+            "target":SnapshotCheck::TARGET_ID,"boundary":"ReceiverAcknowledged","network":"LoopbackOnly",
             "capability":"Unprobed","capacity":"Unavailable"})
         );
         return Ok(0);
@@ -53,11 +54,11 @@ fn execute() -> Result<u8, bridge::Error> {
                 disk_reserve_bytes: 0,
                 workers: 1,
             },
-            required_memory_bytes: 24 * 1024 * 1024,
+            required_memory_bytes: SnapshotCheck::REQUIRED_MEMORY_BYTES,
             boundary: Boundary::ReceiverAcknowledged,
             network: NetworkPlan::LoopbackOnly,
         })?,
-        10,
+        SnapshotCheck::TARGET_ID,
         Box::new(backend),
         None,
     )?;

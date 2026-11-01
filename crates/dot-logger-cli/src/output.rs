@@ -15,13 +15,17 @@ pub enum Failure {
     Gone,
     PermissionDenied,
     Version,
+    CheckFailed,
+    CheckAborted,
+    CheckInconclusive,
 }
 impl Failure {
     pub fn code(self) -> i32 {
         match self {
             Self::Input | Self::Unsupported | Self::PermissionDenied => 2,
             Self::Limit | Self::Cancelled | Self::Deadline | Self::Unknown | Self::Gone => 3,
-            Self::Io | Self::Corrupt | Self::Version => 4,
+            Self::Io | Self::Corrupt | Self::Version | Self::CheckFailed => 4,
+            Self::CheckAborted | Self::CheckInconclusive => 3,
         }
     }
     pub fn name(self) -> &'static str {
@@ -37,6 +41,9 @@ impl Failure {
             Self::Gone => "gone_or_expired",
             Self::PermissionDenied => "permission_denied",
             Self::Version => "incompatible_protocol",
+            Self::CheckFailed => "check_failed",
+            Self::CheckAborted => "check_aborted",
+            Self::CheckInconclusive => "check_inconclusive",
         }
     }
 }

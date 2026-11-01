@@ -370,6 +370,7 @@ impl Request {
                 base_revision: self.handle,
                 patch: self.data,
             },
+            "PlanCheck" => ManagementRequest::PlanCheck { plan: self.handle },
             "RunCheck" => ManagementRequest::RunCheck { plan: self.handle },
             "Compare" => ManagementRequest::Compare {
                 before: self.handle,
@@ -487,7 +488,7 @@ impl Reply {
                 wire.kind = 6;
                 wire.revision = revision;
             }
-            ("RunCheck" | "Compare", ManagementReply::Report(data)) => {
+            ("PlanCheck" | "RunCheck" | "Compare", ManagementReply::Report(data)) => {
                 if data.len() > max {
                     return Err(RemoteError::Limit);
                 }

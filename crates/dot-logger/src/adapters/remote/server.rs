@@ -291,7 +291,7 @@ impl Service<http::Request<tonic::body::Body>> for RpcService {
                 Some("Ack") => Ok(grpc!().unary(AckRpc(service), request).await),
                 Some(
                     name @ ("GetStatus" | "Query" | "ReadBlob" | "Replay" | "GetCompletion"
-                    | "ApplyConfig" | "RunCheck" | "Compare"),
+                    | "ApplyConfig" | "PlanCheck" | "RunCheck" | "Compare"),
                 ) => Ok(grpc!()
                     .unary(
                         UnaryRpc {

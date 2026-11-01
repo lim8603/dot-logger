@@ -23,6 +23,9 @@ tracing = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 subtle = { workspace = true, optional = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix.workspace = true
+
 # The raw payload cell is the only audited production unsafe boundary.
 # Other workspace packages retain forbid; this package denies unsafe everywhere
 # except the private pool/storage module.

@@ -97,7 +97,7 @@ impl Context {
                 self.text("patch")?;
                 self.number::<u64>("base-revision")?;
             }
-            ("check", Some("run")) if remote => {
+            ("check", Some("plan" | "run")) if remote => {
                 self.number::<u64>("plan")?;
             }
             ("compare", _) if remote => {
@@ -689,6 +689,9 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                     base_revision: ctx.number("base-revision")?,
                     patch: model::read(Path::new(ctx.text("patch")?))?,
                 },
+                ("check", Some("plan")) => ManagementRequest::PlanCheck {
+                    plan: ctx.number("plan")?,
+                },
                 ("check", Some("run")) => ManagementRequest::RunCheck {
                     plan: ctx.number("plan")?,
                 },
@@ -747,14 +750,42 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                     if bytes.len() > out.payload_capacity() {
                         return Err(Failure::Limit);
                     }
-                    (
-                        "report",
-                        json!({"encoding":"host_owned_bytes","data_hex":output::hex(&bytes)}),
-                    )
+                    if name == "check" {
+                        let data: Value =
+                            serde_json::from_slice(&bytes).map_err(|_| Failure::Corrupt)?;
+                        let expected = if sub == Some("plan") {
+                            "plan"
+                        } else {
+                            "result"
+                        };
+                        if data["schema"] != "dot_logger.check.v1" || data["kind"] != expected {
+                            return Err(Failure::Corrupt);
+                        }
+                        ("check", data)
+                    } else {
+                        (
+                            "report",
+                            json!({"encoding":"host_owned_bytes","data_hex":output::hex(&bytes)}),
+                        )
+                    }
                 }
                 ManagementReply::Page { .. } => return Err(Failure::Corrupt),
             };
+            let check_failure = if name == "check" && sub == Some("run") {
+                match data["outcome"].as_str() {
+                    Some("Pass") => None,
+                    Some("Fail") => Some(Failure::CheckFailed),
+                    Some("Aborted") => Some(Failure::CheckAborted),
+                    Some("Inconclusive") => Some(Failure::CheckInconclusive),
+                    _ => return Err(Failure::Corrupt),
+                }
+            } else {
+                None
+            };
             out.emit(kind, data)?;
+            if let Some(failure) = check_failure {
+                return Err(failure);
+            }
             Ok(json!({}))
         }
     }

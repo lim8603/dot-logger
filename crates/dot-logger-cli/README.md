@@ -21,10 +21,19 @@ cargo run -p dot-logger-cli -- query --endpoint http://127.0.0.1:50051 --from 0 
 | `config validate` | offline manifest의 등록/제한·메모리 예약 검증. 원본 scan/runtime 검증이 아님 |
 | `config diff` | `--before FILE --after FILE`의 차이 여부만 표시하고 값은 숨김 |
 | `config apply` | Manage 권한으로 `--base-revision --patch FILE`을 host에 게시 |
-| `check run`, `compare` | 등록된 plan/report capability를 host에 전달 |
+| `check plan`, `check run` | `--plan ID`로 등록된 host 계획을 무부하 조회/명시 실행 |
+| `compare` | 등록된 report capability를 host에 전달 |
 | `recover` | 원래 manifest와 `--output NEW_FILE`로 독립 새 파일 복구. 기존 경로 덮어쓰기 없음 |
 
-운영 설정/간편 점검/비교 backend는 후속 TASK-016/017 등에서 구현한다. 현재 호스트가 미지원하면 Unsupported를 전달하며 `check plan`도 그 backend 전에는 Unsupported다. ApplyConfig의 응답 revision과 host-owned Report를 전달하는 것은 해당 backend를 CLI가 구현했다는 뜻이 아니다.
+간편 점검은 호스트가 `diagnostics::CheckHost`에 전용 경로/입력/예산을 등록하고 일반 worker에서 Command를 명시 처리해야 한다. CLI는 등록 ID만 받는다. `check plan`은 경로 생성·실제 capability probe 없이 예산/입력/출처를 보여주며, `check run`은 Manage token이 필요하고 ID를 한 번만 소비한다. 호스트에 backend가 없거나 구 서버의 PlanCheck 미지원이면 Unsupported이며 실행으로 fallback하지 않는다. 설정 적용/비교 운영 backend는 후속이다.
+
+```sh
+# 7은 예시다. 호스트가 등록해 전달한 ID를 사용한다.
+cargo run -p dot-logger-cli -- check plan --endpoint http://127.0.0.1:50051 --plan 7 --json
+cargo run -p dot-logger-cli -- check run --endpoint http://127.0.0.1:50051 --plan 7 --json
+```
+
+점검 응답은 `dot_logger.check.v1` JSON이다. 실제 파일 결과 Pass는 exit0, Fail은 exit4, Aborted/Inconclusive는 exit3이다. 시간/취소는 새 부하를 중지하며 actual footer/sync/close/정리가 끝난 뒤 결과를 만든다. timeout 뒤에는 `completion_unconfirmed`를 유지하며 자동 재실행하지 않는다. 호스트 message 한도는 최소5120B가 필요하고 부족하면 IO/ID 소비 전 Limit이다. Linux의 실제 free probe는 statvfs를 사용한다. 합성 파일 결과·원래 운영 Report/profile을 분리하며, 서로 다른 source/check session 시각을 빼거나 profile 만료를 갱신하지 않는다. `capacity`/`network_measurement`는 Unavailable이며 실제 생산 capture/수신 ACK·dot-probe/성능 인증은 후속이다.
 
 Query 결과의 snapshot을 Replay handle로 전달한다. 제어 요청에는 확인된 generation을 유지하고 seek 응답의 새 generation을 반영한다. Snapshot/blob/cursor는 호스트의 유한 수명 capability이며 파일 경로가 아니다. CLI는 실패 후 자동 재연결·재전송하지 않는다.
 

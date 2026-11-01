@@ -268,11 +268,14 @@ fn next_record<R: CheckRuntime>(
         ));
     }
     let free = s.runtime.available_bytes(directory)?;
+    // Probes are real, potentially slow IO. Admission must use the time and
+    // cancellation observed after the probe, not the earlier pacing instant.
+    let now = s.now()?;
     let progress = Progress {
         elapsed_ns: now - from,
         written_bytes: s.reserved,
         free_disk_bytes: free.saturating_sub(s.reserved.saturating_sub(s.bytes)),
-        cancelled: false,
+        cancelled: s.runtime.cancelled(),
     };
     match plan.write_allowance(progress) {
         Err(reason) => Ok(Admission::Stop(reason)),
@@ -441,8 +444,9 @@ impl CheckPlan {
                 .runtime
                 .available_bytes(owned.parent())
                 .map_err(|e| issue(CheckStage::Observation, e))?;
+            let now = s.now().map_err(|e| issue(CheckStage::Observation, e))?;
             let p = Progress {
-                elapsed_ns: 0,
+                elapsed_ns: now - from,
                 written_bytes: base,
                 free_disk_bytes: free.saturating_sub(base),
                 cancelled: s.runtime.cancelled(),

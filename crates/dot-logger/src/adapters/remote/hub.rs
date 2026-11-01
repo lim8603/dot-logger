@@ -56,6 +56,12 @@ impl Command {
     pub fn cancelled(&self) -> bool {
         self.reply.as_ref().is_none_or(|tx| tx.is_closed())
     }
+    /// Conservative host payload capacity with transport-envelope headroom.
+    /// A backend may reject a command before IO when its bounded reply schema
+    /// cannot fit. This does not reserve a separate response allocation.
+    pub fn response_capacity(&self) -> usize {
+        self._shared.limits.message_bytes.saturating_sub(1024)
+    }
     /// Return a real result after actual work/cleanup; late replies are discarded.
     /// Excess reply allocation capacity is rejected before entering the reply queue.
     pub fn respond(mut self, result: Result<ManagementReply, RemoteError>) {

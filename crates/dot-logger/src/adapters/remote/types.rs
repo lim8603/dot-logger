@@ -340,6 +340,11 @@ pub enum ManagementRequest {
         /// Bounded configuration patch.
         patch: Vec<u8>,
     },
+    /// Load-free preview of a pre-registered host check capability.
+    PlanCheck {
+        /// Plan capability; no path or budgets come from the remote caller.
+        plan: u64,
+    },
     /// Manage permission required; pre-registered bounded plan only.
     RunCheck {
         /// Plan capability.

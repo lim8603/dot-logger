@@ -68,6 +68,9 @@ pub(crate) fn method(request: &ManagementRequest) -> (&'static str, &'static str
         ManagementRequest::ApplyConfig { .. } => {
             ("ApplyConfig", "/dot_logger.remote.v1.Logger/ApplyConfig")
         }
+        ManagementRequest::PlanCheck { .. } => {
+            ("PlanCheck", "/dot_logger.remote.v1.Logger/PlanCheck")
+        }
         ManagementRequest::RunCheck { .. } => ("RunCheck", "/dot_logger.remote.v1.Logger/RunCheck"),
         ManagementRequest::Compare { .. } => ("Compare", "/dot_logger.remote.v1.Logger/Compare"),
     }
@@ -166,7 +169,7 @@ pub(crate) fn request(native: ManagementRequest, max: usize) -> Result<wire::Req
             r.handle = base_revision;
             r.data = patch;
         }
-        ManagementRequest::RunCheck { plan } => {
+        ManagementRequest::PlanCheck { plan } | ManagementRequest::RunCheck { plan } => {
             r.handle = plan;
         }
         ManagementRequest::Compare { before, after } => {
@@ -296,7 +299,7 @@ pub(crate) fn reply(
             ManagementReply::Completion(RecordStatus { confirmed, outcome })
         }
         ("ApplyConfig", 6) => ManagementReply::Applied(r.revision),
-        ("RunCheck" | "Compare", 7) => ManagementReply::Report(r.data),
+        ("PlanCheck" | "RunCheck" | "Compare", 7) => ManagementReply::Report(r.data),
         _ => return Err(RemoteError::Corrupt),
     })
 }

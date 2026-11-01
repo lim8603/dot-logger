@@ -110,6 +110,7 @@ service Logger {
   rpc Replay(Request) returns (Reply);
   rpc GetCompletion(Request) returns (Reply);
   rpc ApplyConfig(Request) returns (Reply);
+  rpc PlanCheck(Request) returns (Reply);
   rpc RunCheck(Request) returns (Reply);
   rpc Compare(Request) returns (Reply);
   rpc Subscribe(SubscribeRequest) returns (stream Frame);

@@ -124,7 +124,7 @@ pub fn command() -> Command {
             .subcommand_required(true)
             .subcommand(Command::new("run").about("Run a pre-registered host plan"))
             .subcommand(
-                Command::new("plan").about("Requires the later host check-planning backend"),
+                Command::new("plan").about("Preview a pre-registered host plan without load"),
             ),
     )
 }

@@ -68,6 +68,8 @@ struct Runtime {
     now: u64,
     cancel_at: Option<u64>,
     free_calls: usize,
+    advance_probe_at: Option<usize>,
+    advance_after_wait: bool,
     fail_probe_at: Option<usize>,
     low_space_at: Option<usize>,
     inspect: Option<PathBuf>,
@@ -88,6 +90,9 @@ impl CheckRuntime for Runtime {
     }
     fn available_bytes(&mut self, _: &Path) -> io::Result<u64> {
         self.free_calls += 1;
+        if self.advance_probe_at == Some(self.free_calls) {
+            self.now += 10_000_000_000;
+        }
         if self.fail_probe_at == Some(self.free_calls) {
             return Err(io::Error::from_raw_os_error(5));
         }
@@ -124,6 +129,9 @@ impl CheckRuntime for Runtime {
         }
         if self.stop_space_after_wait {
             self.low_space_at = Some(self.free_calls + 1);
+        }
+        if self.advance_after_wait {
+            self.advance_probe_at = Some(self.free_calls + 1);
         }
         if self.fail_after_wait {
             self.fail_probe_at = Some(self.free_calls + 1);
@@ -512,4 +520,38 @@ fn unsupported_network_and_invalid_workloads_do_not_start_file_load() {
         ));
     }
     temp.unchanged_and_clean();
+}
+
+#[test]
+fn slow_space_probes_cannot_admit_load_after_time_budget_or_cancellation() {
+    for initial in [true, false] {
+        for cancel in [false, true] {
+            let temp = Temp::new();
+            let mut runtime = Runtime {
+                advance_probe_at: initial.then_some(1),
+                advance_after_wait: !initial,
+                cancel_at: cancel.then_some(10_000_000_000),
+                ..Default::default()
+            };
+            let report = run(temp.spec(), workload(), &mut runtime).unwrap();
+            assert_eq!(
+                report.written_records,
+                if initial { 0 } else { 1 },
+                "{report:?}"
+            );
+            assert_eq!(
+                report.stop,
+                CheckStop::Limit(if cancel {
+                    StopReason::Cancelled
+                } else {
+                    StopReason::TimeBudget
+                })
+            );
+            assert!(report.cleaned);
+            if initial {
+                assert_eq!(report.physical_write_bytes, 0);
+            }
+            temp.unchanged_and_clean();
+        }
+    }
 }

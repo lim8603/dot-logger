@@ -7,7 +7,9 @@
 //! hardware capacity, RT, UPS or long-duration behavior. The host supplies a real
 //! space probe, cancellation and a stable exclusively controlled trusted parent.
 mod file;
+mod host;
 mod run;
+pub use host::{CheckEvidence, CheckHost, CheckSource, HostError, linux_available_bytes};
 pub use run::{
     CheckIssue, CheckOutcome, CheckReport, CheckRuntime, CheckStage, CheckStartError, CheckStop,
     FileCheck, FileCheckRuntime, FileWorkload,

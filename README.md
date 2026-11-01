@@ -57,11 +57,11 @@ custom sink 버퍼는 어댑터 예산이며, 실제 worker와 allocator 내부 
 | Feature | 의존성/계획 경로 |
 |---|---|
 | `remote` | tonic·Tokio, gRPC 어댑터 |
-| `influxdb` | reqwest·Tokio, InfluxDB v2 어댑터 |
+| `influxdb` | reqwest·Tokio·bytes, InfluxDB v2 유한 write 어댑터 |
 | `tracing-adapter` | tracing·log, 일반 로그 어댑터 |
 | `compression-zstd` | MCAP의 zstd 압축 |
 
-선택 feature는 현재 의존성 호환 검사 단계이며 해당 제품 기능의 구현 완료를 뜻하지 않습니다.
+선택 feature의 구현·수락 범위는 모듈별 계약과 검증 근거를 따릅니다. `tracing-adapter`는 아직 의존성 호환 검사 단계입니다.
 MCAP 제품 파일 API는 `storage` 모듈에 있으며, 독립 consumer는 실제 파일 생성·마감·sync 후 임시 파일을 정리합니다.
 
 `storage::SegmentLog`는 bytes·단조시간·메시지 수·인덱스 bytes/chunk 상한에 따라 파일을 회전합니다.
@@ -143,3 +143,15 @@ revision·출력·완료 경계와 현재 세션의 유효 구간이 일치해�
 filesystem 여유 변화는 다른 관측입니다. `NoGrowth`는 양의 증가가 관측되지 않았다는 뜻이고,
 `AtLimit`는 이미 여유가 없는 상태입니다. 유한 시간이 u64 ns를 넘으면 `BeyondRange`로 표시합니다.
 안정 합성 입력의 계산 검증은 실제 PC/RT 예측 오차≤20%나 계측 비용≤5% 달성을 뜻하지 않습니다.
+
+
+## InfluxDB v2 유한 write — TASK-019 S1
+
+`influxdb` feature의 `adapters::influxdb::Writer::new(&QueryBudget, Config)`는 고정 measurement/device/channel·typed schema·원 session·유한 batch/이벤트/재시도/TTL을 검증하고 공유 external 메모리를 예약합니다. 호스트의 Tokio runtime에서 `write(&[Point], &AtomicBool)`을 명시 호출합니다. 일반 경로 전용이며 worker나 spool을 만들지 않습니다. 원본 bytes를 자동 해석하거나 전송하지 않습니다.
+
+- 호스트가 이 session에 **새롭고 독점적인 series namespace**를 공급해야 합니다. 시작 시 기존 DB를 조사하지 않습니다. `RejectNonIncreasing`은 채널별 같은/과거 real timestamp를 생산자·배치에 걸쳐 거절하며 out-of-order도 실패입니다. timestamp를 바꾸지 않습니다. 실패한 전체 preflight는 high-water를 바꾸지 않고, 시도한 배치는 Unknown이어도 시각을 소비합니다.
+- 수치는 `integer`/`float`/`boolean`, 작은 이벤트는 `event` field로 분리합니다. `session`/`producer`/`sequence`는 원 receipt field이며 tag 수를 늘리지 않습니다. 타입이 다른 채널도 동일 field type 충돌을 만들지 않습니다.
+- HTTP 204는 API `Acknowledged`입니다. 400/422 부분 실패·응답 단절/timeout·진행 취소는 `Unknown`, 미시도 취소는 `NotSent`입니다. 재시도는 같은 encoded body를 사용합니다. HTTPS 또는 literal loopback HTTP, redirect/proxy/암묵 retry off, token은 sensitive header로만 유지하며 서버 오류 body를 보고서에 넣지 않습니다.
+- 공유 예약은 HTTP가 소유한 body의 마지막 해제까지 유지합니다. 이전 body가 남으면 `Busy`로 다음 배치를 막습니다. HTTP/TLS/runtime 내부와 OS/RSS는 별도 headroom이며, 원격 IO 취소/rollback을 추정하지 않습니다.
+
+현재 TCP 대역 시험은 실제 DB write/query 수락을 대신하지 않습니다. 배포 버전 pin·제한 수치 query·실제 DB 대조·Router Delivery/완료 연결·파일 장애 격리 계측·실앱/native는 후속입니다. [TASK-019](.cowork/04_implementation/tasks/TASK-019.md)·[API §14.6](.cowork/03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).

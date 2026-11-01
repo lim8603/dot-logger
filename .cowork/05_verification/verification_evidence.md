@@ -701,6 +701,20 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 수락: [REV-030](reviews/REV-030_TASK-017_FILE_RUN.md) 개발 자가 점검 Pass/신규 미해결 RV 없음·기존 위임 S2 로컬 수락/Closed. scope는 synthetic file write/finish/sync/close/정리다. written/synced/실제 Write bytes/파일 길이·원래 stop과 최종 outcome·primary/settlement/cleanup 원인을 보존하며 네트워크/장비 capacity Profile/생산 완료 ACK를 만들지 않는다.
 - 미구현/미검증: S3 운영 OS free probe·Report/profile/CLI/runtime/원격 backend·실제 capture/라우팅/receiver/실앱, PC/RT 비용/오차/처리량·UPS/장기·native(T3)/다른 OS·fresh audit. 기능 fixture의 공간 값은 제어된 입력이며 실제 디스크 성능/space/자원 수락 증거가 아니다. trusted namespace 외부 변경/panic/kill 후 자동 복구/정리는 보장하지 않는다. Task/MS In Progress·TC-010 Partial·Gate4/5 Not Ready 유지.
 
+<a id="ev-033"></a>
+### EV-033 — TASK-017 S3 로컬 운영 host·Report/profile·CLI 연결
+
+- 소스: `5390a55194cf5bf80ecc74f461e24a07d8f6af10`, source101개 commit blob/hash 일치·검사24개 exit0. [커밋 대조](../06_evolution/imported_context/task_017_s3_2026-11-01/commit.json).
+
+- 일자/실행자: 2026-11-01 #006 / AI / 현재 Ubuntu PC generic kernel. [명령/소스 hash·결과](../06_evolution/imported_context/task_017_s3_2026-11-01/results.json)·[검증 script](../06_evolution/imported_context/task_017_s3_2026-11-01/verify.py)·[REV-031](reviews/REV-031_TASK-017_CHECK_HOST.md) 개발 자가 점검 Closed. [API §15.5](../03_design_artifacts/interface_contract.md#155-task-017-s3-로컬-운영-hostcli-연결--2026-11-01).
+- TDD: host API/handle_command 부재 compile Red → Green. 공간 probe 중 시각/취소 도래 뒤 새 record 수락(RV-066) 및 CLI Inconclusive exit0(RV-067) assertion Red → Green. 운영 source session과 전용 check session의 과도한 동일성 검사(RV-068)도 별도 session 보존 반례 Red→Green으로 조치했다. Red witness5개를 같은 근거 폴더에 보존했다.
+- 신규10개: core host3·산술1·느린 probe1·실제 CLI5. 무부하 preview·실제 statvfs/파일·원 Report/profile 보존/foreign 거절·만료 유지·고정 슬롯/새 ID·run 단일 사용, read/manage 권한·응답 부족 pre-IO/ID 유지·remote timeout pacing 취소 후 actual settlement·기존 namespace 보존·결과별 exit를 검증했다. 최소 server message5120B와 source profile 포함 JSON의 실제 TCP/CLI 종단 확인.
+- 최종 검증: Rust1.96 workspace/all-features357개(문서 시험 포함), core/no-default-features288개, MSRV1.85 workspace/all-features357개 Pass. fmt·workspace all-targets/all-features clippy -D warnings·rustdoc -D warnings·protobuf/prost/protoc Pass. Miri nightly-2026-10-26 strict provenance 관리 수명/공간 산술2종×8seeds=16 Pass. 실제 OS IO/PC 기능 시험을 Miri 성능 수락으로 바꾸지 않는다. 전체16 feature matrix는 이번 회차에 반복하지 않았으며 core/전체 feature/실제 remote CLI 경로를 회귀했다.
+- Linux ordinary-path safe rustix1.1.4(std/fs)·linux-raw-sys0.12.1 추가, 기존 package 버전 교체/own unsafe/RT 경로 변경0. audit 실행 DB2295466c(2026-10-30), lock dependency190개·취약점0·unsound0·기존 paste 유지보수 경고1(GAP-005)이다. 실제 capacity/profile 생성·native CI를 실행하지 않았다.
+- 게시: 소스5390a55 origin/main 게시·[원격 HEAD 일치](../06_evolution/imported_context/task_017_s3_2026-11-01/source-push.json), 검증/수락 문서는 별도 [skip ci] 커밋.
+- 수락: 기존 위임으로 S3 로컬 운영 연결 단위만 수락. 원래 session/revision/epoch/window/conditions·profile 유효구간과 실제 파일 결과를 분리한다. source null/만료를 합성 capacity로 채우지 않고 네트워크/점검 capacity Unavailable을 유지한다. 응답 완료 전까지 Command/permit·실제 IO 소유권 유지, 결과 Vec capacity=len·pre-IO response 상한 확인.
+- 미구현/미검증: 생산 capture/routing/실제 수신자 ACK·dot-probe/실앱, PC/RT 처리량/비용≤5%·추정 오차≤20%, UPS/장기/native(T3)/다른 OS. 자동 host worker/결과 저장소/daemon·restart exactly-once는 제공하지 않는다. Task/MS In Progress·TC-010 Partial·Gate4/5 Not Ready·FR-015/TASK-018 미착수 유지.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.

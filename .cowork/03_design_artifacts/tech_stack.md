@@ -17,6 +17,7 @@
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query | ADR-009 | 실제 배포 버전 pin·충돌/부분 실패 테스트, v3 query 호환 미선언 |
 | 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4.6.6·serde 1.0.229/serde_json 1.0.154 | Human 선택·ADR-009·EV-025 | 로컬 CLI10/transport7·두 Rust Pass, 실제 dot-probe/다른 OS 후속 |
+| Linux 공간 관측 구현 | rustix | =1.1.4, std/fs·Linux target 한정; linux-raw-sys0.12.1 lock | TASK-017 S3·API §15.5·EV-033, 승인된 OS probe의 내부 구현 | 일반 경로 statvfs·원 OS 오류, 다른 OS는 Unsupported; 실제 성능 인증 아님 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
 | 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
@@ -57,3 +58,5 @@ TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기
 2026-10-31 REV-019 보강(EV-023): 기존 TLS 간접 의존 subtle2.6.1을 remote 전용 직접 의존으로 pin해 고정256B credential/길이 비교에 사용한다. package/version 집합·MSRV/기술 계열·인증 정책은 유지한다. 전체 RPC constant-time/실제 공격 내성의 정량 증거는 아니다.
 
 2026-10-31 TASK-013 EV-025: native client/CLI를 clap4.6.6·기존 serde1.0.229/JSON1.0.154, 기존 tonic/tower0.5.3/hyper-util0.1.21·Tokio1.51.6 signal로 구현했다. MSRV1.85/개발1.96 로컬 검증 완료, 기존 package/version 교체0. 로컬 CLI package1개·외부6개(anstyle/clap/clap_builder/clap_lex/errno/signal-hook-registry)를 추가했으며 결과 JSON에 정확한 pin·license/rust_version metadata가 있다. cached audit 취약점/unsound0·기존 paste 경고1, fresh DB 갱신은 미실행이다. core/default client의 선택 normal/build 그래프 격리와 RT allocator를 유지한다. 단일 실제 TCP/명시 CA/token·자동 reconnect/retry 없음·native DTO/CLI 출력 계약을 API §14.4에 기록했다.
+
+2026-11-01 TASK-017 S3 EV-033: 안전한 OS 공간 조회의 구현 세부로 Linux target에 rustix1.1.4(std/fs)를 고정했다. 기존 package 버전 교체 없이 rustix/linux-raw-sys 2개를 추가하고 own unsafe·subprocess·RT 경로 변경은 없다. 원래 OS 오류·checked available blocks×fragment size·불가능한 카운터 거절을 사용한다. [공식 문서](https://docs.rs/rustix/1.1.4/rustix/fs/fn.statvfs.html)·로컬 소스의 MSRV1.63을 확인했고 프로젝트 MSRV1.85 workspace 회귀를 별도 실행한다. Rust/API/아키텍처·platform tier 변경이 아니며 되돌릴 수 있는 host adapter 세부라 새 ADR로 승격하지 않았다. 새 의존성의 audit와 실제 실행 근거는 EV-033을 따른다.

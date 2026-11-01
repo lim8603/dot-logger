@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S3 — 실제 운영 free probe·Report/profile/CLI·host backend 연결; 실앱/실측/native 후속 |
+| 다음 액션 | S3 로컬 host/free probe·Report/profile·CLI 연결 수락(EV-033); 다음 생산 capture/routing·실제 수신자/실앱·실측/native |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -21,7 +21,7 @@
 
 ## 변경 대상과 첫 검증
 
-구현 경로: `crates/dot-logger/src/diagnostics/{mod,run,file}.rs` · `tests/tc_010_{diagnostics,file_check}.rs`. S1 계획·S2 실제 합성 파일 실행/정리까지 로컬 수락, CLI/운영 host 연결은 S3 후속이다.
+구현 경로: `crates/dot-logger/src/diagnostics/{mod,run,file}.rs` · `tests/tc_010_{diagnostics,file_check}.rs`. S1/S2 및 S3 로컬 host·CLI까지 수락. 추가 구현: `diagnostics/host.rs`·remote/native codec·CLI·`tc_010_check_host.rs`/CLI `check_host.rs`. 생산/실앱/실측 후속이다.
 
 첫 실패/리뷰 조건: **dry-run 무부하·쓰기/시간 예산 선도달·수신자 없음·취소**.
 
@@ -56,3 +56,16 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 - `required_memory_bytes`에 writer+payload/run/path 보수 예약이 맞는지 preflight하고 writer의 실제 공유 output 예약을 사용한다. 물리 예약 상한·실제 Write bytes/free-reserve backstop, footer/부분 범위·primary/settlement/cleanup 오류를 보존한다.
 - Written/Synced 외 경계·loopback/remote는 Inconclusive/무실행. 임시 파일의 직접 writer 시험이며 capture/routing·생산자 완료 ACK/원격 성능 인증이 아니다. 기능 시험의 공간 probe는 제어된 fixture이며 실제 운영 OS probe는 host/S3가 공급해야 한다.
 - 다음 S3: 실제 free probe/capability·Report/profile/CLI/원격 host 연결과 생산 부하를 별도 연결한다. 기존 임의 경로/무제한 remote 실행 금지·예산·Unsupported 계약을 유지한다. 실앱/PC/RT/UPS/장기/native(T3)와 Task/MS/TC 전체 미완료 유지. 새 dependency/unsafe/wire/ADR·H/J 결정 없음.
+
+## S3 로컬 운영 연결 수락 — 2026-11-01 #006
+
+- 소스 `5390a55194cf5bf80ecc74f461e24a07d8f6af10`·source101개 commit blob/hash 일치, 검사24개 exit0.
+
+- [EV-033](../../05_verification/verification_evidence.md#ev-033)·[REV-031](../../05_verification/reviews/REV-031_TASK-017_CHECK_HOST.md) 개발 자가 점검, [API §15.5](../../03_design_artifacts/interface_contract.md#155-task-017-s3-로컬-운영-hostcli-연결--2026-11-01).
+- [x] 고정 슬롯·checked 증가/단일 사용 capability, host만 경로/예산 등록, 무부하 PlanCheck/CLI preview, 별도 RunCheck Manage 실행.
+- [x] 실제 Linux statvfs·원 OS 오류/checked available bytes, probe 뒤 시간/취소 재검사. 안전한 rustix1.1.4·lock 신규2개, 제품 unsafe/RT 변경 없음.
+- [x] 원래 Report/profile·session/revision/구간/조건·만료를 native로 원문 보존하고 CLI 요약에 출처를 표시. 합성 결과를 capacity로 승격하지 않음.
+- [x] 실제 CLI→TCP/gRPC→host→MCAP footer/sync/close/cleanup. read/manage·단일 사용·메시지 부족 pre-IO·timeout 중 pacing 취소·기존 경로 보존·Fail/Inconclusive exit 구분 검증.
+- [ ] 생산 capture/routing/실제 수신자 ACK·dot-probe 실앱·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS.
+
+S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기존 종료·수락 범위를 실제 장비 능력 검증으로 확대하지 않는다. 자동 worker/상시 서버·임의 remote 경로·무제한 실행·FR-015/TASK-018은 도입하지 않는다.

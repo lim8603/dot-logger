@@ -401,3 +401,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 ## 2026-11-01 #002 종료 — 최근 이력 포인터 정리
 
 - 2026-10-31 #012 TASK-015 완료 상세는 [당시 세션 로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md)와 [EV-028](../05_verification/verification_evidence.md#ev-028)에 보존한다. 공유 상태의 최근 이력은 #002·#014·#013 세 회차로 유지한다.
+
+## 2026-11-01 #006 상태 인덱스 이관
+
+- 2026-11-01 #003: TASK-016 독립 리뷰 Pass/P3 2건을 REV-028 Open으로 남기고 Human 요청으로 종료했다(후속 #004에서 조치/Closed) — [리뷰](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-11-01_003.md).

@@ -618,7 +618,7 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 `CheckPlan::write_allowance(Progress)`는 host의 실제 elapsed·물리 written+outstanding 예약 bytes·outstanding 미쓰기 예약을 차감한 최신 filesystem free·취소를 받아 신규 예약 가능한 최대 bytes를 반환한다. cancelled → reserve → time → bytes 우선순위는 같은 관측 시점의 사유 선택일 뿐 사건 선후 추정이 아니다. 물리 쓰기는 payload만이 아니라 봉투/index/footer와 최종 배출 비용을 포함하고 삭제 bytes를 누적 총 쓰기에서 빼지 않는다. 호스트는 예약을 직렬화하고 indivisible write가 allowance를 넘지 않도록 하며, finalization 예산을 먼저 남긴다. 계산은 stateless이며 실제 공간/메모리 예약이나 IO 취소가 아니다. 공유 filesystem의 다른 프로세스 경쟁과 진행 중 OS IO의 강제 시간 상한은 보장하지 않는다.
 
-`NetworkPlan`은 UnavailableNoReceiver / LoopbackOnly / RemoteUnmeasured(peer_id) 선언을 구분하고 실제 성능·수신 확인·Validated 능력을 만들지 않는다. 수신자가 없으면 네트워크 결과는 미측정으로 남기며 loopback을 원격 인증으로 바꾸지 않는다. S1은 plan·admission primitive이며 로컬 파일 실행은 §15.4의 S2로 연결했다. 생산 capture/routing/네트워크 부하와 CLI/runtime/원격 RunCheck 연결은 S3 후속이다. 기존 check plan/run proxy의 Unsupported를 성공으로 바꾸지 않는다.
+`NetworkPlan`은 UnavailableNoReceiver / LoopbackOnly / RemoteUnmeasured(peer_id) 선언을 구분하고 실제 성능·수신 확인·Validated 능력을 만들지 않는다. 수신자가 없으면 네트워크 결과는 미측정으로 남기며 loopback을 원격 인증으로 바꾸지 않는다. S1은 plan·admission primitive이며 로컬 파일 실행은 §15.4의 S2로 연결했다. 생산 capture/routing/네트워크 부하와 CLI/runtime/원격 RunCheck 연결은 S3 후속이다. S3 로컬 host/CLI 연결은 §15.5를 따르며 backend 부재는 Unsupported다.
 
 ### 15.4 TASK-017 S2 로컬 합성 파일 점검 — 2026-11-01
 
@@ -632,7 +632,23 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 `CheckRuntime`은 session clock·최신 free probe·취소·기한 대기를 제공한다. `FileCheckRuntime`은 실제 Instant/10ms 이하 취소 확인 간격의 대기와 host free probe를 연결하며 worker를 만들지 않는다. 시계 역전/일찍 끝난 대기는 재시도 루프로 숨기지 않고 오류다. 기존/반환 시각·workload/target/channel·written/synced records·actual Write bytes·file length·footer/cleanup 상태를 `CheckReport`에 남긴다. primary 오류·첫 footer/sync 오류·cleanup 오류는 별개로 보존하고 원 OS 원인을 유지한다.
 
-결과는 전체 요청 record의 파일 완료·sync/정리 성공이면 Pass, 깨끗한 취소면 Aborted, 범위/예산 부족이면 Inconclusive, 실제 IO/시계/footer/sync/정리 오류면 Fail이다. 공간이 쓰기 중 급감해 footer도 거절되면 완료를 추정하지 않고 Fail/부분 범위를 남긴다. 기록 성공 뒤 정리만 실패해도 Fail이며 stop 원인은 원래 Completed/Limit로 보존한다. 실제 운영 free probe·Report/profile 연결·CLI/원격 backend·실앱/생산 부하·PC/RT 비용/오차/native/UPS/장기는 S3 이후이고 짧은 합성 파일 Pass로 대체하지 않는다.
+결과는 전체 요청 record의 파일 완료·sync/정리 성공이면 Pass, 깨끗한 취소면 Aborted, 범위/예산 부족이면 Inconclusive, 실제 IO/시계/footer/sync/정리 오류면 Fail이다. 공간이 쓰기 중 급감해 footer도 거절되면 완료를 추정하지 않고 Fail/부분 범위를 남긴다. 기록 성공 뒤 정리만 실패해도 Fail이며 stop 원인은 원래 Completed/Limit로 보존한다. 실제 운영 free probe·Report/profile·CLI/원격 backend의 로컬 연결은 §15.5다. 실앱/생산 부하·PC/RT 비용/오차/native/UPS/장기는 후속이며 짧은 합성 파일 Pass로 대체하지 않는다.
+
+### 15.5 TASK-017 S3 로컬 운영 host·CLI 연결 — 2026-11-01
+
+`CheckHost::new(1..=1024)`는 일반 host worker가 소유하는 고정 등록 슬롯이다. `register(CheckPlan, WriterBudget, FileCheck, Option<CheckSource>)`는 IO/시계/worker 없이 전용 check session/revision의 writer 권위와 명시 계획을 등록한다. 경로·입력·예산은 host만 공급하고 remote 입력은 capability ID뿐이다. ID는 이 host 인스턴스 안에서 checked 증가하며 슬롯 재사용 때도 재발급하고 wrap/자동 재시도를 하지 않는다. host 교체/재시작을 가로지르는 exactly-once·capability 유효성·결과 보존을 보장하지 않으며 살아 있는 inbox에서 host를 초기화해 ID를 재사용하지 않는다. host 등록 metadata/이미 소유한 문자열·Report 저장 비용은 실행 RAM 예산과 별도로 host가 계산·확보한다.
+
+`preview(id)`/새 read RPC `PlanCheck`/`check plan --endpoint ... --plan ID`는 기존 선언의 무부하 조회다. 전용 경로를 생성하거나 filesystem/실제 capability를 조회하지 않으며 경로 문자열도 전송하지 않는다. 예산/required-memory·session/revision/environment/workload/target/boundary·network 선언·합성 records/payload/간격/seed와 capability Unprobed를 보여준다. 계획 조회가 실행 동의나 실제 자원 예약/검증을 의미하지 않는다. PlanCheck는 기존 Request/Reply 메시지를 사용하는 additive 메서드다. 구 server는 Unsupported로 거절하며 RunCheck로 fallback하지 않는다. protobuf 필드/major1·기존 RunCheck Manage 권한은 유지한다.
+
+`run(id, runtime)`은 preflight/IO 전에 capability를 소비하고 S2 실제 file runner를 호출한다. 오류·취소·예산 부족에도 해당 ID는 Gone이며 재실행에는 host의 새 명시 등록이 필요하다. `handle_command(Command, runtime)`은 PlanCheck/RunCheck만 처리하며 다른 요청은 Unsupported로 응답한다. host가 동기 호출하는 일반 worker이므로 Tokio executor의 IO worker를 직접 막지 않도록 별도 host 일반 경로에서 명시 구동한다. Command는 실제 footer/sync/close/cleanup 반환까지 살아 있고 remote timeout/closure는 새 부하의 취소로만 합성한다. pacing은 10ms 이하 구간으로 나누어 remote 취소를 확인하되 진행 중 OS IO를 강제 취소했다고 주장하지 않는다. late 응답이 폐기돼도 native `CheckEvidence`는 host에 반환하므로 host가 유한 결과 저장소에 기록할 수 있다. 자동 결과 저장소/worker/daemon은 만들지 않는다.
+
+`Command::response_capacity()`는 기존 message 한도에서 1024B envelope 여유를 제외한다. host 요약 schema의 보수 상한4096B가 들어가지 않으면 실행/ID 소비 전에 Limit이다(따라서 최소 message_bytes5120). preview/result JSON은 `dot_logger.check.v1`이며 고정 enum·정수만 포맷한다. 파일 경로/임의 오류 문자열 대신 원래 stage·io kind·OS code와 partial written/synced/actual Write bytes/file size·완료/정리 상태·실제 구간을 분리한다. CLI는 schema/kind/outcome을 검사하고 Pass=0, Fail=4, Aborted/Inconclusive=3으로 종료한다. 실제 결과가 도착한 실패에는 completion_unconfirmed를 붙이지 않으며 timeout/transport/Gone 뒤에는 기존 보수 표시를 유지한다. 알 수 없는 host report schema는 Corrupt이며 RunCheck가 이미 수행됐을 가능성을 지우지 않는다.
+
+`CheckSource`는 기존 `telemetry::report::Report`와 선택 외부 `capacity::Profile`을 원문 보존한다. Report의 Window/conditions와 measurements·profile로 재계산한 결과가 일치하고 계획 revision/environment/workload/target/boundary가 맞아야 등록한다. 원래 운영 source session/clock은 전용 synthetic check session/clock과 다를 수 있고 양쪽 identity/구간을 별도로 보존하며 서로 다른 clock의 시각을 차분하지 않는다. profile 자체의 만료/조건 차이는 원래 Report의 Stale/Unavailable 판정을 유지한다. 요약에는 source session/revision/epoch/원래 구간·조건과 profile ID/조건/유효구간/완료 rate를 보존하고 `reused_as_check_capacity=false`다. 합성 결과에서 운영 Window/capture/output counter·새 Profile을 만들거나 오래된 profile 유효기간을 갱신하지 않는다. source가 없으면 null, 점검 capacity/network_measurement는 항상 Unavailable이다.
+
+`linux_available_bytes`는 Linux 일반 경로에서 고정 rustix1.1.4의 안전한 `statvfs`를 호출하고 `f_bavail * f_frsize`를 checked 계산한다. available>total·0 fragment·overflow를 거절하며 원 OS 오류를 보존한다. 제품 unsafe/외부 명령·새 worker를 추가하지 않는다. [rustix 공식 API](https://docs.rs/rustix/1.1.4/rustix/fs/fn.statvfs.html)를 사용하며 다른 OS는 Unsupported다. snapshot은 quota/예약·다른 프로세스의 공간 경쟁/OS IO 시간 상한을 보장하지 않는다. 실제 probe 뒤 시각/취소를 재확인하므로 관측 도중 만료된 예산으로 신규 파일/record를 시작하지 않는다. 이미 수락한 IO·footer/sync/정리는 기한 뒤에도 완료를 시도한다.
+
+S3의 이번 수락 범위는 현재 Linux PC의 실제 공간 관측과 명시 host/CLI의 합성 파일 종단이다([EV-033](../05_verification/verification_evidence.md#ev-033)). 생산 capture/routing/수신 ACK·dot-probe 실앱·실제 PC/RT 성능/비용/오차·UPS/장기/native(T3)/다른 OS는 후속이다. TASK-017/MS-005·TC-010 전체·Gate4/5는 미완료다.
 
 ## 16. 동기화·긴급 동작의 구체안
 

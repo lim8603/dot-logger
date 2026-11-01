@@ -15,8 +15,8 @@
 | 상태 | Yellow — 로컬 수락·운영/실앱·PC/RT/UPS·native 검증 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #007 실행 단위 수락 / AI |
-| 세션 상태 | 진행 — S3 실제 capture/routing·ACK·실앱 snapshot 첫 단위 수락, 지속 통합 후속 |
+| 갱신 | 2026-11-01 / #007 종료 / AI |
+| 세션 상태 | 종료 — Human 「세션 마무리」. S3 첫 단위 수락 유지, routed RunCheck 통합 후속 |
 | 최근 세션 | [2026-11-01 #007](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md) — TASK-017 생산 모듈/ACK·실앱 snapshot |
 
 ## 현재 결정과 제약
@@ -149,7 +149,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-01 #007: TASK-017 S3 raw/routing·실제 loopback ACK·dot-probe export snapshot 첫 단위를 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
+- 2026-11-01 #007: TASK-017 S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
 - 2026-11-01 #006: TASK-017 S3 로컬 운영 host/free probe·원 Report/profile·CLI를 수락하고 Human 요청으로 종료, 생산/실앱·실측 후속을 남겼다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_006.md)·[EV-033](../05_verification/verification_evidence.md#ev-033).
 - 2026-11-01 #005: TASK-017 S2 파일 실행/정리를 로컬 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_005.md)·[EV-032](../05_verification/verification_evidence.md#ev-032).
 

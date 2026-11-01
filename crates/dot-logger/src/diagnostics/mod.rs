@@ -3,13 +3,16 @@
 //! `CheckPlan::build`/`write_allowance` perform no IO, clock reads, worker startup
 //! or network work. `CheckPlan::run_file` explicitly exercises a finite synthetic
 //! product-MCAP file in a dedicated namespace, then syncs, closes and cleans it.
-//! Results cover only the declared file scope, not capture/routing/remote work,
+//! `CheckHost::register_routed` explicitly registers a trusted production backend.
+//! Results cover only the declared file or routed snapshot scope, not general
 //! hardware capacity, RT, UPS or long-duration behavior. The host supplies a real
 //! space probe, cancellation and a stable exclusively controlled trusted parent.
 mod file;
 mod host;
+mod routed;
 mod run;
 pub use host::{CheckEvidence, CheckHost, CheckSource, HostError, linux_available_bytes};
+pub use routed::{HostCheckEvidence, RoutedCheckBackend, RoutedCheckEvidence, RoutedCheckReport};
 pub use run::{
     CheckIssue, CheckOutcome, CheckReport, CheckRuntime, CheckStage, CheckStartError, CheckStop,
     FileCheck, FileCheckRuntime, FileWorkload,

@@ -178,7 +178,9 @@ impl Host {
                             Err(mpsc::TryRecvError::Empty) => {}
                         }
                         if let Some(command) = inbox.try_next() {
-                            if let Some(e) = checks.handle_command(command, &mut runtime) {
+                            if let Some(HostCheckEvidence::File(e)) =
+                                checks.handle_command(command, &mut runtime)
+                            {
                                 result
                                     .send((
                                         e.report.outcome,

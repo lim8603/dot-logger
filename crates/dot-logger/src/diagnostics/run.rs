@@ -92,11 +92,11 @@ impl<F: FnMut(&Path) -> io::Result<u64>> CheckRuntime for FileCheckRuntime<'_, F
         Ok(())
     }
 }
-/// Functional result for this declared synthetic file scope only. Pass does not
+/// Functional result for the declared file or routed snapshot scope only. Pass does not
 /// certify maximum capacity, CPU/RT overhead, network, UPS or 24-hour behavior.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckOutcome {
-    /// Every requested record reached the file boundary and resources were cleaned.
+    /// Every requested record reached its declared boundary and resources settled.
     Pass,
     /// Operational, clock, finalization/sync or cleanup failure; see issues.
     Fail,
@@ -108,7 +108,7 @@ pub enum CheckOutcome {
 /// Original reason load stopped, independent of later settlement errors.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckStop {
-    /// Requested finite workload was written.
+    /// Requested finite workload reached its declared completion boundary.
     Completed,
     /// An admission/resource/cancellation limit stopped new work.
     Limit(StopReason),
@@ -122,6 +122,8 @@ pub enum CheckStop {
 /// Failure stage, retained separately from load-stop and final outcome.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckStage {
+    /// Production capture, routing or receiver transport failed.
+    Transport,
     /// Clock, pacing or free-space observation failed.
     Observation,
     /// Creation or writer initialization failed.

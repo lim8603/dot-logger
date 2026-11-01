@@ -1,6 +1,6 @@
 # dot-logger Rust 클라이언트
 
-일반 경로용 Rust API다. 기본 feature는 파일 조회/재생과 협력 취소이며, `remote` feature가 실제 gRPC/TLS 클라이언트와 수신자를 추가한다. 라이브러리는 runtime이나 애플리케이션 worker를 시작하지 않는다. 원격 호출은 호스트 소유 Tokio runtime에서 실행한다.
+일반 경로용 Rust API다. 기본 feature는 파일 조회/재생과 협력 취소이며, `remote` feature가 실제 gRPC/TLS 클라이언트와 수신자를 추가한다. 일반 클라이언트 API는 runtime이나 애플리케이션 worker를 시작하지 않는다. 명시 실행하는 `diagnostics::SnapshotCheck`는 유한 점검용 current-thread runtime을 소유한다. 원격 호출은 호스트 소유 Tokio runtime에서 실행한다.
 
 ## 원격 요청과 화면 연결
 
@@ -72,4 +72,26 @@ cargo run -p dot-logger-client --features remote --example dot_probe_bridge -- -
 - 예제 host 한정: 입력 ≤64 KiB·최대128 thread, raw/route/수신 큐 각1슬롯, logger 메모리 예산16 MiB, 단일 current-thread runtime, 신규 수집/인계 허용 구간2초. 정리·진행 IO와 ACK settlement는 이 구간 뒤에도 실제 종료까지 소유하며 settlement 관측은 최대3초다. 파일 읽기/OS IO의 강제 종료·프로세스 전체 RSS 상한은 보장하지 않는다. 입력 경로는 앱 exporter가 관리하는 신뢰된 일반 파일이어야 한다.
 - `--plan`은 경로를 읽지 않는다. `--run`은 일반 파일을 최대64 KiB+1까지만 읽고 형태를 검증한다. 원래 bytes/누적 tick 카운터는 보존하고 logger의 별도 session/mono time을 붙인다. export의 freshness/원래 boot ID는 파일 형식에 없으므로 추정하지 않는다.
 - Pass는 수신 큐의 실제 수락 및 서버 ACK 확인/원래 receipt 완료에 한정한다. 큐 거절·연결 종료/수신 후 ACK 불명은 Inconclusive이며 원격 완료를 주장하지 않는다. 소비 큐 소유권이 이미 넘어갔으면 ACK 불명이어도 소급 취소하지 않는다. 취소는 Aborted다. CLI exit는 Pass/preview 0, 미확정3, IO/형태/transport 오류4다.
-- 실제 dot-probe exporter를 이용한 **명시 snapshot 연결 예제**다. logger core/RT 호출·dot-probe 코드/화면을 수정하지 않으며 상시 worker/재연결·RunCheck 운영 backend 등록은 후속이다. loopback을 LAN 측정으로 승격하지 않고 capacity/network/RSS/freshness는 Unavailable이다. app exporter 자체의 비용과 logger off/on 비교, 실앱 전체 적용(TASK-020/026), PC/RT·UPS·장기/native 검증은 이 예제로 수락하지 않는다.
+- 실제 dot-probe exporter를 이용한 **명시 snapshot 연결 예제**다. logger core/RT 호출·dot-probe 코드/화면을 수정하지 않으며 상시 worker/재연결은 제공하지 않는다. 고정 RunCheck 등록은 아래 `SnapshotCheck`가 연결한다. loopback을 LAN 측정으로 승격하지 않고 capacity/network/RSS/freshness는 Unavailable이다. app exporter 자체의 비용과 logger off/on 비교, 실앱 전체 적용(TASK-020/026), PC/RT·UPS·장기/native 검증은 이 예제로 수락하지 않는다.
+
+
+## 고정 RunCheck의 실제 수집·수신 점검
+
+`diagnostics::SnapshotCheck::new(host_payload, receiver)`는 host가 선택한 export만 받는다. 이를 `CheckHost::register_routed(plan, 10, Box::new(backend), source)`로 등록하고 `run_routed` 또는 기존 `PlanCheck`/`RunCheck` 명령으로 실행한다. 임의 원격 경로/수신자/입력이나 자동 재시도는 받지 않는다. core의 `RoutedCheckBackend`는 신뢰된 host 확장점이며 보안 sandbox가 아니다.
+
+- 실제 경계: 원 `CaptureReceipt` → raw/routing guard → loopback TCP/gRPC → 1슬롯 소비 큐 수락 → 서버 ACK → 원 receipt 완료 → 실제 연결 종료/예약 회수. byte 비교만으로 수신 ACK를 대신하지 않는다.
+- host는 일반 worker에서 호출한다. 이 backend는 Tokio runtime 내부 호출을 오류로 반환하므로 async host는 기존의 별도 일반 worker에서 `handle_command`를 구동한다. 상시 worker는 자동 생성하지 않는다.
+- 한 건≤64KiB, target10, 양수 revision, 단일 worker, `LoopbackOnly`/`ReceiverAcknowledged`, admission≤2초다. logger 선언16MiB와 input/JSON/큐/runtime headroom을 합산한 backend 요구량24MiB를 검사한다. 예제의 허용 메모리는32MiB다. 이는 제품 기본값·heap/RSS hard limit이 아니다. 별도의 host 관리/서버 metadata도 host가 예약한다.
+- 쓰기 IO는 없으며 실제 physical write는0이다. 파일 점검 전용 directory/write/reserve 선언은 네트워크 scope에서 소비하지 않는다. network bytes/최대 capacity/LAN/RSS/freshness/원 boot identity는 Unavailable이다. 종료/ACK settlement가 admission 기한 뒤에도 이어질 수 있다.
+- `handle_command`의 native 반환은 `HostCheckEvidence::{File,Routed}`다. 기존 file 호출자는 `File` variant를 소비한다. reply headroom 부족은 실행 전 거절하고 capability를 보존한다. 원격 waiter가 닫혀도 명령 permit과 실행 evidence는 실제 정리 뒤까지 유지한다. 원 Report/profile의 세션/시계/구간/유효성은 수정하지 않는다.
+
+```sh
+# 없는 입력에도 무부하 preview
+cargo run -p dot-logger-client --features remote --example dot_probe_check -- --plan /tmp/ticks.json
+# host가 선택한 실제 export를 한 번만 명시 실행
+cargo run -p dot-logger-client --features remote --example dot_probe_check -- --run /tmp/ticks.json
+# 실제 CLI 관리 권한/계획/단일 실행/remote timeout 경로의 재현
+cargo test -p dot-logger-cli --test routed_check_host
+```
+
+`dot_probe_check`는 전용 로컬 host 실행 예제다. 운영 `CheckHost`에 등록한 capability는 기존 CLI `check plan`/`check run --plan ID`에서 같은 관리 프로토콜로 호출된다. CLI는 별도의 서버를 자동 시작하지 않는다. preview/Pass exit0, Aborted/Inconclusive exit3, Fail/입력 오류 exit4다. 지속 실앱 수집/기존 화면/off-on은 TASK-020/026, 장비·RT/UPS/장기/native 검증은 별도 선행조건을 유지한다.

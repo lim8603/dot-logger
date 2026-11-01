@@ -20,3 +20,8 @@ mod receiver;
 pub use receiver::{
     Acknowledgement, ClientError, ClientReceiver, ConnectionId, PendingRecord, ReceiverConfig,
 };
+
+// Shared bridge code is also compiled independently by fault-injection tests.
+extern crate self as dot_logger_client;
+#[cfg(feature = "remote")]
+pub mod diagnostics;

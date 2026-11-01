@@ -1,5 +1,10 @@
 //! Bounded host-owned, single-use check capabilities. No automatic worker.
-use super::{CheckPlan, CheckReport, CheckRuntime, CheckStartError, FileCheck};
+#[cfg(feature = "remote")]
+use super::HostCheckEvidence;
+use super::{
+    CheckPlan, CheckReport, CheckRuntime, CheckStartError, FileCheck, RoutedCheckBackend,
+    RoutedCheckEvidence,
+};
 use crate::{
     storage::WriterBudget,
     telemetry::{capacity::Profile, report::Report},
@@ -44,9 +49,18 @@ impl std::error::Error for HostError {}
 struct Registered {
     id: u64,
     plan: CheckPlan,
-    budget: WriterBudget,
-    check: FileCheck,
+    runner: Runner,
     source: Option<CheckSource>,
+}
+enum Runner {
+    File {
+        budget: WriterBudget,
+        check: Box<FileCheck>,
+    },
+    Routed {
+        target: u32,
+        backend: Box<dyn RoutedCheckBackend>,
+    },
 }
 /// Fixed registration slots owned and driven by a general-path host. Allocate
 /// host metadata separately from each plan's execution budget. The host supplies
@@ -83,22 +97,7 @@ impl CheckHost {
         if s.session_id != budget.session || s.revision != budget.revision {
             return Err(HostError::InvalidInput);
         }
-        if let Some(source) = source {
-            let r = source.report;
-            let c = r.conditions;
-            if r.window.revision != s.revision
-                || c.revision != s.revision
-                || c.environment_id != s.environment_id
-                || c.workload_id != s.workload_id
-                || c.target_id != budget.target
-                || c.boundary != s.boundary
-                || r.window != r.measurements.window
-                || r.conditions != r.measurements.conditions
-                || r != Report::build(r.measurements, source.profile, r.generated_at_ns)
-            {
-                return Err(HostError::InvalidInput);
-            }
-        }
+        validate_source(&plan, budget.target, source)?;
         let slot = self
             .slots
             .iter_mut()
@@ -109,8 +108,10 @@ impl CheckHost {
         *slot = Some(Registered {
             id,
             plan,
-            budget,
-            check,
+            runner: Runner::File {
+                budget,
+                check: Box::new(check),
+            },
             source,
         });
         Ok(id)
@@ -124,6 +125,23 @@ impl CheckHost {
             .flatten()
             .find(|r| r.id == id)
             .ok_or(HostError::Gone)?;
+        let (budget, check) = match &r.runner {
+            Runner::File { budget, check } => (budget, check),
+            Runner::Routed { target, .. } => {
+                let s = r.plan.spec();
+                return Ok(format!(concat!("{{\"schema\":\"dot_logger.check.v1\",\"kind\":\"plan\",\"plan\":\"{}\",",
+                    "\"scope\":\"production_capture_loopback_snapshot\",\"session\":\"{:032x}\",\"revision\":\"{}\",",
+                    "\"environment\":\"{:032x}\",\"workload\":\"{:032x}\",\"target\":{},\"boundary\":\"{:?}\",",
+                    "\"network\":\"{:?}\",\"duration_ns\":\"{}\",\"write_bytes\":\"{}\",\"memory_bytes\":\"{}\",",
+                    "\"required_memory_bytes\":\"{}\",\"disk_reserve_bytes\":\"{}\",\"workers\":{},",
+                    "\"records\":1,\"capability\":\"Unprobed\",\"capacity\":\"Unavailable\",",
+                    "\"network_measurement\":\"Unavailable\",\"source\":{}}}"),
+                    id,s.session_id,s.revision,s.environment_id,s.workload_id,target,s.boundary,s.network,
+                    s.budgets.duration_ns,s.budgets.write_bytes,s.budgets.memory_bytes,s.required_memory_bytes,
+                    s.budgets.disk_reserve_bytes,s.budgets.workers,source_json(r.source))
+                    .into_bytes().into_boxed_slice().into_vec());
+            }
+        };
         let s = r.plan.spec();
         let b = s.budgets;
         Ok(format!(concat!("{{\"schema\":\"dot_logger.check.v1\",\"kind\":\"plan\",\"plan\":\"{}\",",
@@ -134,9 +152,9 @@ impl CheckHost {
             "\"interval_ns\":\"{}\",\"seed\":{},\"scope\":\"synthetic_file\",",
             "\"capability\":\"Unprobed\",\"network_measurement\":\"Unavailable\",\"capacity\":\"Unavailable\",",
             "\"source\":{}}}"),
-            id,s.session_id,s.revision,s.environment_id,s.workload_id,r.budget.target,s.boundary,s.network,
+            id,s.session_id,s.revision,s.environment_id,s.workload_id,budget.target,s.boundary,s.network,
             b.duration_ns,b.write_bytes,b.memory_bytes,s.required_memory_bytes,b.disk_reserve_bytes,b.workers,
-            r.check.workload.records,r.check.workload.payload_bytes,r.check.workload.interval_ns,r.check.workload.seed,
+            check.workload.records,check.workload.payload_bytes,check.workload.interval_ns,check.workload.seed,
             source_json(r.source)).into_bytes().into_boxed_slice().into_vec())
     }
     /// Consume the capability before preflight/IO. Even errors and cancellation
@@ -151,18 +169,115 @@ impl CheckHost {
             .iter_mut()
             .find(|s| s.as_ref().is_some_and(|r| r.id == id))
             .ok_or(HostError::Gone)?;
+        if !matches!(slot.as_ref().map(|r| &r.runner), Some(Runner::File { .. })) {
+            return Err(HostError::InvalidInput);
+        }
         let r = slot.take().ok_or(HostError::Gone)?;
+        let Runner::File { budget, check } = r.runner else {
+            return Err(HostError::InvalidInput);
+        };
         let report = r
             .plan
-            .run_file(r.budget, r.check, runtime)
+            .run_file(budget, *check, runtime)
             .map_err(HostError::Start)?;
         Ok(CheckEvidence {
             report,
             source: r.source,
         })
     }
+    /// Register a trusted finite production backend without running it. Remote
+    /// callers supply only this host's opaque capability, never input or paths.
+    pub fn register_routed(
+        &mut self,
+        plan: CheckPlan,
+        target: u32,
+        backend: Box<dyn RoutedCheckBackend>,
+        source: Option<CheckSource>,
+    ) -> Result<u64, HostError> {
+        let s = plan.spec();
+        if s.session_id == 0
+            || s.revision == 0
+            || s.budgets.workers != 1
+            || s.boundary != crate::completion::Boundary::ReceiverAcknowledged
+            || s.network != super::NetworkPlan::LoopbackOnly
+            || backend.target_id() != target
+            || backend.required_memory_bytes() == 0
+            || backend.required_memory_bytes() > s.required_memory_bytes
+        {
+            return Err(HostError::InvalidInput);
+        }
+        validate_source(&plan, target, source)?;
+        let slot = self
+            .slots
+            .iter_mut()
+            .find(|s| s.is_none())
+            .ok_or(HostError::Limit)?;
+        let id = self.next;
+        self.next = id.checked_add(1).ok_or(HostError::Limit)?;
+        *slot = Some(Registered {
+            id,
+            plan,
+            runner: Runner::Routed { target, backend },
+            source,
+        });
+        Ok(id)
+    }
+    /// Consume one routed capability before running; return only after backend
+    /// IO settlement. Wrong-backend calls leave the capability untouched.
+    pub fn run_routed<R: CheckRuntime>(
+        &mut self,
+        id: u64,
+        runtime: &mut R,
+    ) -> Result<RoutedCheckEvidence, HostError> {
+        let slot = self
+            .slots
+            .iter_mut()
+            .find(|s| s.as_ref().is_some_and(|r| r.id == id))
+            .ok_or(HostError::Gone)?;
+        if !matches!(
+            slot.as_ref().map(|r| &r.runner),
+            Some(Runner::Routed { .. })
+        ) {
+            return Err(HostError::InvalidInput);
+        }
+        let r = slot.take().ok_or(HostError::Gone)?;
+        let Runner::Routed { target, backend } = r.runner else {
+            return Err(HostError::InvalidInput);
+        };
+        let report = backend.run(&r.plan, runtime).map_err(HostError::Start)?;
+        Ok(RoutedCheckEvidence {
+            plan: r.plan,
+            target,
+            report,
+            source: r.source,
+        })
+    }
 }
-fn source_json(source: Option<CheckSource>) -> String {
+fn validate_source(
+    plan: &CheckPlan,
+    target: u32,
+    source: Option<CheckSource>,
+) -> Result<(), HostError> {
+    let s = plan.spec();
+    if let Some(source) = source {
+        let r = source.report;
+        let c = r.conditions;
+        if r.window.revision != s.revision
+            || c.revision != s.revision
+            || c.environment_id != s.environment_id
+            || c.workload_id != s.workload_id
+            || c.target_id != target
+            || c.boundary != s.boundary
+            || r.window != r.measurements.window
+            || r.conditions != r.measurements.conditions
+            || r != Report::build(r.measurements, source.profile, r.generated_at_ns)
+        {
+            return Err(HostError::InvalidInput);
+        }
+    }
+    Ok(())
+}
+pub(super) fn source_json(source: Option<CheckSource>) -> String {
     match source {
         None => "null".into(),
         Some(s) => format!(concat!("{{\"session\":\"{:032x}\",\"revision\":\"{}\",",
@@ -213,10 +328,10 @@ impl CheckEvidence {
             stage(&r.primary_issue),stage(&r.settlement_issue),stage(&r.cleanup_issue),source_json(self.source)).into_bytes().into_boxed_slice().into_vec()
     }
 }
-fn optional_number(n: Option<u64>) -> String {
+pub(super) fn optional_number(n: Option<u64>) -> String {
     n.map_or_else(|| "null".into(), |n| format!("\"{n}\""))
 }
-fn stage(issue: &Option<super::CheckIssue>) -> String {
+pub(super) fn stage(issue: &Option<super::CheckIssue>) -> String {
     issue.as_ref().map_or_else(
         || "null".into(),
         |i| {
@@ -282,7 +397,7 @@ impl CheckHost {
         &mut self,
         command: crate::adapters::remote::Command,
         runtime: &mut R,
-    ) -> Option<CheckEvidence> {
+    ) -> Option<HostCheckEvidence> {
         use crate::adapters::remote::{ManagementReply, ManagementRequest, RemoteError};
         if command.response_capacity() < 4096 {
             command.respond(Err(RemoteError::Limit));
@@ -303,13 +418,21 @@ impl CheckHost {
                 return None;
             }
         };
-        let result = self.run(
-            id,
-            &mut CommandRuntime {
-                command: &command,
-                runtime,
-            },
-        );
+        let routed = self
+            .slots
+            .iter()
+            .flatten()
+            .any(|r| r.id == id && matches!(r.runner, Runner::Routed { .. }));
+        let mut runtime = CommandRuntime {
+            command: &command,
+            runtime,
+        };
+        let result = if routed {
+            self.run_routed(id, &mut runtime)
+                .map(HostCheckEvidence::Routed)
+        } else {
+            self.run(id, &mut runtime).map(HostCheckEvidence::File)
+        };
         match result {
             Ok(evidence) => {
                 command.respond(Ok(ManagementReply::Report(evidence.summary(id))));

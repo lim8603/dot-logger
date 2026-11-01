@@ -61,5 +61,8 @@ fn execute() -> Result<bool, bridge::Error> {
             "rss_measurement": "Unavailable", "physical_write_bytes": 0
         })
     );
+    if let Some(error) = report.issue {
+        return Err(error);
+    }
     Ok(report.outcome == bridge::BridgeOutcome::Pass && identical)
 }

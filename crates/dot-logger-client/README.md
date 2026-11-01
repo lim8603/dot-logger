@@ -123,6 +123,7 @@ python3 scripts/check-influxdb.py --pipeline-example --output /tmp/dot-logger-pi
 | 파일/구독 | 각각30건 | 각각15건 |
 | DB | 로그·수치20건 | 명시 route off·할당0건 |
 
+JSON phase에는 원 session/epoch·revision/구간·환경/workload/target/boundary/input ID를 보존합니다.
 원 capture receipt·metadata·payload를 MCAP 독립 읽기와 실제 TCP/gRPC/1슬롯 소비 큐에서
 대조합니다. ACK는 완전 조립 후 소비 큐가 받은 경우에만 보내며, DB 수치는 변경 전 원래
 10건의 receipt·Unix ns·값을 query로 대조합니다. raw는 DB에 해석/저장하지 않습니다.

@@ -142,7 +142,14 @@ impl PipelineReport {
     /// Stable machine-readable functional result with explicit missing evidence.
     pub fn json(&self) -> serde_json::Value {
         let phase = |p: &Phase| {
-            serde_json::json!({"revision":p.revision,"offered":30,"accepted":p.accepted,"skipped":p.skipped,
+            serde_json::json!({"session_id":format!("{:032x}",p.snapshot.report.window.session_id),
+            "epoch":p.snapshot.report.window.epoch,"revision":p.revision,
+            "application_input_id":p.snapshot.application_input_id,
+            "conditions":{"environment_id":p.snapshot.report.conditions.environment_id,
+                "workload_id":p.snapshot.report.conditions.workload_id,
+                "target_id":p.snapshot.report.conditions.target_id,
+                "boundary":format!("{:?}",p.snapshot.report.conditions.boundary)},
+            "offered":30,"accepted":p.accepted,"skipped":p.skipped,
             "file":totals_json(p.file),"database":totals_json(p.database),"receiver":totals_json(p.receiver),
             "from_ns":p.snapshot.report.window.from_ns,"to_ns":p.snapshot.report.window.to_ns})
         };

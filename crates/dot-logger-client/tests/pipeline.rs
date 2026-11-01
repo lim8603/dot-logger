@@ -33,6 +33,17 @@ fn db_transport_failure_preserves_file_subscription_and_explicit_workload_differ
     assert_eq!(report.external_after_close, 0);
     assert!(!report.comparison.differences.comparable());
     assert!(report.comparison.differences.workload);
+    let json = report.json();
+    assert_eq!(
+        json["before"]["session_id"],
+        "0000000000000000000000000000002a"
+    );
+    assert_eq!(json["before"]["epoch"], 1);
+    assert_eq!(json["after"]["epoch"], 1);
+    assert_eq!(json["before"]["conditions"]["workload_id"], 1);
+    assert_eq!(json["after"]["conditions"]["workload_id"], 2);
+    assert_eq!(json["after"]["conditions"]["target_id"], 10);
+    assert_eq!(json["after"]["conditions"]["boundary"], "Written");
     assert!(!report.is_complete());
     assert!(matches!(
         report.comparison.accepted_rate,

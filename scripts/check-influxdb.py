@@ -18,6 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--toolchain', default='1.96.0')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--pipeline-example', action='store_true',
+                        help='also verify TASK-020 S2 integration and its CLI against this owned DB')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     name = 'dot-logger-tc008-' + secrets.token_hex(6)
@@ -89,6 +91,26 @@ def main():
             print(log.decode()[-6000:])
             raise RuntimeError('live TC-008 failed; see live.log')
         print(f"InfluxDB {VERSION}: live TC-008 passed")
+        if args.pipeline_example:
+            commands = [
+                ('pipeline-test', ['cargo', '+' + args.toolchain, 'test', '--locked',
+                 '-p', 'dot-logger-client', '--features', 'integration-example',
+                 '--test', 'pipeline', '--', '--ignored', '--test-threads=1']),
+                ('pipeline-example', ['cargo', '+' + args.toolchain, 'run', '--locked',
+                 '-p', 'dot-logger-client', '--features', 'integration-example',
+                 '--example', 'dot_probe_pipeline', '--', '--run',
+                 'tc_pipeline_cli_' + secrets.token_hex(6)]),
+            ]
+            evidence['pipeline_commands'] = []
+            for label, command in commands:
+                run = subprocess.run(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                log = run.stdout.replace(token.encode(), b'[REDACTED]')
+                args.output.joinpath(label + '.log').write_bytes(log)
+                evidence['pipeline_commands'].append({'command': command, 'exit_code': run.returncode})
+                if run.returncode:
+                    print(log.decode()[-6000:])
+                    raise RuntimeError('TASK-020 S2 failed; see ' + label + '.log')
+            print(f"InfluxDB {VERSION}: TASK-020 S2 integration and CLI passed")
     finally:
         if created:
             cleanup = subprocess.run(['docker', 'rm', '--force', '--volumes', name],

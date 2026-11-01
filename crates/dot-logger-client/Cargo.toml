@@ -9,6 +9,8 @@ publish.workspace = true
 default = []
 remote = ["dot-logger/remote", "dep:tonic", "dep:tokio", "dep:prost", "dep:tower", "dep:hyper-util", "dep:serde_json"]
 
+integration-example = ["remote", "dot-logger/influxdb", "dot-logger/tracing-adapter"]
+
 [dependencies]
 dot-logger = { path = "../dot-logger", default-features = false }
 tonic = { workspace = true, optional = true, features = ["tls-ring"] }
@@ -23,6 +25,8 @@ workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+log.workspace = true
+mcap.workspace = true
 
 [[example]]
 name = "remote_query_replay"
@@ -35,3 +39,7 @@ required-features = ["remote"]
 [[example]]
 name = "dot_probe_check"
 required-features = ["remote"]
+
+[[example]]
+name = "dot_probe_pipeline"
+required-features = ["integration-example"]

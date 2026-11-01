@@ -95,3 +95,48 @@ cargo test -p dot-logger-cli --test routed_check_host
 ```
 
 `dot_probe_check`는 전용 로컬 host 실행 예제다. 운영 `CheckHost`에 등록한 capability는 기존 CLI `check plan`/`check run --plan ID`에서 같은 관리 프로토콜로 호출된다. CLI는 별도의 서버를 자동 시작하지 않는다. preview/Pass exit0, Aborted/Inconclusive exit3, Fail/입력 오류 exit4다. 지속 실앱 수집/기존 화면/off-on은 TASK-020/026, 장비·RT/UPS/장기/native 검증은 별도 선행조건을 유지한다.
+
+## 합성 입력 통합·설정 비교 예제 — TASK-020 S2
+
+`dot_probe_pipeline`은 dot-probe 형태의 **합성 입력**을 기존 제품 API로 연결합니다.
+실제 dot-probe 소스나 화면을 수정하지 않으며 지속 앱 적용은 TASK-026입니다.
+
+```sh
+# DB 환경 변수·파일 접근·소켓 bind 없이 실행 계획만 출력
+cargo run --locked -p dot-logger-client --features integration-example --example dot_probe_pipeline -- --plan
+
+# 고정 이미지의 자기 소유 일회 DB에서 실제 통합/CLI까지 검사·정리
+python3 scripts/check-influxdb.py --pipeline-example --output /tmp/dot-logger-pipeline-evidence
+```
+
+기존 DB에 명시 실행할 때는 `DOT_LOGGER_TEST_INFLUX_URL`, `DOT_LOGGER_TEST_INFLUX_ORG`,
+`DOT_LOGGER_TEST_INFLUX_BUCKET`, `DOT_LOGGER_TEST_INFLUX_TOKEN`을 호스트에서 제공한 뒤
+`--run <새로운-독점-measurement>`를 사용합니다. 기존 데이터와 겹치지 않는 namespace를
+제공해야 하며 DB 데이터는 자동 삭제하지 않습니다. 토큰은 인자/보고서에 출력하지 않습니다.
+예제 자신이 만든 임시 MCAP 파일과 loopback 서버는 실제 종료 후 정리합니다.
+
+| 항목 | 변경 전 revision 1 | 변경 후 revision 2 |
+|---|---|---|
+| 동일 생성 입력 | 로그·I64 수치·64B raw 각10건 | 동일 생성 입력 각10건 |
+| 정책 | 모두 수락 | Info 로그 제외·Normal 수치 2회당1회·raw 유지 |
+| 입력 결과 | 수락30·생략0 | 수락15·의도적 생략15 |
+| 파일/구독 | 각각30건 | 각각15건 |
+| DB | 로그·수치20건 | 명시 route off·할당0건 |
+
+원 capture receipt·metadata·payload를 MCAP 독립 읽기와 실제 TCP/gRPC/1슬롯 소비 큐에서
+대조합니다. ACK는 완전 조립 후 소비 큐가 받은 경우에만 보내며, DB 수치는 변경 전 원래
+10건의 receipt·Unix ns·값을 query로 대조합니다. raw는 DB에 해석/저장하지 않습니다.
+`validate_config → apply_config → producer acknowledgment`로 전환하고 MCAP writer는
+revision별로 별도 예약·생성합니다. DB RoutedWriter의 initial revision 계약을 유지하려고
+revision 2의 DB 경로는 명시적으로 끕니다. 이 예제는 live DB revision 지원을 추가하지 않습니다.
+
+계측 구간은 **가상 session mono 시계**의 두 10초 창(0~10초, 11~21초)입니다.
+실제 sleep/성능 실측을 대신하지 않으며 출력에 `SyntheticFunctionalExample`을 표시합니다.
+HTTP·ACK·신규 입력 기한은 실제 Instant 시계로 제한합니다. fanout 변경은 workload 차이로
+Comparison에 남겨 인과적 rate 비교는 Unavailable입니다. CPU·RSS·capacity·RT 비용/성능을
+수락하지 않습니다. 호스트가 일반 경로에서 순차 실행하는 유한 예제여서 DB 지연과 무관한
+지속 파일 처리율도 보장하지 않습니다. 명시 예산32MiB와 런타임/OS RSS는 구분합니다.
+
+종료 코드0은 이 고정 기능 프로필의 모든 선택 경계·독립 읽기·query·정리를 확인한 경우,
+3은 DB/구독 결과가 프로필에 미달한 경우, 4는 입력/IO/검증 오류입니다.
+S3 구독 종료/재연결 불연속 예제·실제 화면·지속 앱·실측/native는 후속입니다.

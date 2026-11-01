@@ -197,5 +197,12 @@ Capacity/Closing 등 기존 결과를 그대로 반환하며, 수락 receipt는 
 cargo run --locked -p dot-logger --features tracing-adapter --example general_logs
 ```
 
-이 예제는 일반 로그→수집/소비까지입니다. 파일·DB·구독/조절 비교 통합 예제(S2),
+이 예제는 일반 로그→수집/소비까지입니다. S2 통합 비교는 아래 별도 예제를 사용합니다.
 구독 종료/재연결 화면 불연속 예제(S3), 실제 지속 dot-probe 적용(TASK-026)은 후속입니다.
+
+### 합성 입력 통합·설정 비교 (TASK-020 S2)
+
+[dot_probe_pipeline 예제](crates/dot-logger-client/examples/dot_probe_pipeline.rs)는 합성 로그·수치·원본을
+같은 capture receipt로 실제 MCAP·InfluxDB·loopback 구독에 연결하고, 명시 설정 변경 후
+필터/sampling·DB route off 결과를 비교합니다. [실행과 수락 범위](crates/dot-logger-client/README.md#합성-입력-통합설정-비교-예제--task-020-s2)를 따릅니다.
+가상 session 시계의 기능 예제이며 실제 dot-probe 적용·성능/RT 검증은 후속입니다.

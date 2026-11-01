@@ -275,6 +275,8 @@ version = "0.1.0"
 dependencies = [
  "dot-logger",
  "hyper-util",
+ "log",
+ "mcap",
  "prost",
  "serde_json",
  "tokio",

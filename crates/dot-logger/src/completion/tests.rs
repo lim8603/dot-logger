@@ -418,3 +418,116 @@ fn delayed_enqueue_feedback_after_writer_failure_does_not_stall_dispatch() {
         });
     });
 }
+
+#[cfg(feature = "influxdb")]
+#[test]
+fn routed_db_busy_publication_keeps_the_same_attempt_and_output_permit() {
+    use crate::{adapters::influxdb::*, query::QueryBudget};
+    use std::sync::atomic::AtomicBool;
+    let (_, original, route) = setup();
+    let mut config = original.config().clone();
+    config.memory.external_bytes = 128 * 1024;
+    let plan = SessionBuilder::new(config)
+        .validate(&Default::default())
+        .unwrap();
+    let budget = QueryBudget::new(&plan);
+    let tracking = CompletionConfig {
+        history_retention: Duration::from_secs(60),
+        window_records: 8,
+        max_queries: 1,
+        page_items: 2,
+        feedback_events: 2,
+        updates_per_turn: 2,
+        reconcile_per_turn: 2,
+        targets: vec![TargetContract {
+            id: 10,
+            required: true,
+            supported: Boundaries::DATABASE,
+            completion: Boundary::DatabaseAcknowledged,
+        }],
+    };
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        tracking,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut producer, input) = scope.next().unwrap();
+        let receipt = match producer
+            .try_record_small(metadata(), &1i64.to_le_bytes())
+            .unwrap()
+        {
+            crate::capture::RecordOutcome::Accepted(r) => r,
+            _ => panic!("skipped"),
+        };
+        let mut router = Router::new(&plan, vec![input], route).unwrap();
+        let low = Writer::new(
+            &budget,
+            Config {
+                endpoint: "http://127.0.0.1:1".into(),
+                organization: "test".into(),
+                bucket: "test".into(),
+                token: "test-only".into(),
+                session_id: 42,
+                measurement: "test".into(),
+                device: "test".into(),
+                channels: vec![Channel {
+                    id: 7,
+                    kind: Kind::Integer,
+                }],
+                collision_policy: CollisionPolicy::RejectNonIncreasing,
+                max_points: 1,
+                max_batch_bytes: 4096,
+                max_event_bytes: 64,
+                max_attempts: 1,
+                request_timeout: Duration::from_secs(1),
+                retry_delay: Duration::from_millis(1),
+                ttl: Duration::from_secs(1),
+            },
+        )
+        .unwrap();
+        let mut writer = RoutedWriter::new(
+            low,
+            c,
+            10,
+            vec![ProjectionSchema {
+                channel_id: 7,
+                schema_id: 99,
+                schema_version: 1,
+                encoding: ProjectionEncoding::I64Le,
+            }],
+        )
+        .unwrap();
+        router.scope(|mut d, mut outputs| {
+            d.turn(Instant::now(), &mut [None; 4]).unwrap();
+            let attempt = writer.write_delivery(
+                outputs[0].try_next(Instant::now()).unwrap().unwrap(),
+                &AtomicBool::new(true),
+            );
+            assert_eq!(attempt.result().unwrap().attempts, 0);
+            let slot = c.registry.locate(receipt).unwrap();
+            let phase = slot.phase.load(Ordering::Acquire);
+            slot.phase.store(UPDATING, Ordering::Release);
+            assert_eq!(attempt.publish(), Err(CompletionError::Busy));
+            assert_eq!(d.target_snapshot(10).unwrap().in_flight, 1);
+            slot.phase.store(phase, Ordering::Release);
+            attempt.publish().unwrap();
+            assert_eq!(
+                c.poll(receipt, 10, Boundary::DatabaseAcknowledged)
+                    .unwrap()
+                    .outcome,
+                QueryOutcome::Dropped(crate::routing::DropReason::Cancelled)
+            );
+            assert_eq!(attempt.result().unwrap().attempts, 0);
+            drop(attempt);
+            assert_eq!(d.target_snapshot(10).unwrap().in_flight, 0);
+        });
+        drop(writer);
+    });
+    assert_eq!(budget.used_bytes(), 0);
+}

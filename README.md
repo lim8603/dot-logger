@@ -145,7 +145,7 @@ filesystem 여유 변화는 다른 관측입니다. `NoGrowth`는 양의 증가�
 안정 합성 입력의 계산 검증은 실제 PC/RT 예측 오차≤20%나 계측 비용≤5% 달성을 뜻하지 않습니다.
 
 
-## InfluxDB v2 유한 write — TASK-019 S1
+## InfluxDB v2 쓰기·수치 조회 — TASK-019 S1/S2
 
 `influxdb` feature의 `adapters::influxdb::Writer::new(&QueryBudget, Config)`는 고정 measurement/device/channel·typed schema·원 session·유한 batch/이벤트/재시도/TTL을 검증하고 공유 external 메모리를 예약합니다. 호스트의 Tokio runtime에서 `write(&[Point], &AtomicBool)`을 명시 호출합니다. 일반 경로 전용이며 worker나 spool을 만들지 않습니다. 원본 bytes를 자동 해석하거나 전송하지 않습니다.
 
@@ -154,7 +154,7 @@ filesystem 여유 변화는 다른 관측입니다. `NoGrowth`는 양의 증가�
 - HTTP 204는 API `Acknowledged`입니다. 400/422 부분 실패·응답 단절/timeout·진행 취소는 `Unknown`, 미시도 취소는 `NotSent`입니다. 재시도는 같은 encoded body를 사용합니다. HTTPS 또는 literal loopback HTTP, redirect/proxy/암묵 retry off, token은 sensitive header로만 유지하며 서버 오류 body를 보고서에 넣지 않습니다.
 - 공유 예약은 HTTP가 소유한 body의 마지막 해제까지 유지합니다. 이전 body가 남으면 `Busy`로 다음 배치를 막습니다. HTTP/TLS/runtime 내부와 OS/RSS는 별도 headroom이며, 원격 IO 취소/rollback을 추정하지 않습니다.
 
-S2는 OSS2.9.1/Linux amd64 digest 고정 DB에서 write/query를 대조했습니다. Router Delivery/완료 연결·파일 장애 격리 계측·실앱/native는 후속입니다. [TASK-019](.cowork/04_implementation/tasks/TASK-019.md)·[API §14.6](.cowork/03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).
+S2는 OSS2.9.1/Linux amd64 digest 고정 DB에서 write/query를 대조했습니다. S3 원 Delivery/완료와 로컬 파일 격리는 아래 범위에서 검증했으며 실앱/정량 성능/native는 후속입니다. [TASK-019](.cowork/04_implementation/tasks/TASK-019.md)·[API §14.6](.cowork/03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).
 
 
 `Writer::query_numeric(NumericQuery, &AtomicBool)`은 고정 numeric 채널의 `[from_ns,to_ns)`를 조회합니다. max_rows≤1024·응답≤1MiB·request timeout/TTL·cancel을 적용하고, 원 session/measurement/device/channel·receipt·Unix ns·typed value를 `NumericPage`에 보존합니다. 행/bytes 상한·손상/late-error·부분 응답·기한 초과는 전체 실패이며 일부 결과를 성공처럼 반환하지 않습니다. 별도 query 예약은 Page와 실제 HTTP body 마지막 소유자까지 유지됩니다. DB engine의 CPU/RAM hard cap이나 원격 rollback을 뜻하지 않습니다. [API§14.7](.cowork/03_design_artifacts/interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01).
@@ -165,4 +165,13 @@ S2는 OSS2.9.1/Linux amd64 digest 고정 DB에서 write/query를 대조했습니
 python3 scripts/check-influxdb.py --toolchain 1.96.0 --output /tmp/dot-logger-influx-check
 ```
 
-Docker 접근/고정 image 다운로드가 필요합니다. 일반 `cargo test`에서는 실제 DB 시험3개를 명시 ignore하며 위 harness가 별도로 실행합니다. 기존 DB/volume/설정은 사용하지 않습니다. fixture/기능 성공을 파일 격리·실앱·장기/RT/성능/native 수락으로 확대하지 않습니다.
+Docker 접근/고정 image 다운로드가 필요합니다. 일반 `cargo test`에서는 실제 DB 시험4개를 명시 ignore하며 위 harness가 별도로 실행합니다. 기존 DB/volume/설정은 사용하지 않습니다. fixture/기능 성공을 파일 격리·실앱·장기/RT/성능/native 수락으로 확대하지 않습니다.
+
+
+## InfluxDB 원본·완료 연결 — TASK-019 S3
+
+`RoutedWriter::new(writer, completion, db_target, schemas)`로 원 session/초기 revision·DB 완료 계약·채널의 schema ID/version과 `I64Le/F64Le/BoolByte/Utf8Event`를 고정합니다. `write_delivery(delivery,cancel)`은 **host의 일반 worker에서 호출하는 동기식 한 건 처리**입니다. 원 metadata/bytes를 바꾸지 않고 전용 current-thread runtime의 로컬 IO 정리까지 Delivery를 유지합니다. 기존 async runtime 안에서는 원 guard를 미시도 오류로 반환합니다. runtime/DNS/OS 정리는 TTL 뒤에도 실제 종료까지 기다릴 수 있습니다.
+
+`DeliveryAttempt::result()`로 write 결과를 확인하고 `publish()`로 원 receipt의 `DatabaseAcknowledged`/실패/폐기/Unknown을 게시합니다. Busy이면 같은 Attempt를 유지하고 publish만 다시 호출합니다. HTTP를 재제출하지 않습니다. 완료를 게시한 뒤에도 실제 Attempt Drop까지 원본을 유지합니다. `into_delivery()`는 identity/runtime/Busy의 미시도 guard만 복구할 수 있습니다. 미게시 Drop은 Unknown입니다.
+
+파일 출력은 별도 host worker에서 진행합니다. 로컬 시험은 DB 정지·포화 중 파일6건/3508B·원문/metadata 보존·Written 완료를 확인했고, DB는 in-flight1/8B·추가5건 Capacity drop을 분리 표시했습니다. paired file-phase ns는 기능 관측이며 처리량/RT/≤5% 비용 수락이 아닙니다. 공유 raw 풀이 모두 고갈되면 새 수집도 거절될 수 있습니다. 실앱·정량 성능/장기·다른 OS/native는 후속입니다. [API§14.8](.cowork/03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).

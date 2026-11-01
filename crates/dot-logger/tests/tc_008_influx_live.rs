@@ -260,3 +260,133 @@ fn real_v2_partial_type_failure_reports_unknown_and_retains_valid_rows() {
         assert_eq!(b.used_bytes(), 0);
     });
 }
+
+#[path = "support/influx_routed.rs"]
+mod routed_fixture;
+#[test]
+#[ignore = "requires digest-pinned isolated DB; run scripts/check-influxdb.py"]
+fn real_v2_delivery_ack_and_failure_keep_original_completion_identity() {
+    use dot_logger::{
+        capture::{CaptureOwner, ChannelConfig, Importance},
+        completion::{Boundary, QueryOutcome, Update},
+        pool::RawRecordOutcome,
+        routing::Router,
+    };
+    use std::time::Instant;
+    for failure in [false, true] {
+        let plan = routed_fixture::plan();
+        let route = routed_fixture::route(true);
+        let budget = QueryBudget::new(&plan);
+        let measurement = if failure {
+            "tc_routed_failed"
+        } else {
+            "tc_routed"
+        };
+        let mut cfg = config(measurement);
+        cfg.channels.retain(|c| c.id == 7);
+        let t = now();
+        if failure {
+            assert_eq!(
+                routed_fixture::runtime(raw_write(
+                    measurement,
+                    format!(
+                        "{measurement},channel=7,device=robot_1 integer=\"conflict\" {}",
+                        t - 1
+                    )
+                )),
+                204
+            );
+        }
+        let mut owner = CaptureOwner::new_tracked(
+            &plan,
+            42,
+            1,
+            &[ChannelConfig::new(7, 99, 1)],
+            &route,
+            routed_fixture::tracking(),
+        )
+        .unwrap();
+        owner.scope(|mut scope| {
+            let c = scope.completion().unwrap();
+            let (mut producer, a) = scope.next().unwrap();
+            let (_, b) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![a, b], route).unwrap();
+            let mut db = RoutedWriter::new(
+                Writer::new(&budget, cfg).unwrap(),
+                c,
+                20,
+                routed_fixture::schemas(),
+            )
+            .unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let mut loan = producer.try_acquire(8, Importance::Normal).unwrap();
+                loan.payload_mut().copy_from_slice(&(-123i64).to_le_bytes());
+                let mut metadata = support::meta();
+                metadata.real_ns = t;
+                let receipt = match producer.try_record_raw(metadata, loan).unwrap() {
+                    RawRecordOutcome::Accepted(r) => r,
+                    _ => panic!("skipped"),
+                };
+                dispatch.turn(Instant::now(), &mut [None; 8]).unwrap();
+                let file = outputs[0].try_next(Instant::now()).unwrap().unwrap();
+                file.report(Update::Confirmed(Boundary::Written)).unwrap();
+                drop(file);
+                let attempt = db.write_delivery(
+                    outputs[1].try_next(Instant::now()).unwrap().unwrap(),
+                    &AtomicBool::new(false),
+                );
+                assert_eq!(
+                    attempt.result().unwrap().outcome,
+                    if failure {
+                        Outcome::Unknown
+                    } else {
+                        Outcome::Acknowledged
+                    }
+                );
+                assert_eq!(
+                    c.poll(receipt, 20, Boundary::DatabaseAcknowledged)
+                        .unwrap()
+                        .outcome,
+                    QueryOutcome::Pending
+                );
+                if failure {
+                    assert!(matches!(attempt.result().unwrap().status, Some(400 | 422)));
+                    assert_eq!(attempt.result().unwrap().attempts, 1);
+                }
+                attempt.publish().unwrap();
+                assert_eq!(
+                    c.poll(receipt, 20, Boundary::DatabaseAcknowledged)
+                        .unwrap()
+                        .outcome,
+                    if failure {
+                        QueryOutcome::Unknown
+                    } else {
+                        QueryOutcome::Complete
+                    }
+                );
+                assert_eq!(dispatch.snapshot().raw_retained_bytes, 8);
+                drop(attempt);
+                assert_eq!(
+                    dispatch
+                        .turn(Instant::now(), &mut [None; 8])
+                        .unwrap()
+                        .reclaimed,
+                    1
+                );
+                let mut low = db.into_writer();
+                if !failure {
+                    let page = routed_fixture::runtime(
+                        low.query_numeric(query(7, t), &AtomicBool::new(false)),
+                    )
+                    .unwrap();
+                    assert_eq!(page.points().len(), 1);
+                    assert_eq!(page.points()[0].receipt, receipt);
+                    assert_eq!(page.points()[0].real_ns, t);
+                    assert_eq!(page.points()[0].value, NumericValue::Integer(-123));
+                }
+                drop(low);
+            });
+        });
+        assert_eq!(budget.used_bytes(), 0);
+    }
+}

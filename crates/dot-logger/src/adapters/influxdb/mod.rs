@@ -7,6 +7,7 @@
 //! file IO, spool, worker or exactly-once guarantee is provided here. Numeric
 //! queries use fixed scope, finite response/row/time limits and no retries.
 mod numeric;
+mod routed;
 use crate::{
     capture::CaptureReceipt,
     query::{QueryBudget, Reservation},
@@ -17,6 +18,9 @@ pub use numeric::{
 use reqwest::{
     Client, Url,
     header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue, RETRY_AFTER},
+};
+pub use routed::{
+    DeliveryAttempt, ProjectionEncoding, ProjectionError, ProjectionSchema, RoutedWriter,
 };
 use std::{
     fmt::{self, Write as _},

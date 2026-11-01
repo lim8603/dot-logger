@@ -440,6 +440,7 @@ fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
         let proxy_addr = listener.local_addr().unwrap();
         let pause = Arc::new(AtomicBool::new(false));
         let pause_copy = pause.clone();
+        let (upload_tx, upload_rx) = tokio::sync::oneshot::channel();
         let proxy = tokio::spawn(async move {
             let (downstream, _) = listener.accept().await.unwrap();
             let upstream = tokio::net::TcpStream::connect(addr).await.unwrap();
@@ -448,6 +449,9 @@ fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
             let upload = tokio::spawn(async move {
                 let _ = tokio::io::copy(&mut down_read, &mut up_write).await;
             });
+            // The test owner must join both proxy directions before expecting
+            // the shared server reservation to be released.
+            upload_tx.send(upload).unwrap();
             let mut bytes = [0; 1024];
             loop {
                 let n = up_read.read(&mut bytes).await.unwrap();
@@ -462,13 +466,12 @@ fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
                     down_write.write_all(&bytes[..n]).await.unwrap();
                 }
             }
-            upload.abort();
-            let _ = upload.await;
         });
         let cancel = Cancellation::new();
         let mut config = RemoteConfig::new(format!("http://{proxy_addr}"));
         config.timeout = Duration::from_millis(150);
         let mut client = RemoteClient::connect(config, &cancel).await.unwrap();
+        let upload = upload_rx.await.unwrap();
         let mut stream = client
             .subscribe(
                 &budget,
@@ -509,6 +512,8 @@ fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
         drop((stream, client, ack, inbox));
         proxy.abort();
         let _ = proxy.await;
+        upload.abort();
+        let _ = upload.await;
         stop.send(()).unwrap();
         server.await.unwrap().unwrap();
         drop(hub);

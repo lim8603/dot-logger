@@ -1,6 +1,6 @@
 # Task 목록과 실행 계획
 
-- 현재(2026-11-01 #004): TASK-016 REV-028 RV-063/064 조치·수락/Closed, TASK-017 S1 무부하 계획·예산 판정 착수/로컬 수락(EV-031·REV-029 Closed, 소스0622a90). 다음 S2 실제 실행·배출/sync/정리·결과 분류. runtime/실앱·PC/RT/native 후속 및 Task/MS 전체 미완료 유지. 이전 기록은 당시 이력이다.
+- 현재(2026-11-01 #005): TASK-017 S2 합성 MCAP 파일 실제 실행·예산/취소·footer/sync/close/소유 경로 정리·결과 분류 로컬 수락(EV-032·REV-030 Closed, 소스1cae3b9). 다음 S3 운영 free probe·Report/CLI/host 연결. 실앱/PC/RT/native와 Task/MS 전체 미완료 유지. 이전 기록은 당시 이력이다.
 - INT-001 / 2026-10-28 / 계획 Approved(2026-10-26). TASK-001 Done, TASK-002 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-001 이력). TASK-003 Done — 구현·Human 리뷰·로컬/native CI 완료(EV-002). TASK-004 In Progress — 구현·Human 리뷰 승인·게시 완료(EV-003 로컬 Pass); GitHub 계정 결제/한도로 native CI 실행 전 차단.
 - 담당 AI는 승인된 실행 담당이며 Human은 프로젝트 오너다. 2026-10-31 모든 권한/게시 위임에 따라 승인된 목표의 구현·검증·로컬 수락/마감·단위별 커밋/푸시는 AI가 수행·보고한다. 같은 범위의 재승인은 받지 않으며 solo를 유지한다.
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
@@ -29,7 +29,7 @@
 | TASK-014 | 운영 계측과 제한된 집계 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-10-31 | EV-029 범주·이력 복구 수락/REV-025 Closed; 비용/실측/native 후속 | TASK-005 | [상세](tasks/TASK-014.md) | 1~2 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 정렬 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | EV-030 로컬 수락·REV-028 Closed/EV-031; backend/실앱/실측/native 후속 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |
-| TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | S1 계획/예산 EV-031 수락; S2 실제 run·배출/sync/정리·결과 분류 TDD | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
+| TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | S2 파일 실행/정리 EV-032 수락·REV-030 Closed; 다음 S3 Report/CLI·host 연결 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
 | TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | unknown hardware와 사용자 고정 설정에서 과신 추천/자동 적용 금지 | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 동일 timestamp 충돌·timeout 이후 unknown·부분 batch 오류 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 일반 tracing을 RT 경로로 사용하지 않음·화면 client 데이터 흐름 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |

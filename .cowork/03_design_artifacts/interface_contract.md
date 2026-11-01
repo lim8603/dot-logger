@@ -618,7 +618,21 @@ history_len()은 Observation<usize>이며 poison을 0으로 치환하지 않는�
 
 `CheckPlan::write_allowance(Progress)`는 host의 실제 elapsed·물리 written+outstanding 예약 bytes·outstanding 미쓰기 예약을 차감한 최신 filesystem free·취소를 받아 신규 예약 가능한 최대 bytes를 반환한다. cancelled → reserve → time → bytes 우선순위는 같은 관측 시점의 사유 선택일 뿐 사건 선후 추정이 아니다. 물리 쓰기는 payload만이 아니라 봉투/index/footer와 최종 배출 비용을 포함하고 삭제 bytes를 누적 총 쓰기에서 빼지 않는다. 호스트는 예약을 직렬화하고 indivisible write가 allowance를 넘지 않도록 하며, finalization 예산을 먼저 남긴다. 계산은 stateless이며 실제 공간/메모리 예약이나 IO 취소가 아니다. 공유 filesystem의 다른 프로세스 경쟁과 진행 중 OS IO의 강제 시간 상한은 보장하지 않는다.
 
-`NetworkPlan`은 UnavailableNoReceiver / LoopbackOnly / RemoteUnmeasured(peer_id) 선언을 구분하고 실제 성능·수신 확인·Validated 능력을 만들지 않는다. 수신자가 없으면 네트워크 결과는 미측정으로 남기며 loopback을 원격 인증으로 바꾸지 않는다. S1은 plan·admission primitive만 구현했다. 실제 명시 run·전용 경로 배타 소유/정리·부하 재현·실제 IO drain/sync/close·Pass/Fail/Aborted/Inconclusive·CLI/runtime/원격 RunCheck 연결은 TASK-017 S2 이후다. 기존 check plan/run proxy의 Unsupported를 성공으로 바꾸지 않는다.
+`NetworkPlan`은 UnavailableNoReceiver / LoopbackOnly / RemoteUnmeasured(peer_id) 선언을 구분하고 실제 성능·수신 확인·Validated 능력을 만들지 않는다. 수신자가 없으면 네트워크 결과는 미측정으로 남기며 loopback을 원격 인증으로 바꾸지 않는다. S1은 plan·admission primitive이며 로컬 파일 실행은 §15.4의 S2로 연결했다. 생산 capture/routing/네트워크 부하와 CLI/runtime/원격 RunCheck 연결은 S3 후속이다. 기존 check plan/run proxy의 Unsupported를 성공으로 바꾸지 않는다.
+
+### 15.4 TASK-017 S2 로컬 합성 파일 점검 — 2026-11-01
+
+`CheckPlan::run_file(WriterBudget, FileCheck, &mut CheckRuntime)`는 별도 명시 실행 API다. 전용 check session/target의 writer 권위와 plan의 session/revision이 같아야 하며, 단일 호출 worker·Unix directory sync만 지원한다. `FileWorkload`는 유한 records·payload bytes·간격 ns(0은 명시 최대 부하)·반복 byte seed, `FileCheck`는 단일 채널 등록을 보존한다. 입력은 합성이며 producer0/sequence1..N·실제 mono·real0/source 없음·Normal/Info다. 생산 capture/라우팅/필터/수신 ACK를 우회하는 파일 scope이고 실제 앱의 수락/완료 receipt나 검증 능력 Profile을 만들지 않는다.
+
+실행 전 writer의 checked requested-byte 예약+payload+run bookkeeping/path 상한을 계산하고 `required_memory_bytes`를 넘으면 파일 생성 전 `MemoryBudget`로 거절한다. host runtime·OS cache/allocator 내부/RSS·OS 메모리 가용성 인증은 별도다. 실제 SegmentWriter의 공유 output 예약도 적용하고 모든 반환 경로에서 회수한다. records/spacing overflow·0 입력·다른 identity/지원하지 않는 worker는 pre-IO 오류다. Written/Synced 외 완료 경계나 loopback/remote 요청은 파일 부하를 시작하지 않고 `Inconclusive`/UnsupportedBoundary 또는 UnsupportedNetwork로 남긴다. 수신자 없는 파일 점검 Pass는 네트워크 성능 Pass가 아니다.
+
+호스트는 기존 trusted parent와 생성 namespace를 호출 동안 독점 통제한다(FileStore와 같은 전제). parent가 실제 디렉터리인지 확인하고 `create_dir`/`create_new`로 새 경로만 만든다. 기존 디렉터리/파일/symlink는 거절한다. 출력은 고정 `check.mcap`이며 cleanup은 생성한 inode/dev가 유지된 파일과 디렉터리에 한정한다. 재귀 삭제하지 않으므로 외부/예상 밖 파일이나 경로 교체가 있으면 보존하고 cleanup 오류로 보고한다. 이 검사는 악의적인 ancestor 동시 교체에 대한 완전한 sandbox가 아니다. 진행 중 file/clone을 실제 Drop한 뒤 삭제하며 parent directory sync까지 확인한다.
+
+무압축 product MCAP writer를 사용하고 각 record의 chunk를 flush한다. header/footer/summary·chunk/index·seek 재쓰기를 포함한 보수적 물리 예약을 먼저 남겨 예산에 일찍 도달할 수 있다. `BoundedSink`는 실제 Write 수락 bytes(파일 길이·payload 양·SSD write amplification/파일시스템 journal과 다름)를 누적하며 총 한도/예약 상한과 최신 free-reserve를 각 쓰기 전에 재검사한다. 공간/시간/쓰기 한계와 취소는 신규 부하를 멈춘다. 일반 관측/시계 오류도 이미 쓴 prefix의 footer 마감→실제 file+directory sync→close→정리 시도를 생략하지 않는다. writer가 IO로 poison됐으면 footer 성공을 만들지 않고 실제 남은 파일 sync/close/정리만 시도한다. footer/배출·sync는 admission 기한을 넘길 수 있으며 진행 중 OS IO를 강제 취소하지 않는다.
+
+`CheckRuntime`은 session clock·최신 free probe·취소·기한 대기를 제공한다. `FileCheckRuntime`은 실제 Instant/10ms 이하 취소 확인 간격의 대기와 host free probe를 연결하며 worker를 만들지 않는다. 시계 역전/일찍 끝난 대기는 재시도 루프로 숨기지 않고 오류다. 기존/반환 시각·workload/target/channel·written/synced records·actual Write bytes·file length·footer/cleanup 상태를 `CheckReport`에 남긴다. primary 오류·첫 footer/sync 오류·cleanup 오류는 별개로 보존하고 원 OS 원인을 유지한다.
+
+결과는 전체 요청 record의 파일 완료·sync/정리 성공이면 Pass, 깨끗한 취소면 Aborted, 범위/예산 부족이면 Inconclusive, 실제 IO/시계/footer/sync/정리 오류면 Fail이다. 공간이 쓰기 중 급감해 footer도 거절되면 완료를 추정하지 않고 Fail/부분 범위를 남긴다. 기록 성공 뒤 정리만 실패해도 Fail이며 stop 원인은 원래 Completed/Limit로 보존한다. 실제 운영 free probe·Report/profile 연결·CLI/원격 backend·실앱/생산 부하·PC/RT 비용/오차/native/UPS/장기는 S3 이후이고 짧은 합성 파일 Pass로 대체하지 않는다.
 
 ## 16. 동기화·긴급 동작의 구체안
 

@@ -4,20 +4,20 @@
 
 | 항목 | 내용 |
 |---|---|
-| 프로젝트 | dot-logger — 설정/비교 로컬 수락·간편 점검 S1 착수, 실제 점검 실행·운영/실앱 후속 |
+| 프로젝트 | dot-logger — 간편 점검 S2 합성 파일 실행/정리 로컬 수락, 운영 연결·생산/실앱 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-017 S1 계획/예산 EV-031 로컬 수락, MS-005 진행 |
+| 현재 Phase | Build — TASK-017 S2 파일 실행/정리 EV-032 로컬 수락, MS-005 진행 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-005 In Progress — 운영 계측, MS-004/007은 native·실앱/실측 후속 |
-| 활성 Task | TASK-017 In Progress — S1 무부하 계획/예산 판정 수락, 다음 S2 실제 run·배출/sync/정리·결과 분류 |
-| 미처리 리뷰 | 없음 — REV-028 RV-063/064 조치 Closed, REV-029 S1 개발 자가 점검 Closed (EV-031) |
+| 활성 Task | TASK-017 In Progress — S2 합성 파일 실행/정리 수락, 다음 S3 운영 free probe·Report/CLI/host 연결 |
+| 미처리 리뷰 | 없음 — REV-028/029 Closed 유지·REV-030 S2 개발 자가 점검 Closed (EV-032) |
 | 상태 | Yellow — 클라이언트/계측 로컬 수락, 운영 backend/실앱·비용/PC/RT/UPS·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-01 / #004 작업 동기화 / AI |
-| 세션 상태 | 진행 — REV-028 조치/마감 후 TASK-017 S1 구현·검증/수락, 다음 S2 실제 실행 TDD |
-| 최근 세션 | [2026-11-01 #004](../members/lim8603/workspace/session_logs/session_2026-11-01_004.md) — REV-028 조치/Closed·TASK-017 S1 착수/로컬 수락 |
+| 갱신 | 2026-11-01 / #005 작업 동기화 / AI |
+| 세션 상태 | 진행 — TASK-017 S2 구현·검증/로컬 수락, 다음 S3 운영/CLI 연결 |
+| 최근 세션 | [2026-11-01 #005](../members/lim8603/workspace/session_logs/session_2026-11-01_005.md) — TASK-017 S2 실제 파일 실행·동기화·정리/로컬 수락 |
 
 ## 현재 결정과 제약
 
@@ -40,7 +40,7 @@
 
 - **TASK-016 로컬 계약:** EV-030/source542c6e6·source102개·검사10개·Miri496·소스/commit blob102개 일치, REV-027 개발 자가 점검 Pass/Closed·위임 수락. 명시 enable/preview/validate/apply와 두 bank·posted/per-producer ack·old accepted cutoff/완료/실제 raw·Delivery guard 해제 뒤 회수, Busy/Conflict/checked revision을 사용한다. level/Normal sampling/기존 target route만 live 변경하며 Important sampling 우회·같은 raw loan·과거 수락 route를 보존한다. 전환 Sample은 RevisionTransition, 혼합 revision Window 금지. Comparison은 원래 Report/profile/revision/구간·입력/장비/boundary/측정 scope 차이와 skip/거절/출력 손실을 분리한다. 단일 revision 파일은 명시 budget/별도 writer다. 운영 backend/CLI runtime/자동 worker·실앱/실제 PC·RT 비용/오차/native는 후속. [TASK-016](../04_implementation/tasks/TASK-016.md)·[API §15.2](../03_design_artifacts/interface_contract.md#152-task-016-로컬-설정-변경전후-비교--2026-11-01).
 
-- **2026-11-01 #004 현재 작업:** [EV-031](../05_verification/verification_evidence.md#ev-031)·소스5d447b4/0622a90. REV-028 RV-063/064의 유휴 `apply_pending_config`·전환 구간 비교 지침과 회귀를 보강해 Closed. TASK-017 S1 `CheckPlan`·선언 예산/경로 검증·stateless physical write allowance만 신규5개 Red→Green/위임 수락, REV-029 Closed. actual run/IO·배출/sync/정리·최종 결과 및 CLI/runtime는 S2 이후 미구현이다. required_memory는 host 계산 선언, 네트워크 범위는 미측정 선언이며 성능/실제 예약을 인증하지 않는다. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.3](../03_design_artifacts/interface_contract.md#153-task-017-s1-로컬-계획예산-판정--2026-11-01).
+- **TASK-017 로컬 계약:** [EV-032](../05_verification/verification_evidence.md#ev-032)·소스1cae3b9·[REV-030](../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) Closed. S1 무부하 plan/예산 판정 뒤 S2 `run_file`로 전용 session/target·단일 calling worker의 유한 synthetic MCAP 파일을 명시 실행한다. 물리 예약/actual Write bytes·시간/reserve/취소, prefix footer/실제 sync/close·동일 inode 소유 경로만 정리·부분 결과/오류 분리를 검증했다. 기존 경로/symlink/foreign 파일 보존, resource 부족은 Inconclusive·실제 IO/정리 오류는 Fail이며 원래 stop을 유지한다. 전체347개·MSRV 관련40개·Miri24 Pass. 실제 운영 free probe·Report/CLI/host·생산 capture/라우팅/receiver/실앱/성능/native는 S3 후속이며 합성 파일 Pass로 인증하지 않는다. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.4](../03_design_artifacts/interface_contract.md#154-task-017-s2-로컬-합성-파일-점검--2026-11-01).
 
 - **TASK-022 승인 기준:** local-pc-v1의10ms 주기/기한·500µs 합성 연산·2GiB·P3 120초×3회·160GiB cap/64GiB reserve·UPS 모의3초/8·64MiB는 Human 승인 완료다. [EV-021](../05_verification/verification_evidence.md#ev-021)은 프로필 준비/승인 근거이며 실제 성능/RT/UPS는 NotRun이다.
 
@@ -73,7 +73,7 @@
 | TASK-014 | 운영 계측·유한 집계 | AI | In Progress | 2026-10-31 | EV-029 거절 범주·이력 복구 조치 수락/REV-025 Closed; 비용≤5%·PC/RT/native 후속 |
 | TASK-015 | 여유·병목·보존 시간 리포트 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 출력 정렬 조치 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 |
 | TASK-016 | revision 설정 변경과 전후 비교 | AI | In Progress | 2026-11-01 | EV-030 로컬 수락·REV-028 조치 Closed/EV-031; 운영 backend/실앱·PC/RT/native 후속 |
-| TASK-017 | 예산 제한 간편 점검 | AI | In Progress | 2026-11-01 | S1 계획/예산 EV-031 수락·REV-029 Closed; 다음 S2 실제 run·배출/sync/정리·결과 분류 |
+| TASK-017 | 예산 제한 간편 점검 | AI | In Progress | 2026-11-01 | S2 파일 실행/정리 EV-032 수락·REV-030 Closed; 다음 S3 운영 free probe·Report/CLI/host 연결 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -87,14 +87,15 @@
 | [REV-026](../05_verification/reviews/REV-026_TASK-015_RV-060-062_REVIEW.md) | TASK-015 RV-060~062 조치·후속 형상 검증 | Closed | Pass (P1/P2/P3 0건), RV-060~062 조치 및 계약·RT 안전성 확인 완료, 수락 마감 |
 | [REV-027](../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) | TASK-016 설정/비교 개발 자가 점검 | Closed | EV-030/source542c6e6·검사10개/Miri496·source102개 blob일치·위임 로컬 수락 |
 | [REV-028](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md) | TASK-016 독립 코드리뷰 P3 2건 | Closed | RV-063/064 수용·API/rustdoc·설정13/비교4개·EV-031/5d447b4, 위임 수락 |
-| [REV-029](../05_verification/reviews/REV-029_TASK-017_PLAN_START.md) | TASK-017 S1 계획/예산 개발 자가 점검 | Closed | Pass·신규 RV 없음, EV-031/0622a90·S1만 로컬 수락, 실제 run/IO 후속 |
+| [REV-029](../05_verification/reviews/REV-029_TASK-017_PLAN_START.md) | TASK-017 S1 계획/예산 개발 자가 점검 | Closed | Pass·신규 RV 없음, EV-031/0622a90·S1만 로컬 수락, 실제 파일 run/IO는 REV-030에서 로컬 수락, 운영 연결 후속 |
+| [REV-030](../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) | TASK-017 S2 합성 파일 실행/정리 개발 자가 점검 | Closed | Pass·신규 미해결 RV 없음, EV-032/1cae3b9·S2 로컬 수락·운영/생산/실측 후속 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다. 과거 Resolved 상태와 현재 Closed를 혼동하지 않는다.
 
 ## 다음 시작점
 
-1. **TASK-017 S2 실제 실행부터 TDD.** S1 무부하 계획/선언 예산·경로 문법/신규 쓰기 allowance는 EV-031·소스0622a90·REV-029 Closed로 수락했다. 명시 run, 전용 경로의 배타 소유/운영 파일 불변, actual physical writes·outstanding/finalization 예약, 예산 선도달/취소/IO 오류 뒤 drain/sync/close/cleanup, 최종 범위·Pass/Fail/Aborted/Inconclusive를 다음 구현 단위로 진행한다. plan 선언만으로 실행이나 memory/space 예약·capability를 인증하지 않는다.
-2. **리뷰 미처리 없음.** REV-028 RV-063/064는 실제 `apply_pending_config()` 유휴 worker 책임·안정 Window 지침·전환→Report/Comparison 및 인접/겹침 회귀로 조치/Closed. TASK-016 로컬 수락은 유지하고 운영 backend/실앱·실측/native 이월은 보존한다.
+1. **TASK-017 S3 운영 연결을 다음 구현 단위로 진행.** S2 로컬 synthetic file run/예산/취소·footer/sync/close·소유 namespace 정리·결과 분류는 EV-032·소스1cae3b9·REV-030 Closed로 수락했다. 실제 운영 free probe/capability와 Report/profile·CLI/host backend를 기존 bounded 관리 경계에 연결하고 무제한/임의 remote 경로를 허용하지 않는다. 기존 check plan/run의 Unsupported는 backend 전까지 유지한다.
+2. **미처리 리뷰 없음.** REV-028 RV-063/064·REV-029 S1 수락은 유지하며 REV-030은 개발 자가 점검이다. S2는 실제 MCAP 파일 scope로 실제 생산 capture/라우팅/수신 ACK·capacity/RT/장기 인증을 대체하지 않는다. actual space probe·실앱/PC/RT/native 후속은 남아 있다.
 3. RV-049 포화 회복 실측은 TASK-022, RV-053 server lease/재구독 화면 불연속은 TASK-020 후속이다. ApplyConfig/Compare/RunCheck 운영 backend·CLI runtime/자동 worker 및 실제 수신자는 실앱 통합과 함께 명시 구동한다. FR-015/TASK-018은 별도 승인 전 미착수다.
 4. native는 공개 후(T3), 실제 PC/RT 오차·비용/UPS/실앱·TC-009/010 전체/MS-005/Gate4·5는 미완료. 새 T1/T2/T3 도래 근거 없음.
 
@@ -147,8 +148,8 @@
 
 ## 최근 작업·이력
 
-- 2026-11-01 #004: REV-028 RV-063/064 조치·수락/Closed 후 TASK-017 S1 계획/예산을 Red→Green으로 착수·로컬 수락했으며 다음 시작점은 S2 실제 run/정리다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_004.md)·[EV-031](../05_verification/verification_evidence.md#ev-031).
+- 2026-11-01 #005: TASK-017 S2 합성 MCAP 파일 실제 실행·예산/취소·sync/close/정리·결과 분류를 로컬 수락했으며 다음은 S3 운영/Report/CLI 연결이다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_005.md)·[EV-032](../05_verification/verification_evidence.md#ev-032).
+- 2026-11-01 #004: REV-028 RV-063/064를 조치/Closed하고 TASK-017 S1 무부하 계획·예산 판정을 Red→Green으로 착수·로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_004.md)·[EV-031](../05_verification/verification_evidence.md#ev-031).
 - 2026-11-01 #003: TASK-016 독립 리뷰 Pass/P3 2건을 REV-028 Open으로 남기고 Human 요청으로 종료했다(후속 #004에서 조치/Closed) — [리뷰](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-11-01_003.md).
-- 2026-11-01 #002: TASK-016 EV-030/source542c6e6·검사10개/Miri496·REV-027 Closed로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_002.md)·[근거](../05_verification/verification_evidence.md#ev-030).
 
 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

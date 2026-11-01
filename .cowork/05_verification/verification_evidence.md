@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~031 |
+| 버전 | 2026-11-01 / EV-001~032 |
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-11-01 #004 / Build, MS-005 In Progress. TASK-016 EV-030 수락 뒤 REV-028 RV-063/064를 EV-031로 조치·Closed, TASK-017 S1 무부하 계획·예산 판정만 착수/로컬 수락했다(REV-029 Closed). S2 실제 run/IO/배출/sync/정리·결과 분류 및 운영 backend/CLI·실앱/PC/RT/UPS·native(T3) 후속이 남으며 Gate4/5 Not Ready를 유지한다. 각 EV의 과거 실행/미실행과 형상을 구분한다.
+INT-001 / 2026-11-01 #005 / Build, MS-005 In Progress. TASK-017 S2 로컬 합성 파일 실행·예산/취소·footer/sync/close·소유 경로 정리·결과 분류를 EV-032/REV-030 Closed로 수락했다. S3 운영 free probe·Report/CLI/host/backend·실앱/실측/UPS·native(T3)가 남고 Task/MS/TC 전체 및 Gate4/5 Not Ready를 유지한다. EV-031 이전 로컬 수락과 각 형상의 미검증 이력은 보존한다.
 
 ## Evidence Index
 
@@ -690,6 +690,17 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 수락: [REV-028](reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md) 반입 조치와 [REV-029](reviews/REV-029_TASK-017_PLAN_START.md) 개발 자가 점검의 S1만 기존 위임으로 수락/Closed. 독립 리뷰/Task 전체 완료로 확장하지 않는다. 기존 소비자(수집/완료/라우팅·MCAP·조회/재생·원격/client/CLI·RT allocator)는 workspace 종단 회귀로 확인했다. 기존 게이트/불변식 강화는 없고 additive 계획 API다.
 - 미구현/미검증: TASK-017 S2의 실제 명시 run·전용 경로 배타 소유·부하 재현/실제 physical IO·drain/sync/close/cleanup·최종 범위/Pass/Fail/Aborted/Inconclusive, CLI/runtime/원격 backend 및 실앱/PC/RT 비용/오차·UPS·장기/native(T3)/다른 OS·fresh audit. TC-010 Partial·Task/MS In Progress·Gate4/5 Not Ready 유지.
 
+<a id="ev-032"></a>
+### EV-032 — TASK-017 S2 실제 합성 파일 실행·동기화·정리
+
+- 대상/실행자: 소스 `1cae3b93aa64662cc29d945f1c84dba0680a82a4`, 2026-11-01 #005 / AI / 현재 Ubuntu PC. [명령7개·Red witness·source4개 SHA-256/commit blob 일치](../06_evolution/imported_context/task_017_run_2026-11-01/results.json). 무압축 product MCAP 한 파일/한 채널·calling worker1이며 생산 capture/라우팅/원격 부하 검증이 아니다.
+- TDD: run API 부재 compile Red, 기록 뒤 공간 관측/시계 오류가 prefix footer를 생략하는 반례 assertion Red, 교체된 출력 경로가 synced로 집계되는 반례 assertion Red → 최소 구현/수정 Green. 원본은 .log.gz, 공백 정규화 뷰는 .log로 보존했다.
+- 실제 파일15개: 임시 directory/file create_new·기존 운영 bytes 불변·완료/예산 선도달/취소·초기 reserve/관측 오류·진행 중 관측/시계 오류 뒤 prefix finish/sync·공간 급감 footer 실패·경로/symlink/identity 변경·foreign file cleanup 거절·메모리/identity/workers/workload 거절·unsupported receiver/network 무실행·실제 단조 시계. 실제 MCAP prefix/완성 파일의 독립 읽기·payload/revision 및 writer 예산 원복 확인.
+- 내부3개: 짧은 쓰기/부분 OS 오류·seek 재쓰기를 포함한 actual Write bytes·cap/reserve backstop·원 OS/sync 오류 보존. 신규 unsafe/RT/원자 연산·dependency/lock/wire 변경 없음. [API §15.4](../03_design_artifacts/interface_contract.md#154-task-017-s2-로컬-합성-파일-점검--2026-11-01).
+- 최종 검증: Rust1.96.0 workspace/all-features **347개(문서 시험 포함)**, core lib/S1/S2 관련 **40개**, MSRV1.85.0 관련 **40개**, fmt·workspace all-targets/all-features clippy -D warnings·workspace rustdoc -D warnings Pass. Miri nightly-2026-10-26 strict provenance 내부3종×8seeds=**24 Pass**. 검사7개 exit0·source4개 commit blob/hash 일치. 실제 OS IO 시험은 Miri로 대체하지 않는다.
+- 수락: [REV-030](reviews/REV-030_TASK-017_FILE_RUN.md) 개발 자가 점검 Pass/신규 미해결 RV 없음·기존 위임 S2 로컬 수락/Closed. scope는 synthetic file write/finish/sync/close/정리다. written/synced/실제 Write bytes/파일 길이·원래 stop과 최종 outcome·primary/settlement/cleanup 원인을 보존하며 네트워크/장비 capacity Profile/생산 완료 ACK를 만들지 않는다.
+- 미구현/미검증: S3 운영 OS free probe·Report/profile/CLI/runtime/원격 backend·실제 capture/라우팅/receiver/실앱, PC/RT 비용/오차/처리량·UPS/장기·native(T3)/다른 OS·fresh audit. 기능 fixture의 공간 값은 제어된 입력이며 실제 디스크 성능/space/자원 수락 증거가 아니다. trusted namespace 외부 변경/panic/kill 후 자동 복구/정리는 보장하지 않는다. Task/MS In Progress·TC-010 Partial·Gate4/5 Not Ready 유지.
+
 ## 검증 수락 환경·시점 갱신 — 2026-10-31
 
 Human 승인 [ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md): 현재 PC 실측을 실제 장치 테스트 대체 근거로 수락하고, 실물 UPS 없이 시뮬레이션 결과로 판정한다. GitHub native는 공개 완료 후 진행한다. [환경 관측](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)은 PC 사양/실행 커널 확인이며 성능/UPS 시험 Pass가 아니다.
@@ -707,7 +718,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1 EV-031/REV-029 Closed, 실제 점검 실행/운영 backend·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, 생산 점검·운영 free probe/backend·실앱/실측 TC 잔여 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

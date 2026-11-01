@@ -32,3 +32,6 @@ pub mod adapters;
 
 /// Fixed producer counters and bounded caller-driven operational observations.
 pub mod telemetry;
+
+/// Load-free diagnostic plans and caller-driven physical write admission.
+pub mod diagnostics;

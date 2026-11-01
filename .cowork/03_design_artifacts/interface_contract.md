@@ -695,3 +695,18 @@ receiver `next`/완전 조립 뒤에도 원 receipt는 Pending이고 routing gua
 - `handle_command`는 기존 Read/Manage·응답4096B headroom preflight·command permit·취소 관측을 양쪽 backend에 적용한다. native 반환은 `HostCheckEvidence::File(CheckEvidence)` / `Routed(RoutedCheckEvidence)`이며 summary의 scope를 구분한다. transport wire 변경은 없다. remote waiter 종료 후에도 native evidence는 실제 정리 뒤 반환한다.
 - 동기 host는 Tokio 밖 일반 worker에서 실행한다. 기존 async host는 별도 일반 worker를 사용해야 하며 중첩 runtime 호출은 panic 대신 오류다. 이 API는 상시 worker/데몬을 생성하지 않는다. 기존 file backend·별도 explicit bridge 예제도 유지한다.
 - 계약 검증: [EV-035](../05_verification/verification_evidence.md#ev-035). 지속 실앱/기존 화면/off-on(TASK-020/026), PC/RT 비용/오차·UPS/장기(TASK-021~024), 공개 후 native(T3)는 이 기능 시험의 수락 범위 밖이며 전체 완료 조건에서는 유지한다.
+
+
+### 14.6 TASK-019 S1 InfluxDB v2 유한 write — 2026-11-01
+
+`adapters::influxdb`는 `influxdb` 선택 feature의 일반 경로다. `Writer::new(&QueryBudget, Config)`는 고정 session/measurement/device/채널≤128·typed schema와 max_points≤128·body≤64KiB·event≤4KiB·attempts≤8·request timeout≤60초·retry delay≤60초·TTL≤1시간을 명시 검증한다. `write(&[Point], cancel)`은 호스트 Tokio runtime에서 호출하며 큐/worker/spool·원본 자동 projection을 만들지 않는다.
+
+- **충돌/시계:** 호스트가 session별 새 독점 series namespace를 제공한다. `CollisionPolicy::RejectNonIncreasing`만 구현하며 같은 measurement/device/channel의 equal/older real Unix ns를 생산자와 배치에 걸쳐 거절한다. 과거 timestamp도 거절하는 보수 계약이다. 기존 DB 조사·재시작 연속성·별도 writer 충돌 방지는 아직 없다. 원 timestamp/receipt 보존, mono/source clock 추정 변환 없음. 전체 preflight는 트랜잭션이며 실패 시 high-water 변경/네트워크 없음. 첫 시도 직전 high-water를 소비하여 Unknown/취소/호출 future Drop 후 새 배치 재제출을 막는다.
+- **형식:** measurement는 유한 ASCII 식별자, device는 유한 고정 tag, channel은 설정된 유한 tag. int/float/bool/event는 서로 다른 field key이며 채널별 field type 고정. session/producer/accepted_seq는 field다. 작은 UTF-8 이벤트의 quote/backslash만 escape하고 control/newline은 거절한다. 유효 real timestamp를 명시하여 서버 시각 대체를 방지한다.
+- **결과/재시도:** 204만 API `Acknowledged`, 최초401/403/404/413은 `Rejected`, 400/422·응답 불명·이전 Unknown 뒤 거절은 `Unknown`이다. 미시도 취소/TTL은 `NotSent`; 시도 뒤 취소/기한은 Unknown이며 원격 rollback을 추정하지 않는다. 실제 종료 원인은 `Stop`과 attempts/status로 분리한다. 429/503·transport 오류만 유한 retry, 같은 bytes 사용, Retry-After 초 단위를 냉각/전체 TTL에 반영한다. 날짜 형식은 조기 재시도하지 않고 중단한다. 재시도는 at-least-once 위험이 있으며 exactly-once/DB disk 내구성·query 검증과 다르다.
+- **예산/소유권:** 요청 body 상한×2+32KiB의 보수 application 예약을 공유 external partition에서 확보한다. HTTP body는 `bytes::Bytes::from_owner`를 통해 예약을 함께 소유한다. 마지막 transport body가 해제되기 전 다음 배치는 Busy이며 Writer Drop 뒤에도 body 예약은 남는다. 라이브러리 HTTP/TLS/runtime/allocator/OS 메모리는 별도 host headroom으로 전체 RSS cap이 아니다. 호출자 Point/입력 메모리는 host 소유다.
+- **보안/격리:** HTTPS 또는 literal loopback HTTP base URL만 허용, URL credential/path/query/fragment 거절·자동 redirect/proxy/라이브러리 retry 비활성. token은 sensitive header, Config/Writer Debug 없음, Error/WriteReport에 URL/token/server body 없음. 파일/RT/기존 Router/Completion 구현은 변경하지 않는다.
+
+공식 근거: [v2 write API](https://docs.influxdata.com/influxdb/v2/api/write/), [line protocol 타입·중복점 규칙](https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/). `bytes`는 기존 lockfile의1.12.1을 influxdb 선택 직접 의존으로 고정했다. 승인된 ADR-009 방향 안의 내부 구현이며 새 DB 계열/배포 버전 채택이 아니다.
+
+S1 대역 검증은 [EV-037](../05_verification/verification_evidence.md#ev-037)이다. S2 배포 버전 pin/제한 수치 query/실제 DB write-query 대조, S3 실제 Delivery 및 `DatabaseAcknowledged`·Unknown/원본 수명/파일 격리 계측은 미구현·미수락이다. Task/TC-008 전체와 Gate4/5는 미완료다.

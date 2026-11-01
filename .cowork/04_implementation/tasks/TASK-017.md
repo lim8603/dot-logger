@@ -99,3 +99,8 @@ S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기�
 | native/다른 OS 수락 | AI / GAP-004·T3 | 저장소 공개 완료 후 source hash 고정 실행. 현재 트리거 미도래; 공개 전환/CI·계정 조회·차단 재시도하지 않음 |
 
 TASK-017의 로컬 기능 구현 잔여는 처리했으나 위 통합/환경 수락은 면제되지 않는다. S3 전체·Task/MS·TC 전체와 Gate4/5를 Done/Pass로 올리지 않는다. 선택 추천 FR-015/TASK-018·무제한/임의 원격 실행·상시 서버는 추가하지 않았다. 별도 Task의 명시 DoD는 현황의 담당 경계를 설명한 것이며 완료 기준을 삭제하거나 작업 범위를 변경한 것이 아니다.
+
+
+## REV-034 조치 — 2026-11-01 #010
+
+RV-071/072를 `SnapshotCheck::TARGET_ID`·`REQUIRED_MEMORY_BYTES` 공개와 24MiB 구성/RSS 한계 rustdoc로 조치했다. trait/bridge/예제가 상수를 공유한다. 소스 `a972229`·[EV-036](../../05_verification/verification_evidence.md#ev-036) 로컬 회귀 수락, REV-034 Closed. 위 통합/실측/native 조건과 Task In Progress는 유지한다. 다음 개발 단위는 TASK-019 S1이다.

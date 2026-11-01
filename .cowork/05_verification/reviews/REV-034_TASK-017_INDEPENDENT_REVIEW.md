@@ -17,7 +17,7 @@
   - `cargo test -p dot-logger-cli --test routed_check_host`: 3/3 Pass
   - `cargo test -p dot-logger-cli --test check_host`: 5/5 Pass
 - **종합 판정:** Pass (P1 0건, P2 0건, P3 2건). RT 제약 완벽 분리, 동시성/자원 수명 보장, Safe Rust 100%, 단일 사용 슬롯 계약 엄격 준수.
-- **상태:** Open
+- **상태:** Closed — 2026-11-01 개발 세션 위임 수락
 
 ---
 
@@ -44,8 +44,8 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-071 | P3 | [`dot-logger-client/src/diagnostics/mod.rs#L27-L30`](../../../crates/dot-logger-client/src/diagnostics/mod.rs#L27-L30), `SnapshotCheck::target_id` | `SnapshotCheck`의 고정 대상 타깃(`target_id = 10`)이 트레이트 메서드로만 노출되어 있어, 호스트 등록 시 호출자가 별도 문서 없이 타깃 ID를 사전에 알기 어려움 | `SnapshotCheck::TARGET_ID: u32 = 10` 연관 상수를 노출하거나 `SnapshotCheck` 상단 rustdoc에 대상 타깃 ID가 10으로 고정됨을 명시 | 대기 (Open) | Open |
-| RV-072 | P3 | [`dot-logger-client/src/diagnostics/mod.rs#L31-L35`](../../../crates/dot-logger-client/src/diagnostics/mod.rs#L31-L35), `required_memory_bytes` | `required_memory_bytes`가 24 MiB로 하드코딩되어 있는데, `CheckPlan` 생성자가 요구 예산을 책정할 때 참고할 수 있는 rustdoc 가이드 필요 | `SnapshotCheck` struct 레벨 rustdoc에 16 MiB 코어 로거 예약과 8 MiB 런타임/버퍼 북키핑을 합산한 최소 24 MiB 요구치임을 문서화 | 대기 (Open) | Open |
+| RV-071 | P3 | [`dot-logger-client/src/diagnostics/mod.rs#L27-L30`](../../../crates/dot-logger-client/src/diagnostics/mod.rs#L27-L30), `SnapshotCheck::target_id` | `SnapshotCheck`의 고정 대상 타깃(`target_id = 10`)이 트레이트 메서드로만 노출되어 있어, 호스트 등록 시 호출자가 별도 문서 없이 타깃 ID를 사전에 알기 어려움 | `SnapshotCheck::TARGET_ID: u32 = 10` 연관 상수를 노출하거나 `SnapshotCheck` 상단 rustdoc에 대상 타깃 ID가 10으로 고정됨을 명시 | 수용·EV-036 검증 | Closed |
+| RV-072 | P3 | [`dot-logger-client/src/diagnostics/mod.rs#L31-L35`](../../../crates/dot-logger-client/src/diagnostics/mod.rs#L31-L35), `required_memory_bytes` | `required_memory_bytes`가 24 MiB로 하드코딩되어 있는데, `CheckPlan` 생성자가 요구 예산을 책정할 때 참고할 수 있는 rustdoc 가이드 필요 | `SnapshotCheck` struct 레벨 rustdoc에 16 MiB 코어 로거 예약과 8 MiB 런타임/버퍼 북키핑을 합산한 최소 24 MiB 요구치임을 문서화 | 수용·EV-036 검증 | Closed |
 
 ---
 
@@ -63,9 +63,9 @@
   - `SnapshotCheck`의 연관 상수 `pub const TARGET_ID: u32 = 10;`을 제공하거나, `SnapshotCheck::new` rustdoc에 타깃 ID 10과의 바인딩 계약을 명시할 것을 권고한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (Open)
-- **처리 내용:** (후속 개발 세션에서 처리)
-- **검증 근거:** (후속 개발 세션에서 작성)
+- **판정 결과:** 수용·Closed (Open → In Progress → Resolved → 위임 수락).
+- **처리 내용:** `SnapshotCheck::TARGET_ID`를 공개하고 trait·공용 bridge·고정 host 예제가 같은 상수를 소비한다. 독립 컴파일되는 bridge fixture에서도 `dot_logger_client` 경로로 접근한다.
+- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `a972229`; workspace374·MSRV routed host7·fmt/clippy/rustdoc·무부하 preview Pass. 문서/상수 보강이며 동작 결함을 수정하지 않아 신규 재현 시험은 추가하지 않았다.
 
 ---
 
@@ -81,9 +81,9 @@
   - `SnapshotCheck` 구조체 rustdoc에 플랜 요구 메모리 수치(최소 24 MiB)와 그 구성 근거(16 MiB 세션 예약 + 8 MiB 런타임/입출력)를 명시하여 상위 호스트 구성자가 올바른 `CheckPlan`을 작성할 수 있도록 돕는다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (Open)
-- **처리 내용:** (후속 개발 세션에서 처리)
-- **검증 근거:** (후속 개발 세션에서 작성)
+- **판정 결과:** 수용·Closed (Open → In Progress → Resolved → 위임 수락).
+- **처리 내용:** struct rustdoc에 16MiB logger+8MiB input/JSON/receiver/runtime=24MiB 요구량과 RSS/OS hard limit이 아님을 명시했다. `REQUIRED_MEMORY_BYTES`를 공개하여 trait·예제 plan과 실제 등록이 공유한다.
+- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `a972229`; 기존 메모리 부족 등록 거절/슬롯 미소비 시험과 32MiB 실제 routed 실행 회귀, rustdoc Pass.
 
 ---
 

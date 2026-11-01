@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~035 |
+| 버전 | 2026-11-01 / EV-001~037 |
 
 ---
 
@@ -747,6 +747,24 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **원 source·권한·정리:** 고정 File/Routed 슬롯·단일 사용 ID, 원 Report/profile·foreign 조건/target/network/worker/boundary·메모리 요구량 검증. Read plan/Manage run, reply headroom 부족 시 무실행/ID 보존, remote waiter timeout 후 무수집/Aborted·native evidence·재사용 Gone. 기존 file scope/실제 free probe·전용 경로·운영 파일 불변도 회귀했다.
 - **실제 앱:** dot-probe269d348의 robot-serve를 빌드·격리 data/loopback ephemeral peer로2초 실행, SIGTERM/wait exit0. [새 원문1627B](../06_evolution/imported_context/task_017_host_2026-11-01/app_ticks.json)→`dot_probe_check`의 CheckHost/실제 raw/routing/TCP 큐/ACK에서 accepted1/ack1/Complete·raw회수1/external0/physical write0. 기존 명시 bridge도 같은 입력으로 Pass. 앱 저장소는 clean 유지, 첫 적용 완료가 아니며 T1 미도래.
 - **한계/미수락:** host-selected≤64KiB 단일 snapshot/loopback scope·2초 admission·logger16MiB+보수 host headroom=backend24MiB·예제 허용32MiB이며 RSS/OS IO hard limit·capacity/LAN 측정이 아니다. source freshness/boot identity·capacity/network/RSS Unavailable 유지. 지속 앱/기존 화면/off-on은 TASK-020/026의 선행 작업, PC/RT 비용/오차·UPS/장기는 TASK-021~024 통합 harness/RT 부팅, native/다른 OS는 공개 완료(T3) 조건이 남아 있다. Task 완료 기준을 삭제하거나 Pass로 대체하지 않는다.
+
+<a id="ev-036"></a>
+## EV-036 — REV-034 P3 등록 상수·메모리 rustdoc 조치
+
+- **판정:** [REV-034](reviews/REV-034_TASK-017_INDEPENDENT_REVIEW.md) RV-071/072 수용·Closed, 기존 위임 로컬 수락. 소스 `a972229`.
+- **변경:** SnapshotCheck::TARGET_ID/REQUIRED_MEMORY_BYTES 공개, trait/bridge/예제 공유. 16MiB logger+8MiB input/JSON/receiver/runtime=24MiB와 RSS/OS hard cap 아님을 rustdoc에 명시. 문서/상수 변경이며 신규 동작 재현 시험은 추가하지 않았다.
+- **검증:** [명령/로그/소스3개 commit blob 대조](../06_evolution/imported_context/rev_034_fixes_2026-11-01/results.json). Rust1.96 workspace/all-features374개, MSRV1.85 routed_host7개, fmt/clippy(all-targets/all-features -D warnings)/rustdoc·없는 경로 무부하 plan Pass. 독립 컴파일 bridge 경로는 최종 lint/회귀에서 확인했다.
+- **한계:** TASK-017 로컬 기능/운영 계약은 동일. 지속 실앱/화면·실측·UPS/장기/native(T3)·TC/MS/Gate4/5 후속 유지.
+
+<a id="ev-037"></a>
+## EV-037 — TASK-019 S1 유한 InfluxDB v2 write·충돌/불명
+
+- **판정:** S1 로컬 구현/검증 Pass·위임 수락, [REV-035](reviews/REV-035_TASK-019_INFLUX_WRITE.md) RV-073/074 Closed. TASK-019 In Progress·MS-006 In Progress·TC-008 Partial. [API §14.6](../03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01).
+- **대상/환경:** 2026-11-01 #010 AI·현재 Linux generic PC·Rust1.96/MSRV1.85. 소스 `0ef1395`·[소스107개 hash/commit blob 대조·명령/로그](../06_evolution/imported_context/task_019_2026-11-01/results.json). bytes1.12.1은 기존 lockfile의 선택 직접 의존이며 버전 변경 없음. RT/unsafe·기존 file/routing/completion 구현 변경 없음.
+- **Red→Green:** 기능 부재 compile Red(exit101), RV-073 같은 value field의 이종 수치 충돌 위험을 타입별 key 기대 시험으로 실패→integer/float/boolean/event 분리 후 통과. RV-074는 실제 body owner/Arc 예약·Weak 단일 slot으로 수명 검토를 보강했다.
+- **검증:** 신규 TCP/입력/상한10개+body 수명1개. Rust1.96/MSRV1.85 workspace/all-features 각385개, 개발 Rust16 feature 조합·독립 core consumer·RT allocator·MSRV influx-only·fmt/clippy(-D warnings)/core·client API rustdoc(-D warnings) Pass. 전체 회귀 뒤 테스트만 실제 진행 timeout+취소/시각 재사용 검증으로 확장했으며 두 Rust 해당10개·fmt/clippy를 최종 재실행했다. 생산 source는 동일하며 results.json이 검사 범위를 구분한다.
+- **계약 확인:** 새 독점 namespace/고정 session·device/channel/schema·원 real ns/receipt, equal/older 시각을 producer/batch 간 거절. preflight 실패는 상태/IO 변경 없음, 시도한 Unknown은 high-water 유지. 동일 encoded retry·partial422/연결 종료/timeout/진행 취소 Unknown·처음401 Rejected·204 API ACK·Retry-After overflow/TTL·입력/공유 budget/encoded body 상한·민감 header/redirect 차단을 확인했다. transport body clone이 local owner Drop 뒤 예약4096B를 유지하고 마지막 Drop 뒤0으로 반환하는 순수 수명 시험 포함.
+- **미실행/다음:** 실제 DB 배포 버전 pin·제한 수치 query/실제 write-query·기존 DB/재시작 충돌 탐지·Router Delivery/DatabaseAcknowledged와 파일 장애 격리 계측·실앱/PC/RT/RSS/성능/native는 미완료. out-of-order도 보수 거절하며 timestamp를 변조하지 않는다. HTTP/TLS/runtime/OS 메모리는 별도 headroom, 원격 rollback·DB disk 내구성 보장 아님. Miri/native 새 실행 없음. S2 실제 DB 검증, S3 Delivery/파일 연결을 다음 시작점으로 둔다. TC/MS 전체·Gate4/5 Not Ready 유지.
 
 ## Open Evidence Gaps
 

@@ -11,7 +11,7 @@
 | MS-003 | 파일 영속성과 보존 | Build | In Progress | TASK-007·TASK-008·TASK-009 | 다중 파일 기록·회전·이벤트·복구 완성 | 6~9 | [상세](milestones/MS-003.md) |
 | MS-004 | 조회·재생·클라이언트 | Build | In Progress | TASK-010·TASK-011·TASK-012·TASK-013 | Rust API/CLI로 실제 기록 활용 | 7~12 | [상세](milestones/MS-004.md) |
 | MS-005 | 운영 관측·조절·간편 점검 | Build | In Progress | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
-| MS-006 | 외부 연동과 긴급 기록 | Build | Planned | TASK-019·TASK-020·TASK-021·TASK-026 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
+| MS-006 | 외부 연동과 긴급 기록 | Build | In Progress | TASK-019·TASK-020·TASK-021·TASK-026 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
 | MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
 
 필수 합계 **45~76 인일**(주 5일 전담 기준 약 9.0~15.2주), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
@@ -59,3 +59,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-11-01 #006: TASK-017 S3 로컬 운영 host/PlanCheck·RunCheck/CLI·실제 Linux free probe·원 Report/profile 연결을 [EV-033](../05_verification/verification_evidence.md#ev-033)·REV-031 Closed로 수락했다. workspace357/core288·MSRV workspace357·Miri16·audit Pass. 생산 capture/routing/실제 수신자·dot-probe/실앱·PC/RT/UPS/장기/native가 남아 S3 전체·Task/MS/TC·Gate4/5 미완료 유지.
 
 2026-11-01 #007: TASK-017 S3 실제 raw capture/routing·loopback TCP receiver 큐/ACK·dot-probe tick export snapshot을 [EV-034](../05_verification/verification_evidence.md#ev-034)·REV-032 Closed/소스cf8fa25로 첫 연결 수락했다. 신규7개·Rust1.96/MSRV workspace 각364 Pass. routed RunCheck 운영 backend·지속 실앱/화면·PC/RT/UPS/장기/native 후속으로 MS-005/Task/TC 전체·Gate4/5 미완료 유지.
+
+2026-11-01 #010: REV-034 P3 조치 EV-036/Closed 뒤 TASK-019 S1 유한 InfluxDB v2 write를 EV-037/REV-035 Closed로 로컬 수락했다. MS-006 In Progress. 실제 DB/query·Delivery/파일 격리·tracing/실앱·UPS·실측/native·Gate4/5는 미완료다.

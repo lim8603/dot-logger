@@ -21,6 +21,98 @@ struct SubmissionPause {
 }
 thread_local! {
     static SUBMISSION_PAUSE: RefCell<Option<SubmissionPause>> = const { RefCell::new(None) };
+    static REPORT_PAUSE: RefCell<Option<SubmissionPause>> = const { RefCell::new(None) };
+}
+pub(super) fn pause_emergency_report() {
+    if let Some(pause) = REPORT_PAUSE.with(|pause| pause.borrow_mut().take()) {
+        pause.entered.wait();
+        pause.resume.wait();
+    }
+}
+
+#[test]
+fn earlier_alarm_during_report_cannot_leave_protected_complete_using_old_deadline() {
+    use super::emergency::*;
+    use crate::platform::power::PowerAlarm;
+    let (mut owner, plan, route) = setup();
+    owner.scope(|mut scope| {
+        let start = Instant::now();
+        let mut control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 64,
+            },
+            start,
+        )
+        .unwrap();
+        control
+            .enable_emergency(
+                &plan,
+                EmergencyConfig {
+                    files: vec![EmergencyFile {
+                        target: 10,
+                        rank: 1,
+                        protected_bytes: 64,
+                        estimated_drain_sync: Duration::ZERO,
+                    }],
+                    safety_margin: Duration::from_millis(200),
+                },
+            )
+            .unwrap();
+        let (_, input) = scope.next().unwrap();
+        let mut router = Router::new(&plan, vec![input], route).unwrap();
+        router.scope(|mut d, _| {
+            control
+                .notify_power(
+                    PowerAlarm::new(1, start, Duration::from_secs(3)).unwrap(),
+                    start,
+                )
+                .unwrap();
+            control.poll_emergency(start, &mut d).unwrap();
+            control.observe_protected_bytes(10, 0).unwrap();
+            let token = control.shutdown_sync().unwrap();
+            let mut ranges = [ProducerRange::default(); 1];
+            let now = start + Duration::from_secs(1);
+            control
+                .next_sync(token, 10, now, &mut d, &mut ranges)
+                .unwrap()
+                .unwrap()
+                .complete(SyncResult::Synced);
+            assert!(
+                control
+                    .poll_emergency(now, &mut d)
+                    .unwrap()
+                    .unwrap()
+                    .protected_complete
+            );
+            let entered = Arc::new(Barrier::new(2));
+            let resume = Arc::new(Barrier::new(2));
+            REPORT_PAUSE.with(|p| {
+                *p.borrow_mut() = Some(SubmissionPause {
+                    entered: entered.clone(),
+                    resume: resume.clone(),
+                })
+            });
+            std::thread::scope(|threads| {
+                let control = &control;
+                threads.spawn(move || {
+                    entered.wait();
+                    control
+                        .notify_power(
+                            PowerAlarm::new(2, start, Duration::from_millis(500)).unwrap(),
+                            now,
+                        )
+                        .unwrap();
+                    resume.wait();
+                });
+                let report = control.poll_emergency(now, &mut d).unwrap().unwrap();
+                assert_eq!(report.poweroff_deadline, start + Duration::from_millis(500));
+                assert!(!report.protected_complete);
+            });
+        });
+    });
 }
 
 // Test-only scheduler: the real request method performs every state transition.

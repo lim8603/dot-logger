@@ -16,6 +16,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
 use std::time::Instant;
 /// Explicit two-generation filter, sampling and existing-target route updates.
 pub mod config_update;
+/// Optional startup-only power alarm plans and ranked emergency synchronization.
+pub mod emergency;
 mod types;
 pub use types::*;
 const FREE: u8 = 0;
@@ -135,6 +137,7 @@ pub struct ControlOwner<'owner> {
     shutdown_deadline: AtomicU64,
     shutdown_finished_at: AtomicU64,
     sync_files: AtomicBool,
+    emergency: Option<Box<emergency::EmergencyState>>,
     // Last field: release attachment only after all control allocations are freed.
     _attachment: ControllerLease<'owner>,
 }
@@ -248,9 +251,10 @@ impl<'owner> ControlOwner<'owner> {
             reserved,
             shutdown: AtomicU8::new(0),
             sync_submitting: AtomicBool::new(false),
-            shutdown_deadline: AtomicU64::new(0),
+            shutdown_deadline: AtomicU64::new(u64::MAX),
             shutdown_finished_at: AtomicU64::new(0),
             sync_files: AtomicBool::new(false),
+            emergency: None,
             _attachment: attachment,
         })
     }
@@ -355,7 +359,7 @@ impl<'owner> ControlOwner<'owner> {
         let tick = self.now(now)?;
         let end = self.tick(deadline)?;
         let _submission = SyncSubmission::enter(&self.sync_submitting).map_err(|error| {
-            if self.shutdown.load(Ordering::SeqCst) != 0 {
+            if self.shutdown.load(Ordering::SeqCst) != 0 || self.emergency_active() {
                 ControlError::Closing
             } else {
                 error
@@ -365,7 +369,7 @@ impl<'owner> ControlOwner<'owner> {
         // If this call saw Running, shutdown must see its live submission until
         // the slot is published (or every error path returns via the RAII guard).
         // A call entering after shutdown observes Closing before touching a slot.
-        if self.shutdown.load(Ordering::SeqCst) != 0 {
+        if self.shutdown.load(Ordering::SeqCst) != 0 || self.emergency_active() {
             return Err(ControlError::Closing);
         }
         #[cfg(test)]
@@ -407,6 +411,7 @@ impl<'owner> ControlOwner<'owner> {
         ranges: &mut [ProducerRange],
     ) -> Result<Option<SyncWork<'control, 'owner>>, ControlError> {
         let tick = self.now(now)?;
+        self.tighten_emergency_deadline();
         let slot = self.slot(token)?;
         let _publication = slot.claim(token.generation)?;
         let index = self
@@ -415,6 +420,15 @@ impl<'owner> ControlOwner<'owner> {
             .iter()
             .position(|contract| contract.id == target)
             .ok_or(ControlError::UnsupportedBoundary)?;
+        if token.slot == self.config.sync_slots && !self.emergency_sync_allowed(index) {
+            return Ok(None);
+        }
+        if token.slot != self.config.sync_slots && self.emergency_active() {
+            if slot.targets[index].state.load(Ordering::Acquire) == QUEUED {
+                slot.targets[index].state.store(EXPIRED, Ordering::Release);
+            }
+            return Ok(None);
+        }
         if slot.targets[index].state.load(Ordering::Acquire) != QUEUED {
             return Ok(None);
         }
@@ -502,6 +516,7 @@ impl<'owner> ControlOwner<'owner> {
     /// frozen cutoff are never confirmed by an older barrier acknowledgment.
     pub fn poll(&self, now: Instant) -> Result<ControlProgress, ControlError> {
         let tick = self.now(now)?;
+        self.tighten_emergency_deadline();
         let mut out = ControlProgress::default();
         let total =
             self.completion.registry.producers.len() * self.completion.registry.limits.window;
@@ -512,7 +527,12 @@ impl<'owner> ControlOwner<'owner> {
             };
             for (index, target) in slot.targets.iter().enumerate() {
                 let state = target.state.load(Ordering::Acquire);
-                if state == QUEUED && tick >= slot.deadline.load(Ordering::Acquire) {
+                let emergency_skip = self.emergency_active()
+                    && (!std::ptr::eq(slot, &self.slots[self.config.sync_slots])
+                        || !self.emergency_target_selected(index));
+                if state == QUEUED
+                    && (emergency_skip || tick >= slot.deadline.load(Ordering::Acquire))
+                {
                     target.state.store(EXPIRED, Ordering::Release);
                     continue;
                 }
@@ -564,6 +584,7 @@ impl<'owner> ControlOwner<'owner> {
                     target.cursor.store(cursor + 1, Ordering::Release);
                 }
                 if target.cursor.load(Ordering::Acquire) == total {
+                    self.mark_emergency_confirmation(slot, index, tick);
                     target.state.store(
                         match state {
                             ACK_OK => DONE_OK,
@@ -637,7 +658,8 @@ impl<'owner> ControlOwner<'owner> {
         self.shutdown
             .compare_exchange(0, 4, Ordering::SeqCst, Ordering::Relaxed)
             .map_err(|_| ControlError::Closing)?;
-        self.shutdown_deadline.store(end, Ordering::Relaxed);
+        self.shutdown_deadline.fetch_min(end, Ordering::AcqRel);
+        self.tighten_emergency_deadline();
         self.sync_files.store(plan.sync_files, Ordering::Relaxed);
         self.capture.close();
         self.shutdown.store(1, Ordering::Release);
@@ -673,6 +695,7 @@ impl<'owner> ControlOwner<'owner> {
         dispatcher: &mut Dispatcher<'_, '_>,
     ) -> Result<ShutdownPoll, ControlError> {
         let tick = self.now(now)?;
+        self.tighten_emergency_deadline();
         if !dispatcher
             .tracking()
             .is_some_and(|ours| std::ptr::eq(ours.registry, self.completion.registry))
@@ -706,6 +729,7 @@ impl<'owner> ControlOwner<'owner> {
             }
             for (i, target) in slot.targets.iter().enumerate() {
                 let sync = self.sync_files.load(Ordering::Relaxed)
+                    && self.emergency_target_selected(i)
                     && self.completion.targets()[i]
                         .supported
                         .contains(Boundary::Synced);

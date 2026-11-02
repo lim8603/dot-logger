@@ -90,3 +90,5 @@ impl PlatformCapabilities {
         }
     }
 }
+/// Explicit power alarm DTOs for host adapters and deterministic simulation.
+pub mod power;

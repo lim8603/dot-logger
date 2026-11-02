@@ -1478,3 +1478,72 @@ fn live_revision_boundary_sampling_raw_errors_and_drop_do_not_allocate() {
         assert_eq!(calls, (0, 0));
     });
 }
+
+#[test]
+fn power_notification_and_closed_capture_rejection_allocate_and_free_nothing() {
+    use dot_logger::{
+        control::{ControlConfig, ControlOwner, emergency::*},
+        platform::power::*,
+    };
+    use std::time::{Duration, Instant};
+    let plan = tracked_fixtures::plan();
+    let route = tracked_fixtures::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        tracked_fixtures::tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let start = Instant::now();
+        let mut control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 64,
+            },
+            start,
+        )
+        .unwrap();
+        let (mut p, _) = scope.next().unwrap();
+        let alarm = PowerAlarm::new(1, start, Duration::from_secs(3)).unwrap();
+        assert_eq!(
+            allocator::observe(|| assert_eq!(
+                control.notify_power(alarm, start).unwrap(),
+                PowerNotice::Disabled
+            )),
+            (0, 0)
+        );
+        control
+            .enable_emergency(
+                &plan,
+                EmergencyConfig {
+                    files: vec![EmergencyFile {
+                        target: 10,
+                        rank: 1,
+                        protected_bytes: 64,
+                        estimated_drain_sync: Duration::ZERO,
+                    }],
+                    safety_margin: Duration::from_millis(200),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            allocator::observe(|| {
+                assert_eq!(
+                    control.notify_power(alarm, start).unwrap(),
+                    PowerNotice::Posted
+                );
+                assert!(matches!(
+                    p.try_record_small(tracked_fixtures::meta(), &[1]),
+                    Err(CaptureError::Closing)
+                ));
+            }),
+            (0, 0)
+        );
+    });
+}

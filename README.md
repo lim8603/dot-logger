@@ -220,3 +220,31 @@ cargo run --locked -p dot-logger-client --features remote --example dot_probe_ta
 
 종료/새 구독 사이에는 연속성을 주장하지 않으며 누락 개수를 추정하지 않습니다.
 [표시·예산·수락 범위](crates/dot-logger-client/README.md#구독-경계-화면-예제--task-020-s3)를 따릅니다.
+
+### UPS 알람·차단 기한 시뮬레이션 (TASK-021)
+
+실물 UPS 없이 호스트가 `PowerAlarm` 이벤트를 전달해 긴급 저장을 실행할 수 있습니다.
+기본은 비활성이며 `ControlOwner::enable_emergency`로 시작 전에 파일 rank·보호량·안전 여유를
+선언합니다. 알람은 신규 입력을 닫고, 기존 종료 coordinator가 rank/target ID 순서로 파일 sync를
+진행합니다. 중복 알람은 기한을 늘리지 않고 진행 중 IO는 실제 종료까지 소유합니다.
+
+```sh
+# 파일/하드웨어 접근 없이 계획만 출력
+cargo run --locked -p dot-logger --example ups_simulation -- --plan
+# 현재 PC의 승인된 ext4 볼륨: 새 독점 하위 경로만 생성·정리
+cargo run --locked -p dot-logger --example ups_simulation -- --run /data/build
+```
+
+실행은 8/64MiB × 전달 지연0/50/250/1000ms의 실제 MCAP sync·복구와 프로세스 중단을 대조합니다.
+다른 환경에서는 신뢰된 저장 디렉터리를 지정하고 그 파일시스템을 기록합니다. tmpfs의 sync를
+SSD 영속 쓰기 측정으로 해석하지 않습니다. 기존 파일을 덮어쓰거나 재귀 삭제하지 않습니다.
+
+`PowerAlarm::new(id, generated_at, hold_up)`은 몇 분의 여유도 표현합니다. 수락 프로필은
+신호 생성부터 차단까지3초·안전 여유200ms를 유지하며 수신 뒤3초를 새로 부여하지 않습니다.
+보호 데이터는 기존 input/raw quota에서 미리 수락하고 알람 뒤 추가 snapshot 수락량은0입니다.
+`observe_protected_bytes`에 파일별 frozen payload 양을 명시해야 하며 미관측·한도 초과·기존
+기록 실패/만료는 성공으로 표시하지 않습니다. 파일 framing과 pending OS IO는 별도 예산에 포함합니다.
+
+파일별 barrier 결과는 `emergency_files`, 전체 보호/기한/실제 정리 상태는 `poll_emergency`로 조회합니다.
+실제 UPS 드라이버·OS 알람은 호스트가 일반 경로에서 연결하며 자동 설치하지 않습니다.
+현재 PC의 UPS 시뮬레이션 판정과 물리 전원 소실 내구성을 구분합니다. 커널 변경/재부팅은 필요하지 않습니다.

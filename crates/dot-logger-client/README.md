@@ -140,4 +140,45 @@ Comparison에 남겨 인과적 rate 비교는 Unavailable입니다. CPU·RSS·ca
 
 종료 코드0은 이 고정 기능 프로필의 모든 선택 경계·독립 읽기·query·정리를 확인한 경우,
 3은 DB/구독 결과가 프로필에 미달한 경우, 4는 입력/IO/검증 오류입니다.
-S3 구독 종료/재연결 불연속 예제·실제 화면·지속 앱·실측/native는 후속입니다.
+S3 구독 종료/재연결 불연속은 아래 예제에서 확인합니다. 실제 화면·지속 앱·실측/native는 후속입니다.
+
+## 구독 경계 화면 예제 — TASK-020 S3
+
+`dot_probe_tail`은 합성 source record와 실제 loopback TCP/gRPC로 **유한 화면 이력**을 만듭니다.
+`--plan`은 runtime/환경 변수/파일/소켓 접근 없이 계획 JSON만 출력합니다.
+`--run`은 자기 소유 서버와 최대 두 연결/두 구독을 열고 한국어 구분선 출력 후 마지막 줄에 JSON 보고서를 출력합니다.
+제품 SDK/서버/wire와 실제 dot-probe 화면은 변경하지 않습니다.
+
+```sh
+cargo run --locked -p dot-logger-client --features remote --example dot_probe_tail -- --plan
+cargo run --locked -p dot-logger-client --features remote --example dot_probe_tail -- --run
+cargo test --locked -p dot-logger-client --features remote --test tail_screen
+```
+
+| 관측 | 표시·동작 |
+|---|---|
+| 로컬/서버 `TimedOut` | `wait_timed_out`·연속성 `Unconfirmed`. 같은 구독에서 명시 재대기 |
+| 다음 `None`·취소·기타 오류 | `subscription_ended` 구분선과 관측된 원인 |
+| 새 subscribe 성공 | 새 `segment`와 `subscription_started` 구분선. `connect_from_previous=false`, 누락 건수 `null` |
+| 구독 내 overflow Gap | 해당 구독의 inclusive transfer 범위, 새 `span`. capture 누락 건수로 변환하지 않음 |
+| 화면 이력 포화 | 기록 인계 거절·미ACK·종료 구분선 보존 후 stream/연결 종료 |
+| 인계 후 ACK 불명 | 이미 수신한 행을 보존하고 `AcknowledgementUnknown` 종료 표시. 재전송/미수신으로 추정하지 않음 |
+
+SDK가 로컬 timeout과 서버 lease TimedOut을 같은 오류로 전달하므로 timeout 한 번만으로 종료나
+연속성을 확정하지 않습니다. lease 오류로 SDK stream이 닫혔다면 다음 호출의 `None`으로 종료를 확인합니다.
+렌더러는 `segment/span`과 원 session/producer/channel/schema/revision으로 계열을 구분해야 합니다.
+새 구독이 같은 TCP에서 열리거나 capture sequence가 인접해도 이전 선을 이어 그리지 않습니다.
+재구독 사이의 누락 범위/개수는 알 수 없으며, 구독 내 Gap과 별개입니다.
+
+예제의 고정 실행은 대기 만료 후 같은 구독의 기록 두 건 ACK, lease 종료 후 새 연결/구독의
+기록 한 건 ACK, 슬롯 포화로 transfer2 Gap, 명시 취소를 확인합니다. 시나리오 대기10초,
+서버 정리 관측2초, 개별 SDK 대기250ms, 요청 lease1500ms, record≤64B, 수신1슬롯,
+화면32행(최대64행 지원)·종료 전용1행입니다. 이력은 자동 삭제/재시도하지 않습니다.
+선언 메모리8MiB/external4MiB와 별도 JSON/HTTP2/runtime/OS headroom을 구분하며 RSS 상한이나 RT 기한을 보장하지 않습니다.
+서버 join 및 실제 runtime/수신자 종료 뒤 shared 예약0을 확인합니다.
+
+JSON의 128bit session/schema ID는 hex, 큰 정수·시각·transfer는 문자열입니다.
+원 receipt·revision·clock·source clock·payload를 보존하며 `ConsumerAccepted`와 서버 ACK 확인 수를 구분합니다.
+화면 렌더링은 소비 큐 인계/ACK 뒤의 별도 동작이므로 stdout 실패가 이미 확인된 ACK를 취소하지 않습니다.
+고정 프로필과 정리를 확인한 경우 exit0, 입력/IO/검증 오류는 exit4입니다.
+실제 지속 dot-probe/화면·장기 유휴 tail·재구독 복원·PC/RT/UPS/정량 성능/native는 후속입니다.

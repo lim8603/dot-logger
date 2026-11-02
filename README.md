@@ -198,7 +198,7 @@ cargo run --locked -p dot-logger --features tracing-adapter --example general_lo
 ```
 
 이 예제는 일반 로그→수집/소비까지입니다. S2 통합 비교는 아래 별도 예제를 사용합니다.
-구독 종료/재연결 화면 불연속 예제(S3), 실제 지속 dot-probe 적용(TASK-026)은 후속입니다.
+구독 종료/재연결 화면 불연속은 아래 S3 예제로 확인할 수 있습니다. 실제 지속 dot-probe 적용은 TASK-026 후속입니다.
 
 ### 합성 입력 통합·설정 비교 (TASK-020 S2)
 
@@ -206,3 +206,17 @@ cargo run --locked -p dot-logger --features tracing-adapter --example general_lo
 같은 capture receipt로 실제 MCAP·InfluxDB·loopback 구독에 연결하고, 명시 설정 변경 후
 필터/sampling·DB route off 결과를 비교합니다. [실행과 수락 범위](crates/dot-logger-client/README.md#합성-입력-통합설정-비교-예제--task-020-s2)를 따릅니다.
 가상 session 시계의 기능 예제이며 실제 dot-probe 적용·성능/RT 검증은 후속입니다.
+
+### 구독 경계 화면 표시 (TASK-020 S3)
+
+[dot_probe_tail 예제](crates/dot-logger-client/examples/dot_probe_tail.rs)는 실제 loopback 구독에서
+대기 만료·서버 lease 종료·명시 재연결·구독 내 Gap·취소를 유한하게 실행하고,
+한국어 경계 표시와 원 receipt/시각을 포함한 JSON 이력을 출력합니다.
+
+```sh
+cargo run --locked -p dot-logger-client --features remote --example dot_probe_tail -- --plan
+cargo run --locked -p dot-logger-client --features remote --example dot_probe_tail -- --run
+```
+
+종료/새 구독 사이에는 연속성을 주장하지 않으며 누락 개수를 추정하지 않습니다.
+[표시·예산·수락 범위](crates/dot-logger-client/README.md#구독-경계-화면-예제--task-020-s3)를 따릅니다.

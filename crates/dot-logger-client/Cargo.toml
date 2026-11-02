@@ -43,3 +43,7 @@ required-features = ["remote"]
 [[example]]
 name = "dot_probe_pipeline"
 required-features = ["integration-example"]
+
+[[example]]
+name = "dot_probe_tail"
+required-features = ["remote"]

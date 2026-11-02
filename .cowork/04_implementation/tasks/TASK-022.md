@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | local-pc-v1 수치 프로필 Approved·선행 Task/시험 harness 준비, RT 행은 부팅 확인 후 |
+| 마지막 갱신일 | 2026-11-02 |
+| 다음 액션 | 선행 시험 harness 준비. RT 필요 시 설치 상태/실행 계획 확인→Human에게 설치·전환/재시작 요청→승인·RT 부팅 확인 후 시험 |
 | 의존 | TASK-001 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -49,7 +49,7 @@ Human 결정 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 | PC/OS | AMD Ryzen7 H255, 8코어16스레드 / Ubuntu26.04.1 LTS x86_64 |
 | 메모리 | OS 인식59,750,248,448B(약55.6GiB). logger 예산과 OS cache/host 앱 메모리는 분리 |
 | 실행 커널 | 7.0.0-42-generic / CONFIG_PREEMPT_DYNAMIC=y, CONFIG_PREEMPT_RT 미설정 |
-| 설치된 RT 커널 | 7.0.0-38-realtime / CONFIG_PREEMPT_RT=y. 부팅 뒤 uname/sysfs/config를 다시 확인하고 RT 행 시험 |
+| RT 설치 과거 관측 | 2026-10-31에7.0.0-38-realtime/CONFIG_PREEMPT_RT=y를 관측한 이력. 현재 설치/부팅 가능 여부는 RT 준비 때 재확인하며 실행 중인 커널로 간주하지 않음 |
 | SSD/FS | CT1000T500SSD8: 루트 ext4(relatime). HP EX950512GB 2개: /data/build ext4(noatime), /data/db ext4. 시험별 실제 경로 고정 필요 |
 | UPS | 시뮬레이션 수락: 모의 원점·전달 지연·약3초 기한·최대 보호량·진행 IO·실제 sync/중단·복구/receipt 대조 |
 | native | 공개 완료 후 source hash 고정·6 contracts+audit+raw-memory. 현재 미실행 이월 |
@@ -66,7 +66,7 @@ Human 「승인, 다음작업 진행하자」에 따라 TASK-008/010/011 리뷰�
 
 | 항목 | local-pc-v1 승인 기준·판정 경계 |
 |---|---|
-| 환경 | 현재 Ubuntu generic / 실행7.0.0-42, RT 행은 설치7.0.0-38-realtime 부팅 및 sysfs/권한 확인 후. generic 결과와 RT 결과 분리 |
+| 환경 | 현재 Ubuntu generic / 실행7.0.0-42, RT 행은 설치 상태 재확인·Human 요청/승인·필요 설치/부팅 전환·재시작 및 실행 커널/sysfs/권한 확인 후. generic 결과와 RT 결과 분리 |
 | 저장 | `/data/build` ext4(noatime), 매 run 새로운 `dot-logger-verification-*` 전용 디렉터리. run cap160GiB·별도 free reserve64GiB·파일1GiB. 원본/운영 파일 덮어쓰기 없음. run 전후 실제 mount/여유·원본/출력 경로 기록 |
 | 예산 | 2GiB: input64/raw1408/output256/external128/control64/worker128MiB, 기존 설계 배분. 512MiB/4GiB 비교는 별도 concrete quota/최대 record/startup 검증 뒤 사용하며 단순 배율로 실행하지 않음 |
 | CPU | control2·safety3, SMT10/11은 workload 배치에서 제외, worker4~7/12~15, housekeeping0/1/8/9. 실제 affinity 기록·동일 설정 off/on 비교. 현재 시스템 전체 격리/IRQ 이동은 수행하지 않으며 affinity만으로 OS 간섭 제거를 주장하지 않음 |
@@ -112,3 +112,9 @@ examples/telemetry_overhead.rs의 enabled/disabled·순서 반전 fixture를 실
 ### TASK-021 UPS 프로필 실행 — 2026-11-02
 
 [EV-043](../../05_verification/verification_evidence.md#ev-043)으로 local-pc-v1의 UPS 하위 행을 실행·수락했다. 현재 generic PC·`/data/build` ext4에서8/64MiB×전달0/50/250/1000ms·원점3초/안전여유200ms·64MiB rank48/16MiB, 두 Rust 각각8조건의 실제 MCAP sync/복구·child 중단 후 oracle 대조 Pass. 관측 최대1.803017545초, output 예약0. 초기 tmpfs 측정은 SSD 수락 근거에서 제외했다. 실물 UPS는 필수 입력이 아니다. 앞선 EV-021의 UPS NotRun은 당시 준비 이력이며 현재 UPS 하위 행은 Simulation Accepted다. P0~P6/10ms 제어 부하·RT·24h·통합/native 전체 검증은 미완료다.
+
+### RT 준비·재시작 요청 규칙 — 2026-11-02 Human 명시
+
+현재 PC는 Ubuntu 일반 커널로 실행 중이며 RT 커널을 올려 실행한 상태가 아니다. 이번 읽기 전용 `uname -r` 확인도 `7.0.0-42-generic`이다. 이전 설치 기록을 현재 RT 실행/설치 완료의 증거로 사용하지 않는다.
+
+RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/예상 시간·현재 설치 상태를 확인하고, 필요한 RT 커널 설치/부팅 선택·재시작과 작업 재개 절차를 구체적으로 정리해 Human에게 요청한다. Human 승인 전에 커널 설치/부트 설정 변경/재시작을 실행하지 않는다. 재시작 후에는 실행 커널·CONFIG_PREEMPT_RT·sysfs/capability를 실제 확인하고 동일 조건의 generic/RT 결과를 분리한다. 현재까지 EV-043 UPS 시뮬레이션을 포함한 PC 실행 결과는 일반 커널 결과이며 RT 시험은 Not Run이다.

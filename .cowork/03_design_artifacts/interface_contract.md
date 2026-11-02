@@ -661,6 +661,18 @@ FR-018 활성화는 재시작 때만 허용하는 안이다. 시작 전에 중�
 
 `available = poweroff_deadline - signal_received - safety_margin`이며 signal_received가 늦어졌으면 예산도 줄어든다. 전체 판정에는 신호 생성→수신의 지연을 포함한다. 예상 drain/sync가 available보다 크면 Unachievable과 파일별 partial 결과를 보고한다. 비활성에서는 긴급 전용 예약/전이가 없고 Disabled를 반환한다.
 
+### 16.1 TASK-021 로컬 긴급 제어·UPS 시뮬레이션 — 2026-11-02
+
+`platform::power::PowerAlarm`은 nonzero event ID·원 신호 생성 Instant·절대 차단 기한을 전달하는 host DTO다. `new(id, generated, hold_up)`은3초나180초 등 유한 시간을 표현한다. OS signal handler 안에서 IO하지 않으며 hardware/OS 어댑터·worker를 자동 설치하지 않는다. 신호 시각을 직접 모르면 host가 검증한 전달 지연 상한을 보수적으로 차감하고, 그 근거가 없으면 시간 지원을 인증하지 않는다.
+
+`ControlOwner` 기본 emergency=None은 전용 heap 예약/전이 없음·`notify_power` Disabled다. producer/ordinary sync 사용 전 `enable_emergency(plan, EmergencyConfig)`에서 startup 고정 파일 목록/동일 session target·Synced 지원·중복/필수 Synced 누락·payload 합계·checked control metadata 예산을 검사한다. 파일은 rank/동일 rank target ID로 정렬한다. 보호 payload는 기존 raw/input quota에 포함하고 framing/index/footer는 기존 writer/output 예약을 유지한다. 이 첫 정책의 **알람 후 추가 snapshot 수락량은0**이며 사전 수락한 protected 범위만 frozen cutoff로 처리한다.
+
+`notify_power(alarm, received)`는 할당/해제·IO·락·사용자 콜백·retry 루프 없이 신호를 게시하고 capture를 닫는다. event ID·최소 생성/수신 시각은 독립 관측이며 atomic mailbox의 cutoff는 fetch_min으로만 줄어든다. `poll_emergency`는 optional 비보호 출력의 신규 작업을 취소하고 같은 정상 종료 coordinator를 시작/단축한다. 일반 sync 신규 수락은 닫고 queued ordinary 작업은 Expired, 이미 시작한 SyncWork/Delivery/raw guard는 실제 IO 종료까지 유지한다. 중요 파일보다 낮은 순위/동일 순위 큰 ID는 이전 파일의 barrier가 terminal이 될 때까지 시작하지 않는다. 실패한 상위 파일 때문에 하위 파일을 무한 대기시키지 않는다.
+
+실제 work deadline은 원 차단 기한−안전 여유다. 늦게 받은 알람에 새 예산을 주지 않으며 정상 종료의 더 이른 기한도 늘리지 않는다. `poll_emergency`는 마지막 기한을 다시 관측해 report 도중의 단축을 반영한다. 보고의 `unachievable`(host 예상 drain/sync 또는 payload 초과)과 `protected_complete`(실제 파일/receipt·명시 양·기한 확인)는 별개다. `observe_protected_bytes(target, frozen_payload_bytes)`는 cutoff 이후 host가 실제 writer 원본 범위의 양을 한 번 관측해 공급한다. 미관측은0이 아니고, 초과/기존 실패·누락/만료는 보호 성공이 아니다. `emergency_files`는 caller buffer에 순위별 Armed/Pending/InFlight/Synced/Failed/Unknown/Expired와 양/한도·보수적 확인 시각을 복사한다. file barrier와 개별 receipt 결과를 혼동하지 않는다.
+
+`ups_simulation --plan`은 무부하 선언, `--run <trusted-parent>`는 고정 합성8/64MiB·48/16MiB rank·전달0/50/250/1000ms·원점→차단3초·여유200ms의 실제 MCAP/sync/복구를 실행한다. 기본 회귀의 작은 파일 시험과 현재 PC ext4 실측을 구분한다. child exit17은 writer destructor 없이 active 파일을 남기며 parent의 사전 외부 oracle·read-only 원본/새 독립 출력으로 잘린 꼬리를 제외하고 receipt/metadata/bytes를 대조한다. 과거 completion은 복원하지 않는다. ENOSPC/sync 오류·기한 초과는 partial, 실제 owner 종료 후 예약/소유 경로 정리를 확인한다. OS IO 강제 취소/모든 환경3초 보장·물리 전원 소실 내구성을 주장하지 않는다. 실물 UPS 제공은 수락 선행조건이 아니다(ADR-011).
+
 ## 17. 첫 검증 구성과 상세 리뷰 경계
 
 - 수집: 2 importance, Normal 기본, explicit → channel policy → Normal, Important 예약 slots/bytes, 신규 거절, producer별 FIFO.

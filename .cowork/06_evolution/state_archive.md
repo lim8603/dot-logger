@@ -456,3 +456,25 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - **리포트/호스트 경계:** 실제 Window session/revision/epoch/구간·장비/부하/target/boundary와 검증 능력의 session clock/유효성을 유지한다. 물리 bytes/slots·출력정지·filesystem/quota·순환 보존/retained span을 분리한다. host는 성공 sample과 target_totals의 유한 이력에서 실제 from/to를 대조하고 terminal checked 차분·최종 pending을 공급한다. 누락/foreign/Busy/overflow는 Unavailable이며 가까운 시점 혼합/배출 후 정확 계약이다. 물리 gauge/출력 출처·capacity evidence·자동 worker/CLI runtime backend·실앱과 실제 PC/RT 오차≤20%·계측 비용≤5%·native는 후속이다. 상세 [TASK-014](../04_implementation/tasks/TASK-014.md)·[TASK-015](../04_implementation/tasks/TASK-015.md)·[API§15](../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안).
 
 - 2026-11-01 #013: TASK-019 InfluxDB v2 어댑터 독립 코드리뷰를 수행하여 Pass 판정 및 REV-038(Open)을 등록했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md).
+
+## #021 — 2026-11-02 #001 TASK-021 수락 시 R2 이관
+
+- **TASK-016 로컬 계약:** EV-030/source542c6e6·source102개·검사10개·Miri496·소스/commit blob102개 일치, REV-027 개발 자가 점검 Pass/Closed·위임 수락. 명시 enable/preview/validate/apply와 두 bank·posted/per-producer ack·old accepted cutoff/완료/실제 raw·Delivery guard 해제 뒤 회수, Busy/Conflict/checked revision을 사용한다. level/Normal sampling/기존 target route만 live 변경하며 Important sampling 우회·같은 raw loan·과거 수락 route를 보존한다. 전환 Sample은 RevisionTransition, 혼합 revision Window 금지. Comparison은 원래 Report/profile/revision/구간·입력/장비/boundary/측정 scope 차이와 skip/거절/출력 손실을 분리한다. 단일 revision 파일은 명시 budget/별도 writer다. 운영 backend/CLI runtime/자동 worker·실앱/실제 PC·RT 비용/오차/native는 후속. [TASK-016](../04_implementation/tasks/TASK-016.md)·[API §15.2](../03_design_artifacts/interface_contract.md#152-task-016-로컬-설정-변경전후-비교--2026-11-01).
+
+- **2026-10-31 Human 구현 승인:** 「승인, 다음작업 진행하자」로 TASK-008 EV-012/013·TASK-010 EV-016/017·TASK-011 EV-020을 수락했다. REV-009/010/013/014/017 및 해당 RV Closed, TASK-008/010/011 Human 리뷰 완료. 기존 리뷰는 닫았으며 신규 TASK-012 리뷰는 별도다. 낮은 pin 유실/forget 강제 회수 없음·실제 reader close 뒤 반환 계약과 실측/native 이월은 유지한다.
+
+### TASK-021 수락 시 이전 Closed 리뷰 행 이관
+
+| [REV-029](../05_verification/reviews/REV-029_TASK-017_PLAN_START.md) | TASK-017 S1 계획/예산 개발 자가 점검 | Closed | Pass·S1 계획/예산 로컬 수락(EV-031/0622a90), S2는 REV-030 참조 |
+| [REV-030](../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) | TASK-017 S2 합성 파일 실행/정리 개발 자가 점검 | Closed | Pass·신규 미해결 RV 없음, EV-032/1cae3b9·S2 로컬 수락·운영/생산/실측 후속 |
+| [REV-031](../05_verification/reviews/REV-031_TASK-017_CHECK_HOST.md) | TASK-017 S3 로컬 운영 host·CLI 개발 자가 점검 | Closed | RV-066~068 probe 기한/CLI exit/원 source session 조치, EV-033·로컬 연결 수락 |
+| [REV-032](../05_verification/reviews/REV-032_TASK-017_ROUTED_BRIDGE.md) | S3 생산 모듈/실제 ACK·실앱 snapshot 개발 자가 점검 | Closed | 신규7개·두 Rust workspace 각364/EV-034, 미해결 지적 없음 |
+| [REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md) | 고정 routed host·원 source/CLI 권한·시계 개발 자가 점검 | Closed | RV-069 호스트 deadline·RV-070 초기 OS 원인 보존 Red→Green, EV-035·기능 수락 |
+| [REV-034](../05_verification/reviews/REV-034_TASK-017_INDEPENDENT_REVIEW.md) | TASK-017 독립 리뷰 조치 | Closed | RV-071/072 상수 공개·24MiB rustdoc·EV-036 수락 |
+| [REV-035](../05_verification/reviews/REV-035_TASK-019_INFLUX_WRITE.md) | TASK-019 S1 개발 자가 점검 | Closed | RV-073 타입별 field·RV-074 HTTP body 예약 수명·EV-037 로컬 수락 |
+| [REV-036](../05_verification/reviews/REV-036_TASK-019_NUMERIC_QUERY.md) | TASK-019 S2 개발 자가 점검 | Closed | RV-075 query dialect·실제 DB/typed query EV-038 수락 |
+| [REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) | TASK-019 S3 개발 자가 점검 | Closed | RV-076 terminal 복구·RV-077 초기 cancel·RV-078 proxy 자식 합류·EV-039 수락 |
+| [REV-038](../05_verification/reviews/REV-038_TASK-019_INDEPENDENT_REVIEW.md) | TASK-019 독립 리뷰 문서 조치 | Closed | RV-079/080 rustdoc·fmt 확인, 소스d16c7e5 |
+| [REV-039](../05_verification/reviews/REV-039_TASK-020_TRACING_INPUT.md) | TASK-020 S1 일반 로그 입력 자가 점검 | Closed | RV-081 MSRV 예제 수명 수정·EV-040 수락 |
+| [REV-040](../05_verification/reviews/REV-040_TASK-020_PIPELINE.md) | TASK-020 S2 통합 비교 자가 점검 | Closed | RV-082 JSON 출처 식별자 보강·EV-041 수락 |
+| [REV-041](../05_verification/reviews/REV-041_TASK-020_TAIL_SCREEN.md) | TASK-020 S3 화면 구독 불연속 자가 점검 | Closed | RV-083 큰 ID/clock 표기 조치·EV-042 수락 |

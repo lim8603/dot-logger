@@ -108,3 +108,7 @@ Human 「20ms를 10ms로 줄일 수있을까?」에 따라 합성 제어 주기�
 ## TASK-014 계측 비용 실측 후속 — 2026-10-31
 
 examples/telemetry_overhead.rs의 enabled/disabled·순서 반전 fixture를 실제 검증 프로필에서 release/CPU·작업 부하·반복 조건을 고정해 실행한다. 기본 계측 완료 처리량 비용≤5%와 계측 포함 RT 지연은 미측정 목표다. EV-027의 128회 debug smoke/할당0은 비용 또는 RT 목표 Pass가 아니다. raw acquisition 거절과 제출 결과, GeneralProducer 재시도 판정 수를 구분해 조건/카운터를 기록한다.
+
+### TASK-021 UPS 프로필 실행 — 2026-11-02
+
+[EV-043](../../05_verification/verification_evidence.md#ev-043)으로 local-pc-v1의 UPS 하위 행을 실행·수락했다. 현재 generic PC·`/data/build` ext4에서8/64MiB×전달0/50/250/1000ms·원점3초/안전여유200ms·64MiB rank48/16MiB, 두 Rust 각각8조건의 실제 MCAP sync/복구·child 중단 후 oracle 대조 Pass. 관측 최대1.803017545초, output 예약0. 초기 tmpfs 측정은 SSD 수락 근거에서 제외했다. 실물 UPS는 필수 입력이 아니다. 앞선 EV-021의 UPS NotRun은 당시 준비 이력이며 현재 UPS 하위 행은 Simulation Accepted다. P0~P6/10ms 제어 부하·RT·24h·통합/native 전체 검증은 미완료다.

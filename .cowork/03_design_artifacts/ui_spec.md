@@ -49,3 +49,9 @@ EV-025/REV-021로 Rust native client/server·CLI·offline query/timed replay·re
 복구는 단일 전체 immutable source·독립 create_new 출력과 file sync를 지원하고 namespace sync를 주장하지 않는다. partial active prefix recovery는 Unsupported이며 오류 출력은 조사용으로 보존한다. excluded suffix는 교체 index/summary도 포함한다.
 
 Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다. remote에서 이미 게시한 명령/ACK는 불명일 수 있으며 자동 reconnect/retry로 성공을 추정하지 않는다. Gone/expired·permission·version을 구분하고 stdout write/flush 실패 기록에는 ACK하지 않는다. 실제 dot-probe 화면/운영 보안 연동·성능/다른 OS는 해당 Task 후속이다.
+
+## 5. TASK-020 S3 화면 구독 불연속 예제 — 2026-11-02
+
+[dot_probe_tail](../../crates/dot-logger-client/examples/dot_probe_tail.rs)은 유한 화면 이력을 한국어 구분선과 JSON으로 표시한다. 대기 만료는 `Unconfirmed`, 종료/취소/오류는 종료 구분선, 명시 재구독은 새 segment다. 화면은 새 구독과 이전 구독의 선을 연결하지 않으며 누락 건수/범위를 추정하지 않는다. 구독 내 overflow만 transfer 범위와 새 span으로 표시한다. chart 계열은 segment/span과 원 source identity로 구분한다.
+
+화면 이력 포화 시 기록 인계를 거절해 ACK하지 않고 종료 전용행을 남긴다. 소비 큐 인계/ACK와 그 뒤 렌더링은 별도이므로 이 예제의 stdout 실패는 이미 받은 기록/확인 ACK를 소급 취소하지 않는다. 실제 CLI tail의 stdout 인계 계약은 위 §4 그대로다. source ID는 hex, 큰 정수/시각은 문자열이며 원 receipt·revision·clock·payload를 보존한다. 실제 지속 화면 적용·장기 tail/복원·환경/성능 검증은 TASK-026/022 후속이다.

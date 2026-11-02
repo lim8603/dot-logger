@@ -547,6 +547,7 @@ CLI `dot-logger`는 explicit remote 또는 offline manifest를 받는다. schema
 
 ### 14.5 REV-022 오류·구독 대기 보강 — 2026-10-31
 
+- TASK-020 S3(2026-11-02): [유한 화면 예제](../../crates/dot-logger-client/examples/dot_probe_tail.rs)·[표시 계약](../../crates/dot-logger-client/README.md#구독-경계-화면-예제--task-020-s3)은 `TimedOut`의 로컬/서버 출처를 추정하지 않고 같은 구독 재대기로 확인한다. timeout 행은 Unconfirmed, None/취소/기타 오류는 종료 구분선, 새 subscribe는 새 segment·연결 금지/누락 개수 Unknown이다. 구독 내 Gap만 inclusive transfer 범위와 새 span으로 표시하고 capture 손실로 환산하지 않는다. 화면 큐 포화는 미인계/미ACK·종료 전용행 보존 후 owner 종료, ACK 불명은 이미 인계된 행과 별도 종료 표시다. 실제 SDK/wire를 바꾸지 않으며 지속 앱/화면·장기 tail/복원은 TASK-026 후속이다.
 - `next`의 로컬 wait timeout만으로 구독/미완성 decoder를 버리지 않는다. 같은 owner에서 명시 재대기할 수 있다. 서버 TimedOut(lease 만료) 등 원격 오류·명시 cancel·연결 오류는 종료이며 그 뒤 next는 None이다. tonic0.13.1의 message/poll_next가 decoder 상태를 Streaming에 보관하는 것을 소스 대조하고 실제 TCP 분할 시험으로 확인한다. grpc-timeout은 이 버전의 server response future(handshake)를 제한하며 서버 idle lease를 대체하지 않는다.
 - ReceiverConfig ttl은 조립/미수락 기록 수명과 요청 idle lease를 겸한다. 서버 max_age로 제한된다. heartbeat/lease 분리 wire는 추가하지 않는다. 별도 구독 사이의 기록은 연속 transfer/Gap으로 추정하거나 복원하지 않는다. 화면 호스트는 종료/재구독 경계를 불연속으로 표시한다. 장기 유휴 tail/재구독 복원은 후속이며 이번 조치의 수락 범위 밖이다.
 - handoff는 소비자 미호출의 TTL/세대 사전 거절을 Remote(Gone)으로, 실제 소비자 거절을 ConsumerRejected로 구분한다. 모두 ACK 없음이다. 소비자 수락 뒤 ACK 불명은 기존 AcknowledgementUnknown이다.

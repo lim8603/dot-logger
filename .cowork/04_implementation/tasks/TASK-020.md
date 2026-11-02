@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S1/S2 EV-040/041 로컬 수락, 다음 S3 화면 구독 불연속 |
+| 마지막 갱신일 | 2026-11-02 |
+| 다음 액션 | S1~S3 EV-040~042 로컬 수락, 통합/환경 TASK-026/022·native T3 대기. 다음 구현 TASK-021 |
 | 의존 | TASK-013·TASK-016·TASK-019 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -31,10 +31,10 @@ S1 구현: `crates/dot-logger/src/adapters/tracing.rs`, `examples/general_logs.r
 
 ## 완료 기준
 
-- [x] S2 대표 합성 로그/수치/raw→실제 파일/DB/구독·명시 설정 비교(EV-041). 실제 dot-probe 수정은 TASK-026, S3 화면 불연속은 잔여.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] S2 대표 합성 로그/수치/raw→실제 파일/DB/구독·명시 설정 비교(EV-041). 실제 dot-probe 수정은 TASK-026, S3는 아래 EV-042로 수락했다.
+- [x] S1~S3 로컬 대상 revision·환경·명령·미실행 및 MS-006 하위 근거를 EV-040~042/추적표에 기록했다. 전체 MS 검증은 미완료다.
+- [x] S1~S3 로컬 실패/포화·취소/종료·예산 경계 검증. 실앱/환경 검증은 별도 대기다.
+- [x] 기존 2026-10-31 Human 위임으로 S1~S3 로컬 구현/조치 수락·REV-039~041 Closed. 실제 통합/환경 수락은 대기다.
 
 테스트 정의: [TC-007](../../05_verification/test_case.md#tc-007). S1 제품 코드·검증 근거: [EV-040](../../05_verification/verification_evidence.md#ev-040). TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -50,7 +50,7 @@ Human 「다음 작업 시작하자」로 REV-038 조치 후 착수했다. 선�
 |---|---|---|
 | S1 | 일반 경로 tracing/log 이벤트 유한 인코딩·수집 연결 | 로컬 수락 — EV-040/REV-039 Closed |
 | S2 | 대표 로그/수치/합성 원본의 파일·DB·구독/조절 비교 예제 | 로컬 수락 — EV-041/REV-040 Closed |
-| S3 | 구독 종료/재연결 불연속 표시 예제·검증 | 미착수 — RV-053 소비 |
+| S3 | 구독 종료/재연결 불연속 표시 예제·검증 | 로컬 수락 — EV-042/REV-041 Closed, RV-053 화면 예제 후속 소비 |
 | 통합/환경 수락 | 지속 dot-probe/화면·PC/RT/native | 대기 — TASK-026/022·T3 |
 
 TASK-018은 별도 FR-015 범위 승인 대기로 미착수다. S1 수락은 Task 전체 완료가 아니다.
@@ -69,3 +69,11 @@ TASK-018은 별도 FR-015 범위 승인 대기로 미착수다. S1 수락은 Tas
 - session/epoch·revision/구간·환경/workload/target/boundary/input ID를 JSON에 보존한다. 누락 Red→Green은 RV-082다. 가상 mono 시계의 기능 창이며 fanout 차이는 Comparison workload 차이/Unavailable로 남긴다. 실제 처리량·CPU/RSS/RT/≤5% 비용/≤20% 오차 수락이 아니다.
 - 일반4개+실제 DB1개. 두 Rust workspace각413개/실제DB5개 일반회귀 ignore, 별도 고정 OSS2.9.1 harness각 core4+pipeline1·CLI Pass/cleanup0. default/remote/MSRV default client·독립 graph·fmt/clippy/doc·CLI0/3/4 확인. 제품 core/client src 변경 없음, lock 버전/checksum 동일. EV-041·REV-040/RV-082 Closed·기존 위임 수락.
 - 다음은 S3 구독 종료/재연결 불연속 표시 예제·검증이다. Task/MS/TC 전체·실제 지속 앱/화면/PC·RT/UPS/장기/native(T3)·Gate4/5 미완료를 유지한다. TASK-018은 별도 FR-015 승인 대기로 미착수다.
+
+## S3 로컬 수락 — 2026-11-02 #001
+
+- `dot_probe_tail --plan`은 무부하 계획, 명시 `--run`은 유한 합성 source와 실제 loopback TCP/gRPC의 한국어 구분선·JSON 화면 이력이다. local/server TimedOut 출처를 단정하지 않고 Unconfirmed로 표시하며 같은 구독 재대기를 유지한다. lease 뒤 None, 명시 취소/오류는 종료 구분선, 명시 새 연결/구독은 새 segment·연결 금지·누락 건수 Unknown이다. 구독 내 Gap만 inclusive transfer 범위·새 span으로 표시한다.
+- 고정 실행: 같은 구독 기록2건/새 구독1건 ACK, overflow transfer2 Gap, 취소 종료2개 구분선. 화면 이력 포화·부모 연결 종료에서는 미ACK→원 PendingAck Unknown, 실제 owner/runtime 종료 뒤 external0을 확인했다. 큐 인계와 렌더링 완료를 구분하며 ACK unknown은 이미 받은 행을 보존한다.
+- 화면 최대64행/실행32행·payload64B·수신1슬롯·종료 전용1행, 시나리오 대기10초·서버 정리 관측2초·SDK250ms·lease1500ms다. 별도 JSON/runtime/OS headroom과 선언8MiB/external4MiB를 구분한다. 무제한 retry/재전송/복원·heartbeat는 없다.
+- RV-083 큰 u128 schema JSON panic을 실제 Red→hex/큰 정수·시각 문자열/source clock 구조 보존 Green으로 조치했다. 기능/renderer 부재 Red 후 신규8개, 두 Rust workspace각421개(일반 회귀 DB5개 ignore)·default/remote·fmt/clippy/doc·CLI plan0/run0/invalid4/stdout-full4·default dependency graph Pass. source `0b02274`·검증파일134개 commit blob 일치, 제품 src/lock 불변. [EV-042](../../05_verification/verification_evidence.md#ev-042)·[REV-041](../../05_verification/reviews/REV-041_TASK-020_TAIL_SCREEN.md) Closed·기존 위임 로컬 수락.
+- S1~S3 로컬 구현 잔여를 마쳤지만 TASK-020 In Progress·TC-007 Partial·MS-006/전체 Gate4/5 미완료다. 실제 지속 dot-probe/화면·장기 tail/재구독 복원·PC/RT/UPS/성능/native(T3)는 미수락이다. 새 Miri/실제DB 재실행은 하지 않았다. 다음 구현 단위는 TASK-021, TASK-018은 FR-015 별도 승인 대기로 미착수다.

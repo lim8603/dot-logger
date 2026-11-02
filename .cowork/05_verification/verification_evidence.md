@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-01 / EV-001~041 |
+| 버전 | 2026-11-02 / EV-001~042 |
 
 ---
 
@@ -808,12 +808,22 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **관측:** before 생성30/수락30/skip0·파일/수신30·DB20, after 동일 생성30/수락15/skip15·파일/수신15·DB할당0. revision별 닫힌 MCAP 독립 읽기45·실제 소비 큐45·DB 원 numeric receipt/real ns/value10·raw회수20·actual close 후 external0. DB transport 실패에서도 파일/수신45 유지, 마지막 소비 큐 Full은 미ACK/Unknown1·파일45 유지다. 단순 Ok(report)를 Pass로 해석하지 않고 전체 경계/query/정리를 is_complete로 확인한다.
 - **한계/다음:** 합성 session 시계 창0~10s/11~21s의 기능 증거다. 실제 HTTP/ACK/신규 입력 기한만 Instant를 쓴다. DB route off로 fanout/workload가 달라 Comparison은 IncomparableConditions이고 CPU/RSS/capacity/RT를 추정하지 않는다. 순차 호스트라 DB 지연과 독립된 지속 파일 처리율 수락이 아니다. S3 화면 불연속·TASK-026 지속 앱/화면·PC/RT/UPS/장기/native(T3) 미완료, 새 Miri 미실행.
 
+<a id="ev-042"></a>
+## EV-042 — TASK-020 S3 화면 구독 불연속·유한 수신 이력
+
+- 대상: `0b02274`·검증파일134개/commit blob SHA-256 일치. [명령·형상·원본/뷰 로그 hash](../06_evolution/imported_context/task_020_s3_2026-11-02/results.json), [checks](../06_evolution/imported_context/task_020_s3_2026-11-02/checks.json), [리뷰 REV-041](reviews/REV-041_TASK-020_TAIL_SCREEN.md). 2026-11-02 / AI / Ubuntu x86_64·Rust1.96.0/MSRV1.85.0. 제품 core/client src·wire·의존/lock 불변.
+- TDD: [module 부재 Red](../06_evolution/imported_context/task_020_s3_2026-11-02/red.log)·[renderer 부재 Red](../06_evolution/imported_context/task_020_s3_2026-11-02/red-render.log)→신규8개 Green. RV-083은 [큰 schema ID JSON panic Red](../06_evolution/imported_context/task_020_s3_2026-11-02/red-identity.log)→hex ID·큰 정수/시각 문자열·source clock 구조 보존 Green으로 조치/Closed.
+- 실제 loopback: local wait 뒤 동일 구독 record2건, lease TimedOut 보류 뒤 next None·종료, 명시 새 TCP/구독 record1건, overflow transfer2 Gap, 취소 종료. ACK3·구독2·종료표시2·Gap1·실제 runtime/server/receiver owner 정리 뒤 external0. history full/연결 종료의 실제 미ACK→Unknown·예약0도 확인했다. ACK unknown 행 보존은 화면 모델 시험이며 이번에 새 transport ACK fault 주입은 하지 않았다.
+- 화면: 종료/새 구독은 새 segment·이전 선 연결 금지·누락 건수 Unknown, 구독 내 Gap만 inclusive transfer 범위와 새 span. local/server TimedOut의 같은 코드만으로 출처를 단정하지 않는다. 화면≤64행(실행32)·payload64B/행·종료 전용1행·수신1슬롯, 시나리오 대기10초·서버 정리 관측2초·개별SDK250ms·lease1500ms. 선언8MiB/external4MiB와 별도 JSON/runtime/OS/RSS를 구분한다.
+- 회귀: [Rust1.96](../06_evolution/imported_context/task_020_s3_2026-11-02/workspace.log)·[MSRV1.85](../06_evolution/imported_context/task_020_s3_2026-11-02/msrv.log) workspace각421 Pass(실제DB5개 일반회귀 ignore), client default/remote·fmt/clippy(-D warnings)/rustdoc(-D warnings)·default normal/build graph Pass. CLI plan0/run0/invalid4/stdout-full4. 렌더링은 ACK 뒤이므로 출력 실패가 기존 ACK를 취소하지 않는다. 소스 불변의 기존 DB/S2 기능 근거 EV-041을 유지하며 실제DB·새 Miri는 반복하지 않았다.
+- 유효 범위: S3 합성 source/실제 loopback의 유한 화면 예제. 실제 지속 dot-probe/화면·장기 무손실 tail/재구독 복원·LAN/RSS/PC/RT/UPS/정량 성능/native(T3)는 미실행. S1~S3 로컬 수락·REV-041 Closed, TASK-020 In Progress·TC-007 Partial·MS-006/전체 Gate4/5 Not Ready 유지. 다음 구현 TASK-021, TASK-018 별도 FR-015 승인 대기.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여. TASK-020 S1/S2 EV-040/041 수락, S3·실앱/환경 후속 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여. TASK-020 S1~S3 EV-040~042 로컬 수락, 지속 실앱/환경 후속 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019·020의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |

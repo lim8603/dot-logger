@@ -102,8 +102,25 @@ fn status(e: RemoteError) -> Status {
         RemoteError::TimedOut => Status::deadline_exceeded(e.to_string()),
         RemoteError::Unsupported => Status::unimplemented(e.to_string()),
         RemoteError::Gone => Status::not_found(e.to_string()),
+        RemoteError::Conflict => Status::aborted(e.to_string()),
+        // Shared gRPC codes carry a fixed reason so clients never read a busy
+        // revision as transport loss or a restart requirement as a version skew.
+        RemoteError::Busy => reasoned(tonic::Code::Unavailable, e, "busy"),
+        RemoteError::RestartRequired => {
+            reasoned(tonic::Code::FailedPrecondition, e, "restart_required")
+        }
         _ => Status::unavailable(e.to_string()),
     }
+}
+/// Fixed metadata key for reasons that share a gRPC code with another failure.
+pub const REASON_KEY: &str = "dot-logger-reason";
+fn reasoned(code: tonic::Code, e: RemoteError, reason: &'static str) -> Status {
+    let mut metadata = tonic::metadata::MetadataMap::new();
+    metadata.insert(
+        REASON_KEY,
+        tonic::metadata::MetadataValue::from_static(reason),
+    );
+    Status::with_metadata(code, e.to_string(), metadata)
 }
 impl RemoteServer {
     /// Bind only after explicit enable, security validation and TLS parsing.

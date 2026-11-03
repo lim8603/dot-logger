@@ -9,6 +9,9 @@ pub mod capacity;
 /// Before/after condition checks and evidence-preserving rate comparison.
 pub mod compare;
 mod counters;
+/// Host-driven remote status, explicit apply and compare backend.
+#[cfg(feature = "remote")]
+pub mod operations;
 pub mod report;
 
 use crate::completion::Completion;

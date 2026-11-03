@@ -393,10 +393,21 @@ impl Reply {
             ..Self::default()
         };
         match (method, reply) {
-            ("GetStatus", ManagementReply::Status { session, revision }) => {
+            (
+                "GetStatus",
+                ManagementReply::Status {
+                    session,
+                    revision,
+                    report,
+                },
+            ) => {
+                if report.len() > max {
+                    return Err(RemoteError::Limit);
+                }
                 wire.kind = 1;
                 wire.session = session.to_le_bytes().to_vec();
                 wire.revision = revision;
+                wire.data = report;
             }
             (
                 "Query",

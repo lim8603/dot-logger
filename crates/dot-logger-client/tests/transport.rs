@@ -113,6 +113,7 @@ fn native_status_and_large_subscription_ack_use_the_actual_connection() {
                     command.respond(Ok(ManagementReply::Status {
                         session: 42,
                         revision: 1,
+                        report: Vec::new(),
                     }));
                     break;
                 }
@@ -126,8 +127,9 @@ fn native_status_and_large_subscription_ack_use_the_actual_connection() {
                 .unwrap(),
             ManagementReply::Status {
                 session: 42,
-                revision: 1
-            }
+                revision: 1,
+                ref report,
+            } if report.is_empty()
         ));
         host.await.unwrap();
         let mut stream = client
@@ -763,6 +765,7 @@ fn cancellation_keeps_actual_host_command_capacity_until_its_owner_finishes() {
                 .respond(Ok(ManagementReply::Status {
                     session: 42,
                     revision: 1,
+                    report: Vec::new(),
                 }));
         });
         assert!(
@@ -883,6 +886,84 @@ fn gap_consumer_rejection_and_cancel_after_handoff_never_claim_ack_success() {
         .unwrap();
         assert_eq!(pending.state(), AckState::Unknown);
         drop((first, discarded, pending, inbox, client));
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+#[test]
+fn config_conflict_busy_restart_and_status_report_keep_their_meaning() {
+    runtime().block_on(async {
+        let budget = budget();
+        let token = "test-only-manage-credential";
+        let (hub, mut inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                tokens: vec![AccessToken::new(token.into(), Permission::Manage).unwrap()],
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut config = RemoteConfig::new(format!("http://{addr}"));
+        config.token = Some(token.into());
+        let mut client = RemoteClient::connect(config, &cancel).await.unwrap();
+        let host = tokio::spawn(async move {
+            for e in [
+                RemoteError::Conflict,
+                RemoteError::Busy,
+                RemoteError::RestartRequired,
+                RemoteError::Version,
+                RemoteError::Disabled,
+            ] {
+                command(&mut inbox).await.respond(Err(e));
+            }
+            command(&mut inbox)
+                .await
+                .respond(Ok(ManagementReply::Status {
+                    session: 7,
+                    revision: 3,
+                    report: b"{\"schema\":\"x\"}".to_vec(),
+                }));
+            command(&mut inbox)
+                .await
+                .respond(Ok(ManagementReply::Status {
+                    session: 7,
+                    revision: 3,
+                    report: Vec::new(),
+                }));
+        });
+        let apply = || ManagementRequest::ApplyConfig {
+            base_revision: 1,
+            patch: b"{}".to_vec(),
+        };
+        for expected in [
+            RemoteError::Conflict,
+            RemoteError::Busy,
+            RemoteError::RestartRequired,
+            RemoteError::Version,
+            RemoteError::Transport,
+        ] {
+            match client.request(apply(), &cancel).await {
+                Err(ClientError::Remote(e)) => assert_eq!(e, expected),
+                other => panic!("{other:?}"),
+            }
+        }
+        for expected in [b"{\"schema\":\"x\"}".as_slice(), b""] {
+            match client.request(ManagementRequest::GetStatus, &cancel).await {
+                Ok(ManagementReply::Status {
+                    session: 7,
+                    revision: 3,
+                    report,
+                }) => assert_eq!(report, expected),
+                other => panic!("{other:?}"),
+            }
+        }
+        host.await.unwrap();
+        drop(client);
         stop.send(()).unwrap();
         server.await.unwrap().unwrap();
         drop(hub);

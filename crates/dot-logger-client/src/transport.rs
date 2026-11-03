@@ -147,7 +147,18 @@ impl AsyncWrite for ConnectionIo {
     }
 }
 fn rpc_error(status: tonic::Status) -> ClientError {
-    ClientError::Remote(match status.code() {
+    let reason = status
+        .metadata()
+        .get(dot_logger::adapters::remote::REASON_KEY)
+        .and_then(|v| v.to_str().ok());
+    ClientError::Remote(match (status.code(), reason) {
+        (tonic::Code::Unavailable, Some("busy")) => RemoteError::Busy,
+        (tonic::Code::FailedPrecondition, Some("restart_required")) => RemoteError::RestartRequired,
+        (code, _) => code_error(code),
+    })
+}
+fn code_error(code: tonic::Code) -> RemoteError {
+    match code {
         tonic::Code::InvalidArgument => RemoteError::InvalidInput,
         tonic::Code::PermissionDenied | tonic::Code::Unauthenticated => {
             RemoteError::PermissionDenied
@@ -159,8 +170,9 @@ fn rpc_error(status: tonic::Status) -> ClientError {
         tonic::Code::DeadlineExceeded => RemoteError::TimedOut,
         tonic::Code::NotFound => RemoteError::Gone,
         tonic::Code::Unimplemented => RemoteError::Unsupported,
+        tonic::Code::Aborted => RemoteError::Conflict,
         _ => RemoteError::Transport,
-    })
+    }
 }
 fn auth<T>(body: T, token: &Option<MetadataValue<Ascii>>, timeout: Duration) -> tonic::Request<T> {
     let mut request = tonic::Request::new(body);

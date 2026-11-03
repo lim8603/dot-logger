@@ -555,6 +555,7 @@ mod sockets {
             command.respond(Ok(ManagementReply::Status {
                 session: 42,
                 revision: 1,
+                report: Vec::new(),
             }));
             let future = tokio::spawn(async move {
                 let result = unary(&mut c, "/dot_logger.remote.v1.Logger/GetStatus", req()).await;
@@ -565,6 +566,7 @@ mod sockets {
             cmd.respond(Ok(ManagementReply::Status {
                 session: 42,
                 revision: 2,
+                report: Vec::new(),
             }));
             let (c, result) = future.await.unwrap();
             assert_eq!(result.unwrap().revision, 2);
@@ -585,11 +587,27 @@ mod sockets {
             wire::Reply::native(ManagementReply::Blob(vec![1; 4096]), "ReadBlob", 4096, 1000),
             Err(RemoteError::Limit)
         );
+        let status = |report| ManagementReply::Status {
+            session: 42,
+            revision: 1,
+            report,
+        };
+        assert_eq!(
+            wire::Reply::native(status(vec![1; 4097]), "GetStatus", 4096, 1000),
+            Err(RemoteError::Limit)
+        );
+        assert_eq!(
+            wire::Reply::native(status(vec![1; 8]), "GetStatus", 4096, 1000)
+                .unwrap()
+                .data,
+            vec![1; 8]
+        );
         assert!(
             wire::Reply::native(
                 ManagementReply::Status {
                     session: 42,
-                    revision: 1
+                    revision: 1,
+                    report: Vec::new(),
                 },
                 "Query",
                 4096,

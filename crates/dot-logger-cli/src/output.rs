@@ -18,14 +18,17 @@ pub enum Failure {
     CheckFailed,
     CheckAborted,
     CheckInconclusive,
+    Conflict,
+    Busy,
+    RestartRequired,
 }
 impl Failure {
     pub fn code(self) -> i32 {
         match self {
-            Self::Input | Self::Unsupported | Self::PermissionDenied => 2,
+            Self::Input | Self::Unsupported | Self::PermissionDenied | Self::RestartRequired => 2,
             Self::Limit | Self::Cancelled | Self::Deadline | Self::Unknown | Self::Gone => 3,
             Self::Io | Self::Corrupt | Self::Version | Self::CheckFailed => 4,
-            Self::CheckAborted | Self::CheckInconclusive => 3,
+            Self::CheckAborted | Self::CheckInconclusive | Self::Conflict | Self::Busy => 3,
         }
     }
     pub fn name(self) -> &'static str {
@@ -44,6 +47,9 @@ impl Failure {
             Self::CheckFailed => "check_failed",
             Self::CheckAborted => "check_aborted",
             Self::CheckInconclusive => "check_inconclusive",
+            Self::Conflict => "revision_conflict",
+            Self::Busy => "revision_busy",
+            Self::RestartRequired => "restart_required",
         }
     }
 }
@@ -92,6 +98,9 @@ impl From<ClientError> for Failure {
             ClientError::Remote(RemoteError::Version) => Self::Version,
             ClientError::Remote(RemoteError::Gone) => Self::Gone,
             ClientError::Remote(RemoteError::PermissionDenied) => Self::PermissionDenied,
+            ClientError::Remote(RemoteError::Conflict) => Self::Conflict,
+            ClientError::Remote(RemoteError::Busy) => Self::Busy,
+            ClientError::Remote(RemoteError::RestartRequired) => Self::RestartRequired,
             ClientError::Remote(RemoteError::InvalidInput | RemoteError::Disabled) => Self::Input,
             ClientError::StaleConnection => Self::Gone,
             ClientError::AlreadyConnected => Self::Input,

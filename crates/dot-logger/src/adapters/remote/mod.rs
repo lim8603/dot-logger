@@ -7,7 +7,7 @@ mod types;
 mod wire;
 pub use hub::{Command, CommandInbox, PendingAck, RemoteDelivery, RemoteHub};
 pub use receiver::{Reassembler, ReceivedRecord};
-pub use server::RemoteServer;
+pub use server::{REASON_KEY, RemoteServer};
 pub use types::*;
 #[cfg(test)]
 mod tests;

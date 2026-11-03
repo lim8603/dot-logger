@@ -37,7 +37,9 @@ consumer 거절은 `ConsumerRejected`이며 ACK가 없다. 소비 인계 뒤 ACK
 
 | 결과 | 화면 어댑터의 처리 |
 |---|---|
-| native Status | session/revision 표시. 미구현 운영 지표는 Unavailable이며 0으로 채우지 않음 |
+| native Status | session/revision 표시. `report`가 비어 있으면 운영 지표 Unavailable, 아니면 host `dot_logger.status.v1`의 Observed/Stale/Unavailable를 그대로 표시하며 0으로 채우지 않음 |
+| Applied / Conflict·Busy·RestartRequired | posted revision 표시. 세 거절은 게시 없음 — 각각 revision 재조회, 배출 후 재시도, 재시작 안내 |
+| Compare Report | `dot_logger.compare.v1`의 `comparable`·differences를 먼저 표시하고 Unavailable 수치를 감소/개선으로 해석하지 않음 |
 | Page/Blob | snapshot/cursor/blob capability와 원래 record identity 보관. 경로로 해석하지 않음 |
 | Replay transition | 확인된 generation/state 반영. seek 후 host/수신 gate 함께 갱신 |
 | RemoteEvent::Record | 유한 소비 큐 인계가 성공한 경우에만 handoff 수락 |

@@ -709,10 +709,22 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
             );
             let reply = client.request(request, &ctx.cancel).await?;
             let (kind, data) = match reply {
-                ManagementReply::Status { session, revision } => (
-                    "status",
-                    json!({"session":format!("{session:032x}"),"revision":revision.to_string(),"availability":"Observed","metrics":{"state":"Unavailable","reason":"no_runtime_metrics_backend"}}),
-                ),
+                ManagementReply::Status {
+                    session,
+                    revision,
+                    report,
+                } => {
+                    // An empty report means the host has no metrics backend.
+                    let metrics = if report.is_empty() {
+                        json!({"state":"Unavailable","reason":"no_runtime_metrics_backend"})
+                    } else {
+                        host_report(&report, "dot_logger.status.v1")?
+                    };
+                    (
+                        "status",
+                        json!({"session":format!("{session:032x}"),"revision":revision.to_string(),"availability":"Observed","metrics":metrics}),
+                    )
+                }
                 ManagementReply::Blob(bytes) => {
                     if bytes.len() > out.payload_capacity() {
                         return Err(Failure::Limit);
@@ -762,6 +774,8 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                             return Err(Failure::Corrupt);
                         }
                         ("check", data)
+                    } else if name == "compare" {
+                        ("compare", host_report(&bytes, "dot_logger.compare.v1")?)
                     } else {
                         (
                             "report",
@@ -789,6 +803,14 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
             Ok(json!({}))
         }
     }
+}
+/// Decode a bounded host JSON report; an unknown schema is invalid data.
+fn host_report(bytes: &[u8], schema: &str) -> Result<Value, Failure> {
+    let data: Value = serde_json::from_slice(bytes).map_err(|_| Failure::Corrupt)?;
+    if data["schema"] != schema {
+        return Err(Failure::Corrupt);
+    }
+    Ok(data)
 }
 fn tail_plan(external: usize) -> Result<dot_logger::config::ValidatedConfig, Failure> {
     use dot_logger::{config::*, platform::*};

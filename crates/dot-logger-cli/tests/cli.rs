@@ -530,6 +530,7 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
                         ManagementRequest::GetStatus => Ok(ManagementReply::Status {
                             session: 42,
                             revision: 1,
+                            report: Vec::new(),
                         }),
                         ManagementRequest::Query { snapshot, .. }
                             if snapshot != 0 && snapshot != 9 =>

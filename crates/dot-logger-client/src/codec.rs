@@ -203,6 +203,7 @@ pub(crate) fn reply(
         ("GetStatus", 1) => ManagementReply::Status {
             session: id(&r.session)?,
             revision: r.revision,
+            report: r.data,
         },
         ("Query", 2) => {
             if r.handle == 0

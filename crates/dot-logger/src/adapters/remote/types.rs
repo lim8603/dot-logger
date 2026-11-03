@@ -367,6 +367,9 @@ pub enum ManagementReply {
         session: u128,
         /// Current revision.
         revision: u64,
+        /// Bounded host status report with host-owned schema; empty means the
+        /// host has no runtime metrics backend, never zero-valued metrics.
+        report: Vec<u8>,
     },
     /// Bounded page with explicit blob references.
     Page {
@@ -396,7 +399,9 @@ pub enum ManagementReply {
 impl ManagementReply {
     pub(crate) fn check_buffer_limit(&self, max: usize) -> Result<(), RemoteError> {
         match self {
-            Self::Blob(data) | Self::Report(data) if data.capacity() > max => {
+            Self::Blob(data) | Self::Report(data) | Self::Status { report: data, .. }
+                if data.capacity() > max =>
+            {
                 Err(RemoteError::Limit)
             }
             Self::Page { items, .. } => {
@@ -444,6 +449,12 @@ pub enum RemoteError {
     Unsupported,
     /// Invalid offsets, metadata or checksum.
     Corrupt,
+    /// Revision precondition is stale; nothing was published. Re-read and retry.
+    Conflict,
+    /// A previous change is still draining; nothing was published.
+    Busy,
+    /// The requested change needs a stopped owner; nothing was published.
+    RestartRequired,
 }
 impl std::fmt::Display for RemoteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -458,6 +469,9 @@ impl std::fmt::Display for RemoteError {
             Self::Gone => "remote handle gone",
             Self::Unsupported => "unsupported remote operation",
             Self::Corrupt => "invalid remote record",
+            Self::Conflict => "remote revision conflict",
+            Self::Busy => "remote revision busy",
+            Self::RestartRequired => "remote change requires restart",
         })
     }
 }

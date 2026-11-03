@@ -851,6 +851,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy(-D warnings)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 440 Pass(5 ignore, 기존 DB 회귀)·두 toolchain feature matrix exit0.
 - **미실행:** Miri(네트워크/Tokio 경로 대상 아님), LAN·실앱·native(T3).
 
+## EV-046 — TASK-023 S1 P0 기준선 harness·결과 판정 로컬 구현
+
+- **판정:** 로컬 구현 Pass. 정식 P0~P5 측정·off/on 3회·RT는 NotRun이며 성능 합격 근거가 아니다.
+- **대상/환경:** 소스 `3740671`(base `d5f822a`), 변경 4개 파일(제품 코드 변경 없음). 2026-11-03 AI, 현재 Ubuntu generic 7.0.0-42, governor powersave(관측만). [명령/결과/hash](../06_evolution/imported_context/task_023_s1_2026-11-03/results.json), [TASK-023 S1](../04_implementation/tasks/TASK-023.md#단계별-실행--2026-11-03-003).
+- **의존:** Linux dev-dependency로 기존 rustix 1.1.4에 `thread`/`time` feature만 추가했다. 새 crate·Cargo.lock 변경·unsafe는 없고, 제품 normal 그래프는 std/fs 그대로다.
+- **TDD:** 모듈 부재 컴파일 Red → 판정 규칙·release 회계·histogram·P0 writer(회전·sync·reserve 중단·pacing·oracle)·제어 루프·주기 보정 10개 Green.
+- **검증:** fmt·clippy(-D warnings)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 450 Pass(5 ignore)·feature matrix 두 toolchain exit0. MSRV matrix 첫 시도는 `/data/build` ENOSPC(링크 단계)로 실패했고 Human 승인 cache 정리 후 재실행 Pass.
+- **smoke:** 보정 3회 control 1.95~2.05M(508~524µs)·safety 778~786k(≈199µs). logger off 5초 control/safety miss0. reserve 미만 디스크에서 P0 `Stop::Reserve`·처리량 `Incomplete` 거절. 정리 후 5초 P0 실제 쓰기 5,033,164,800B read-back 일치·정리, 수락 5.35초 대비 durable 20.69초(243MB/s). 대용량 삭제 직후라 측정값으로 쓰지 않는다.
+- **미실행:** logger on 경로(S2), 정식 120초×3·P5·계측 비용(S3), RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

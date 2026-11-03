@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-03 |
+| 다음 액션 | S2 logger on 경로(P1/P2/P3 혼합 workload·무결성 oracle)를 같은 P0 workload와 대조 |
 | 의존 | TASK-026·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -25,7 +25,7 @@
 
 첫 실패/리뷰 조건: **P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다. — S1 판정 규칙 Red→Green(EV-046)
 - [ ] 최소 구현 후 관련 `TC-012`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
 - [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
@@ -45,3 +45,20 @@ Human 결정(2026-11-03)으로 실제 앱이 필요 없는 합성 행(P0 simple-
 ## 2026-10-31 수락 방식·검증 시점 갱신
 
 Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체하고 UPS는 시뮬레이션으로 판정한다. native는 GitHub 공개 완료 후 진행한다. 일반 Linux/RT는 실제 실행 커널을 기록하며 물리 전원 소실 내구성의 관측 결과로 표시하지 않는다. 기존 수치/예산/24h/소프트웨어 통합 목표와 선행 의존은 유지하며 이번 문서 갱신만으로 제품 시험을 Pass 처리하지 않는다.
+
+## 단계별 실행 — 2026-11-03 #003
+
+| 단계 | 범위 | 상태 |
+|---|---|---|
+| S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `3740671`. 정식 측정 NotRun |
+| S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle | 다음 세션 |
+| S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·P5 동시 조회·계측 비용≤5% | S2 뒤 |
+| RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
+
+S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../crates/dot-logger/examples/support/perf/mod.rs)·[perf_baseline](../../../crates/dot-logger/examples/perf_baseline.rs)·[TC-012 시험](../../../crates/dot-logger/tests/tc_012_performance.rs). 제품 코드 변경은 없다.
+
+- **판정 규칙(첫 실패 조건):** 처리량 분모는 최종 file+directory sync 완료 시각이다. RAM 수락만 있으면 `NoFinalSync`, admission 중단은 `Incomplete`로 거절한다. 효율 비율은 같은 workload의 P0 run에 대해서만 계산하며 `MissingBaseline`·`BaselineNotP0`·`WorkloadMismatch`·`PayloadMismatch`를 거절한다. 추가 deadline miss는 off/on 각 3회·CPU/주기/기한/작업량/커널/release 수가 같을 때만 계산한다.
+- **P0 writer:** 16B 헤더(seq·len)와 고정 fill payload, 1MiB 블록, 1GiB 회전(create_new), 1초 flush+fdatasync, 최종 sync_all과 디렉터리 sync. 시작·회전 때 free가 reserve+file 한도보다 작으면 admission을 멈추고 이미 받은 것은 sync한다. paced/unpaced, writer별 CPU 고정, 파일별 등차 seq prefix·길이·내용 read-back oracle, 소유 파일만 정리.
+- **제어 루프:** 단조 시계 절대 release, 기한이 지난 release는 skipped이자 miss. wake/response는 2의 거듭제곱 µs histogram과 정확한 max, 다른 CPU 관측 수를 기록한다. 보정은 powersave governor 아래 busy-loop 보정이 2.15M~4.87M으로 흔들려, 실제 10ms 주기 안의 중앙값 보정(±5%)으로 바꿨다. governor는 기록만 하며 변경하지 않는다.
+- **smoke(측정 아님):** logger off control/safety 각 500 release miss0. P0 실제 쓰기 5초 5,033,164,800B read-back 일치, 수락 5.35초·durable 20.69초(243MB/s) — RAM 수락 분모였다면 약4배 과대. 대용량 삭제 직후라 성능 수치로 쓰지 않는다.
+- **환경:** `/data/build` 여유 부족(68.3GB)은 Human 결정으로 build cache를 정리해 472.9GB로 회복했다. 측정 run 전에 다시 cap+reserve를 검사한다.

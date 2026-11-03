@@ -65,3 +65,5 @@ TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기
 2026-11-01 TASK-019 S2 EV-038: 승인 v2 계열의 **로컬 기능 시험 프로필**을 OSS2.9.1/Linux amd64 image digest `sha256:a66a9e8b2c93f58bec088c17ff5876540caa095436df5a66e908bdbdb6a36205`와 `/health` v2.9.1로 고정했다. [API§14.7](interface_contract.md#147-task-019-s2-제한-수치-query실제-db-검증--2026-11-01)의 격리 tmpfs/loopback/유한 container에서 실행하며 사용자 기존 DB 업그레이드/운영 배포가 아니다. serde_json1.0.154를 기존 lock 그대로 선택 직접 의존에 추가했다. ADR-009의 v2/제한 query 방향 안의 되돌릴 수 있는 시험/adapter 세부이며 신규 계열/MSRV/저장 계약 변경은 없다. 다른 DB/OS·실앱/성능·공개 후 native는 후속이다.
 
 2026-11-01 TASK-019 S3 EV-039: 기존 reqwest/Tokio와 원 Router Delivery를 일반 worker의 명시 동기 한 건 API로 연결했다. current-thread runtime의 실제 로컬 IO/DNS 정리가 끝날 때까지 guard를 유지한다. 별도 daemon/자동 worker·외부 runtime 타입을 공개 API에 강제하지 않으며 신규 의존성/버전 변경 없음. 로컬 파일 격리/기능 관측과 실앱·정량 성능/다른 OS/native 수락을 구분한다.
+
+2026-11-03 TASK-023 S1 EV-046: 성능 harness 전용으로 Linux dev-dependency의 기존 rustix 1.1.4에 `thread`/`time` feature를 추가했다(per-thread `sched_setaffinity`, `clock_nanosleep` 절대 release). 새 crate·lock·MSRV 변경 없음, 제품 normal 그래프는 std/fs 유지. RT 행의 SCHED_FIFO/메모리 잠금 방법은 RT 요청 때 정한다.

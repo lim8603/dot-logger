@@ -35,7 +35,7 @@
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경·native 대기 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3 이월; 다음 TASK-026 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-10-31 | local-pc-v1 Approved·선행 harness 준비; RT 부팅/capability 확인 뒤 실행 | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
-| TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절 | TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
+| TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-03 | S1 P0 harness·판정 EV-046 완료, 다음 S2 logger on 경로 | TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | 현재 PC24h/장애·UPS 시뮬레이션·native/OS 교환 공개 후 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-26 | 문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치 | TASK-024 | [상세](tasks/TASK-025.md) | 1~2 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 실제 앱에서 logger off/on 동일 제어 시나리오·record→query→replay→관측 조절 | TASK-020·TASK-021 | [상세](tasks/TASK-026.md) | 2~4 |

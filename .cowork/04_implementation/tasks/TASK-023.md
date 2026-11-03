@@ -38,6 +38,10 @@
 
 테스트 정의: [TC-012](../../05_verification/test_case.md#tc-012). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
+## 2026-11-03 의존 조정 — 합성 행 선행
+
+Human 결정(2026-11-03)으로 실제 앱이 필요 없는 합성 행(P0 simple-file 기준선·local-pc-v1 10ms 제어 off/on·P1~P3·P5·계측 비용≤5%)을 TASK-026 전에 현재 PC generic 커널에서 실행한다. RT 행은 합성 generic 측정 뒤 TASK-022 요청 규칙에 따라 Human 승인/부팅 확인 후 실행한다. 실앱 부하·화면 연동 행은 TASK-026 의존을 유지하며 합성 결과로 대체하지 않는다.
+
 ## 2026-10-31 수락 방식·검증 시점 갱신
 
 Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체하고 UPS는 시뮬레이션으로 판정한다. native는 GitHub 공개 완료 후 진행한다. 일반 Linux/RT는 실제 실행 커널을 기록하며 물리 전원 소실 내구성의 관측 결과로 표시하지 않는다. 기존 수치/예산/24h/소프트웨어 통합 목표와 선행 의존은 유지하며 이번 문서 갱신만으로 제품 시험을 Pass 처리하지 않는다.

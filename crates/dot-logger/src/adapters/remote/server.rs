@@ -17,7 +17,7 @@ use subtle::ConstantTimeEq;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
-    sync::{OwnedSemaphorePermit, Semaphore},
+    sync::{OwnedSemaphorePermit, Semaphore, mpsc},
 };
 use tonic::{
     Request, Response, Status,
@@ -158,6 +158,8 @@ impl RemoteServer {
             .map_err(|_| RemoteError::Transport)
     }
     /// Serve until host shutdown. No detached application worker is created.
+    /// Returns only after every server-side request and stream task has dropped
+    /// its hub handle; host-owned commands keep theirs until the host drops them.
     pub async fn serve(self, shutdown: impl Future<Output = ()> + Send) -> Result<(), RemoteError> {
         struct Close(RemoteHub);
         impl Drop for Close {
@@ -168,12 +170,16 @@ impl RemoteServer {
         let _close = Close(self.hub.clone());
         let limits = &self.hub.shared.limits;
         let incoming = Incoming::new(self.listener, limits.connections);
+        // Never sent on: recv() ends once the last server-side clone is dropped.
+        let (drain, mut drained) = mpsc::channel(1);
         let service = RpcService {
             hub: self.hub.clone(),
             security: self.security,
+            _drain: drain,
         };
         let close_hub = self.hub.clone();
-        self.builder
+        let served = self
+            .builder
             .concurrency_limit_per_connection(limits.commands)
             .max_concurrent_streams((limits.commands + limits.subscriptions) as u32)
             .initial_stream_window_size(limits.message_bytes.min(1024 * 1024) as u32)
@@ -188,7 +194,13 @@ impl RemoteServer {
                 close_hub.close();
             })
             .await
-            .map_err(|_| RemoteError::Transport)
+            .map_err(|_| RemoteError::Transport);
+        // Hyper runs each HTTP/2 stream on its own task, which may still hold
+        // the hub reservation after the connection future tonic awaits ends.
+        if served.is_ok() {
+            let _ = drained.recv().await;
+        }
+        served
     }
 }
 struct LimitedIo {
@@ -277,6 +289,7 @@ impl Stream for Incoming {
 struct RpcService {
     hub: RemoteHub,
     security: Arc<Security>,
+    _drain: mpsc::Sender<()>,
 }
 impl Service<http::Request<tonic::body::Body>> for RpcService {
     type Response = http::Response<tonic::body::Body>;
@@ -399,6 +412,7 @@ impl tonic::server::ServerStreamingService<wire::SubscribeRequest> for Subscribe
                 .map_err(status)?;
             Ok(Response::new(SubscriptionStream {
                 sub,
+                _drain: s._drain.clone(),
                 started: false,
                 finished: false,
                 timer: Box::pin(tokio::time::sleep(age)),
@@ -409,6 +423,7 @@ impl tonic::server::ServerStreamingService<wire::SubscribeRequest> for Subscribe
 }
 struct SubscriptionStream {
     sub: Arc<Subscription>,
+    _drain: mpsc::Sender<()>,
     started: bool,
     finished: bool,
     timer: Pin<Box<tokio::time::Sleep>>,

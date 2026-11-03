@@ -102,6 +102,30 @@ impl ControlOwner<'_> {
     /// Existing input/raw allocations contain protected records; this reserves
     /// only checked control metadata, not a second payload pool. No late snapshots
     /// are accepted after notify. Reconfiguration requires a new stopped owner.
+    ///
+    /// # Preconditions
+    ///
+    /// Installation requires all of the following:
+    /// - No emergency plan is installed and no shutdown has started.
+    /// - `plan` is the same validated config whose memory section built this owner.
+    /// - No submit call is active, no producer has accepted a record, and every
+    ///   sync slot is free.
+    /// - `config.files` is nonempty and has at most one entry per completion
+    ///   target; target IDs are unique and each target supports
+    ///   [`Boundary::Synced`].
+    /// - Every required target whose selected completion is [`Boundary::Synced`]
+    ///   is listed in `config.files`.
+    /// - Each `protected_bytes` is neither `0` nor `u64::MAX`, and their sum fits
+    ///   within `memory.input_bytes + memory.raw_bytes`.
+    /// - The emergency metadata fits in the remaining `memory.control_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ControlError::InvalidConfig`] if a structural precondition
+    /// fails, [`ControlError::InvalidDeadline`] if the safety margin or summed
+    /// drain/sync estimate overflows nanoseconds, and
+    /// [`ConfigError::BudgetExceeded`] for [`Resource::Control`] if the control
+    /// metadata reservation does not fit.
     pub fn enable_emergency(
         &mut self,
         plan: &ValidatedConfig,
@@ -271,6 +295,19 @@ impl ControlOwner<'_> {
     /// Record a trusted host's frozen protected payload count after closure and
     /// publication quiescence. Missing/over-limit observations prevent success.
     /// This is observation only; it does not authorize additional input or IO.
+    ///
+    /// Each protected target accepts exactly one observation; a repeated call is
+    /// not idempotent and never replaces the first value. `u64::MAX` is the
+    /// unobserved sentinel and is rejected. A value above the declared limit is
+    /// recorded, marks the report `unachievable`, and keeps `protected_complete`
+    /// false.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ControlError::InvalidConfig`] if no emergency plan is installed
+    /// or `target` is not a protected file, and [`ControlError::Busy`] if
+    /// producer cutoffs are not frozen yet, `bytes` is `u64::MAX`, or the target
+    /// was already observed.
     pub fn observe_protected_bytes(&self, target: u32, bytes: u64) -> Result<(), ControlError> {
         let state = self.emergency.as_ref().ok_or(ControlError::InvalidConfig)?;
         if self.shutdown_sync().is_none() || bytes == u64::MAX {

@@ -25,7 +25,7 @@
   - `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`: Pass (문서 경고 0건)
   - Safe Rust 100% (신규 구현 코드 내 `unsafe` 블록 0건)
 - **종합 판정:** **Pass** (P1 0건, P2 0건, P3 2건). RT 핫패스 무할당·무대기 불변식 완전 보존, 100% Safe Rust, 순위(Rank) 기반 원자적 순차 동기화, 알람 단축 시 기한 안전성 보장, 실물 UPS 하드웨어 의존 없는 완결된 실제 파일시스템 모의 검증 완료.
-- **상태:** **Open** (리뷰 결과 보고 후 후속 개발 세션에서 P3 문서 보강 예정)
+- **상태:** **Closed** (2026-11-03 #001 개발 세션에서 P3 문서 보강·검증 후 기존 위임으로 수락)
 
 ---
 
@@ -55,8 +55,8 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-086 | P3 | [`crates/dot-logger/src/control/emergency.rs#L105-L128`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/control/emergency.rs#L105-L128), `enable_emergency` | 필수 선행조건 위반 시 `ControlError::InvalidConfig` 단일 variant만 반환되어, 호스트 설정자가 구성 실패 원인(필수 Synced 누락, 중복 타깃, 슬롯 상태, 페이로드 예산 초과 등)을 파악하기 어려움 | `enable_emergency` 상단 rustdoc에 `# Preconditions` 또는 `# Errors` 섹션을 추가하여 필수 구성 조건 6가지를 명시 | 수용 예정 | Open |
-| RV-087 | P3 | [`crates/dot-logger/src/control/emergency.rs#L274-L288`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/control/emergency.rs#L274-L288), `observe_protected_bytes` | `observe_protected_bytes`가 타깃당 1회성(One-shot) 관측 계약이며, `u64::MAX` 값은 센티널로 거부되고 중복 호출 시 `ControlError::Busy`를 반환한다는 점이 rustdoc에 명시되지 않음 | `observe_protected_bytes`의 rustdoc에 1회 호출 계약 및 `u64::MAX` 센티널 불허 조건을 명시하여 호스트 연동 시 오해 방지 | 수용 예정 | Open |
+| RV-086 | P3 | [`crates/dot-logger/src/control/emergency.rs#L105-L128`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/control/emergency.rs#L105-L128), `enable_emergency` | 필수 선행조건 위반 시 `ControlError::InvalidConfig` 단일 variant만 반환되어, 호스트 설정자가 구성 실패 원인(필수 Synced 누락, 중복 타깃, 슬롯 상태, 페이로드 예산 초과 등)을 파악하기 어려움 | `enable_emergency` 상단 rustdoc에 `# Preconditions` 또는 `# Errors` 섹션을 추가하여 필수 구성 조건 6가지를 명시 | 수용·조치 | Closed |
+| RV-087 | P3 | [`crates/dot-logger/src/control/emergency.rs#L274-L288`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/control/emergency.rs#L274-L288), `observe_protected_bytes` | `observe_protected_bytes`가 타깃당 1회성(One-shot) 관측 계약이며, `u64::MAX` 값은 센티널로 거부되고 중복 호출 시 `ControlError::Busy`를 반환한다는 점이 rustdoc에 명시되지 않음 | `observe_protected_bytes`의 rustdoc에 1회 호출 계약 및 `u64::MAX` 센티널 불허 조건을 명시하여 호스트 연동 시 오해 방지 | 수용·조치 | Closed |
 
 ---
 
@@ -80,9 +80,9 @@
   - `enable_emergency` 상단 rustdoc에 `# Preconditions` 섹션을 보강하여 위 주요 검증 요건을 명시한다.
 
 #### [처리담당]
-- **판정 결과:** 수용 예정 (`Open`)
-- **처리 내용:** (후속 개발 세션에서 작성)
-- **검증 근거:** (후속 개발 세션에서 검증)
+- **판정 결과:** 수용·조치 (`Closed`)
+- **처리 내용:** `enable_emergency` rustdoc에 `# Preconditions`(계획 미설치·셧다운 전, 동일 memory 설정, 활성 제출/수락 producer/점유 slot 없음, 비어있지 않은 고유 Synced 지원 타깃, 필수 Synced 타깃 포함, `protected_bytes` 0/`u64::MAX` 금지·payload 예산 이내, control 예산)과 `# Errors`(`InvalidConfig`·`InvalidDeadline`·`ConfigError::BudgetExceeded{Control}` 구분)를 명시했다. 새 오류 variant나 동작 변경은 없다.
+- **검증 근거:** 소스 `9cbbfb8`; `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps` exit0, tc_011 11/11·doctest 17/17 Pass, 전체 `cargo test` Pass. [rustdoc/검증 원문](../../06_evolution/imported_context/rev043_2026-11-03/rev043-doc.log). 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
 
 ---
 
@@ -99,7 +99,7 @@
   - `observe_protected_bytes` rustdoc에 타깃당 단 1회 보고 계약과 `u64::MAX` 불허 제약을 명기한다.
 
 #### [처리담당]
-- **판정 결과:** 수용 예정 (`Open`)
-- **처리 내용:** (후속 개발 세션에서 작성)
-- **검증 근거:** (후속 개발 세션에서 검증)
+- **판정 결과:** 수용·조치 (`Closed`)
+- **처리 내용:** `observe_protected_bytes` rustdoc에 타깃당 1회 관측(재호출 비멱등·첫 값 유지), `u64::MAX` 미관측 센티널 거부, 한도 초과 값은 기록되나 `unachievable=true`·`protected_complete=false`가 됨을 명시하고 `# Errors`(미설치/비보호 타깃 `InvalidConfig`, cutoff 미동결·센티널·중복 `Busy`)를 추가했다. 동작 변경은 없다.
+- **검증 근거:** 소스 `9cbbfb8`; RV-086과 같은 명령 exit0. [rustdoc/검증 원문](../../06_evolution/imported_context/rev043_2026-11-03/rev043-doc.log).
 

@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-006 In Progress — DB/외부 연동; MS-002~005/007 검증 후속 |
 | 활성 Task | TASK-021 In Progress — 로컬 구현/UPS 모의 수락, native T3 이월 |
-| 미처리 리뷰 | REV-043 (Open, RV-086/087 P3 문서 권고 2건) |
+| 미처리 리뷰 | 없음 — REV-043 RV-086/087 rustdoc 조치·Closed(9cbbfb8) |
 | 상태 | Yellow — UPS 모의 수락, 운영/실앱·성능/RT/장기·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-02 / #002 종료 / AI |
-| 세션 상태 | 종료 — Human 「리뷰 세션 마무리」. 다음 RV-086/087 조치 또는 TASK-026 |
-| 최근 세션 | [2026-11-02 #002](../members/lim8603/workspace/session_logs/session_2026-11-02_002.md) — TASK-021 독립 코드리뷰(REV-043) |
+| 갱신 | 2026-11-03 / #001 진행 / AI |
+| 세션 상태 | 진행 — Human 「권장대로 진행」. REV-043 마감 완료, 다음 TASK-026 |
+| 최근 세션 | [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md) — REV-043 조치·마감 후 TASK-026 |
 
 ## 현재 결정과 제약
 
@@ -93,16 +93,15 @@
 | REV-023~028 | 계측·리포트·설정변경 자가/독립 리뷰 | Closed | EV-027~031 로컬 수락 마감, 비용·오차·실앱/native 후속 |
 | REV-029~041 | 간편 점검·DB·tracing/화면 예제 | Closed | EV-031~042 로컬 수락, 실앱/환경 후속은 각 Task 참조 |
 | [REV-042](../05_verification/reviews/REV-042_TASK-021_UPS_SIMULATION.md) | UPS 긴급 계획·모의 시험 자가 점검 | Closed | RV-084 기한 경합·RV-085 ext4 프로필 조치, EV-043 수락 |
-| [REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md) | TASK-021 UPS 긴급 계획·모의 시험 독립 코드리뷰 | Open | RV-086/RV-087 P3 문서 보강 권고, 후속 개발 세션 조치 대기 |
+| [REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md) | TASK-021 UPS 긴급 계획·모의 시험 독립 코드리뷰 | Closed | RV-086/RV-087 rustdoc 선행조건·1회 관측 계약 보강(9cbbfb8), 동작 변경 없음 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **REV-043 조치 및 마감:** RV-086(`enable_emergency` 선행조건), RV-087(`observe_protected_bytes` 1회성 계약) rustdoc 가이드 보강 후 Closed 마감.
-2. **TASK-026 실제 첫 적용·화면 연동:** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따른다. TASK-018은 FR-015 별도 승인 대기다.
-3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
-4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
+1. **TASK-026 실제 첫 적용·화면 연동:** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따른다. TASK-018은 FR-015 별도 승인 대기다.
+2. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
+3. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
 
 ## 승인·재개 제약
 
@@ -152,6 +151,8 @@
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
+
+- 2026-11-03 #001: REV-043 RV-086/087 rustdoc 보강(소스 9cbbfb8)·검증 후 Closed, 미처리 리뷰 없음 — [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md).
 
 - 2026-11-02 #002: TASK-021 UPS 긴급 계획·모의 시험에 대한 독립 코드리뷰([REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 문서 권고 2건)
 

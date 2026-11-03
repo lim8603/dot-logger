@@ -31,6 +31,10 @@ rustix.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 
+# TASK-023 harness only: per-thread affinity and absolute monotonic release.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+rustix = { workspace = true, features = ["thread", "time"] }
+
 # The raw payload cell is the only audited production unsafe boundary.
 # Other workspace packages retain forbid; this package denies unsafe everywhere
 # except the private pool/storage module.

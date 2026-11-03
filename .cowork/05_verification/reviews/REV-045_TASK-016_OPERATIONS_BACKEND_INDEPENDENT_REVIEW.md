@@ -36,7 +36,7 @@
   - `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps`: Pass (문서 경고 0건)
   - Safe Rust 100% (신규 구현 코드 내 `unsafe` 블록 0건)
 - **종합 판정:** **Pass** (P1 0건, P2 0건, P3 3건). RT 경로 무할당 불변식 보존, 호스트 일반 워커 주도형 구조, wire/gRPC/CLI 오류 매핑 정합성, 관측 정직성(0-채움 배제), Safe Rust 100% 준수 확인.
-- **상태:** **Open** (P3 권고 3건 등록, 후속 개발 세션 조치 대기)
+- **상태:** **Closed** (2026-11-03 #003 개발 세션, 소스 `497149b`에서 P3 3건 수용·조치)
 
 ---
 
@@ -67,9 +67,9 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-091 | P3 | [`crates/dot-logger/src/telemetry/operations.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs), `OperationsHost` 메서드군 | `OperationsHost::new`, `register_snapshot`, `forget_snapshot`, `compare` 등 주요 API의 rustdoc에 실패 조건 및 반환 오류(`RemoteError`)를 명시하는 `# Errors` 섹션 누락 | 각 메서드 상단 rustdoc에 `# Errors` 섹션을 추가하고 실패 조건(`InvalidInput`, `Limit`, `Gone`)을 명시하여 호스트 연동 시 편의성 개선 | 미처리 | Open |
-| RV-092 | P3 | [`crates/dot-logger/src/telemetry/operations.rs#L33`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs#L33), `pub struct OperationsHost` | 공개(public) 구조체인 `OperationsHost`에 `Debug` 트레이트가 구현되어 있지 않아 호스트 워커나 진단 컨텍스트에서 구조체 로깅/디버깅 불가 | `OperationsHost`에 `#[derive(Debug)]`를 부여하여 트레이트 인체공학(Trait Ergonomics) 및 진단 편의성 향상 | 미처리 | Open |
-| RV-093 | P3 | [`crates/dot-logger/src/telemetry/operations.rs#L119-L129`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs#L119-L129), `status` 리포트 `snapshots` | 스냅샷 등록(`register_snapshot`) 및 해제(`forget_snapshot`)가 반복되면 첫 빈 슬롯 재사용 특성으로 인해 `snapshots` JSON 배열의 ID가 비단조(non-monotonic) 순서(예: `[3, 2]`)로 직렬화될 수 있음 | 직렬화 전 ID 기준 정렬을 수행하거나, API §15.8 문서에 `snapshots` 배열이 ID 순서를 보장하지 않는 비정렬 집합임을 명시하여 클라이언트의 배열 순서 가정 방지 | 미처리 | Open |
+| RV-091 | P3 | [`crates/dot-logger/src/telemetry/operations.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs), `OperationsHost` 메서드군 | `OperationsHost::new`, `register_snapshot`, `forget_snapshot`, `compare` 등 주요 API의 rustdoc에 실패 조건 및 반환 오류(`RemoteError`)를 명시하는 `# Errors` 섹션 누락 | 각 메서드 상단 rustdoc에 `# Errors` 섹션을 추가하고 실패 조건(`InvalidInput`, `Limit`, `Gone`)을 명시하여 호스트 연동 시 편의성 개선 | 수용·조치 | Closed |
+| RV-092 | P3 | [`crates/dot-logger/src/telemetry/operations.rs#L33`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs#L33), `pub struct OperationsHost` | 공개(public) 구조체인 `OperationsHost`에 `Debug` 트레이트가 구현되어 있지 않아 호스트 워커나 진단 컨텍스트에서 구조체 로깅/디버깅 불가 | `OperationsHost`에 `#[derive(Debug)]`를 부여하여 트레이트 인체공학(Trait Ergonomics) 및 진단 편의성 향상 | 수용·조치 | Closed |
+| RV-093 | P3 | [`crates/dot-logger/src/telemetry/operations.rs#L119-L129`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs#L119-L129), `status` 리포트 `snapshots` | 스냅샷 등록(`register_snapshot`) 및 해제(`forget_snapshot`)가 반복되면 첫 빈 슬롯 재사용 특성으로 인해 `snapshots` JSON 배열의 ID가 비단조(non-monotonic) 순서(예: `[3, 2]`)로 직렬화될 수 있음 | 직렬화 전 ID 기준 정렬을 수행하거나, API §15.8 문서에 `snapshots` 배열이 ID 순서를 보장하지 않는 비정렬 집합임을 명시하여 클라이언트의 배열 순서 가정 방지 | 수용·조치(대안 A) | Closed |
 
 ---
 
@@ -91,9 +91,9 @@
   - 각 메서드 상단 rustdoc에 `# Errors` 섹션을 보강하여 발생하는 `RemoteError`의 종류와 조건을 명기한다.
 
 #### [처리담당]
-- **판정 결과:** 미처리 (`Open`)
-- **처리 내용:** 후속 개발 세션에서 rustdoc 보강 예정.
-- **검증 근거:** -
+- **판정 결과:** 수용·조치 (`Closed`)
+- **처리 내용:** `new`(`InvalidInput`), `register_snapshot`(`Limit`: 슬롯 가득/ID 소진), `forget_snapshot`·`compare`(`Gone`)에 더해 `apply`에도 `# Errors`를 추가해 §15.8 오류 매핑 전체(`Unsupported`·`InvalidInput`·`RestartRequired`·`Conflict`·`Busy`·`Limit`·`Gone`·`Transport`)를 명시했다. 동작 변경은 없다.
+- **검증 근거:** 소스 `497149b`; `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps` exit0. [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
 
 ---
 
@@ -109,9 +109,9 @@
   - `pub struct OperationsHost` 상단에 `#[derive(Debug)]`를 추가한다.
 
 #### [처리담당]
-- **판정 결과:** 미처리 (`Open`)
-- **처리 내용:** 후속 개발 세션에서 트레이트 유도 추가 예정.
-- **검증 근거:** -
+- **판정 결과:** 수용·조치 (`Closed`)
+- **처리 내용:** `#[derive(Debug)]`를 추가했다.
+- **검증 근거:** 소스 `497149b`; `host_slots_are_bounded`에 `{host:?}` 포맷 검사를 추가했다(추가 전 E0277 컴파일 Red → derive 후 Pass). [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
 
 ---
 
@@ -129,7 +129,7 @@
   - 대안 B: API §15.8 문서에 `snapshots` 배열이 ID 순서를 보장하지 않는 비정렬 목록(unordered set)임을 명시한다.
 
 #### [처리담당]
-- **판정 결과:** 미처리 (`Open`)
-- **처리 내용:** 후속 개발 세션에서 결정 및 조치 예정.
-- **검증 근거:** -
+- **판정 결과:** 수용·조치 — 대안 A (`Closed`)
+- **처리 내용:** ID가 인스턴스 안에서 재사용되지 않으므로 ID 오름차순은 곧 등록 순서다. 정렬 비용은 일반 worker의 64개 이하 항목이고 RT 경로와 무관하므로, 문서로 비정렬을 허용하기보다 안정 순서를 보장했다. `status`가 보유 snapshot을 ID 기준 정렬 후 직렬화하며, API §15.8에 「ID 오름차순 = 등록 순서」를 명시했다.
+- **검증 근거:** 소스 `497149b`; `compare_preserves_differences_and_rejects_unknown_or_exhausted_ids` 끝에 forget 후 첫 슬롯 재사용 목록 검사를 추가했다(Red: `["3","2"]` → Pass: `["2","3"]`). `cargo test -p dot-logger --features remote`, `-p dot-logger-cli`, `-p dot-logger-rt-allocation`(16/16, RT 0할당/0해제) 전체 Pass. [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
 

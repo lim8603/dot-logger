@@ -30,12 +30,16 @@ const MAX_SLOTS: usize = 64;
 
 /// Fixed snapshot slots and the local capability counter. IDs are never reused
 /// within one instance; a replacement host starts a new, unrelated ID space.
+#[derive(Debug)]
 pub struct OperationsHost {
     slots: Vec<Option<(u64, Snapshot)>>,
     next: u64,
 }
 impl OperationsHost {
     /// Allocate 1..=64 snapshot slots; registration never grows the array.
+    ///
+    /// # Errors
+    /// `InvalidInput` when `slots` is 0 or above 64.
     pub fn new(slots: usize) -> Result<Self, RemoteError> {
         if !(1..=MAX_SLOTS).contains(&slots) {
             return Err(RemoteError::InvalidInput);
@@ -47,6 +51,9 @@ impl OperationsHost {
     }
     /// Retain a host-built stable-window snapshot under a new opaque ID.
     /// A full host returns Limit; nothing is evicted implicitly.
+    ///
+    /// # Errors
+    /// `Limit` when every slot is held or the instance's ID space is exhausted.
     pub fn register_snapshot(&mut self, snapshot: Snapshot) -> Result<u64, RemoteError> {
         let slot = self
             .slots
@@ -59,6 +66,9 @@ impl OperationsHost {
         Ok(id)
     }
     /// Release one snapshot slot; the ID stays retired.
+    ///
+    /// # Errors
+    /// `Gone` when `id` is not currently held, including a forgotten ID.
     pub fn forget_snapshot(&mut self, id: u64) -> Result<(), RemoteError> {
         let slot = self
             .slots
@@ -71,6 +81,14 @@ impl OperationsHost {
     /// Parse a `dot_logger.config_patch.v1` JSON patch and post it explicitly.
     /// Producer adoption stays per producer; the result is the posted revision.
     /// Memory changes are reported as RestartRequired and never applied live.
+    ///
+    /// # Errors
+    /// `Unsupported` without config updates or tracking; `InvalidInput` for a
+    /// malformed or effectively empty patch, or routes that do not fit;
+    /// `RestartRequired` for memory changes; `Conflict` for a stale
+    /// `base_revision`; `Busy` while a previous revision drains; `Limit` for
+    /// revision exhaustion or metadata beyond the control reservation; `Gone`
+    /// while closing; `Transport` when management state is unavailable.
     pub fn apply(
         &self,
         updates: Option<ConfigUpdates<'_>>,
@@ -98,6 +116,7 @@ impl OperationsHost {
     }
     /// Bounded `dot_logger.status.v1` JSON from the host's retained history.
     /// Missing samples or windows stay Unavailable; stale values keep their time.
+    /// `snapshots` lists held snapshots in ascending ID order.
     pub fn status_report(
         &self,
         telemetry: Telemetry<'_>,
@@ -116,10 +135,11 @@ impl OperationsHost {
                 Json::Object(w)
             })
             .collect();
-        let snapshots: Vec<Json> = self
-            .slots
-            .iter()
-            .flatten()
+        // Slot reuse reorders storage; list by ID, which is registration order.
+        let mut held: Vec<_> = self.slots.iter().flatten().collect();
+        held.sort_unstable_by_key(|(id, _)| *id);
+        let snapshots: Vec<Json> = held
+            .into_iter()
             .map(|(id, s)| {
                 let w = s.report.window;
                 json!({"id":id.to_string(),"revision":w.revision.to_string(),
@@ -134,6 +154,9 @@ impl OperationsHost {
         .into_bytes()
     }
     /// Bounded `dot_logger.compare.v1` JSON preserving every condition difference.
+    ///
+    /// # Errors
+    /// `Gone` when `before` or `after` is not currently held.
     pub fn compare(&self, before: u64, after: u64) -> Result<Vec<u8>, RemoteError> {
         let find = |id| {
             self.slots

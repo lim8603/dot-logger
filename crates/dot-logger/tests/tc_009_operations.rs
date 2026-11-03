@@ -174,6 +174,15 @@ fn compare_preserves_differences_and_rejects_unknown_or_exhausted_ids() {
         assert_eq!(host.forget_snapshot(1), Err(RemoteError::Gone));
         // A freed slot gets a new ID; old IDs never come back.
         assert_eq!(host.register_snapshot(snapshot(w)), Ok(after + 1));
+        // The reused first slot must not reorder the listing: IDs ascend.
+        let listed = json(&host.status_report(telemetry, None, 20 * SECOND));
+        let ids: Vec<_> = listed["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["id"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ids, [after.to_string(), (after + 1).to_string()]);
     });
 }
 
@@ -181,7 +190,8 @@ fn compare_preserves_differences_and_rejects_unknown_or_exhausted_ids() {
 fn host_slots_are_bounded() {
     assert!(OperationsHost::new(0).is_err());
     assert!(OperationsHost::new(65).is_err());
-    assert!(OperationsHost::new(64).is_ok());
+    let host = OperationsHost::new(64).unwrap();
+    assert!(format!("{host:?}").starts_with("OperationsHost"));
 }
 
 fn snapshot(window: dot_logger::telemetry::Window) -> Snapshot {

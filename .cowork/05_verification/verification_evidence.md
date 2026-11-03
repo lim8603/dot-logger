@@ -841,6 +841,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **사전 존재 불안정:** `transport::next_timeout_during_partial_tcp_frame_retains_decoder_and_record`가 변경 전 HEAD에서도 5/40 실패(서버 종료 직후 예약 40,976,384B 잔존). 최종 실행에서는 통과했다. GAP-008로 추적한다.
 - **미실행:** 실제 dot-probe 화면/지속 앱(TASK-026), 자동 1초 sampling worker(host 책임), CPU/메모리/지연 실측, PC/RT·native(T3).
 
+## EV-045 — GAP-008 서버 종료 뒤 hub 예약 지연 반환 수정
+
+- **판정:** 로컬 Pass. GAP-008 Closed. 원격 서버 수명 계약을 보강한 것이며, LAN·RSS·native(T3) 수락을 뜻하지 않는다.
+- **대상/환경:** 소스 `13523f1`(base `77013e7`), 변경 1개 파일 `server.rs`. 2026-11-03 AI, 현재 Ubuntu generic 7.0.0-42. [명령/결과/hash](../06_evolution/imported_context/gap008_2026-11-03/results.json), [API 원격 GAP-008 수정](../03_design_artifacts/interface_contract.md).
+- **원인:** tonic 0.13.1 graceful shutdown은 연결 future만 기다린다. hyper가 HTTP/2 stream마다 따로 실행하는 task는 `RpcService`·`SubscriptionStream`을 통해 hub의 `Arc<Shared>`(전체 adapter 예약 40,976,384B)를 연결 종료 뒤에도 잠시 보유했다. 임시 진단 결과, 전체 파일 실행 60회 중 3회에서 `drop(hub)` 직후 예약이 남아 있었고 모두 1ms 안에 0이 됐다. 누수가 아니라 `serve` 반환과 실제 해제 사이의 순서 문제다. 시험만 대기하도록 고치면 host가 serve 직후 같은 예산으로 hub를 다시 만들 때 Limit을 받는 문제가 남으므로 서버를 수정했다.
+- **수정:** 서버가 만드는 service와 구독 stream이 보내지 않는 drain sender clone을 보유한다. `serve`는 Ok 반환 전에 receiver가 None이 될 때까지(마지막 clone Drop까지) 기다린다. host Command·오류 반환·future 취소 동작은 바뀌지 않는다.
+- **TDD/재현:** 결정적 Red는 실행 스케줄 경합이라 만들 수 없어, 기존 시험을 통계적 Red로 사용했다. 전체 transport 파일(12개 시험) 기준 순차 실행은 수정 전 5/100 실패 → 수정 후 0/200, 4개 동시 실행은 같은 조건에서 수정 전 19/200(전부 40,976,384B 잔존) → 수정 후 0/200.
+- **검증:** fmt·clippy(-D warnings)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 440 Pass(5 ignore, 기존 DB 회귀)·두 toolchain feature matrix exit0.
+- **미실행:** Miri(네트워크/Tokio 경로 대상 아님), LAN·실앱·native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -851,7 +861,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
-| GAP-008 | `dot-logger-client` transport 시험 `next_timeout_during_partial_tcp_frame_retains_decoder_and_record`가 변경 전 HEAD `035baba`에서도 5/40 실패: `server.await`·hub drop 직후 구독 예약 40,976,384B가 남음. 시험의 즉시 검사 문제인지, 서버 연결 task가 serve 종료 뒤에도 예약을 잡는 수명 문제인지 미확정(EV-044) | AI, 원인 조사 후 시험 대기 보정 또는 서버 연결 종료 순서 수정. 수정 전에는 실패 시 재실행 결과와 함께 기록 | Open |
+| GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `13523f1`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
 
 

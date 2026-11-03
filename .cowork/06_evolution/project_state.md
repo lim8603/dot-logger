@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-03 / #003 / AI |
-| 세션 상태 | 진행 중 — REV-045 마감 → GAP-008 조사 → TASK-023 합성 성능 순서(Human 지정) |
+| 세션 상태 | 진행 중 — REV-045·GAP-008(EV-045) 마감, TASK-023 합성 성능 착수 |
 | 최근 세션 | [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md) — REV-043 마감·단독 작업 선행 결정·운영 backend EV-044 |
 
 ## 현재 결정과 제약
@@ -103,7 +103,7 @@
 
 ## 다음 시작점
 
-1. **probe 연동 전 단독 작업(2026-11-03 Human 결정):** ~~운영 backend~~ EV-044 완료·~~REV-045~~ Closed → **GAP-008(사전 존재 transport 불안정 시험) 조사** → TASK-023 합성 행 generic 측정(P0 harness부터) → RT 요청/승인 후 RT 행 → probe 연동 인계 패키지. (2026-11-03 #003 Human 순서 지정)
+1. **probe 연동 전 단독 작업(2026-11-03 Human 결정):** ~~운영 backend~~ EV-044 완료·~~REV-045~~ Closed·~~GAP-008~~ EV-045 Closed → **TASK-023 합성 행 generic 측정**(P0 harness부터) → RT 요청/승인 후 RT 행 → probe 연동 인계 패키지. (2026-11-03 #003 Human 순서 지정)
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따른다. TASK-018은 FR-015 별도 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -142,7 +142,7 @@
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
 | GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~017·019~021 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
-| GAP-008 | 사전 존재 transport 시험 불안정(HEAD 035baba에서도 5/40, 서버 종료 직후 구독 예약 잔존) | 원인 조사 후 시험 보정 또는 서버 종료 순서 수정 |
+| GAP-008 | Closed — hyper stream task가 serve 반환 뒤 hub 예약을 보유하던 순서 문제. serve가 서버 측 handle 해제까지 대기(EV-045, 13523f1), 동시4 19/200→0/200 | 재발 시 같은 방법으로 재측정 |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
 | GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
 | RV-015~017 | 최종 sync 취소는 EV-014, 방어적 슬라이싱/스택 포맷은 EV-015에서 반영·REV-011/012 Closed·Human 승인 | native·장비 검증 대기 |
@@ -158,6 +158,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-03 #003: GAP-008 원인(hyper HTTP/2 stream task의 hub handle 지연 해제)을 확인하고 serve drain 대기로 수정(EV-045, 소스 13523f1), Closed.
 - 2026-11-03 #003: REV-045 RV-091~093 수용·조치(소스 497149b: `# Errors` rustdoc·Debug·status snapshots ID 오름차순)·회귀 Pass, Closed.
 - 2026-11-03 #002: TASK-016 운영 backend(status·apply·compare)에 대한 독립 코드리뷰([REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 권고 3건: rustdoc #Errors 명시, Debug derive, 스냅샷 정렬 계약)
 - 2026-11-03 #001: 운영 backend(status 지표·ApplyConfig·Compare, 새 오류 3종) EV-044/REV-044 로컬 수락(소스 a738ebf). GAP-008 사전 존재 불안정 시험 등록.

@@ -173,7 +173,7 @@ TASK-020 S3 [EV-042](verification_evidence.md#ev-042): 신규8개·실제 loopba
 ### TC-009 — 운영 리포트·변경·전후 비교
 
 - 관련: MS-005 / FR-014·017 / NFR-006
-- 상태: Partial — TASK-014/015/016 로컬 하위 Pass / 최근 실행: 2026-11-01 / EV: [EV-027](verification_evidence.md#ev-027)·[EV-028](verification_evidence.md#ev-028)·[EV-029](verification_evidence.md#ev-029)·[EV-030](verification_evidence.md#ev-030). TASK-017·운영 backend/실측/실앱을 포함한 TC 전체는 미완료
+- 상태: Partial — TASK-014/015/016 로컬 하위 Pass / 최근 실행: 2026-11-01 / EV: [EV-027](verification_evidence.md#ev-027)·[EV-028](verification_evidence.md#ev-028)·[EV-029](verification_evidence.md#ev-029)·[EV-030](verification_evidence.md#ev-030). TASK-017·실측/실앱을 포함한 TC 전체는 미완료. 운영 backend 하위는 [EV-044](verification_evidence.md#ev-044) 로컬 Pass
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

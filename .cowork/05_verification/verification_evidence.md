@@ -830,6 +830,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **중단/실패/복구:** 각 프로필 실행의 child는 실제 sync 후 writer destructor 없이 exit17·잘린 꼬리를 남긴다. parent 사전 영속 oracle→새 read-only source/독립 create_new 복구에서8건과 제외 꼬리를 확인하고 source bytes 불변/과거 completion 미복원을 검증했다. 작은 파일 회귀의 ENOSPC/sync 실패·더 이른/늦은 기한은 partial, 실제 sync/raw guard는 기한 후 실제 종료까지 유지한다. 소유 child의 kill/wait와 고정 소유 파일 정리도 명시한다.
 - **미실행:** 물리 전원 소실 내구성은 관측하지 않았으며 필수 입력도 아니다. 실제 UPS/OS 드라이버 연결·지속 dot-probe(TASK-026)·P0~P6/RT/24h/통합·다른 OS/native(T3)는 별도 후속이다. 다음 구현 TASK-026, TASK-018은 FR-015 별도 범위 승인 대기다.
 
+<a id="ev-044"></a>
+## EV-044 — TASK-016 운영 backend(status·apply·compare) 로컬 수락
+
+- **판정:** 로컬 기능 범위 Pass, [REV-044](reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) Closed(P3 3건 문서 처리). 실제 dot-probe 화면 연동·PC/RT 비용/오차·native(T3)는 별도다. Task/MS·Gate4/5 완료를 뜻하지 않는다.
+- **대상/환경:** source `a738ebf`(base `035baba`)·변경 18개 파일 commit blob SHA-256 기록, 2026-11-03 AI·현재 Ubuntu generic 7.0.0-42. [명령/결과/hash](../06_evolution/imported_context/ops_backend_2026-11-03/results.json), [API§15.8](../03_design_artifacts/interface_contract.md#158-운영-backendstatusapplycompare--2026-11-03). Cargo.lock 불변(serde_json 1.0.154를 `remote` feature 선택 의존에 추가), unsafe 추가 없음.
+- **TDD:** transport 왕복 시험은 새 오류 variant/Status report 부재 컴파일 Red→구현. CLI 종단 시험은 status metrics가 버려지는 Red(`metrics.schema` Null)→구현. core operations 시험은 모듈 작성 후 실행했으며 첫 실행에서 용량 초과·window 기준 표본 기대값을 바로잡았다(동작이 아닌 시험 입력 수정).
+- **검증:** Rust1.96/MSRV1.85 workspace 각 440 Pass(5 ignore, 기존 DB 회귀), 두 toolchain feature matrix(core 16조합·독립 consumer·RT allocator) Pass, fmt/clippy(-D warnings)/rustdoc(-D warnings) Pass, Miri strict provenance seeds0..7 `tc_009_operations` 4×8 Pass. 신규: transport 1·wire 단위 보강·core operations 4·CLI 종단 1.
+- **종단 범위:** 실제 loopback gRPC·Manage token·`OperationsHost`·실제 `ConfigUpdates`/`Telemetry`·CLI 바이너리. status metrics(Observed window·snapshot 목록)·Conflict exit3·적용 revision2·idle producer Busy exit3·memory RestartRequired exit2·invalid exit2·compare Decrease/Unavailable cpu·없는 ID Gone exit3·적용 후 posted revision2를 확인했다. 세 거절에는 `posted_host_io`가 없다.
+- **사전 존재 불안정:** `transport::next_timeout_during_partial_tcp_frame_retains_decoder_and_record`가 변경 전 HEAD에서도 5/40 실패(서버 종료 직후 예약 40,976,384B 잔존). 최종 실행에서는 통과했다. GAP-008로 추적한다.
+- **미실행:** 실제 dot-probe 화면/지속 앱(TASK-026), 자동 1초 sampling worker(host 책임), CPU/메모리/지연 실측, PC/RT·native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -840,6 +851,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
+| GAP-008 | `dot-logger-client` transport 시험 `next_timeout_during_partial_tcp_frame_retains_decoder_and_record`가 변경 전 HEAD `035baba`에서도 5/40 실패: `server.await`·hub drop 직후 구독 예약 40,976,384B가 남음. 시험의 즉시 검사 문제인지, 서버 연결 task가 serve 종료 뒤에도 예약을 잡는 수명 문제인지 미확정(EV-044) | AI, 원인 조사 후 시험 대기 보정 또는 서버 연결 종료 순서 수정. 수정 전에는 실패 시 재실행 결과와 함께 기록 | Open |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
 
 

@@ -9,9 +9,9 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-03 |
-| 다음 액션 | S2 logger on 경로(P1/P2/P3 혼합 workload·무결성 oracle)를 같은 P0 workload와 대조 |
-| 의존 | TASK-026·TASK-017·TASK-021·TASK-022 |
+| 마지막 갱신일 | 2026-11-04 |
+| 다음 액션 | S2 — TASK-027 facade 기본 worker 경로로 logger on(P1/P2/P3 혼합 workload·무결성 oracle)을 같은 P0 workload와 대조 |
+| 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
 ## 진입 조건
@@ -42,6 +42,10 @@
 
 Human 결정(2026-11-03)으로 실제 앱이 필요 없는 합성 행(P0 simple-file 기준선·local-pc-v1 10ms 제어 off/on·P1~P3·P5·계측 비용≤5%)을 TASK-026 전에 현재 PC generic 커널에서 실행한다. RT 행은 합성 generic 측정 뒤 TASK-022 요청 규칙에 따라 Human 승인/부팅 확인 후 실행한다. 실앱 부하·화면 연동 행은 TASK-026 의존을 유지하며 합성 결과로 대체하지 않는다.
 
+## 2026-11-04 순서 조정 — facade 경로 측정
+
+Human 승인(MS-008)으로 S2는 [TASK-027](TASK-027.md) 뒤에 진행한다. S2 harness가 기본 worker를 따로 배선하면 같은 배선을 두 번 만들고 제품 경로가 아닌 것을 재게 되므로, S2/S3는 사용자가 실제 쓰는 facade 기본 worker 경로를 측정한다. S1 P0 harness·판정 규칙(EV-046)은 그대로 사용한다. S3 정식 결과는 [TASK-028](TASK-028.md) S2 auto preset의 정확도 oracle로 쓴다. P4(TCP receiver ACK 대비)는 완료 기준에 있으나 S2/S3 범위 배정이 없으므로 S3 계획 때 포함 여부를 확인한다.
+
 ## 2026-10-31 수락 방식·검증 시점 갱신
 
 Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체하고 UPS는 시뮬레이션으로 판정한다. native는 GitHub 공개 완료 후 진행한다. 일반 Linux/RT는 실제 실행 커널을 기록하며 물리 전원 소실 내구성의 관측 결과로 표시하지 않는다. 기존 수치/예산/24h/소프트웨어 통합 목표와 선행 의존은 유지하며 이번 문서 갱신만으로 제품 시험을 Pass 처리하지 않는다.
@@ -51,7 +55,7 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 | 단계 | 범위 | 상태 |
 |---|---|---|
 | S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `3740671`. 정식 측정 NotRun |
-| S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle | 다음 세션 |
+| S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle. TASK-027 facade 기본 worker 경로로 측정 | TASK-027 뒤 |
 | S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·P5 동시 조회·계측 비용≤5% | S2 뒤 |
 | RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
 

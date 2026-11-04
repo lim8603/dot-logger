@@ -30,15 +30,21 @@
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-10-31 | EV-029 압력/시도 부하·host 정렬 수락/REV-025 Closed; PC/RT 오차/native·실앱 후속 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-03 | EV-030/031 로컬 수락·운영 backend EV-044/REV-044 Closed; 실앱/실측/native 후속 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |
 | TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | In Progress | 2026-11-01 | 고정 routed RunCheck 로컬 구현/기능 검증 EV-035; 지속 앱/화면 TASK-020/026·통합 실측·native(T3) 수락 대기 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
-| TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-10-26 | unknown hardware와 사용자 고정 설정에서 과신 추천/자동 적용 금지 | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
+| TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-11-04 | 질문 프리셋 부분만 FR-015 승인 대기(장비 측정 preset은 TASK-028 S2) | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-01 | S1/S2/S3 EV-037~039 수락; 통합/환경·native 후속, 다음 후보 TASK-020 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경·native 대기 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3 이월; 다음 TASK-026 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-10-31 | local-pc-v1 Approved·선행 harness 준비; RT 부팅/capability 확인 뒤 실행 | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
-| TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-03 | S1 P0 harness·판정 EV-046 완료, 다음 S2 logger on 경로 | TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
+| TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-04 | S2 — TASK-027 facade 기본 worker 경로로 logger on 측정(S1 EV-046 완료) | TASK-027·TASK-026·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | 현재 PC24h/장애·UPS 시뮬레이션·native/OS 교환 공개 후 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-26 | 문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치 | TASK-024 | [상세](tasks/TASK-025.md) | 1~2 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 실제 앱에서 logger off/on 동일 제어 시나리오·record→query→replay→관측 조절 | TASK-020·TASK-021 | [상세](tasks/TASK-026.md) | 2~4 |
+| TASK-027 | 기본 실행 계층(facade)과 기본 worker | MS-008 | INT-001 | US-001·002·003 | AI | Planned | 2026-11-04 | S1 — 소유 모델 ADR 초안·facade 공개 API(API §18)·NFR-008 수치 제안 | TASK-006·TASK-008·TASK-014·TASK-021 | [상세](tasks/TASK-027.md) | 4~6 |
+| TASK-028 | 예산 preset·사이징 도우미·장비 측정 auto preset | MS-008 | INT-001 | US-002·004·005 | AI | Planned | 2026-11-04 | S1 — TASK-027 뒤 상위 부하 입력→예산 결정적 계산·preset | TASK-027·TASK-017·TASK-023 | [상세](tasks/TASK-028.md) | 3~5 |
+| TASK-029 | 연결 레시피·문서·접점 회귀 가드 | MS-008 | INT-001 | US-001·003 | AI | Planned | 2026-11-04 | TASK-027·028 S1 뒤 레시피 3단계·quickstart·공개 API 회귀 가드 | TASK-027·TASK-028 | [상세](tasks/TASK-029.md) | 1~2 |
+| TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | Planned | 2026-11-04 | S1 — Envelope 해제 표준 MCAP export와 독립 reader·Foxglove 계열 판독 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |
+| TASK-031 | 원격 소비처 dot-logger-viewer와 시각화 bridge | MS-009 | INT-001 | US-003·004 | AI | Planned | 2026-11-04 | S1 — Foxglove WebSocket 프로토콜·SDK·Lichtblick 호환/라이선스 조사와 결정 | TASK-012·TASK-013·TASK-030 | [상세](tasks/TASK-031.md) | 2~3 |
+| TASK-032 | viewer 운영 대시보드 | MS-009 | INT-001 | US-004 | AI | Planned | 2026-11-04 | S1 — UI 방식(viewer 내장 웹·native·Foxglove 확장 패널) 결정 | TASK-031·TASK-016·TASK-017 | [상세](tasks/TASK-032.md) | 2~4 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 
@@ -55,3 +61,5 @@ TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consume
 2026-10-31 #012: TASK-015 리포트·용량 근거·분리된 버퍼/디스크/보존 계산을 EV-028 source100개/검사13개·Miri168·소스a247d01로 위임 로컬 수락했다. [REV-024](../05_verification/reviews/REV-024_TASK-015_REPORT.md) RV-056~059 Closed. 실제 PC/RT/native·실앱 검증과 TASK-016/017은 후속이다.
 
 - 현재(2026-11-01 #008): TASK-017 고정 routed RunCheck·원 source·기존 CLI 권한/취소·실제 exporter host 실행은 EV-035/REV-033. 로컬 기능 구현 잔여 완료, 별도 통합/실측/native 수락 조건은 유지하여 In Progress다.
+
+- 2026-11-04 #001: Human 승인으로 MS-008 TASK-027~029·MS-009 TASK-030~032를 Planned 등록했다. TASK-023 S2는 TASK-027 facade 기본 worker 경로로 측정하도록 의존을 추가했다. FR-015 장비 측정 부분은 TASK-028 S2, 질문 프리셋은 TASK-018에 남는다.

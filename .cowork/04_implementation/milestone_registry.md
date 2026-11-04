@@ -13,8 +13,10 @@
 | MS-005 | 운영 관측·조절·간편 점검 | Build | In Progress | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
 | MS-006 | 외부 연동과 긴급 기록 | Build | In Progress | TASK-019·TASK-020·TASK-021·TASK-026 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
 | MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
+| MS-008 | 소비처 통합 접점 경량화 | Build | Planned | TASK-027·TASK-028·TASK-029 | facade 기본 worker·preset/auto preset·support 없는 레시피 | 8~13 | [상세](milestones/MS-008.md) |
+| MS-009 | 표준 호환과 원격 시각화 | Build | Planned | TASK-030·TASK-031·TASK-032 | 표준 MCAP 판독·분리된 viewer 시각화·운영 대시보드 | 8~13 | [상세](milestones/MS-009.md) |
 
-필수 합계 **45~76 인일**(주 5일 전담 기준 약 9.0~15.2주), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
+필수 합계 **61~102 인일**(주 5일 전담 기준 약 12.2~20.4주; 2026-11-04 MS-008/009 16~26 인일 추가), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
 
 첫 구현 진입점은 **TASK-002 → TASK-003 → TASK-004**다. 원본 수명/메모리 안전성과 작은 종단 기록을 먼저 검증한다. 계측 TASK-014는 코어 이후 조기 구현할 수 있고, 장비 프로필 TASK-022는 설계 합의 직후 수집 가능하다. 각 의존의 단일 기준은 task_registry다.
 
@@ -73,3 +75,5 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 2026-11-02 TASK-020 S1~S3 EV-040~042 로컬 수락·REV-039~041 Closed. 다음 구현은 TASK-021 UPS 소프트웨어 경로이며 TASK-026 실제 지속 앱/화면·PC/RT/UPS/정량 성능/native(T3)·전체 Gate4/5는 잔여라 MS-006 In Progress를 유지한다.
 
 2026-11-02 TASK-021 S1~S3 로컬 구현·현재 PC ext4 UPS 시뮬레이션을 EV-043/REV-042로 수락했다. 실물 UPS 제공은 필수 조건이 아니다. 다음 구현은 TASK-026 실제 지속 dot-probe/화면, native 공개 후 T3·장기/RT/전체 Gate4/5는 잔여라 MS-006 In Progress 유지.
+
+2026-11-04 #001: 사용성 평가(공개 항목 534개·기본 worker 없음·예산 명시 부담·Envelope 저장의 표준 도구 판독 불가)에 따라 Human이 MS-008 소비처 통합 접점 경량화(TASK-027~029)와 MS-009 표준 호환과 원격 시각화(TASK-030~032, TASK-032 포함)를 승인했다. 순서는 TASK-027 → TASK-028 S1 → TASK-023 S2/S3(facade 경로)·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026이다. FR-015 장비 측정 부분은 TASK-028 S2로 포함하고 질문 프리셋은 TASK-018에 남는다.

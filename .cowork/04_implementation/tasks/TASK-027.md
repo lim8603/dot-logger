@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-05 |
-| 다음 액션 | S2 — TC-013 F1 실패 테스트부터 TDD: `CaptureCore` 내부 분해·`Writer`·host/IO worker·file 출력·shutdown([API §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05)) |
+| 다음 액션 | S3 — slot 직접 encode·tracing/remote/계측 선택 연결·`health()`·CPU 고정·worker panic 시험(GAP-009)·api-consumer 갱신 |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -33,7 +33,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | Done(2026-11-05 Human 승인) |
-| S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | Planned |
+| S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | 로컬 Pass(2026-11-05 [EV-047](../../05_verification/verification_evidence.md#ev-047)); worker panic 자동 시험만 GAP-009 |
 | S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | Planned |
 
 ## 변경 대상과 첫 검증
@@ -52,6 +52,12 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 - Drop 불변식: Writer는 상태를 1-slot 반환 mailbox로 이동만 하고, Logger/host/reaper가 항상 최종 소유자다. S2 DoD에 allocator guard 3가지 Drop 순서 시험을 추가한다.
 - 기각: core 전면 Arc(A), 제어 역전 scope(B), 프록시 링(C), `Box::leak`(D), 자기참조(E).
 - 계약: [API §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05). 초기 스케치와 달리 `writer.try_log(channel, &msg)`(thread당 Writer, `!Sync` FIFO). NFR-008 제안: L1 ≤20줄·개념 ≤6, L2 ≤40줄·≤10, L3 연결당 +6줄, facade 공개 항목 ≤60.
+
+## S2 실행 — 2026-11-05
+
+- 소스 `1af172c`(capture 분해, 공개 시그니처 불변)·`64c4d23`(logger 모듈). TC-013 F1·F4~F8 + rt-allocation F2/F3 Pass, workspace 1.96/1.85 각 460 Pass. 근거 [EV-047](../../05_verification/verification_evidence.md#ev-047), 자가 점검 [REV-046](../../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md) Closed.
+- 구현하며 구체화한 규칙(완료 경계 Written + sync barrier, 메모리 분할, routing·파일 규칙, `LogError` variant)은 [API §18.8](../../03_design_artifacts/interface_contract.md#188-s2-구현-반영--2026-11-05).
+- 잔여: worker panic 자동 시험(GAP-009), CPU 고정·`health()`(S3), 기존 MSRV clippy lint(GAP-010).
 
 ## S1 Human 결정 — 2026-11-05
 

@@ -6,18 +6,18 @@
 |---|---|
 | 프로젝트 | dot-logger — TASK-021 로컬 구현·UPS 시뮬레이션 수락, 지속 실앱 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — MS-008 In Progress(TASK-027 S1 ADR-012·API §18 승인), MS-006/007 진행 |
+| 현재 Phase | Build — MS-008 In Progress(TASK-027 S2 facade·기본 worker EV-047 로컬 Pass), MS-006/007 진행 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-027 S2 — TC-013 F1부터 TDD(S1 승인 완료). TASK-023 S2는 TASK-027 뒤 |
-| 미처리 리뷰 | 없음 — REV-045 Closed(497149b) |
+| 활성 Task | TASK-027 S3 — 선택 연결·`health()`·CPU 고정·GAP-009. TASK-023 S2는 facade 경로로 착수 가능 |
+| 미처리 리뷰 | 없음 — REV-046 자가 점검 Closed(64c4d23) |
 | 상태 | Yellow — UPS 모의 수락, 운영/실앱·성능/RT/장기·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-05 / #001 / AI |
-| 세션 상태 | 진행 — TASK-027 S1 승인(리뷰 포인트 5개 결정). 다음 S2 |
-| 최근 세션 | [2026-11-05 #001](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md) — TASK-027 S1 ADR-012 Accepted·API §18 |
+| 세션 상태 | 진행 — TASK-027 S1 승인·S2 로컬 Pass(EV-047). 다음 S3 |
+| 최근 세션 | [2026-11-05 #001](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md) — TASK-027 S1 승인·S2 facade 구현 |
 
 ## 현재 결정과 제약
 
@@ -89,7 +89,7 @@
 | TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경/native 대기 |
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-04 | S2 — TASK-027 facade 기본 worker 경로로 logger on 측정(S1 EV-046 완료) |
-| TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-05 | S2 — TC-013 F1부터 TDD; S1 [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted·[API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05) |
+| TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-05 | S2 [EV-047](../05_verification/verification_evidence.md#ev-047) 로컬 Pass(F1~F8, panic 시험 GAP-009); 다음 S3 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -104,12 +104,13 @@
 | [REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md) | TASK-021 UPS 긴급 계획·모의 시험 독립 코드리뷰 | Closed | RV-086/RV-087 rustdoc 선행조건·1회 관측 계약 보강(9cbbfb8), 동작 변경 없음 |
 | [REV-044](../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) | 운영 backend(status·apply·compare) 자가 점검 | Closed | RV-088~090 P3 문서 처리, EV-044 로컬 수락. 독립 리뷰 미실시 |
 | [REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md) | TASK-016 운영 backend 독립 코드리뷰 | Closed | RV-091 `# Errors`·RV-092 Debug·RV-093 snapshots ID 오름차순(API§15.8) 조치(497149b) |
+| [REV-046](../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md) | TASK-027 S2 facade·기본 worker 자가 점검 | Closed | RV-094 panic 시험→GAP-009, RV-095~099 P3 문서화/S3. 독립 리뷰 미실시 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인(ADR-012·API §18) → **다음 TASK-027 S2**(TC-013 F1 실패 테스트 → `CaptureCore` 내부 분해·`Writer`·host/IO worker·file 출력·shutdown, F2/F3 allocator guard 포함) → S3 → TASK-028 S1 → TASK-023 S2(facade 경로; P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`1af172c`·`64c4d23`) → **다음 TASK-027 S3**(slot 직접 encode·tracing/remote/계측 선택 연결·`health()`·CPU 고정·worker panic 시험 GAP-009·api-consumer 갱신) → TASK-028 S1 → TASK-023 S2(facade 경로; P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -148,6 +149,8 @@
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
 | GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~017·019~021 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-009 | Open — TC-013 F5 worker panic 자동 시험 없음(처리 코드는 구현, RV-094) | TASK-027 S3에서 주입점 검토 |
+| GAP-010 | Open — Rust 1.85 clippy의 기존 `adapters/tracing.rs` needless_lifetimes 1건(변경 전부터) | 해당 파일 수정 시 정리 |
 | GAP-008 | Closed — hyper stream task가 serve 반환 뒤 hub 예약을 보유하던 순서 문제. serve가 서버 측 handle 해제까지 대기(EV-045, 13523f1), 동시4 19/200→0/200 | 재발 시 같은 방법으로 재측정 |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
 | GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
@@ -164,6 +167,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-05 #001: TASK-027 S2 — capture를 공유 core/endpoint로 분해(`1af172c`, 공개 시그니처 불변)하고 facade·기본 worker를 구현(`64c4d23`). TC-013 F1~F8·allocator F2/F3, workspace 1.96/1.85 각 460 Pass(EV-047), REV-046 Closed.
 - 2026-11-05 #001: TASK-027 S1 — core 빌림 구조 조사 후 ADR-012·API §18·NFR-008 수치를 제안했고, Human이 리뷰 포인트 5개를 모두 권고안으로 승인했다(ADR-012 Accepted, MS-008 In Progress, TC-013 F1~F8 상세화). 제품 코드 변경 없음.
 - 2026-11-04 #001: 객관 평가(엔진은 가벼운 설계·통합 접점은 무거움, Envelope 저장으로 표준 MCAP 도구 판독 불가) 후 MS-008/009·TASK-027~032·NFR-008·TC-013/014 계획 등록. 제품 코드 변경 없음.
 - 2026-11-03 #003: TASK-023 S1 P0 기준선 harness·판정 규칙·합성 제어 루프(EV-046, 소스 3740671). `/data/build` 여유 부족은 Human 승인으로 build cache(target/debug·gate-target) 정리해 472.9GB 회복.

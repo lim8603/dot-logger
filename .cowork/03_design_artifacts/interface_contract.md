@@ -881,3 +881,17 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 | 3 | `Logger::drop` | `drop_deadline` 동안 기한 있는 종료, 보고서 폐기(§18.5) |
 | 4 | NFR-008 수치 | §18.6 표 그대로 |
 | 5 | 핸들 형태 | `writer.try_log(channel, &msg)`. writer는 thread당 하나(`!Sync` FIFO), channel은 `Copy` 이름표. 편의 핸들(`bind`)은 필요해지면 별도로 검토 |
+
+### 18.8 S2 구현 반영 — 2026-11-05
+
+[EV-047](../05_verification/verification_evidence.md#ev-047)·[REV-046](../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md). 승인된 계약과 다른 결정은 없다. 초안을 구체화하거나 다르게 드러난 점은 다음과 같다.
+
+- **완료 경계:** file target의 completion 경계는 Written이다. 내구성은 `Budget.sync_every` 주기 barrier와 shutdown 전용 sync로 확인하며, `FacadeReport::is_success()`가 sync 실패·기한 초과·IO 실패를 거절한다. 그래서 completion window는 수락부터 파일 쓰기까지만 덮으면 된다(writer별 slot 수 × 2).
+- **메모리 분할 규칙:** raw = Σ raw slot bytes, input = core의 `input_entry_bytes`와 같은 공식, worker = (IO thread + 1) × 2 MiB stack. 나머지를 control 1/4, output 3/4로 나누고 external은 0이다. 부족하면 `StartError::Budget { resource, required, available }`(RV-097, TASK-028에서 정밀화).
+- **routing 규칙:** 공유 record 상한 = 모든 writer slot 합계 = 각 target queue 크기. 과부하는 target drop이 아니라 ingress 역압으로 나타나고, RT에서는 Capacity 거절로 보인다. queued 최대 나이 24시간, pending 0, 시도 1회.
+- **파일 규칙:** segment = clamp(retention/8, max(8 MiB, 2 × 최대 payload + 1 MiB), 256 MiB), 60초 또는 16384 record 또는 4096 chunk에서 회전, index 4 MiB. 기본 일괄 쓰기는 256 record / 10 ms(`Budget::batching`).
+- **`LogError` 실제 variant:** `Closing`·`Capacity`·`TooLarge`·`Encode`·`InvalidInput`·`SchemaMismatch`·`Exhausted`. core에 긴급 전원 전용 거절이 없어 `EmergencyPowerOff`는 넣지 않았다(긴급 종료는 `Closing`으로 보인다, RV-099).
+- **`FacadeReport`:** `core`·`writers_outstanding`·`worker_failed`·`io_failed`·`unconfirmed`. 파일 목록 요약 대신 `Logger::directories()`가 출력별 session/target 디렉터리를 준다.
+- **API 표면:** `Budget::new()`의 손실 값 setter(`memory_bytes`·`sync_every`·`drop_deadline`·`writer_quota`)와 성능 값 setter(`io_threads`·`batching`·`idle_wait`), `WriterQuota::small(..).with_raw(..)`, `Retention::{ring, continuous}.reserve(..)`, `Channel::at(level)`, `Writer::{try_log, try_log_at, producer, now_ns}`, `Logger::{channel, take_writer, directories, worker_failed, shutdown}`, `PendingShutdown::wait`.
+- **S3 이후:** CPU 고정(RV-096), `health()`(주기 sync 실패 노출 포함, RV-095), slot 직접 encode, tracing·remote·telemetry 선택 연결, worker panic 자동 시험(GAP-009). 비 Linux Unix에서는 여유 공간 관측이 없어 `start()`가 거절된다(RV-098, Tier 2).
+

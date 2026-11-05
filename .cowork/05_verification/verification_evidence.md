@@ -861,6 +861,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **smoke:** 보정 3회 control 1.95~2.05M(508~524µs)·safety 778~786k(≈199µs). logger off 5초 control/safety miss0. reserve 미만 디스크에서 P0 `Stop::Reserve`·처리량 `Incomplete` 거절. 정리 후 5초 P0 실제 쓰기 5,033,164,800B read-back 일치·정리, 수락 5.35초 대비 durable 20.69초(243MB/s). 대용량 삭제 직후라 측정값으로 쓰지 않는다.
 - **미실행:** logger on 경로(S2), 정식 120초×3·P5·계측 비용(S3), RT 행, native(T3).
 
+<a id="ev-047"></a>
+## EV-047 — TASK-027 S2 facade·기본 worker 로컬 구현
+
+- **판정:** 로컬 구현 Pass. logger on 성능·RT·native(T3)는 NotRun이며 성능 합격 근거가 아니다.
+- **대상/환경:** 소스 `1af172c`(capture 분해)·`64c4d23`(logger), base `0165260`. 2026-11-05 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음. [명령/결과/hash](../06_evolution/imported_context/task_027_s2_2026-11-05/results.json), [REV-046](reviews/REV-046_TASK-027_S2_FACADE.md), [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05).
+- **TDD:** `dot_logger::logger` 부재 컴파일 Red(E0432) → capture 분해 후 회귀(tc_013 제외) 450 Pass → facade 구현 → TC-013 F1·F4~F8 7개, rt-allocation F2/F3 2개 Green. F1은 30회 반복 모두 통과. F4·F5·F7은 구현 뒤 작성이라 돌연변이(Drop 종료 처리·`io_failed` 표시 끄기)로 F5·F7이 실패함을 확인했다.
+- **확인한 계약:** support 코드 없이 builder→start→`'static` thread의 `try_log`→shutdown이 최종 sync·파일 게시까지 Closed·`is_success`, 독립 MCAP 판독으로 원 payload 200건 일치(F1). `try_log` Capacity 거절·raw loan·shutdown 뒤 Closing 할당 (0,0)(F2). Writer Drop 세 순서 모두 할당·해제 (0,0)(F3). 만료 기한 → Incomplete → `pending.wait` → Closed(실패 판정, 기록 보존)(F4). 디렉터리 소실 → `io_failed`·실패 판정(F5). 손실 값 누락 목록·메모리 부족 partition/부족량, 디렉터리 미생성(F6). shutdown 없는 Drop이 기한 안에 sync·게시(F7). 조회 오류 3종(F8).
+- **검증:** fmt·`git diff --check`·clippy 1.96(-D warnings)·workspace rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 460 Pass(5 ignore, 기존 DB 회귀)·feature matrix 두 toolchain 16조합 exit0. MSRV 1.85 clippy는 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 exit101이며 변경 전 HEAD에서도 같다(GAP-010).
+- **미실행:** worker panic 자동 시험(GAP-009), Miri(새 unsafe 없음·필드 이동만), logger on 성능(TASK-023 S2), RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -872,6 +882,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `13523f1`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |
+| GAP-009 | TC-013 F5의 worker panic 절반: host/IO panic 처리(catch_unwind·Failed 배출·closing·`worker_failed`)는 `64c4d23`에 구현했지만 panic 주입점이 없어 자동 시험이 없다(RV-094) | AI, TASK-027 S3에서 crate 내부 시험 또는 feature-gated 주입점 검토 | Open |
+| GAP-010 | Rust 1.85 clippy `-D warnings`가 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 실패. `0165260`(변경 전)에서도 동일하며 1.96 clippy는 Pass | AI, 해당 파일을 다음에 수정할 때 lint 정리 후 두 toolchain clippy 재확인 | Open — 기존 lint |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
 
 

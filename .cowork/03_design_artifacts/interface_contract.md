@@ -792,7 +792,7 @@ Human 결정(2026-11-03): 원격 ApplyConfig/Compare 운영 backend와 status ru
 
 ## 18. 기본 실행 계층(facade) 계약안 — 2026-11-05
 
-상태: **Proposed(TASK-027 S1, Human 승인 대기)**. 소유 모델은 [ADR-012](adrs/ADR-012_facade_owned_writer_handles.md)를 따른다. 아래 선언은 계약 검토용 스케치이며 이름·필드는 S2 TDD에서 확정한다. 기존 §13~17의 세부 API는 고급 경로로 그대로 유지하고 외부 시그니처를 바꾸지 않는다.
+상태: **Accepted(2026-11-05 Human, TASK-027 S1)**. 결정 내용은 §18.7. 소유 모델은 [ADR-012](adrs/ADR-012_facade_owned_writer_handles.md)를 따른다. 아래 선언은 계약 검토용 스케치이며 이름·필드는 S2 TDD에서 확정한다. 기존 §13~17의 세부 API는 고급 경로로 그대로 유지하고 외부 시그니처를 바꾸지 않는다.
 
 ### 18.1 범위와 위치
 
@@ -817,7 +817,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 | API | 계약 |
 |---|---|
 | `Logger::builder()` | 할당·IO 없음. 아래 선언을 모아 `start()`에서 한 번에 검증한다. |
-| `.budget(Budget)` / `.preset(..)`(TASK-028) | 둘 중 하나는 필수다. 없으면 `start()`가 `ConfigError::MissingBudget`으로 거절한다. 장비 미확정 용량·손실 기본값을 몰래 넣지 않는다(ADR-008). |
+| `.budget(Budget)` / `.preset(..)`(TASK-028) | 둘 중 하나는 필수다. 없으면 `start()`가 `ConfigError::MissingBudget`으로 거절한다. **손실 값**(sync 주기, `shutdown`·`drop_deadline` 기한, 메모리·slot 크기, 보존 용량)은 필수이며, 빠지면 빠진 항목 목록과 함께 거절한다. **성능 값**(IO thread 1, CPU 고정 없음, idle 대기 상한)은 facade 기본값이 있다(ADR-012 §6). |
 | `Budget` | writer별 small slots·slot bytes·raw slots/bytes·중요 예약, 완료 window, IO thread 수·CPU 목록, sync 주기, 종료/Drop 기한. facade가 `MemoryBudget` 7분할·`RoutingConfig`·`CompletionConfig`·`WriterConfig` 세부를 **결정적 규칙**으로 계산한다. 부족하면 항목·부족량을 담은 오류를 반환한다. `Budget::advanced(core configs)`는 core 설정을 그대로 받는 탈출구다. |
 | `.file_output(dir, Retention)` | file target 하나를 추가한다(여러 번 호출 가능, TASK-023 S2의 16파일 대응). `Retention::{ring, continuous, event}` 상위 입력에서 `RetentionConfig`를 계산한다. 경로는 기존 `FileStore`의 신선한 session namespace 규칙을 따른다. |
 | `.channel::<T: Record>(topic)` / `.channel_with(topic, ChannelOptions)` | 시작 전에 고정 등록한다. 등록 순서가 channel ID 순서다. 기본 level=Info·importance=Normal·route=모든 file target. 런타임 채널 추가는 없다(core 고정 등록 계약). |
@@ -852,7 +852,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 | `Logger::shutdown(self, deadline) -> Result<Shutdown, ShutdownError>` | close → drain → (Synced 계약이면) 최종 file·directory sync → worker join. `Shutdown::Closed(FacadeReport)` 또는 `Incomplete { report, pending }`. |
 | `PendingShutdown::wait(self, deadline)` / Drop | 같은 정리를 계속 기다린다. Drop하면 detach한다. host가 정리를 끝낸 뒤 management thread에서 해제한다. IO·guard를 강제 해제하지 않는다. |
 | `FacadeReport` | core `ShutdownReport` + 미확인 producer 범위(유한 배열, 상한 = writer 수) + `writers_outstanding` + `worker_failed` + 파일 목록 요약(유한). `is_success()`는 core 판정에 `!worker_failed`를 더한다. `writers_outstanding`은 성공 판정을 바꾸지 않고 자원 잔여로만 보고한다. |
-| `Logger::drop` | Human 확인 사항 3. 권고: `Budget.drop_deadline` 동안 bounded shutdown 수행, 결과 폐기. |
+| `Logger::drop` | `Budget.drop_deadline` 동안 `shutdown`과 같은 기한 있는 종료를 수행하고 보고서는 버린다. 기한을 넘기면 detach한다(ADR-012 §5). |
 | `Logger::health()`(S3) | `Running`/`Degraded{reason}`/`Closing`/`Failed{WorkerFailed\|IoPoisoned\|..}`와 target별 요약. 측정하지 않은 값은 `Unavailable`로 표시하고 0으로 쓰지 않는다. |
 
 ### 18.6 NFR-008 수락 수치 제안
@@ -870,10 +870,14 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 
 기존 NFR-001(RT 무대기·무할당)과 NFR-005(유한 예산)는 약화하지 않는다. 수치를 넘으면 TASK-029 검사가 실패한다.
 
-### 18.7 Human 확인 사항(S1 승인 대상)
+### 18.7 Human 결정 — 2026-11-05
 
-1. **소유 모델:** ADR-012 옵션 F(공유 core + 소유 endpoint + 빌림 뷰)와 Drop 불변식·검증 조건.
-2. **기본값 위치:** worker 수·CPU 고정·sync 주기·종료 기한을 `Budget`/preset에 두고 builder 단독 기본값은 두지 않는다(권고). 대안은 facade 고정 기본값(예: IO 1·sync 1초)이다. 줄 수는 줄지만 장비 미확정 손실 기본값을 확정하게 된다.
-3. **`Logger::drop`:** (권고) `drop_deadline` 동안 bounded shutdown을 수행하고 결과를 폐기한다. 대안 ① 즉시 detach: host가 백그라운드에서 정리하며, 프로세스가 종료되면 마지막 sync 구간을 잃을 수 있다. 대안 ② close만 하고 정리는 reaper에 맡긴다.
-4. **NFR-008 수치:** §18.6 표.
-5. **핸들 형태:** 초기 스케치 `pose.try_log(&msg)` 대신 `writer.try_log(pose, &msg)`(thread당 Writer 하나). 이유는 producer가 thread당 하나인 `!Sync` FIFO이기 때문이다.
+리뷰 포인트 5개를 하나씩 검토해 모두 권고안으로 정했다.
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | 소유 모델 | ADR-012 옵션 F(공유 core + 소유 endpoint + 빌림 뷰). Drop 반납함 불변식과 allocator guard 3가지 Drop 순서 시험을 S2 DoD에 포함 |
+| 2 | 기본값 위치 | 혼합. 성능 값은 facade 기본값, 손실 값은 `Budget`/preset 필수(§18.2) |
+| 3 | `Logger::drop` | `drop_deadline` 동안 기한 있는 종료, 보고서 폐기(§18.5) |
+| 4 | NFR-008 수치 | §18.6 표 그대로 |
+| 5 | 핸들 형태 | `writer.try_log(channel, &msg)`. writer는 thread당 하나(`!Sync` FIFO), channel은 `Copy` 이름표. 편의 핸들(`bind`)은 필요해지면 별도로 검토 |

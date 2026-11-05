@@ -37,7 +37,7 @@
 | ADR-010 | 압축 의존성 보안 수정에 따른 MCAP 0.26 채택 | Accepted | 2026-10-26 | INT-001 | MS-002 | [상세](adrs/ADR-010_mcap_security_update.md) | Human 승인, MCAP 0.26.0·선택 zstd 보안 의존성 수정 |
 
 | ADR-011 | 현재 PC 실측·UPS 시뮬레이션 수락과 공개 후 native 검증 | Accepted | 2026-10-31 | INT-001 | MS-002~007 | [상세](adrs/ADR-011_local_pc_simulated_ups_verification.md) | Human 승인, 장비/UPS 수락 방법·native 시점 갱신 |
-| ADR-012 | facade 소유 모델: 공유 core + 소유 endpoint 핸들 + 빌림 뷰 | Proposed | 2026-11-05 | INT-001 | MS-008 | [상세](adrs/ADR-012_facade_owned_writer_handles.md) | TASK-027 S1 초안, Human 승인 대기. ADR-008 borrowed core 유지 |
+| ADR-012 | facade 소유 모델: 공유 core + 소유 endpoint 핸들 + 빌림 뷰 | Accepted | 2026-11-05 | INT-001 | MS-008 | [상세](adrs/ADR-012_facade_owned_writer_handles.md) | Human 승인(리뷰 포인트 5개 권고안). ADR-008 borrowed core 유지 |
 
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`

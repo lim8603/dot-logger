@@ -6,11 +6,11 @@
 | Story | US-001·002·003 |
 | 요구사항 | FR-001 FR-003 FR-008 FR-012 FR-013 NFR-001 NFR-004 NFR-008 |
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
-| ADR | ADR-003~009 Accepted, ADR-007 범위 안. 소유 모델 [ADR-012](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Proposed |
+| ADR | ADR-003~009 Accepted, ADR-007 범위 안. 소유 모델 [ADR-012](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-05 |
-| 다음 액션 | S1 Human 승인 대기 — ADR-012·[API §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05)·NFR-008 수치(§18.6)·확인 사항 §18.7 |
+| 다음 액션 | S2 — TC-013 F1 실패 테스트부터 TDD: `CaptureCore` 내부 분해·`Writer`·host/IO worker·file 출력·shutdown([API §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05)) |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -32,7 +32,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | 초안 완료·승인 대기(2026-11-05) |
+| S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | Done(2026-11-05 Human 승인) |
 | S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | Planned |
 | S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | Planned |
 
@@ -53,7 +53,11 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 - 기각: core 전면 Arc(A), 제어 역전 scope(B), 프록시 링(C), `Box::leak`(D), 자기참조(E).
 - 계약: [API §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05). 초기 스케치와 달리 `writer.try_log(channel, &msg)`(thread당 Writer, `!Sync` FIFO). NFR-008 제안: L1 ≤20줄·개념 ≤6, L2 ≤40줄·≤10, L3 연결당 +6줄, facade 공개 항목 ≤60.
 
-## Human 확인 필요 사항
+## S1 Human 결정 — 2026-11-05
+
+리뷰 포인트 5개 모두 권고안: ① ADR-012 옵션 F, ② 기본값 혼합(성능 값은 기본값, 손실 값은 필수), ③ `Logger::drop` 기한 있는 종료, ④ NFR-008 수치 제안대로, ⑤ `writer.try_log(channel, &msg)`. S2 DoD에 TC-013 F1~F8(특히 F2·F3 allocator guard)을 포함한다. 상세는 [API §18.7](../../03_design_artifacts/interface_contract.md#187-human-결정--2026-11-05).
+
+## Human 확인 필요 사항(S1 시점 원문)
 
 - 소유 모델 ADR: 기존 borrowed API 수명 계약(RSK)과 `'static` 핸들 전환의 trade-off.
 - 기본 worker 수·CPU 고정·sync 주기의 기본값을 preset에 둘지 builder 필수값으로 둘지.

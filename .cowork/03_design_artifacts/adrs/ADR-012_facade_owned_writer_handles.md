@@ -1,7 +1,7 @@
 # ADR-012 — 기본 실행 계층(facade)의 소유 모델: 공유 core + 소유 endpoint 핸들 + 빌림 뷰
 
-- 상태: Proposed / 날짜: 2026-11-05 / 작성: AI(TASK-027 S1)
-- 승인: 대기 — Human 승인 전 S2 구현에 착수하지 않는다.
+- 상태: Accepted / 날짜: 2026-11-05 / 작성: AI(TASK-027 S1)
+- 승인: 2026-11-05 Human — 리뷰 포인트 5개를 하나씩 검토해 모두 권고안을 선택했다: ① 옵션 F, ② 기본값 혼합(성능 값은 facade 기본값, 손실 값은 필수), ③ `Logger::drop`은 기한 있는 종료, ④ NFR-008 수치 제안대로, ⑤ `writer.try_log(channel, &msg)` 분리 형태. 상세는 아래 「결정」과 [API §18.7](../interface_contract.md#187-human-결정--2026-11-05).
 - 관련: INT-001 / MS-008 / TASK-027(S2·S3)·TASK-023 S2/S3·TASK-026 / FR-001·003·008·012·013 / NFR-001·004·005·008 / US-001~003
 - 관계: [ADR-008](ADR-008_bounded_ownership_completion.md)의 "RT 원본 수명" 행(session owner + borrowed producer/loan)을 **유지**하고, 그 위에 소유형 facade 계층을 추가한다. ADR-007의 내장형 파이프라인·별도 데몬 없음은 그대로다. 대체하는 ADR은 없다.
 
@@ -45,7 +45,7 @@ ADR-008은 borrowed 모델을 고른 이유로 "Arc 마지막 Drop은 RT free �
 | E. 자기참조 셀 | `self_cell`/`ouroboros` 또는 unsafe 수명 확장 | 기각. 새 unsafe 경계나 의존성이 생긴다. `&mut WriteState` 독점 빌림은 표현하기 어렵다. |
 | **F. 공유 core + 소유 endpoint + 빌림 뷰** | 아래 결정 | **권고** |
 
-## 결정 (권고안)
+## 결정
 
 ### 1. core를 "공유 불변부"와 "독점 endpoint"로 내부 분해한다
 
@@ -83,7 +83,12 @@ ADR-008은 borrowed 모델을 고른 이유로 "Arc 마지막 Drop은 RT free �
   - 기한을 넘기면 `Incomplete { report, pending }`을 반환한다. `pending`은 `wait(deadline)`로 이어서 기다릴 수 있다. `pending`을 버리면 host가 정리를 계속하고 끝난 뒤 자원을 해제한다(detach). 진행 중 IO·guard를 무효화하지 않는다.
   - 보고서는 core `ShutdownReport`(필수/전체 totals·잔여 IO·sync 실패)에 다음을 더한다: 미확인 producer 범위, `writers_outstanding`, `worker_failed`.
 - worker panic: host는 scoped thread의 panic을 join에서 수집한다. 그 즉시 ingress를 close하므로 이후 `try_log`는 `Closing`이다. 처리 중이던 guard는 기존 Drop 계약대로 Unknown이 된다. 보고서와 `health()`에는 `WorkerFailed`를 표시한다. host 자체 panic에도 drop guard가 closing을 설정한다. owner 해제는 항상 host(management) thread에서 일어난다.
-- `Logger::drop` 동작은 Human 확인 사항 3에서 정한다.
+- `Logger::drop`(2026-11-05 Human 결정): `Budget.drop_deadline` 동안 `shutdown`과 같은 기한 있는 종료(배출 → 최종 sync → join)를 수행하고 보고서는 버린다. `Logger`는 management thread에서만 다루므로 RT thread를 멈추지 않는다. 기한을 넘기면 `PendingShutdown` Drop과 같이 detach한다.
+
+### 6. 기본값 위치 (2026-11-05 Human 결정)
+
+- 성능 값(IO thread 수=1, CPU 고정 없음, idle 대기 상한)에는 facade 기본값을 둔다. 잘못 정해도 성능만 바뀌고 손실 범위는 바뀌지 않는다.
+- 손실 값(sync 주기, `shutdown`·`drop_deadline` 기한, 메모리·slot 크기, 보존 용량)은 `Budget` 또는 preset(TASK-028)에서 필수로 받는다. 빠지면 `start()`가 빠진 항목 목록과 함께 거절한다. ADR-008의 '장비 미확정 손실 기본값 금지'를 유지한다.
 
 ## 결과
 
@@ -102,6 +107,6 @@ ADR-008은 borrowed 모델을 고른 이유로 "Arc 마지막 Drop은 RT free �
 
 ## 승인 범위와 잔여
 
-- 승인을 요청하는 범위: 옵션 F의 소유 모델, 위 3절의 Drop 불변식과 검증 조건, 4절의 worker 구성 원칙, 5절의 종료·panic 계약.
+- 승인 범위: 옵션 F의 소유 모델, 3절의 Drop 불변식과 검증 조건, 4절의 worker 구성 원칙, 5절의 종료·panic·Drop 계약, 6절의 기본값 위치.
 - 상세 API는 [interface §18](../interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05), NFR-008 수치는 §18.6에 둔다.
 - 실제 RT 지연·처리량은 TASK-023, native는 T3로 이월한다. 이 ADR의 승인은 구현·성능 합격이 아니다.

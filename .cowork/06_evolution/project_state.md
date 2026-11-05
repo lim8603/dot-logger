@@ -6,20 +6,22 @@
 |---|---|
 | 프로젝트 | dot-logger — TASK-021 로컬 구현·UPS 시뮬레이션 수락, 지속 실앱 후속 |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build — TASK-027 S1 설계 초안(ADR-012 Proposed·API §18) 승인 대기, MS-006/007 진행 |
+| 현재 Phase | Build — MS-008 In Progress(TASK-027 S1 ADR-012·API §18 승인), MS-006/007 진행 |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-008 Planned — 소비처 통합 접점 경량화(다음 착수); MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-027 S1 Human 승인 대기(ADR-012·API §18·NFR-008 §18.6·확인 사항 §18.7). TASK-023 S2는 TASK-027 뒤 |
+| 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
+| 활성 Task | TASK-027 S2 — TC-013 F1부터 TDD(S1 승인 완료). TASK-023 S2는 TASK-027 뒤 |
 | 미처리 리뷰 | 없음 — REV-045 Closed(497149b) |
 | 상태 | Yellow — UPS 모의 수락, 운영/실앱·성능/RT/장기·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-05 / #001 / AI |
-| 세션 상태 | 진행 — TASK-027 S1 설계 초안 작성, Human 승인 대기 |
-| 최근 세션 | [2026-11-05 #001](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md) — TASK-027 S1 ADR-012·API §18 초안 |
+| 세션 상태 | 진행 — TASK-027 S1 승인(리뷰 포인트 5개 결정). 다음 S2 |
+| 최근 세션 | [2026-11-05 #001](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md) — TASK-027 S1 ADR-012 Accepted·API §18 |
 
 ## 현재 결정과 제약
+
+- **2026-11-05 Human 결정 — TASK-027 S1 facade 계약 승인:** 리뷰 포인트 5개를 하나씩 검토해 모두 권고안을 선택했다. ① [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted: 공유 `CaptureCore` + 소유 `Writer` + 빌림 `Producer<'_>` 뷰, Writer Drop은 반납함 이동만 하고 host/reaper가 최종 소유(ADR-008 borrowed core 유지). ② 성능 값(IO 1·CPU 고정 없음)은 facade 기본값, 손실 값(sync 주기·종료/Drop 기한·메모리·보존)은 `Budget`/preset 필수. ③ `Logger::drop`은 `drop_deadline` 기한 있는 종료. ④ NFR-008: L1 ≤20줄·≤6개념, L2 ≤40·≤10, L3 +6, facade 공개 ≤60. ⑤ `writer.try_log(channel, &msg)`. 계약은 [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05), 시험은 TC-013 F1~F8.
 
 - **2026-11-04 Human 결정 — 소비처 접점 경량화·시각화 범위 추가:** 사용성 평가(공개 항목 534개·기본 worker 없음·예산 명시 부담·Envelope 저장으로 표준 도구 판독 불가)에 동의하고 「권고대로」·「TASK-032 포함」·「MS 분리 가능」. [MS-008](../04_implementation/milestones/MS-008.md)(TASK-027 facade·기본 worker, TASK-028 preset·auto preset, TASK-029 레시피)와 [MS-009](../04_implementation/milestones/MS-009.md)(TASK-030 MCAP 표준 호환, TASK-031 viewer·Foxglove 계열 bridge, TASK-032 운영 대시보드) 등록. NFR-008 통합 용이성 추가, FR-006 viewer 확장, FR-015 장비 측정 auto preset만 TASK-028 S2로 부분 채택(질문 프리셋은 TASK-018 제안 유지). **순서:** TASK-027 → TASK-028 S1 → TASK-023 S2/S3(facade 경로)·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026. 11-03 결정의 "단독 작업 먼저, probe 연동 나중" 원칙 안에서 단독 작업 범위를 넓혔다. ADR 후보: facade 소유 모델(TASK-027 S1)·MCAP 표준 저장 모드(TASK-030 S2 전)·시각화 방식(TASK-031 S1).
 
@@ -87,7 +89,7 @@
 | TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경/native 대기 |
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-04 | S2 — TASK-027 facade 기본 worker 경로로 logger on 측정(S1 EV-046 완료) |
-| TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-05 | S1 승인 대기 — [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Proposed·[API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05); 승인 후 S2 |
+| TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-05 | S2 — TC-013 F1부터 TDD; S1 [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted·[API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05) |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -107,7 +109,7 @@
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → **TASK-027 S1 초안 완료·Human 승인 대기**(ADR-012 옵션 F·Drop 불변식, API §18, NFR-008 §18.6, 확인 사항 §18.7: 기본값 위치·`Logger::drop`·핸들 형태) → 승인 후 S2 → TASK-028 S1 → TASK-023 S2(facade 경로; P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인(ADR-012·API §18) → **다음 TASK-027 S2**(TC-013 F1 실패 테스트 → `CaptureCore` 내부 분해·`Writer`·host/IO worker·file 출력·shutdown, F2/F3 allocator guard 포함) → S3 → TASK-028 S1 → TASK-023 S2(facade 경로; P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -162,7 +164,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-05 #001: TASK-027 S1 — core 빌림 구조 조사 후 ADR-012(공유 core + 소유 endpoint + 빌림 뷰, 반환 mailbox Drop 불변식) Proposed, API §18·NFR-008 수치 제안. 제품 코드 변경 없음.
+- 2026-11-05 #001: TASK-027 S1 — core 빌림 구조 조사 후 ADR-012·API §18·NFR-008 수치를 제안했고, Human이 리뷰 포인트 5개를 모두 권고안으로 승인했다(ADR-012 Accepted, MS-008 In Progress, TC-013 F1~F8 상세화). 제품 코드 변경 없음.
 - 2026-11-04 #001: 객관 평가(엔진은 가벼운 설계·통합 접점은 무거움, Envelope 저장으로 표준 MCAP 도구 판독 불가) 후 MS-008/009·TASK-027~032·NFR-008·TC-013/014 계획 등록. 제품 코드 변경 없음.
 - 2026-11-03 #003: TASK-023 S1 P0 기준선 harness·판정 규칙·합성 제어 루프(EV-046, 소스 3740671). `/data/build` 여유 부족은 Human 승인으로 build cache(target/debug·gate-target) 정리해 472.9GB 회복.
 - 2026-11-03 #003: GAP-008 원인(hyper HTTP/2 stream task의 hub handle 지연 해제)을 확인하고 serve drain 대기로 수정(EV-045, 소스 13523f1), Closed.

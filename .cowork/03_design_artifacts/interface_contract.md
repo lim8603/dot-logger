@@ -789,3 +789,91 @@ Human 결정(2026-11-03): 원격 ApplyConfig/Compare 운영 backend와 status ru
 - **Compare:** 두 등록 ID로 `Comparison::build`를 실행해 `dot_logger.compare.v1`을 반환한다. 각 쪽의 원 session/revision/epoch/window·조건·application_input ID, `comparable`, differences 8항목 전체, 8개 변화값(state·direction·정수 분자/분모 문자열 또는 Unavailable reason, Validated/Estimated/Stale의 출처)을 보존한다. 없는 ID는 Gone이다. 비교 불가 조건은 수치를 계산하지 않는다.
 
 [EV-044](../05_verification/verification_evidence.md#ev-044)·[REV-044](../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md). 실제 dot-probe 화면(TASK-026)·PC/RT 비용/오차·native(T3)는 후속이다.
+
+## 18. 기본 실행 계층(facade) 계약안 — 2026-11-05
+
+상태: **Proposed(TASK-027 S1, Human 승인 대기)**. 소유 모델은 [ADR-012](adrs/ADR-012_facade_owned_writer_handles.md)를 따른다. 아래 선언은 계약 검토용 스케치이며 이름·필드는 S2 TDD에서 확정한다. 기존 §13~17의 세부 API는 고급 경로로 그대로 유지하고 외부 시그니처를 바꾸지 않는다.
+
+### 18.1 범위와 위치
+
+- 모듈 `dot_logger::logger`와 `dot_logger::prelude`(facade 타입만 재수출). 기존 모듈은 고급 경로다.
+- S2: builder·기본 worker·file 출력·`Writer`/`Channel<T>`·shutdown. S3: slot 직접 encode·tracing·remote·telemetry 표본 선택 연결·`health()`. 예산 계산·preset은 TASK-028에서 `Budget`을 만들어 주입한다.
+
+```rust
+let logger = Logger::builder()
+    .budget(budget)                                   // TASK-028: .preset(Preset::control(1000))
+    .file_output("/data/logs", Retention::ring(64 * GIB))
+    .channel::<Pose>("robot/pose")
+    .writer("control")
+    .start()?;
+let pose = logger.channel::<Pose>("robot/pose")?;    // Copy 토큰, 타입·schema 대조
+let mut w = logger.take_writer("control")?;          // 'static + Send + !Sync, 한 번만
+std::thread::spawn(move || loop { let _ = w.try_log(pose, &read_pose()); });
+let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
+```
+
+### 18.2 구성(일반 경로)
+
+| API | 계약 |
+|---|---|
+| `Logger::builder()` | 할당·IO 없음. 아래 선언을 모아 `start()`에서 한 번에 검증한다. |
+| `.budget(Budget)` / `.preset(..)`(TASK-028) | 둘 중 하나는 필수다. 없으면 `start()`가 `ConfigError::MissingBudget`으로 거절한다. 장비 미확정 용량·손실 기본값을 몰래 넣지 않는다(ADR-008). |
+| `Budget` | writer별 small slots·slot bytes·raw slots/bytes·중요 예약, 완료 window, IO thread 수·CPU 목록, sync 주기, 종료/Drop 기한. facade가 `MemoryBudget` 7분할·`RoutingConfig`·`CompletionConfig`·`WriterConfig` 세부를 **결정적 규칙**으로 계산한다. 부족하면 항목·부족량을 담은 오류를 반환한다. `Budget::advanced(core configs)`는 core 설정을 그대로 받는 탈출구다. |
+| `.file_output(dir, Retention)` | file target 하나를 추가한다(여러 번 호출 가능, TASK-023 S2의 16파일 대응). `Retention::{ring, continuous, event}` 상위 입력에서 `RetentionConfig`를 계산한다. 경로는 기존 `FileStore`의 신선한 session namespace 규칙을 따른다. |
+| `.channel::<T: Record>(topic)` / `.channel_with(topic, ChannelOptions)` | 시작 전에 고정 등록한다. 등록 순서가 channel ID 순서다. 기본 level=Info·importance=Normal·route=모든 file target. 런타임 채널 추가는 없다(core 고정 등록 계약). |
+| `.writer(name)` / `.writer_with(name, WriterQuota)` | producer slot 하나를 선언한다. 기본 quota는 `Budget`에서 온다. |
+| `start()` | 검증 → 사전 할당·예열 → host thread와 IO thread 시작 → `Logger`. 실패 시 생성한 thread·파일을 모두 정리하고 오류를 반환한다. 부분적으로 시작된 상태는 남기지 않는다. |
+
+### 18.3 기록 핸들(RT 경로)
+
+| API | 계약 |
+|---|---|
+| `Logger::channel::<T>(topic) -> Result<Channel<T>, LookupError>` | 등록 topic과 `T::SCHEMA` 대조(일반 경로). `Channel<T>`는 `Copy`이며 메모리를 소유하지 않는다. |
+| `Logger::take_writer(name) -> Result<Writer, LookupError>` | 각 writer를 한 번만 꺼낸다. 두 번째 호출은 `AlreadyTaken`. |
+| `Writer::try_log(&mut self, Channel<T>, &T) -> Result<Logged, LogError>` | 무대기·무할당·Arc clone 0. 단조·실시간 시계를 읽는다. 사전 할당 scratch에 encode한 뒤 기존 `try_record_small`을 호출한다(S3에서 slot 직접 encode로 교체). `Logged::{Accepted(receipt), Skipped}`. |
+| `Writer::try_log_at(.., Stamp)` / `try_log_with(.., Meta)` | 시각·level·importance·source time을 호출자가 지정한다. 시계를 읽지 않는다. |
+| `Writer::producer(&mut self) -> Producer<'_>` | 고급 경로. 기존 `try_acquire`/`Loan`/`try_record_raw`/`apply_pending_config`를 그대로 쓰는 빌림 뷰(ADR-012 §2). |
+| `trait Record` | `const SCHEMA: Schema`(id·version·encoding·이름), `fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError>`. RT 구현은 할당하지 않아야 한다. 이는 사용자 책임이며 문서와 allocator guard 예제로 보인다. `[u8]`·`&[u8]` 고정 구현을 제공한다. |
+| `Writer::drop` | 상태를 반환 mailbox로 이동한다. 할당·해제 0(ADR-012 §3). |
+
+`LogError`는 `Copy`이며 동적 진단을 포함하지 않는다: `Closing`, `Capacity(Resource)`, `TooLarge`, `SchemaMismatch`, `Encode`, `EmergencyPowerOff`. 기존 core 거절 이유를 손실 없이 대응시킨다. revision 적용(`apply_pending_config`)은 `try_log` 진입 시 고정 비용으로 수행한다. idle writer의 미적용은 core 계약대로 `RevisionBusy`로 보인다.
+
+### 18.4 기본 worker
+
+- host thread(이름 `dot-logger-host`, management): dispatcher turn, raw reclaim, `Budget.sync_every` 주기의 `request_sync`/`next_sync`, completion feedback 적용, telemetry 표본(S3).
+- IO thread `Budget.io_threads`개(기본 1): file target을 round-robin으로 배정한다. `write_batch` 크기와 최대 보유 지연은 `Budget`에서 온다. 회전·보존·`SyncWork`는 기존 `SegmentLog` 계약을 따른다.
+- CPU affinity는 `Budget.cpu_ids`에 지정한 경우에만 적용한다. 적용 실패는 기존 `Requirement` 규칙(Optional은 결과에 보존, Required는 `start()` 거절)을 따른다.
+- 대기: idle backoff로 재운다(상한 `Budget.idle_wait`). RT writer는 worker를 깨우지 않는다(무대기).
+
+### 18.5 종료·Drop·상태 조회(일반 경로)
+
+| API | 계약 |
+|---|---|
+| `Logger::shutdown(self, deadline) -> Result<Shutdown, ShutdownError>` | close → drain → (Synced 계약이면) 최종 file·directory sync → worker join. `Shutdown::Closed(FacadeReport)` 또는 `Incomplete { report, pending }`. |
+| `PendingShutdown::wait(self, deadline)` / Drop | 같은 정리를 계속 기다린다. Drop하면 detach한다. host가 정리를 끝낸 뒤 management thread에서 해제한다. IO·guard를 강제 해제하지 않는다. |
+| `FacadeReport` | core `ShutdownReport` + 미확인 producer 범위(유한 배열, 상한 = writer 수) + `writers_outstanding` + `worker_failed` + 파일 목록 요약(유한). `is_success()`는 core 판정에 `!worker_failed`를 더한다. `writers_outstanding`은 성공 판정을 바꾸지 않고 자원 잔여로만 보고한다. |
+| `Logger::drop` | Human 확인 사항 3. 권고: `Budget.drop_deadline` 동안 bounded shutdown 수행, 결과 폐기. |
+| `Logger::health()`(S3) | `Running`/`Degraded{reason}`/`Closing`/`Failed{WorkerFailed\|IoPoisoned\|..}`와 target별 요약. 측정하지 않은 값은 `Unavailable`로 표시하고 0으로 쓰지 않는다. |
+
+### 18.6 NFR-008 수락 수치 제안
+
+측정 방법: `examples/recipes/` 레시피(TASK-029)를 rustfmt로 정리한 뒤 센다. "연동 코드 줄"에서 `use`·주석·빈 줄·사용자 메시지 타입과 그 `Record` 구현은 뺀다. "도입 개념"은 사용자 코드가 이름을 쓰는 `dot_logger` 경로의 타입·trait·자유 함수 수다(메서드 이름은 세지 않는다).
+
+| 지표 | 제안 수치 | 현재 기준(2026-11-04 평가) |
+|---|---|---|
+| L1 최소 file 기록(시작→RT thread 기록→shutdown 판정) 연동 코드 | ≤ 20줄 | pipeline 본문 39줄 + support 약 1,000줄 |
+| L1 도입 개념 | ≤ 6개(예: `Logger`·`Budget`/`Preset`·`Retention`·`Record`·`Schema`·`Shutdown`) | capture/config/routing/completion/control/storage 등 15+ |
+| L2 RT 다중 writer + raw loan + 종료 보고 확인 | ≤ 40줄, 개념 ≤ 10개 | 해당 경로 없음 |
+| L3 선택 연결 1개 추가(tracing·remote 각각) | 연결당 +6줄 이하 | 어댑터별 수십~수백 줄 |
+| 공통 금지 | L1~L3에 support 모듈·`unsafe`·사용자 수명 매개변수·`thread::scope` 강제·메모리 7분할 직접 기입 0 | — |
+| facade 공개 표면 | `dot_logger::logger` 공개 항목 ≤ 60(rustdoc JSON 계수, TASK-029 회귀 가드) | core 534 |
+
+기존 NFR-001(RT 무대기·무할당)과 NFR-005(유한 예산)는 약화하지 않는다. 수치를 넘으면 TASK-029 검사가 실패한다.
+
+### 18.7 Human 확인 사항(S1 승인 대상)
+
+1. **소유 모델:** ADR-012 옵션 F(공유 core + 소유 endpoint + 빌림 뷰)와 Drop 불변식·검증 조건.
+2. **기본값 위치:** worker 수·CPU 고정·sync 주기·종료 기한을 `Budget`/preset에 두고 builder 단독 기본값은 두지 않는다(권고). 대안은 facade 고정 기본값(예: IO 1·sync 1초)이다. 줄 수는 줄지만 장비 미확정 손실 기본값을 확정하게 된다.
+3. **`Logger::drop`:** (권고) `drop_deadline` 동안 bounded shutdown을 수행하고 결과를 폐기한다. 대안 ① 즉시 detach: host가 백그라운드에서 정리하며, 프로세스가 종료되면 마지막 sync 구간을 잃을 수 있다. 대안 ② close만 하고 정리는 reaper에 맡긴다.
+4. **NFR-008 수치:** §18.6 표.
+5. **핸들 형태:** 초기 스케치 `pose.try_log(&msg)` 대신 `writer.try_log(pose, &msg)`(thread당 Writer 하나). 이유는 producer가 thread당 하나인 `!Sync` FIFO이기 때문이다.

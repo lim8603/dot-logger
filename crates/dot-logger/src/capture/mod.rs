@@ -33,7 +33,7 @@ struct QueuedRecord {
     raw: Option<SlotIdentity>,
 }
 
-struct WriteState {
+pub(crate) struct WriteState {
     records: rtrb::Producer<QueuedRecord>,
     bytes: rtrb::Producer<u8>,
     sequence: u64,
@@ -42,7 +42,7 @@ struct WriteState {
     sampling: Box<[u32]>,
 }
 
-struct ReadState {
+pub(crate) struct ReadState {
     records: rtrb::Consumer<QueuedRecord>,
     bytes: rtrb::Consumer<u8>,
     normal_consumed: usize,
@@ -50,21 +50,25 @@ struct ReadState {
     last_sequence: u64,
 }
 
+/// Producer state shared by its RT writer and management consumer.
 struct Entry {
-    write: WriteState,
-    read: ReadState,
     consumed: AtomicUsize,
     slot_bytes: usize,
     normal_limit: usize,
     raw: Option<RawPool>,
 }
 
-/// Owns preallocated small/raw ingress and its fixed registration metadata.
-///
-/// Allocate and drop on a management thread. The application must supply a new
-/// session ID on restart. Targets, completion windows, workers, and
-/// durability are not instantiated by `new`; `new_tracked` adds completion metadata.
-pub struct CaptureOwner {
+/// Unique per-producer queue endpoints. Kept apart from [`CaptureCore`] so an
+/// owning facade can move one writer endpoint to an application thread while
+/// the shared registration stays behind one management-held `Arc`.
+struct Endpoint {
+    write: WriteState,
+    read: ReadState,
+}
+
+/// Immutable-after-start registration and shared producer state. Every borrowed
+/// handle is a view over this core plus exactly one endpoint.
+pub(crate) struct CaptureCore {
     entries: Box<[Entry]>,
     channels: Box<[ChannelConfig]>,
     closing: AtomicBool,
@@ -78,6 +82,17 @@ pub struct CaptureOwner {
     telemetry: Option<Box<crate::telemetry::Bank>>,
     telemetry_epoch: u64,
     updates: Option<Box<crate::control::config_update::State>>,
+}
+
+/// Owns preallocated small/raw ingress and its fixed registration metadata.
+///
+/// Allocate and drop on a management thread. The application must supply a new
+/// session ID on restart. Targets, completion windows, workers, and
+/// durability are not instantiated by `new`; `new_tracked` adds completion metadata.
+pub struct CaptureOwner {
+    // Endpoints first: queue endpoints are released before shared registration.
+    endpoints: Box<[Endpoint]>,
+    core: CaptureCore,
 }
 
 impl CaptureOwner {
@@ -112,23 +127,7 @@ impl CaptureOwner {
         let mut raw_reserved_bytes = 0usize;
         let mut raw_metadata_bytes = 0usize;
         for producer in &config.producers {
-            let slots = producer.small.slots;
-            let bytes = slots
-                .checked_mul(producer.small.slot_bytes)
-                .ok_or_else(overflow)?;
-            // rtrb uses positions in 0..2*capacity; Vec uses an isize-sized layout.
-            if slots > isize::MAX as usize / size_of::<QueuedRecord>()
-                || bytes > isize::MAX as usize
-            {
-                return Err(overflow());
-            }
-            let entry_bytes = slots
-                .checked_mul(size_of::<QueuedRecord>())
-                .and_then(|n| n.checked_add(bytes))
-                .and_then(|n| n.checked_add(size_of::<Entry>()))
-                .and_then(|n| n.checked_add(size_of::<rtrb::RingBuffer<QueuedRecord>>()))
-                .and_then(|n| n.checked_add(size_of::<rtrb::RingBuffer<u8>>()))
-                .ok_or_else(overflow)?;
+            let entry_bytes = Self::input_entry_bytes(&producer.small).ok_or_else(overflow)?;
             input_reserved_bytes = input_reserved_bytes
                 .checked_add(entry_bytes)
                 .ok_or_else(overflow)?;
@@ -197,6 +196,7 @@ impl CaptureOwner {
             payload_len: 0,
         };
         let mut entries = Vec::with_capacity(config.producers.len());
+        let mut endpoints = Vec::with_capacity(config.producers.len());
         for producer in &config.producers {
             let quota = &producer.small;
             let (record_write, record_read) = warm_ring(
@@ -207,7 +207,7 @@ impl CaptureOwner {
                 },
             )?;
             let (byte_write, byte_read) = warm_ring(quota.slots * quota.slot_bytes, 0u8)?;
-            entries.push(Entry {
+            endpoints.push(Endpoint {
                 write: WriteState {
                     records: record_write,
                     bytes: byte_write,
@@ -223,6 +223,8 @@ impl CaptureOwner {
                     reclaim_cursor: 0,
                     last_sequence: 0,
                 },
+            });
+            entries.push(Entry {
                 consumed: AtomicUsize::new(0),
                 slot_bytes: quota.slot_bytes,
                 normal_limit: match config.importance {
@@ -234,20 +236,43 @@ impl CaptureOwner {
         }
         let entries = entries.into_boxed_slice();
         Ok(Self {
-            entries,
-            channels: channels.into(),
-            closing: AtomicBool::new(false),
-            session_id,
-            revision,
-            input_reserved_bytes,
-            raw_reserved_bytes,
-            control_reserved_bytes: control_bytes,
-            completion: None,
-            memory: config.memory.clone(),
-            telemetry: None,
-            telemetry_epoch: 0,
-            updates: None,
+            endpoints: endpoints.into_boxed_slice(),
+            core: CaptureCore {
+                entries,
+                channels: channels.into(),
+                closing: AtomicBool::new(false),
+                session_id,
+                revision,
+                input_reserved_bytes,
+                raw_reserved_bytes,
+                control_reserved_bytes: control_bytes,
+                completion: None,
+                memory: config.memory.clone(),
+                telemetry: None,
+                telemetry_epoch: 0,
+                updates: None,
+            },
         })
+    }
+
+    /// Concrete input reservation of one producer's small ingress: payload bytes,
+    /// envelopes, shared entry, endpoints and rtrb descriptors. `None` on overflow
+    /// or a layout rtrb/Vec cannot represent. Shared with the facade sizing rule so
+    /// the derived budget and the actual reservation cannot diverge.
+    pub(crate) fn input_entry_bytes(small: &crate::config::PoolQuota) -> Option<usize> {
+        let slots = small.slots;
+        let bytes = slots.checked_mul(small.slot_bytes)?;
+        // rtrb uses positions in 0..2*capacity; Vec uses an isize-sized layout.
+        if slots > isize::MAX as usize / size_of::<QueuedRecord>() || bytes > isize::MAX as usize {
+            return None;
+        }
+        slots
+            .checked_mul(size_of::<QueuedRecord>())?
+            .checked_add(bytes)?
+            .checked_add(size_of::<Entry>())?
+            .checked_add(size_of::<Endpoint>())?
+            .checked_add(size_of::<rtrb::RingBuffer<QueuedRecord>>())?
+            .checked_add(size_of::<rtrb::RingBuffer<u8>>())
     }
 
     /// Construct ingress with preallocated completion admission windows and a
@@ -262,7 +287,7 @@ impl CaptureOwner {
         config: CompletionConfig,
     ) -> Result<Self, CaptureBuildError> {
         let mut owner = Self::new(plan, session_id, revision, channels)?;
-        let available = plan.config().memory.control_bytes - owner.control_reserved_bytes;
+        let available = plan.config().memory.control_bytes - owner.core.control_reserved_bytes;
         let registry = Registry::new(
             session_id,
             revision,
@@ -276,8 +301,8 @@ impl CaptureOwner {
             CompletionError::Config(error) => CaptureBuildError::Config(error),
             _ => CaptureBuildError::InvalidCompletion,
         })?;
-        owner.control_reserved_bytes += registry.reserved();
-        owner.completion = Some(Box::new(registry));
+        owner.core.control_reserved_bytes += registry.reserved();
+        owner.core.completion = Some(Box::new(registry));
         Ok(owner)
     }
 
@@ -288,113 +313,113 @@ impl CaptureOwner {
         routing: &RoutingConfig,
     ) -> Result<(), crate::control::config_update::ConfigUpdateError> {
         use crate::control::config_update::{ConfigUpdateError, State};
-        let registry = self
+        let core = &mut self.core;
+        let registry = core
             .completion
             .as_deref()
             .ok_or(ConfigUpdateError::Untracked)?;
         if !registry.matches(routing) {
             return Err(ConfigUpdateError::Untracked);
         }
-        if self.updates.is_some() {
+        if core.updates.is_some() {
             return Ok(());
         }
         let state = State::new(
-            &self.channels,
-            self.entries.len(),
+            &core.channels,
+            core.entries.len(),
             routing,
-            &self.memory,
-            self.revision,
-            self.memory.control_bytes - self.control_reserved_bytes,
+            &core.memory,
+            core.revision,
+            core.memory.control_bytes - core.control_reserved_bytes,
         )?;
-        for (id, entry) in self.entries.iter().enumerate() {
-            state.consumed(id as u32, entry.read.last_sequence);
+        for (id, endpoint) in self.endpoints.iter().enumerate() {
+            state.consumed(id as u32, endpoint.read.last_sequence);
         }
-        self.control_reserved_bytes += state.reserved();
-        self.updates = Some(Box::new(state));
+        core.control_reserved_bytes += state.reserved();
+        core.updates = Some(Box::new(state));
         Ok(())
     }
 
     /// Borrow management completion metadata; absent for untracked ingress.
     pub fn completion(&self) -> Option<Completion<'_>> {
-        self.completion
-            .as_ref()
-            .map(|registry| Completion { registry })
+        self.core.completion()
     }
 
     /// Preallocate fixed counters and 301 one-second samples in the remaining
     /// control budget. Explicit opt-in; call before lending any RT handles.
     pub fn enable_telemetry(&mut self) -> Result<(), CaptureBuildError> {
-        if self.telemetry.is_some() {
+        let core = &mut self.core;
+        if core.telemetry.is_some() {
             return Ok(());
         }
         let overflow = || CaptureBuildError::Config(ConfigError::ArithmeticOverflow);
-        let epoch = self.telemetry_epoch.checked_add(1).ok_or_else(overflow)?;
-        let bytes = crate::telemetry::Bank::required(self.entries.len()).ok_or_else(overflow)?;
-        let required = self
+        let epoch = core.telemetry_epoch.checked_add(1).ok_or_else(overflow)?;
+        let bytes = crate::telemetry::Bank::required(core.entries.len()).ok_or_else(overflow)?;
+        let required = core
             .control_reserved_bytes
             .checked_add(bytes)
             .ok_or_else(overflow)?;
-        if required > self.memory.control_bytes {
+        if required > core.memory.control_bytes {
             return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
                 resource: Resource::Control,
                 required,
-                available: self.memory.control_bytes,
+                available: core.memory.control_bytes,
             }));
         }
-        self.telemetry = Some(Box::new(crate::telemetry::Bank::new(
-            self.entries.len(),
+        core.telemetry = Some(Box::new(crate::telemetry::Bank::new(
+            core.entries.len(),
             epoch,
         )));
-        self.control_reserved_bytes = required;
-        self.telemetry_epoch = epoch;
+        core.control_reserved_bytes = required;
+        core.telemetry_epoch = epoch;
         Ok(())
     }
     /// Explicit management reset after capture/telemetry borrows have ended.
     /// Clears counter history without resetting capture receipt sequences.
     pub fn reset_telemetry(&mut self) -> Result<(), crate::telemetry::TelemetryError> {
         use crate::telemetry::TelemetryError;
-        let bank = self.telemetry.as_mut().ok_or(TelemetryError::Disabled)?;
-        let epoch = self
+        let core = &mut self.core;
+        let bank = core.telemetry.as_mut().ok_or(TelemetryError::Disabled)?;
+        let epoch = core
             .telemetry_epoch
             .checked_add(1)
             .ok_or(TelemetryError::EpochExhausted)?;
         bank.reset(epoch);
-        self.telemetry_epoch = epoch;
+        core.telemetry_epoch = epoch;
         Ok(())
     }
     /// Fixed management observations, absent until explicit enable.
     pub fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'_>> {
-        self.telemetry
-            .as_deref()
-            .map(|bank| crate::telemetry::Telemetry {
-                bank,
-                session: self.session_id,
-                revision: self.revision,
-                updates: self.config_updates(),
-            })
-    }
-
-    fn config_updates(&self) -> Option<crate::control::config_update::ConfigUpdates<'_>> {
-        Some(crate::control::config_update::ConfigUpdates {
-            state: self.updates.as_deref()?,
-            registry: self.completion.as_deref()?,
-            closing: &self.closing,
-        })
+        self.core.telemetry()
     }
 
     /// Bytes reserved for concrete input arrays, queue descriptors, and endpoints.
     pub fn input_reserved_bytes(&self) -> usize {
-        self.input_reserved_bytes
+        self.core.input_reserved_bytes
     }
 
     /// Physical original-payload storage, counted once including unused slots.
     pub fn raw_reserved_bytes(&self) -> usize {
-        self.raw_reserved_bytes
+        self.core.raw_reserved_bytes
     }
 
     /// Concrete owner, channel, and original-slot metadata reservation.
     pub fn control_reserved_bytes(&self) -> usize {
-        self.control_reserved_bytes
+        self.core.control_reserved_bytes
+    }
+
+    /// Split into the shared registration and its unique endpoints, in producer
+    /// ID order. The caller must keep `core` alive until every endpoint and every
+    /// view built from them is gone, and must drop all of them on a management
+    /// thread (ADR-012 §3).
+    pub(crate) fn into_parts(self) -> (CaptureCore, Vec<WriteState>, Vec<ReadState>) {
+        let (writes, reads) = self
+            .endpoints
+            .into_vec()
+            .into_iter()
+            .map(|Endpoint { write, read }| (write, read))
+            .unzip();
+        (self.core, writes, reads)
     }
 
     /// Lend unique producer/consumer pairs without moving their owning endpoints.
@@ -422,19 +447,102 @@ impl CaptureOwner {
     /// ```
     pub fn scope<R>(&mut self, callback: impl FnOnce(CaptureScope<'_>) -> R) -> R {
         callback(CaptureScope {
-            entries: self.entries.iter_mut().enumerate(),
+            core: &self.core,
+            endpoints: self.endpoints.iter_mut().enumerate(),
+        })
+    }
+}
+
+impl CaptureCore {
+    /// Number of producers, equal to the endpoint count.
+    pub(crate) fn producers(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Session identity shared by every receipt of this core.
+    pub(crate) fn session_id(&self) -> u128 {
+        self.session_id
+    }
+
+    /// RT view over one producer endpoint. Copies references only: no
+    /// allocation, atomic read-modify-write or reference-count change.
+    pub(crate) fn producer<'a>(&'a self, id: usize, write: &'a mut WriteState) -> Producer<'a> {
+        let entry = &self.entries[id];
+        Producer {
+            write,
+            consumed: &entry.consumed,
             channels: &self.channels,
             closing: &self.closing,
+            slot_bytes: entry.slot_bytes,
+            normal_limit: entry.normal_limit,
             session_id: self.session_id,
-            revision: self.revision,
-            completion: self
-                .completion
-                .as_ref()
-                .map(|registry| Completion { registry }),
-            control_reserved_bytes: self.control_reserved_bytes,
-            memory: &self.memory,
-            telemetry: self.telemetry.as_deref(),
+            producer_id: id as u32,
+            revision: self
+                .updates
+                .as_deref()
+                .map_or(self.revision, |u| u.applied(id)),
+            raw: entry.raw.as_ref(),
+            completion: self.completion(),
+            telemetry: self.telemetry.as_deref().map(|bank| &bank.cells[id]),
             updates: self.updates.as_deref(),
+        }
+    }
+
+    /// Management view over one producer's consumer endpoint.
+    pub(crate) fn consumer<'a>(
+        &'a self,
+        id: usize,
+        read: &'a mut ReadState,
+    ) -> CaptureConsumer<'a> {
+        let entry = &self.entries[id];
+        CaptureConsumer {
+            read,
+            consumed: &entry.consumed,
+            raw: entry.raw.as_ref(),
+            completion: self.completion(),
+            memory: &self.memory,
+            slot_bytes: entry.slot_bytes,
+            channels: &self.channels,
+            session_id: self.session_id,
+            producer_id: id as u32,
+            revision: self.revision,
+            updates: self.updates.as_deref(),
+        }
+    }
+
+    pub(crate) fn completion(&self) -> Option<Completion<'_>> {
+        self.completion
+            .as_ref()
+            .map(|registry| Completion { registry })
+    }
+
+    pub(crate) fn control(&self) -> CaptureControl<'_> {
+        CaptureControl {
+            closing: &self.closing,
+            completion: self.completion(),
+            reserved: self.control_reserved_bytes,
+            memory: &self.memory,
+        }
+    }
+
+    pub(crate) fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'_>> {
+        self.telemetry
+            .as_deref()
+            .map(|bank| crate::telemetry::Telemetry {
+                bank,
+                session: self.session_id,
+                revision: self.revision,
+                updates: self.config_updates(),
+            })
+    }
+
+    pub(crate) fn config_updates(
+        &self,
+    ) -> Option<crate::control::config_update::ConfigUpdates<'_>> {
+        Some(crate::control::config_update::ConfigUpdates {
+            state: self.updates.as_deref()?,
+            registry: self.completion.as_deref()?,
+            closing: &self.closing,
         })
     }
 }
@@ -457,49 +565,27 @@ fn warm_ring<T: Copy>(
 
 /// Management-created iterator over uniquely borrowed producer/consumer pairs.
 pub struct CaptureScope<'owner> {
-    entries: std::iter::Enumerate<std::slice::IterMut<'owner, Entry>>,
-    channels: &'owner [ChannelConfig],
-    closing: &'owner AtomicBool,
-    session_id: u128,
-    revision: u64,
-    completion: Option<Completion<'owner>>,
-    control_reserved_bytes: usize,
-    memory: &'owner MemoryBudget,
-    telemetry: Option<&'owner crate::telemetry::Bank>,
-    updates: Option<&'owner crate::control::config_update::State>,
+    core: &'owner CaptureCore,
+    endpoints: std::iter::Enumerate<std::slice::IterMut<'owner, Endpoint>>,
 }
 
 impl<'owner> CaptureScope<'owner> {
     /// Management observations sharing this scope's immutable registration.
     pub fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'owner>> {
-        self.telemetry.map(|bank| crate::telemetry::Telemetry {
-            bank,
-            session: self.session_id,
-            revision: self.revision,
-            updates: self.config_updates(),
-        })
+        self.core.telemetry()
     }
     /// Management publication handle, absent until explicit preallocation.
     pub fn config_updates(&self) -> Option<crate::control::config_update::ConfigUpdates<'owner>> {
-        Some(crate::control::config_update::ConfigUpdates {
-            state: self.updates?,
-            registry: self.completion?.registry,
-            closing: self.closing,
-        })
+        self.core.config_updates()
     }
     /// Management completion handle sharing the fixed capture registration.
     pub fn completion(&self) -> Option<Completion<'owner>> {
-        self.completion
+        self.core.completion()
     }
 
     /// Borrow the ingress close flag for a management thread.
     pub fn control(&self) -> CaptureControl<'owner> {
-        CaptureControl {
-            closing: self.closing,
-            completion: self.completion,
-            reserved: self.control_reserved_bytes,
-            memory: self.memory,
-        }
+        self.core.control()
     }
 }
 
@@ -507,37 +593,9 @@ impl<'owner> Iterator for CaptureScope<'owner> {
     type Item = (Producer<'owner>, CaptureConsumer<'owner>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.entries.next().map(|(id, entry)| {
-            (
-                Producer {
-                    write: &mut entry.write,
-                    consumed: &entry.consumed,
-                    channels: self.channels,
-                    closing: self.closing,
-                    slot_bytes: entry.slot_bytes,
-                    normal_limit: entry.normal_limit,
-                    session_id: self.session_id,
-                    producer_id: id as u32,
-                    revision: self.updates.map_or(self.revision, |u| u.applied(id)),
-                    raw: entry.raw.as_ref(),
-                    completion: self.completion,
-                    telemetry: self.telemetry.map(|bank| &bank.cells[id]),
-                    updates: self.updates,
-                },
-                CaptureConsumer {
-                    read: &mut entry.read,
-                    consumed: &entry.consumed,
-                    raw: entry.raw.as_ref(),
-                    completion: self.completion,
-                    memory: self.memory,
-                    slot_bytes: entry.slot_bytes,
-                    channels: self.channels,
-                    session_id: self.session_id,
-                    producer_id: id as u32,
-                    revision: self.revision,
-                    updates: self.updates,
-                },
-            )
+        let core = self.core;
+        self.endpoints.next().map(|(id, Endpoint { write, read })| {
+            (core.producer(id, write), core.consumer(id, read))
         })
     }
 }

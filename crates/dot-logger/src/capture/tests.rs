@@ -17,10 +17,10 @@ fn metadata() -> RecordMetadata {
     }
 }
 
-fn entry() -> Entry {
+fn entry() -> (Entry, Endpoint) {
     let (record_write, record_read) = rtrb::RingBuffer::new(1);
     let (byte_write, byte_read) = rtrb::RingBuffer::new(1);
-    Entry {
+    let endpoint = Endpoint {
         write: WriteState {
             records: record_write,
             bytes: byte_write,
@@ -36,35 +36,41 @@ fn entry() -> Entry {
             reclaim_cursor: 0,
             last_sequence: 0,
         },
+    };
+    let entry = Entry {
         consumed: AtomicUsize::new(0),
         slot_bytes: 1,
         normal_limit: 1,
         raw: None,
-    }
+    };
+    (entry, endpoint)
 }
 
-fn owner(entry: Entry) -> CaptureOwner {
+fn owner((entry, endpoint): (Entry, Endpoint)) -> CaptureOwner {
     CaptureOwner {
-        entries: vec![entry].into_boxed_slice(),
-        channels: vec![ChannelConfig::new(1, 2, 1)].into_boxed_slice(),
-        closing: AtomicBool::new(false),
-        session_id: 3,
-        revision: 4,
-        input_reserved_bytes: 0,
-        raw_reserved_bytes: 0,
-        control_reserved_bytes: 0,
-        completion: None,
-        telemetry: None,
-        telemetry_epoch: 0,
-        updates: None,
-        memory: crate::config::MemoryBudget {
-            total_bytes: 0,
-            input_bytes: 0,
-            raw_bytes: 0,
-            output_bytes: 0,
-            external_bytes: 0,
-            control_bytes: 0,
-            worker_bytes: 0,
+        endpoints: vec![endpoint].into_boxed_slice(),
+        core: CaptureCore {
+            entries: vec![entry].into_boxed_slice(),
+            channels: vec![ChannelConfig::new(1, 2, 1)].into_boxed_slice(),
+            closing: AtomicBool::new(false),
+            session_id: 3,
+            revision: 4,
+            input_reserved_bytes: 0,
+            raw_reserved_bytes: 0,
+            control_reserved_bytes: 0,
+            completion: None,
+            telemetry: None,
+            telemetry_epoch: 0,
+            updates: None,
+            memory: crate::config::MemoryBudget {
+                total_bytes: 0,
+                input_bytes: 0,
+                raw_bytes: 0,
+                output_bytes: 0,
+                external_bytes: 0,
+                control_bytes: 0,
+                worker_bytes: 0,
+            },
         },
     }
 }
@@ -72,7 +78,7 @@ fn owner(entry: Entry) -> CaptureOwner {
 #[test]
 fn sequence_exhaustion_rejects_without_reusing_identity_or_publishing_bytes() {
     let mut entry = entry();
-    entry.write.sequence = u64::MAX - 1;
+    entry.1.write.sequence = u64::MAX - 1;
     let mut owner = owner(entry);
     owner.scope(|mut scope| {
         let (mut producer, mut consumer) = scope.next().unwrap();
@@ -96,9 +102,9 @@ fn sequence_exhaustion_rejects_without_reusing_identity_or_publishing_bytes() {
 #[test]
 fn normal_quota_remains_correct_across_wrapping_occupancy_counters() {
     let mut entry = entry();
-    entry.write.normal_accepted = usize::MAX - 1;
-    entry.read.normal_consumed = usize::MAX - 1;
-    entry.consumed.store(usize::MAX - 1, Ordering::Release);
+    entry.1.write.normal_accepted = usize::MAX - 1;
+    entry.1.read.normal_consumed = usize::MAX - 1;
+    entry.0.consumed.store(usize::MAX - 1, Ordering::Release);
     let mut owner = owner(entry);
     owner.scope(|mut scope| {
         let (mut producer, mut consumer) = scope.next().unwrap();

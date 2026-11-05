@@ -1,0 +1,450 @@
+//! Facade budget inputs and the deterministic rule that derives core configs.
+//!
+//! Loss values (memory, sync period, drop deadline, slot counts, retention) have
+//! no default and must be stated. Performance values (IO threads, batching,
+//! idle wait) default here because a wrong choice changes speed, not loss
+//! (ADR-012 §6).
+
+use std::time::Duration;
+
+use crate::capture::CaptureOwner;
+use crate::completion::{Boundaries, Boundary, CompletionConfig, TargetContract};
+use crate::config::{
+    ImportancePolicy, MemoryBudget, PoolQuota, ProducerQuota, Resource, SessionConfig,
+    WorkerThreadingConfig,
+};
+use crate::control::ControlConfig;
+use crate::platform::Requirement;
+use crate::routing::{Route, RoutingConfig, Schedule, TargetConfig};
+use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfig};
+
+use super::{Missing, StartError};
+
+/// Stack reserved for every facade thread, counted in the worker partition.
+pub(crate) const STACK_BYTES: usize = 2 * 1024 * 1024;
+/// Queued deliveries older than this are dropped; only reachable on an IO stall.
+const MAX_QUEUE_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+const SEGMENT_CEILING: u64 = 256 * 1024 * 1024;
+const SEGMENT_FLOOR: u64 = 8 * 1024 * 1024;
+
+/// Fixed ingress slots of one writer. Slot counts bound how much a burst can
+/// queue before RT admission is rejected, so they are loss values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WriterQuota {
+    /// Small-record slots copied by `try_log`.
+    pub small_slots: usize,
+    /// Largest encoded small record.
+    pub small_slot_bytes: usize,
+    /// Zero-copy original slots lent by `Producer::try_acquire`; zero disables.
+    pub raw_slots: usize,
+    /// Largest original payload.
+    pub raw_slot_bytes: usize,
+}
+
+impl WriterQuota {
+    /// Small records only.
+    pub const fn small(slots: usize, slot_bytes: usize) -> Self {
+        Self {
+            small_slots: slots,
+            small_slot_bytes: slot_bytes,
+            raw_slots: 0,
+            raw_slot_bytes: 0,
+        }
+    }
+
+    /// Add a zero-copy original pool.
+    pub const fn with_raw(mut self, slots: usize, slot_bytes: usize) -> Self {
+        self.raw_slots = slots;
+        self.raw_slot_bytes = slot_bytes;
+        self
+    }
+
+    fn records(&self) -> usize {
+        self.small_slots + self.raw_slots
+    }
+
+    fn payload_bytes(&self) -> usize {
+        self.small_slots * self.small_slot_bytes + self.raw_slots * self.raw_slot_bytes
+    }
+
+    fn producer(&self) -> ProducerQuota {
+        ProducerQuota {
+            small: PoolQuota {
+                slots: self.small_slots,
+                slot_bytes: self.small_slot_bytes,
+                important_slots: 0,
+            },
+            raw: (self.raw_slots > 0).then_some(PoolQuota {
+                slots: self.raw_slots,
+                slot_bytes: self.raw_slot_bytes,
+                important_slots: 0,
+            }),
+        }
+    }
+}
+
+/// Explicit facade budget. Every loss value must be set before `start()`.
+#[derive(Clone, Debug, Default)]
+pub struct Budget {
+    memory_bytes: Option<usize>,
+    sync_every: Option<Duration>,
+    drop_deadline: Option<Duration>,
+    writer_quota: Option<WriterQuota>,
+    io_threads: usize,
+    batch_records: usize,
+    batch_wait: Duration,
+    idle_wait: Duration,
+}
+
+impl Budget {
+    /// Empty budget: loss values unset, performance values at facade defaults
+    /// (one IO thread, 256-record batches held at most 10 ms, 1 ms idle wait).
+    pub fn new() -> Self {
+        Self {
+            io_threads: 1,
+            batch_records: 256,
+            batch_wait: Duration::from_millis(10),
+            idle_wait: Duration::from_millis(1),
+            ..Self::default()
+        }
+    }
+    /// Total logger memory; the facade splits it into the core partitions.
+    pub fn memory_bytes(mut self, bytes: usize) -> Self {
+        self.memory_bytes = Some(bytes);
+        self
+    }
+    /// Period of the ordinary file synchronization barrier. Records accepted
+    /// after the last barrier can be lost on power failure.
+    pub fn sync_every(mut self, period: Duration) -> Self {
+        self.sync_every = Some(period);
+        self
+    }
+    /// Bounded shutdown performed when a `Logger` is dropped without `shutdown`.
+    pub fn drop_deadline(mut self, deadline: Duration) -> Self {
+        self.drop_deadline = Some(deadline);
+        self
+    }
+    /// Default quota for writers declared without one.
+    pub fn writer_quota(mut self, quota: WriterQuota) -> Self {
+        self.writer_quota = Some(quota);
+        self
+    }
+    /// File IO threads; targets are assigned round-robin. Default 1.
+    pub fn io_threads(mut self, threads: usize) -> Self {
+        self.io_threads = threads;
+        self
+    }
+    /// Largest write batch and longest hold before flushing it.
+    pub fn batching(mut self, records: usize, wait: Duration) -> Self {
+        self.batch_records = records;
+        self.batch_wait = wait;
+        self
+    }
+    /// Longest sleep of an idle worker. RT writers never wake workers.
+    pub fn idle_wait(mut self, wait: Duration) -> Self {
+        self.idle_wait = wait;
+        self
+    }
+}
+
+/// File retention policy of one output directory.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Retention {
+    mode: RetentionMode,
+    bytes: u64,
+    reserve: u64,
+}
+
+impl Retention {
+    /// Delete the oldest closed files to stay within `bytes`.
+    pub const fn ring(bytes: u64) -> Self {
+        Self {
+            mode: RetentionMode::Circular,
+            bytes,
+            reserve: 0,
+        }
+    }
+    /// Stop recording (reject at the file stage) once `bytes` are used.
+    pub const fn continuous(bytes: u64) -> Self {
+        Self {
+            mode: RetentionMode::Continuous,
+            bytes,
+            reserve: 0,
+        }
+    }
+    /// Filesystem free bytes that must remain untouched. Default 0.
+    pub const fn reserve(mut self, bytes: u64) -> Self {
+        self.reserve = bytes;
+        self
+    }
+}
+
+/// Facade performance settings resolved from a [`Budget`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Tuning {
+    pub(crate) sync_every: Duration,
+    pub(crate) drop_deadline: Duration,
+    pub(crate) io_threads: usize,
+    pub(crate) batch_records: usize,
+    pub(crate) batch_wait: Duration,
+    pub(crate) idle_wait: Duration,
+}
+
+/// Every core configuration the default worker needs.
+pub(crate) struct Derived {
+    pub(crate) session: SessionConfig,
+    pub(crate) routing: RoutingConfig,
+    pub(crate) completion: CompletionConfig,
+    pub(crate) control: ControlConfig,
+    pub(crate) writer: WriterConfig,
+    pub(crate) retention: Vec<RetentionConfig>,
+    pub(crate) tuning: Tuning,
+}
+
+/// Loss values absent from `budget`, in a fixed order.
+pub(crate) fn missing(budget: &Budget, quotas: &[Option<WriterQuota>]) -> Vec<Missing> {
+    let mut missing = Vec::new();
+    if budget.memory_bytes.is_none() {
+        missing.push(Missing::Memory);
+    }
+    if budget.sync_every.is_none() {
+        missing.push(Missing::SyncEvery);
+    }
+    if budget.drop_deadline.is_none() {
+        missing.push(Missing::DropDeadline);
+    }
+    if budget.writer_quota.is_none() && quotas.iter().any(Option::is_none) {
+        missing.push(Missing::WriterQuota);
+    }
+    missing
+}
+
+fn budget_error(resource: Resource, required: usize, available: usize) -> StartError {
+    StartError::Budget {
+        resource,
+        required,
+        available,
+    }
+}
+
+/// Deterministic derivation; see API §18.2. All counts follow from the quotas.
+pub(crate) fn derive(
+    budget: &Budget,
+    quotas: &[Option<WriterQuota>],
+    channels: &[StorageChannel],
+    retention: &[Retention],
+) -> Result<Derived, StartError> {
+    let (Some(total), Some(sync_every), Some(drop_deadline)) =
+        (budget.memory_bytes, budget.sync_every, budget.drop_deadline)
+    else {
+        return Err(StartError::Missing(missing(budget, quotas)));
+    };
+    let quotas: Vec<WriterQuota> = quotas
+        .iter()
+        .map(|q| q.or(budget.writer_quota))
+        .collect::<Option<_>>()
+        .ok_or_else(|| StartError::Missing(vec![Missing::WriterQuota]))?;
+    if sync_every.is_zero()
+        || budget.io_threads == 0
+        || budget.batch_records == 0
+        || quotas.iter().any(|q| {
+            q.small_slots == 0
+                || q.small_slot_bytes == 0
+                || (q.raw_slots > 0) != (q.raw_slot_bytes > 0)
+        })
+    {
+        return Err(StartError::InvalidBudget);
+    }
+    let overflow = || StartError::InvalidBudget;
+    let producers: Vec<ProducerQuota> = quotas.iter().map(WriterQuota::producer).collect();
+
+    // Memory: exact raw and input, worker stacks, then a fixed control/output split.
+    let mut raw = 0usize;
+    let mut input = 0usize;
+    for p in &producers {
+        input = input
+            .checked_add(CaptureOwner::input_entry_bytes(&p.small).ok_or_else(overflow)?)
+            .ok_or_else(overflow)?;
+        if let Some(r) = &p.raw {
+            raw = raw
+                .checked_add(r.slots.checked_mul(r.slot_bytes).ok_or_else(overflow)?)
+                .ok_or_else(overflow)?;
+        }
+    }
+    let threads = budget.io_threads.checked_add(1).ok_or_else(overflow)?;
+    let worker = threads.checked_mul(STACK_BYTES).ok_or_else(overflow)?;
+    let fixed = raw
+        .checked_add(input)
+        .and_then(|n| n.checked_add(worker))
+        .ok_or_else(overflow)?;
+    if fixed >= total {
+        return Err(budget_error(Resource::Total, fixed + 1, total));
+    }
+    let rest = total - fixed;
+    let control = rest / 4;
+    let memory = MemoryBudget {
+        total_bytes: total,
+        input_bytes: input,
+        raw_bytes: raw,
+        output_bytes: rest - control,
+        external_bytes: 0,
+        control_bytes: control,
+        worker_bytes: worker,
+    };
+    let session = SessionConfig {
+        memory,
+        producers,
+        importance: ImportancePolicy::PrioritizeImportant,
+        workers: WorkerThreadingConfig {
+            count: threads,
+            stack_bytes: STACK_BYTES,
+            cpu_ids: Vec::new(),
+            affinity: Requirement::Optional,
+        },
+        capabilities: Vec::new(),
+    };
+
+    // Routing: the shared record budget saturates before any target queue, so
+    // overload backpressures into ingress and appears as RT Capacity rejection,
+    // never as a silent required-target drop.
+    let records: usize = quotas.iter().map(WriterQuota::records).sum();
+    let bytes: usize = quotas.iter().map(WriterQuota::payload_bytes).sum();
+    let small_copy: usize = quotas
+        .iter()
+        .map(|q| q.small_slots * q.small_slot_bytes)
+        .sum();
+    let max_payload = quotas
+        .iter()
+        .map(|q| q.small_slot_bytes.max(q.raw_slot_bytes))
+        .max()
+        .ok_or(StartError::InvalidBudget)?;
+    let per_writer = quotas
+        .iter()
+        .map(WriterQuota::records)
+        .max()
+        .ok_or(StartError::InvalidBudget)?;
+    let max_raw = quotas.iter().map(|q| q.raw_slots).max().unwrap_or(0).max(1);
+    let targets: Vec<u32> = (1..=retention.len() as u32).collect();
+    let routing = RoutingConfig {
+        targets: targets
+            .iter()
+            .map(|&id| TargetConfig {
+                id,
+                required: true,
+                queue_slots: records,
+                pending_slots: 0,
+                retained_bytes: bytes,
+                max_attempts: 1,
+                max_age: MAX_QUEUE_AGE,
+            })
+            .collect(),
+        routes: channels
+            .iter()
+            .map(|c| Route {
+                channel_id: c.channel.channel_id,
+                targets: targets.clone(),
+            })
+            .collect(),
+        shared_records: records,
+        small_copy_bytes: small_copy,
+        schedule: Schedule {
+            record_quantum: per_writer,
+            byte_quantum: bytes.max(max_payload),
+            records_per_turn: records,
+            bytes_per_turn: bytes.max(max_payload),
+            retries_per_target: 1,
+            reclaim_slots_per_producer: max_raw,
+        },
+    };
+
+    // Completion ends at Written; durability comes from the sync barriers, so
+    // the window only spans records between admission and the file write.
+    let window = per_writer.checked_mul(2).ok_or_else(overflow)?;
+    let feedback = records.checked_mul(2).ok_or_else(overflow)?;
+    let reconcile = window.checked_mul(quotas.len()).ok_or_else(overflow)?;
+    let completion = CompletionConfig {
+        history_retention: Duration::from_secs(60),
+        window_records: window,
+        max_queries: 1,
+        page_items: 64,
+        feedback_events: feedback,
+        updates_per_turn: feedback,
+        reconcile_per_turn: reconcile,
+        targets: targets
+            .iter()
+            .map(|&id| TargetContract {
+                id,
+                required: true,
+                supported: Boundaries::FILE,
+                completion: Boundary::Written,
+            })
+            .collect(),
+    };
+    let control = ControlConfig {
+        sync_slots: 1,
+        work_per_poll: reconcile,
+    };
+
+    let metadata: usize = channels
+        .iter()
+        .map(|c| c.topic.len() + c.payload_encoding.len())
+        .sum();
+    let writer = WriterConfig {
+        max_payload_bytes: max_payload,
+        write_buffer_bytes: 64 * 1024,
+        chunk_target_bytes: 256 * 1024,
+        max_records: 16384,
+        max_chunks: 4096,
+        max_metadata_bytes: metadata + 1024,
+    };
+
+    let floor = SEGMENT_FLOOR.max((max_payload as u64).saturating_mul(2) + 1024 * 1024);
+    let retention = retention
+        .iter()
+        .map(|r| {
+            if r.bytes < floor {
+                return Err(StartError::Retention {
+                    required: floor,
+                    available: r.bytes,
+                });
+            }
+            let segment = (r.bytes / 8).clamp(floor, SEGMENT_CEILING.max(floor));
+            Ok(RetentionConfig {
+                mode: r.mode,
+                disk_bytes: r.bytes,
+                disk_reserve_bytes: r.reserve,
+                max_age_ns: u64::MAX,
+                max_segment_bytes: segment,
+                max_segment_ns: 60_000_000_000,
+                max_index_bytes: 4 * 1024 * 1024,
+                protected_bytes: 0,
+                pre_ns: 0,
+                post_ns: 0,
+                max_segments: usize::try_from(r.bytes / segment)
+                    .map_err(|_| StartError::InvalidBudget)?
+                    + 2,
+                max_events: 0,
+                max_pins: 0,
+                max_pin_bytes: 0,
+                max_pin_ns: 0,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(Derived {
+        session,
+        routing,
+        completion,
+        control,
+        writer,
+        retention,
+        tuning: Tuning {
+            sync_every,
+            drop_deadline,
+            io_threads: budget.io_threads.min(targets.len().max(1)),
+            batch_records: budget.batch_records,
+            batch_wait: budget.batch_wait,
+            idle_wait: budget.idle_wait,
+        },
+    })
+}

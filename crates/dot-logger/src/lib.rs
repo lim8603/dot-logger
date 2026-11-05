@@ -35,3 +35,14 @@ pub mod telemetry;
 
 /// Load-free diagnostic plans and caller-driven physical write admission.
 pub mod diagnostics;
+
+/// Default execution layer: builder, default worker and owned writers (ADR-012).
+pub mod logger;
+
+/// Facade types for the common integration path.
+pub mod prelude {
+    pub use crate::logger::{
+        Budget, Channel, EncodeError, LogError, Logged, Logger, Record, Retention, Schema,
+        Shutdown, Writer, WriterQuota,
+    };
+}

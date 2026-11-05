@@ -1547,3 +1547,125 @@ fn power_notification_and_closed_capture_rejection_allocate_and_free_nothing() {
         );
     });
 }
+
+mod facade {
+    //! TC-013 F2/F3: facade RT logging and every Writer drop order (ADR-012 §3).
+    use super::allocator;
+    use dot_logger::capture::Importance;
+    use dot_logger::logger::{
+        Budget, EncodeError, LogError, Logged, Logger, Record, Retention, Schema, Shutdown,
+        WriterQuota,
+    };
+    use std::path::PathBuf;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    struct Sample(u64);
+    impl Record for Sample {
+        const SCHEMA: Schema = Schema::new(0x5341_4d50, 1, "le-u64");
+        fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError> {
+            out.get_mut(..8)
+                .ok_or(EncodeError)?
+                .copy_from_slice(&self.0.to_le_bytes());
+            Ok(8)
+        }
+    }
+
+    struct Temp(PathBuf);
+    impl Temp {
+        fn new(tag: &str) -> Self {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "dot-logger-alloc-{tag}-{}-{nanos}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn logger(dir: &Temp, writers: &[&str]) -> Logger {
+        let mut builder = Logger::builder()
+            .budget(
+                Budget::new()
+                    .memory_bytes(64 << 20)
+                    .sync_every(Duration::from_millis(10))
+                    .drop_deadline(Duration::from_secs(5))
+                    .writer_quota(WriterQuota::small(4, 16).with_raw(2, 64)),
+            )
+            .file_output(&dir.0, Retention::ring(64 << 20))
+            .channel::<Sample>("sample");
+        for name in writers {
+            builder = builder.writer(name);
+        }
+        builder.start().unwrap()
+    }
+
+    #[test]
+    fn f2_try_log_rejections_and_producer_view_never_allocate_or_free() {
+        let dir = Temp::new("f2");
+        let logger = logger(&dir, &["rt"]);
+        let channel = logger.channel::<Sample>("sample").unwrap();
+        let mut writer = logger.take_writer("rt").unwrap();
+        let mut accepted = 0;
+        let mut capacity = 0;
+        let calls = allocator::observe(|| {
+            // Overrun the four small slots without waiting: some records are
+            // accepted, the rest rejected with Capacity, all without the heap.
+            for i in 0..64 {
+                match writer.try_log(channel, &Sample(i)) {
+                    Ok(Logged::Accepted(_)) => accepted += 1,
+                    Err(LogError::Capacity) => capacity += 1,
+                    other => panic!("unexpected {other:?}"),
+                }
+            }
+            let _ = writer.try_log(channel.at(dot_logger::capture::Level::Warn), &Sample(1));
+            let mut producer = writer.producer();
+            if let Ok(loan) = producer.try_acquire(64, Importance::Normal) {
+                drop(loan);
+            }
+        });
+        assert_eq!(calls, (0, 0), "RT facade path touched the allocator");
+        assert!(accepted > 0);
+        assert!(capacity > 0, "the test must exercise rejection");
+        let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+            panic!("shutdown must close");
+        };
+        assert_eq!(report.writers_outstanding, 1);
+        let calls = allocator::observe(|| {
+            assert_eq!(writer.try_log(channel, &Sample(0)), Err(LogError::Closing));
+        });
+        assert_eq!(calls, (0, 0));
+        assert!(report.core.required.complete >= accepted);
+        drop(writer);
+    }
+
+    #[test]
+    fn f3_writer_drop_never_allocates_or_frees_in_any_order() {
+        let dir = Temp::new("f3");
+        let first = logger(&dir, &["running", "after_shutdown"]);
+        // (1) Logger running.
+        let running = first.take_writer("running").unwrap();
+        assert_eq!(allocator::observe(|| drop(running)), (0, 0));
+        // (2) After shutdown returned with this writer still outstanding.
+        let late = first.take_writer("after_shutdown").unwrap();
+        let Shutdown::Closed(report) = first.shutdown(Duration::from_secs(10)).unwrap() else {
+            panic!("shutdown must close");
+        };
+        assert_eq!(report.writers_outstanding, 1);
+        assert!(report.is_success(), "{report:?}");
+        assert_eq!(allocator::observe(|| drop(late)), (0, 0));
+        // (3) After the Logger itself was dropped without explicit shutdown.
+        let second = logger(&dir, &["after_drop"]);
+        let orphan = second.take_writer("after_drop").unwrap();
+        drop(second);
+        assert_eq!(allocator::observe(|| drop(orphan)), (0, 0));
+    }
+}

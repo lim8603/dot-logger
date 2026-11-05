@@ -478,3 +478,13 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 | [REV-039](../05_verification/reviews/REV-039_TASK-020_TRACING_INPUT.md) | TASK-020 S1 일반 로그 입력 자가 점검 | Closed | RV-081 MSRV 예제 수명 수정·EV-040 수락 |
 | [REV-040](../05_verification/reviews/REV-040_TASK-020_PIPELINE.md) | TASK-020 S2 통합 비교 자가 점검 | Closed | RV-082 JSON 출처 식별자 보강·EV-041 수락 |
 | [REV-041](../05_verification/reviews/REV-041_TASK-020_TAIL_SCREEN.md) | TASK-020 S3 화면 구독 불연속 자가 점검 | Closed | RV-083 큰 ID/clock 표기 조치·EV-042 수락 |
+
+## #022 — 2026-11-05 #001 최근 이력 하베스트(최대 3세션 유지)
+
+- 2026-11-03 #002: TASK-016 운영 backend(status·apply·compare)에 대한 독립 코드리뷰([REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 권고 3건: rustdoc #Errors 명시, Debug derive, 스냅샷 정렬 계약)
+- 2026-11-03 #001: 운영 backend(status 지표·ApplyConfig·Compare, 새 오류 3종) EV-044/REV-044 로컬 수락(소스 a738ebf). GAP-008 사전 존재 불안정 시험 등록.
+- 2026-11-03 #001: REV-043 RV-086/087 rustdoc 보강(소스 9cbbfb8)·검증 후 Closed, 미처리 리뷰 없음 — [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md).
+- 2026-11-02 #002: TASK-021 UPS 긴급 계획·모의 시험에 대한 독립 코드리뷰([REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 문서 권고 2건)
+- 2026-11-02 #001: TASK-020 S3 화면 예제·TASK-021 UPS 시뮬레이션을 EV-042/043·REV-041/042로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-02_001.md).
+- 2026-11-01 #015: TASK-020 S2 실제 파일/DB/구독·명시 설정 비교 예제를 EV-041/REV-040으로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_015.md).
+- 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md).

@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-05 / #001 / AI |
-| 세션 상태 | 진행 — TASK-027 S1 승인·S2 로컬 Pass(EV-047). 다음 S3 |
+| 세션 상태 | 종료 — 2026-11-05 #001 Human 요청. 다음 TASK-027 S3 또는 TASK-023 S2 선택 |
 | 최근 세션 | [2026-11-05 #001](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md) — TASK-027 S1 승인·S2 facade 구현 |
 
 ## 현재 결정과 제약
@@ -173,19 +173,5 @@
 - 2026-11-03 #003: TASK-023 S1 P0 기준선 harness·판정 규칙·합성 제어 루프(EV-046, 소스 3740671). `/data/build` 여유 부족은 Human 승인으로 build cache(target/debug·gate-target) 정리해 472.9GB 회복.
 - 2026-11-03 #003: GAP-008 원인(hyper HTTP/2 stream task의 hub handle 지연 해제)을 확인하고 serve drain 대기로 수정(EV-045, 소스 13523f1), Closed.
 - 2026-11-03 #003: REV-045 RV-091~093 수용·조치(소스 497149b: `# Errors` rustdoc·Debug·status snapshots ID 오름차순)·회귀 Pass, Closed.
-- 2026-11-03 #002: TASK-016 운영 backend(status·apply·compare)에 대한 독립 코드리뷰([REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 권고 3건: rustdoc #Errors 명시, Debug derive, 스냅샷 정렬 계약)
-- 2026-11-03 #001: 운영 backend(status 지표·ApplyConfig·Compare, 새 오류 3종) EV-044/REV-044 로컬 수락(소스 a738ebf). GAP-008 사전 존재 불안정 시험 등록.
-- 2026-11-03 #001: REV-043 RV-086/087 rustdoc 보강(소스 9cbbfb8)·검증 후 Closed, 미처리 리뷰 없음 — [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md).
 
-- 2026-11-02 #002: TASK-021 UPS 긴급 계획·모의 시험에 대한 독립 코드리뷰([REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 문서 권고 2건)
-
-- 2026-11-02 #001: TASK-020 S3 화면 예제·TASK-021 UPS 시뮬레이션을 EV-042/043·REV-041/042로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-02_001.md).
-
-- 2026-11-01 #015: TASK-020 S2 실제 파일/DB/구독·명시 설정 비교 예제를 EV-041/REV-040으로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_015.md).
-
-- 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md).
-
-
-
-
-R1/R2 이관 원문은 [상태 아카이브](state_archive.md)의 #020/021을 따른다. 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.
+2026-11-03 #001~#002와 그 이전 이력은 [상태 아카이브](state_archive.md) #022로 옮겼다. R1/R2 이관 원문은 [상태 아카이브](state_archive.md)의 #020/021을 따른다. 이전 완료 이력과 게시/승인 상세는 [상태 아카이브](state_archive.md)·관련 Task/EV·세션 로그를 따른다.

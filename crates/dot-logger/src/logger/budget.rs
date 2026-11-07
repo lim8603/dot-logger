@@ -8,17 +8,22 @@
 use std::time::Duration;
 
 use crate::capture::CaptureOwner;
+use crate::completion::Registry;
 use crate::completion::{Boundaries, Boundary, CompletionConfig, TargetContract};
 use crate::config::{
     ImportancePolicy, MemoryBudget, PoolQuota, ProducerQuota, Resource, SessionConfig,
     WorkerThreadingConfig,
 };
 use crate::control::ControlConfig;
+use crate::control::ControlOwner;
 #[cfg(not(target_os = "linux"))]
 use crate::platform::CapabilityStatus;
 use crate::platform::{PlatformCapabilities, Requirement};
+use crate::routing::Router;
 use crate::routing::{Route, RoutingConfig, Schedule, TargetConfig};
+use crate::storage::log_required;
 use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfig};
+use crate::telemetry::Bank;
 
 use super::{Missing, StartError};
 
@@ -249,6 +254,8 @@ pub(crate) struct Extra {
     pub(crate) external_bytes: usize,
     /// Additional worker threads (each with `STACK_BYTES`).
     pub(crate) threads: usize,
+    /// Telemetry counters reserved in the control partition.
+    pub(crate) telemetry: bool,
 }
 
 /// Quotas with the budget default applied; `None` when one is missing.
@@ -289,7 +296,8 @@ pub(crate) fn derive(
     let overflow = || StartError::InvalidBudget;
     let producers: Vec<ProducerQuota> = quotas.iter().map(WriterQuota::producer).collect();
 
-    // Memory: exact raw and input, worker stacks, then a fixed control/output split.
+    // Memory: exact raw and input, worker stacks and adapter buffers; control
+    // and output are sized below from the constructors' own formulas.
     let mut raw = 0usize;
     let mut input = 0usize;
     for p in &producers {
@@ -312,39 +320,6 @@ pub(crate) fn derive(
         .and_then(|n| n.checked_add(worker))
         .and_then(|n| n.checked_add(extra.external_bytes))
         .ok_or_else(overflow)?;
-    if fixed >= total {
-        return Err(budget_error(Resource::Total, fixed + 1, total));
-    }
-    let rest = total - fixed;
-    let control = rest / 4;
-    let memory = MemoryBudget {
-        total_bytes: total,
-        input_bytes: input,
-        raw_bytes: raw,
-        output_bytes: rest - control,
-        external_bytes: extra.external_bytes,
-        control_bytes: control,
-        worker_bytes: worker,
-    };
-    let session = SessionConfig {
-        memory,
-        producers,
-        importance: ImportancePolicy::PrioritizeImportant,
-        workers: WorkerThreadingConfig {
-            count: threads,
-            stack_bytes: STACK_BYTES,
-            cpu_ids: budget
-                .worker_cpus
-                .as_ref()
-                .map_or_else(Vec::new, |(cpus, _)| cpus.clone()),
-            affinity: budget
-                .worker_cpus
-                .as_ref()
-                .map_or(Requirement::Optional, |&(_, r)| r),
-        },
-        capabilities: Vec::new(),
-    };
-
     // Routing: the shared record budget saturates before any target queue, so
     // overload backpressures into ingress and appears as RT Capacity rejection,
     // never as a silent required-target drop.
@@ -471,6 +446,78 @@ pub(crate) fn derive(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Control and output: the exact reservations the core constructors make
+    // for these configs (API §19.2, replaces the fixed 1/4 split of RV-097).
+    let producer_count = producers.len();
+    let target_count = targets.len();
+    let mut raw_metadata = 0usize;
+    for p in &producers {
+        if let Some(r) = &p.raw {
+            raw_metadata = raw_metadata
+                .checked_add(CaptureOwner::raw_metadata_bytes(r).ok_or_else(overflow)?)
+                .ok_or_else(overflow)?;
+        }
+    }
+    let mut control_need =
+        CaptureOwner::registration_bytes(channels.len(), producer_count, raw_metadata)
+            .ok_or_else(overflow)?;
+    let parts = [
+        Registry::required(producer_count, window, target_count, &routing)
+            .map_err(|_| overflow())?,
+        ControlOwner::own_bytes(control.sync_slots, producer_count, target_count)
+            .ok_or_else(overflow)?,
+        if extra.telemetry {
+            Bank::required(producer_count).ok_or_else(overflow)?
+        } else {
+            0
+        },
+    ];
+    for part in parts {
+        control_need = control_need.checked_add(part).ok_or_else(overflow)?;
+    }
+    let mut output_need =
+        Router::required(producer_count, &routing, Some(feedback)).map_err(|_| overflow())?;
+    for r in &retention {
+        output_need = output_need
+            .checked_add(log_required(writer, channels, producer_count, r)?)
+            .ok_or_else(overflow)?;
+    }
+    let need = fixed
+        .checked_add(control_need)
+        .and_then(|n| n.checked_add(output_need))
+        .ok_or_else(overflow)?;
+    if need > total {
+        return Err(budget_error(Resource::Total, need, total));
+    }
+    // Spare memory goes to output, where writers use it for buffering.
+    let memory = MemoryBudget {
+        total_bytes: total,
+        input_bytes: input,
+        raw_bytes: raw,
+        output_bytes: total - fixed - control_need,
+        external_bytes: extra.external_bytes,
+        control_bytes: control_need,
+        worker_bytes: worker,
+    };
+    let session = SessionConfig {
+        memory,
+        producers,
+        importance: ImportancePolicy::PrioritizeImportant,
+        workers: WorkerThreadingConfig {
+            count: threads,
+            stack_bytes: STACK_BYTES,
+            cpu_ids: budget
+                .worker_cpus
+                .as_ref()
+                .map_or_else(Vec::new, |(cpus, _)| cpus.clone()),
+            affinity: budget
+                .worker_cpus
+                .as_ref()
+                .map_or(Requirement::Optional, |&(_, r)| r),
+        },
+        capabilities: Vec::new(),
+    };
 
     Ok(Derived {
         session,

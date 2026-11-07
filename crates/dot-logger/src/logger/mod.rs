@@ -520,13 +520,14 @@ impl LoggerBuilder {
             }
         };
         #[allow(unused_mut)]
-        let mut extra = budget::Extra::default();
+        let mut extra = budget::Extra {
+            telemetry: self.telemetry,
+            ..budget::Extra::default()
+        };
         #[cfg(feature = "remote")]
         if let Some((_, _, reserve)) = &remote {
-            extra = budget::Extra {
-                external_bytes: *reserve,
-                threads: 1,
-            };
+            extra.external_bytes = *reserve;
+            extra.threads = 1;
         }
         let derived = budget::derive(&budget, &quotas, &storage, &retention, extra)?;
         let plan = SessionBuilder::new(derived.session).validate(&derived.platform)?;

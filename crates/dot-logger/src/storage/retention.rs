@@ -220,6 +220,34 @@ pub struct SegmentLog<S: SegmentStore> {
     // Last: retained logger allocations are released before their reservation.
     catalog: Catalog,
 }
+fn catalog_extra(
+    config: WriterConfig,
+    channels: usize,
+    producers: usize,
+) -> Result<usize, RetentionError> {
+    config
+        .max_metadata_bytes
+        .checked_mul(4)
+        .and_then(|n| n.checked_add(channels.checked_mul(1024)?))
+        .and_then(|n| n.checked_add(producers.checked_mul(32)?))
+        .and_then(|n| n.checked_add(config.max_payload_bytes.checked_add(codec::OVERHEAD)?))
+        .ok_or(RetentionError::InvalidConfig)
+}
+/// Peak output bytes one log holds: its catalog plus one active writer
+/// (rotation publishes the old writer before opening the next). Shared
+/// with the facade sizing so both use the constructors' formulas.
+pub(crate) fn log_required(
+    config: WriterConfig,
+    channels: &[StorageChannel],
+    producers: usize,
+    retention: &RetentionConfig,
+) -> Result<usize, RetentionError> {
+    let writer = config.reservation(channels, producers)?;
+    let catalog = Catalog::required(retention, catalog_extra(config, channels.len(), producers)?)?;
+    writer
+        .checked_add(catalog)
+        .ok_or(RetentionError::InvalidConfig)
+}
 impl<S: SegmentStore> SegmentLog<S> {
     /// Validate, reserve finite metadata, and create the first active file.
     pub fn new(
@@ -242,13 +270,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         {
             return Err(RetentionError::InvalidConfig);
         }
-        let extra = config
-            .max_metadata_bytes
-            .checked_mul(4)
-            .and_then(|n| n.checked_add(channels.len().checked_mul(1024)?))
-            .and_then(|n| n.checked_add(budget.producers.checked_mul(32)?))
-            .and_then(|n| n.checked_add(config.max_payload_bytes.checked_add(codec::OVERHEAD)?))
-            .ok_or(RetentionError::InvalidConfig)?;
+        let extra = catalog_extra(config, channels.len(), budget.producers)?;
         let catalog = Catalog::new(&budget, retention, extra)?;
         let target = TargetLease::enter(&budget)?;
         let producers = budget.producers;

@@ -4,6 +4,7 @@ mod codec;
 mod index;
 pub(crate) mod recovery;
 mod retention;
+pub(crate) use retention::log_required;
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};

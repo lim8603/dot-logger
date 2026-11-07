@@ -156,19 +156,9 @@ impl CaptureOwner {
                 available: config.memory.input_bytes,
             }));
         }
-        let control_bytes = channels
-            .len()
-            .checked_mul(size_of::<ChannelConfig>())
-            .and_then(|n| n.checked_add(size_of::<Self>()))
-            .and_then(|n| n.checked_add(raw_metadata_bytes))
-            .and_then(|n| {
-                channels
-                    .len()
-                    .checked_mul(config.producers.len())?
-                    .checked_mul(size_of::<u32>())?
-                    .checked_add(n)
-            })
-            .ok_or_else(overflow)?;
+        let control_bytes =
+            Self::registration_bytes(channels.len(), config.producers.len(), raw_metadata_bytes)
+                .ok_or_else(overflow)?;
         if control_bytes > config.memory.control_bytes {
             return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
                 resource: Resource::Control,
@@ -373,6 +363,27 @@ impl CaptureOwner {
         core.control_reserved_bytes = required;
         core.telemetry_epoch = epoch;
         Ok(())
+    }
+    /// Control bytes `new` reserves for channel/producer registration and raw
+    /// pool metadata. Shared with the facade sizing so both use one formula.
+    pub(crate) fn registration_bytes(
+        channels: usize,
+        producers: usize,
+        raw_metadata: usize,
+    ) -> Option<usize> {
+        channels
+            .checked_mul(size_of::<ChannelConfig>())?
+            .checked_add(size_of::<Self>())?
+            .checked_add(raw_metadata)?
+            .checked_add(
+                channels
+                    .checked_mul(producers)?
+                    .checked_mul(size_of::<u32>())?,
+            )
+    }
+    /// Raw pool metadata bytes of one producer's raw quota (control partition).
+    pub(crate) fn raw_metadata_bytes(quota: &crate::config::PoolQuota) -> Option<usize> {
+        RawPool::metadata_bytes(quota)
     }
     /// Explicit management reset after capture/telemetry borrows have ended.
     /// Clears counter history without resetting capture receipt sequences.

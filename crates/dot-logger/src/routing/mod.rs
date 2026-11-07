@@ -353,6 +353,75 @@ fn arc_bytes<T>() -> usize {
 }
 
 impl<'owner> Router<'owner> {
+    /// Output bytes `new` reserves for these counts; `feedback` is the
+    /// completion feedback capacity when tracked. Shared with the facade sizing
+    /// so both use one formula.
+    pub(crate) fn required(
+        producers: usize,
+        config: &RoutingConfig,
+        feedback: Option<usize>,
+    ) -> Result<usize, RoutingError> {
+        let mut reserved = size_of::<Self>()
+            + size_of::<Dispatcher<'_, '_>>()
+            + size_of::<Vec<TargetConsumer<'_, '_>>>()
+            + arc_bytes::<SharedLedger>();
+        add(
+            &mut reserved,
+            array_bytes(producers, size_of::<Input<'_>>())?,
+        )?;
+        add(
+            &mut reserved,
+            array_bytes(config.routes.len(), size_of::<Route>())?,
+        )?;
+        for route in &config.routes {
+            add(
+                &mut reserved,
+                array_bytes(route.targets.len(), size_of::<u32>())?,
+            )?;
+        }
+        add(
+            &mut reserved,
+            array_bytes(
+                config.targets.len(),
+                size_of::<Target<'_>>()
+                    + size_of::<TargetWriter<'_, '_>>()
+                    + size_of::<TargetConsumer<'_, '_>>()
+                    + arc_bytes::<TargetLedger>()
+                    + size_of::<rtrb::RingBuffer<Delivery<'_>>>(),
+            )?,
+        )?;
+        for target in &config.targets {
+            add(
+                &mut reserved,
+                array_bytes(target.queue_slots, size_of::<Delivery<'_>>())?,
+            )?;
+            add(
+                &mut reserved,
+                array_bytes(target.pending_slots, size_of::<Option<Pending<'_>>>())?,
+            )?;
+        }
+        add(
+            &mut reserved,
+            array_bytes(config.shared_records, arc_bytes::<SharedPayload<'_>>())?,
+        )?;
+        add(&mut reserved, array_bytes(config.small_copy_bytes, 1)?)?;
+        let feedback_capacity = feedback.unwrap_or(0);
+        add(
+            &mut reserved,
+            array_bytes(feedback_capacity, size_of::<Option<DispatchEvent>>())?,
+        )?;
+        if feedback.is_some() {
+            for _ in &config.targets {
+                add(
+                    &mut reserved,
+                    array_bytes(feedback_capacity, size_of::<DispatchEvent>())?,
+                )?;
+                add(&mut reserved, size_of::<rtrb::RingBuffer<DispatchEvent>>())?;
+            }
+        }
+        Ok(reserved)
+    }
+
     /// Validate the full concrete reservation before output allocation. `inputs`
     /// must contain each producer once in ID order from the same capture session.
     /// Every registered channel needs an explicit route, including empty routes.
@@ -455,65 +524,13 @@ impl<'owner> Router<'owner> {
                 return Err(RoutingError::InvalidConfig);
             }
         }
-        let mut reserved = size_of::<Self>()
-            + size_of::<Dispatcher<'_, '_>>()
-            + size_of::<Vec<TargetConsumer<'_, '_>>>()
-            + arc_bytes::<SharedLedger>();
-        add(
-            &mut reserved,
-            array_bytes(inputs.len(), size_of::<Input<'_>>())?,
-        )?;
-        add(
-            &mut reserved,
-            array_bytes(config.routes.len(), size_of::<Route>())?,
-        )?;
-        for route in &config.routes {
-            add(
-                &mut reserved,
-                array_bytes(route.targets.len(), size_of::<u32>())?,
-            )?;
-        }
-        add(
-            &mut reserved,
-            array_bytes(
-                config.targets.len(),
-                size_of::<Target<'_>>()
-                    + size_of::<TargetWriter<'_, '_>>()
-                    + size_of::<TargetConsumer<'_, '_>>()
-                    + arc_bytes::<TargetLedger>()
-                    + size_of::<rtrb::RingBuffer<Delivery<'_>>>(),
-            )?,
-        )?;
-        for target in &config.targets {
-            add(
-                &mut reserved,
-                array_bytes(target.queue_slots, size_of::<Delivery<'_>>())?,
-            )?;
-            add(
-                &mut reserved,
-                array_bytes(target.pending_slots, size_of::<Option<Pending<'_>>>())?,
-            )?;
-        }
-        add(
-            &mut reserved,
-            array_bytes(config.shared_records, arc_bytes::<SharedPayload<'_>>())?,
-        )?;
-        add(&mut reserved, array_bytes(config.small_copy_bytes, 1)?)?;
         let feedback_capacity =
             completion.map_or(0, |completion| completion.registry.limits.feedback);
-        add(
-            &mut reserved,
-            array_bytes(feedback_capacity, size_of::<Option<DispatchEvent>>())?,
+        let reserved = Self::required(
+            inputs.len(),
+            &config,
+            completion.map(|completion| completion.registry.limits.feedback),
         )?;
-        if completion.is_some() {
-            for _ in &config.targets {
-                add(
-                    &mut reserved,
-                    array_bytes(feedback_capacity, size_of::<DispatchEvent>())?,
-                )?;
-                add(&mut reserved, size_of::<rtrb::RingBuffer<DispatchEvent>>())?;
-            }
-        }
         if reserved > plan.config().memory.output_bytes {
             return Err(RoutingError::Config(ConfigError::BudgetExceeded {
                 resource: Resource::Output,

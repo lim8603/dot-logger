@@ -486,3 +486,61 @@ fn f11_unknown_worker_cpu_is_rejected_before_anything_starts() {
     );
     assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
 }
+
+/// Start once with too little memory and return the reported requirement.
+fn reported_requirement(make: &dyn Fn(usize) -> dot_logger::logger::LoggerBuilder) -> usize {
+    match make(4096).start() {
+        Err(StartError::Budget { required, .. }) => required,
+        other => panic!("expected a budget shortfall, got {other:?}"),
+    }
+}
+
+#[test]
+fn f14_reported_memory_requirement_is_exact_and_sufficient() {
+    let temp = Temp::new();
+    // Several shapes: writers, raw pools, outputs, channels and telemetry all
+    // change the control/output partitions the facade must reserve.
+    let shapes: Vec<Box<dyn Fn(usize) -> dot_logger::logger::LoggerBuilder>> = vec![
+        Box::new(|memory| {
+            Logger::builder()
+                .budget(budget().memory_bytes(memory))
+                .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+                .channel::<Pose>("robot/pose")
+                .writer("control")
+        }),
+        Box::new(|memory| {
+            Logger::builder()
+                .budget(
+                    budget()
+                        .memory_bytes(memory)
+                        .writer_quota(WriterQuota::small(512, 256).with_raw(4, MIB)),
+                )
+                .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+                .file_output(&temp.0, Retention::continuous(64 * MIB as u64))
+                .channel::<Pose>("robot/pose")
+                .channel::<[u8]>("camera")
+                .writer("a")
+                .writer("b")
+                .writer("c")
+                .telemetry()
+        }),
+    ];
+    for make in &shapes {
+        let required = reported_requirement(make.as_ref());
+        // One byte short is still rejected with the same requirement.
+        match make(required - 1).start() {
+            Err(StartError::Budget {
+                required: again, ..
+            }) => assert_eq!(again, required),
+            other => panic!("one byte short must fail: {other:?}"),
+        }
+        // Exactly the requirement starts and closes successfully.
+        let logger = make(required)
+            .start()
+            .unwrap_or_else(|e| panic!("the reported {required} bytes must be sufficient: {e:?}"));
+        let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+            panic!("shutdown did not close");
+        };
+        assert!(report.is_success(), "{report:?}");
+    }
+}

@@ -87,6 +87,32 @@ fn add_array(total: &mut usize, count: usize, size: usize) -> Result<(), Complet
     Ok(())
 }
 impl Registry {
+    /// Control bytes of the registry for these counts. Shared with the facade
+    /// sizing so both use one formula.
+    pub(crate) fn required(
+        producers: usize,
+        window: usize,
+        targets: usize,
+        routing: &RoutingConfig,
+    ) -> Result<usize, CompletionError> {
+        let mut reserved = size_of::<Self>();
+        add_array(&mut reserved, producers, size_of::<ProducerState>())?;
+        let slots = producers.checked_mul(window).ok_or_else(memory_error)?;
+        add_array(&mut reserved, slots, size_of::<RecordSlot>())?;
+        let cells = slots.checked_mul(targets).ok_or_else(memory_error)?;
+        add_array(&mut reserved, cells, size_of::<TargetCell>())?;
+        add_array(
+            &mut reserved,
+            producers.checked_mul(targets).ok_or_else(memory_error)?,
+            size_of::<Retired>(),
+        )?;
+        add_array(&mut reserved, targets, size_of::<TargetContract>())?;
+        add_array(&mut reserved, routing.routes.len(), size_of::<RoutePlan>())?;
+        for route in &routing.routes {
+            add_array(&mut reserved, route.targets.len(), size_of::<usize>())?;
+        }
+        Ok(reserved)
+    }
     pub(crate) fn new(
         session_id: u128,
         revision: u64,
@@ -153,32 +179,12 @@ impl Registry {
                 return Err(CompletionError::InvalidConfig);
             }
         }
-        let mut reserved = size_of::<Self>();
-        add_array(&mut reserved, producer_count, size_of::<ProducerState>())?;
-        let slots = producer_count
-            .checked_mul(config.window_records)
-            .ok_or_else(memory_error)?;
-        add_array(&mut reserved, slots, size_of::<RecordSlot>())?;
-        let cells = slots
-            .checked_mul(config.targets.len())
-            .ok_or_else(memory_error)?;
-        add_array(&mut reserved, cells, size_of::<TargetCell>())?;
-        add_array(
-            &mut reserved,
-            producer_count
-                .checked_mul(config.targets.len())
-                .ok_or_else(memory_error)?,
-            size_of::<Retired>(),
-        )?;
-        add_array(
-            &mut reserved,
+        let reserved = Self::required(
+            producer_count,
+            config.window_records,
             config.targets.len(),
-            size_of::<TargetContract>(),
+            routing,
         )?;
-        add_array(&mut reserved, routing.routes.len(), size_of::<RoutePlan>())?;
-        for route in &routing.routes {
-            add_array(&mut reserved, route.targets.len(), size_of::<usize>())?;
-        }
         if reserved > available {
             return Err(CompletionError::Config(ConfigError::BudgetExceeded {
                 resource: Resource::Completion,

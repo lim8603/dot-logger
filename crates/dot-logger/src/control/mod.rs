@@ -142,6 +142,22 @@ pub struct ControlOwner<'owner> {
     _attachment: ControllerLease<'owner>,
 }
 impl<'owner> ControlOwner<'owner> {
+    /// Control bytes this owner reserves beyond the capture reservation.
+    /// Shared with the facade sizing so both use one formula.
+    pub(crate) fn own_bytes(sync_slots: usize, producers: usize, targets: usize) -> Option<usize> {
+        let count = sync_slots.checked_add(1)?;
+        let mut reserved = size_of::<Self>();
+        for (n, size) in [
+            (count, size_of::<SyncSlot>()),
+            (count.checked_mul(producers)?, size_of::<AtomicRange>()),
+            (count.checked_mul(targets)?, size_of::<SyncTarget>()),
+        ] {
+            let bytes = n.checked_mul(size).filter(|n| *n <= isize::MAX as usize)?;
+            reserved = reserved.checked_add(bytes)?;
+        }
+        reserved.checked_add(targets.checked_mul(size_of::<AtomicBool>())?)
+    }
+
     /// Reserve ordinary request slots plus a dedicated shutdown slot, within the
     /// control bytes remaining after concrete capture/completion reservations.
     pub fn new(
@@ -161,33 +177,12 @@ impl<'owner> ControlOwner<'owner> {
             .sync_slots
             .checked_add(1)
             .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?;
-        let mut reserved = size_of::<Self>();
-        for (n, size) in [
-            (count, size_of::<SyncSlot>()),
-            (
-                count
-                    .checked_mul(completion.registry.producers.len())
-                    .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?,
-                size_of::<AtomicRange>(),
-            ),
-            (
-                count
-                    .checked_mul(completion.targets().len())
-                    .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?,
-                size_of::<SyncTarget>(),
-            ),
-        ] {
-            let bytes = n
-                .checked_mul(size)
-                .filter(|n| *n <= isize::MAX as usize)
-                .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?;
-            reserved = reserved
-                .checked_add(bytes)
-                .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?;
-        }
-        reserved = reserved
-            .checked_add(completion.targets().len() * size_of::<AtomicBool>())
-            .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?;
+        let reserved = Self::own_bytes(
+            config.sync_slots,
+            completion.registry.producers.len(),
+            completion.targets().len(),
+        )
+        .ok_or(ControlError::Config(ConfigError::ArithmeticOverflow))?;
         let required = capture
             .reserved
             .checked_add(reserved)

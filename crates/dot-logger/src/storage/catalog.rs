@@ -148,12 +148,11 @@ fn intersects(a: Option<(u64, u64)>, start: u64, end: u64) -> bool {
     a.is_some_and(|(lo, hi)| lo <= end && start <= hi)
 }
 impl Catalog {
-    pub fn new(
-        budget: &WriterBudget,
-        config: RetentionConfig,
+    /// Output bytes `new` reserves; shared with the facade sizing.
+    pub(crate) fn required(
+        config: &RetentionConfig,
         extra: usize,
-    ) -> Result<Self, RetentionError> {
-        config.validate()?;
+    ) -> Result<usize, RetentionError> {
         let mut bytes = extra
             .checked_add(1024)
             .ok_or(RetentionError::InvalidConfig)?;
@@ -170,6 +169,15 @@ impl Catalog {
                 )
                 .ok_or(RetentionError::InvalidConfig)?;
         }
+        Ok(bytes)
+    }
+    pub fn new(
+        budget: &WriterBudget,
+        config: RetentionConfig,
+        extra: usize,
+    ) -> Result<Self, RetentionError> {
+        config.validate()?;
+        let bytes = Self::required(&config, extra)?;
         let lease = budget.reserve(bytes)?;
         Ok(Self {
             config,

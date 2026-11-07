@@ -135,6 +135,23 @@ impl Shared {
         }
     }
 
+    /// Record a worker placement result observed outside the host (remote thread).
+    #[cfg(feature = "remote")]
+    pub(crate) fn placed(&self, placed: Option<bool>) {
+        match placed {
+            Some(true) => {
+                let _ = self.affinity.compare_exchange(
+                    AFFINITY_NONE,
+                    AFFINITY_APPLIED,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                );
+            }
+            Some(false) => self.affinity.store(AFFINITY_FAILED, Ordering::Release),
+            None => {}
+        }
+    }
+
     /// Evaluate at session-monotonic `now_ns`; `overdue` is the sync lateness bound.
     pub(crate) fn health(&self, now_ns: u64, overdue: Duration) -> Health {
         let overdue = u64::try_from(overdue.as_nanos()).unwrap_or(u64::MAX);

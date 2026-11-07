@@ -124,6 +124,11 @@ impl Delivery<'_> {
     pub fn record(&self) -> CapturedRecord {
         self.shared.record
     }
+    /// Whether the payload is a zero-copy original (raw) rather than a small copy.
+    #[cfg(feature = "remote")]
+    pub(crate) fn is_raw(&self) -> bool {
+        matches!(self.shared.payload, Payload::Raw(_))
+    }
     /// Target retaining this guard.
     pub fn target_id(&self) -> u32 {
         self.target_id

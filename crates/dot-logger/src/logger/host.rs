@@ -28,6 +28,7 @@ use crate::storage::{
 use super::affinity::pin_current;
 use super::budget::{STACK_BYTES, Tuning};
 use super::health::{AFFINITY_APPLIED, AFFINITY_FAILED, AFFINITY_NONE, OutputStatus, Shared};
+use super::remote::{Remote, Tap};
 use super::writer::Owned;
 use super::{FacadeReport, StartError};
 
@@ -65,6 +66,8 @@ pub(crate) struct HostPlan {
     pub(crate) shared: Arc<Shared>,
     /// Validated worker CPU list.
     pub(crate) cpus: Option<(Vec<usize>, Requirement)>,
+    /// Running remote server, stopped by the host before it reports Closed.
+    pub(crate) remote: Remote,
 }
 
 /// Start the host and wait until it built every component or failed.
@@ -125,6 +128,7 @@ fn host_main(
         origin,
         shared,
         cpus,
+        mut remote,
     } = plan;
     let mut ready = Some(ready);
     {
@@ -150,8 +154,11 @@ fn host_main(
                 &mut mailboxes,
                 routing,
                 &config,
-                &commands,
-                &mut ready,
+                Links {
+                    commands: &commands,
+                    ready: &mut ready,
+                    remote: &mut remote,
+                },
             )
         }));
         match result {
@@ -172,6 +179,8 @@ fn host_main(
     // No more commands are read: a later `shutdown` fails fast as WorkerFailed
     // instead of waiting for a reply that never comes.
     drop(commands);
+    // Every exit path (including failure and panic) stops the listener.
+    remote.stop();
     // Reaper: an outstanding Writer still points into `core` and its rings.
     // Keep this thread as their last owner until every writer state returned,
     // so no RT thread ever performs the final release (ADR-012 §3).
@@ -196,6 +205,14 @@ struct Config<'a> {
     origin: Instant,
     flags: &'a Shared,
     cpus: Option<&'a (Vec<usize>, Requirement)>,
+}
+
+/// The host's management connections: handle commands, the start-up report
+/// and the remote server.
+struct Links<'a> {
+    commands: &'a Receiver<Command>,
+    ready: &'a mut Option<SyncSender<Result<Vec<PathBuf>, StartError>>>,
+    remote: &'a mut Remote,
 }
 
 /// Restrict the calling worker thread to the configured CPUs. A `Required`
@@ -278,9 +295,13 @@ fn run(
     mailboxes: &mut [rtrb::Consumer<Owned>],
     routing: RoutingConfig,
     config: &Config<'_>,
-    commands: &Receiver<Command>,
-    ready: &mut Option<SyncSender<Result<Vec<PathBuf>, StartError>>>,
+    links: Links<'_>,
 ) -> Result<(), StartError> {
+    let Links {
+        commands,
+        ready,
+        remote,
+    } = links;
     let consumers = reads
         .iter_mut()
         .enumerate()
@@ -300,6 +321,8 @@ fn run(
             .map(|(index, (consumer, log))| IoTarget {
                 id: index as u32 + 1,
                 status: &config.flags.outputs[index],
+                // Subscribers see what the first output wrote, once per record.
+                tap: if index == 0 { remote.tap() } else { None },
                 consumer,
                 log,
                 batch: Vec::with_capacity(config.tuning.batch_records),
@@ -374,6 +397,7 @@ fn run(
                         sampled = Some(now);
                     }
                 }
+                remote.serve(telemetry, ns(config.origin, now));
                 let turn = dispatcher.turn(now, &mut events)?;
                 if let Some(fault) = turn.fault {
                     return Err(StartError::Routing(fault));
@@ -445,6 +469,8 @@ fn run(
         })
         .map(|(report, unconfirmed, reply)| {
             // IO threads are joined here; finish errors are already flagged.
+            // The listener closes before Closed is reported.
+            remote.stop();
             let mut report = facade_report(report, &control, mailboxes, config);
             report.unconfirmed = unconfirmed;
             if let Some(reply) = reply {
@@ -580,6 +606,7 @@ fn facade_report(
 struct IoTarget<'s, 'o> {
     id: u32,
     status: &'s OutputStatus,
+    tap: Option<Tap>,
     consumer: TargetConsumer<'s, 'o>,
     log: &'s mut Log,
     batch: Vec<Delivery<'o>>,
@@ -735,8 +762,18 @@ fn failure(error: &RetentionError) -> FailureReason {
 
 fn write_batch(target: &mut IoTarget<'_, '_>, now: u64, flags: &Shared) {
     let refs: Vec<&Delivery<'_>> = target.batch.iter().collect();
-    if let Err(error) = target.log.write_batch(&refs, now) {
-        settle(target.log, &refs, error, flags, target.status);
+    match target.log.write_batch(&refs, now) {
+        Ok(()) => {
+            if let Some(tap) = target.tap.as_mut() {
+                tap.offer(&refs);
+            }
+        }
+        Err(error) => {
+            if let Some(tap) = target.tap.as_mut() {
+                tap.offer(&refs[..error.written]);
+            }
+            settle(target.log, &refs, error, flags, target.status);
+        }
     }
     drop(refs);
     target.batch.clear();

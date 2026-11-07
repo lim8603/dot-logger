@@ -40,6 +40,7 @@ mod affinity;
 mod budget;
 mod health;
 mod host;
+mod remote;
 #[cfg(feature = "tracing-adapter")]
 mod sink;
 #[cfg(test)]
@@ -130,6 +131,9 @@ pub enum StartError {
     Io(std::io::Error),
     /// The default worker stopped before it was ready.
     WorkerFailed,
+    /// Remote limits are invalid or the listener could not bind.
+    #[cfg(feature = "remote")]
+    Remote(crate::adapters::remote::RemoteError),
 }
 
 impl fmt::Display for StartError {
@@ -342,6 +346,11 @@ pub struct LoggerBuilder {
     telemetry: bool,
     #[cfg(feature = "tracing-adapter")]
     tracing: Option<(String, ::tracing::Level, WriterQuota)>,
+    #[cfg(feature = "remote")]
+    remote: Option<(
+        crate::adapters::remote::ServerConfig,
+        Option<crate::adapters::remote::RemoteLimits>,
+    )>,
 }
 
 /// Internal writer of the tracing connection; never returned by `take_writer`.
@@ -396,6 +405,28 @@ impl LoggerBuilder {
         self.tracing = Some((topic.into(), min, quota));
         self
     }
+    /// Serve a gRPC listener (`server.enabled` must be true; loopback-only
+    /// unless TLS and tokens are set, as `ServerConfig::validate` requires).
+    /// Subscribers receive best-effort copies of records the first file output
+    /// wrote; they are not completion targets, and their overflow is their own
+    /// Gap/Disconnect. GetStatus is answered; other requests are Unsupported.
+    /// Limits are derived from the writer quotas (see API §18.11) and their
+    /// buffers are charged to `Budget::memory_bytes`.
+    #[cfg(feature = "remote")]
+    pub fn remote(mut self, server: crate::adapters::remote::ServerConfig) -> Self {
+        self.remote = Some((server, None));
+        self
+    }
+    /// Like [`remote`](Self::remote) with explicit limits.
+    #[cfg(feature = "remote")]
+    pub fn remote_with(
+        mut self,
+        server: crate::adapters::remote::ServerConfig,
+        limits: crate::adapters::remote::RemoteLimits,
+    ) -> Self {
+        self.remote = Some((server, Some(limits)));
+        self
+    }
 
     fn missing(&self) -> Vec<Missing> {
         let mut missing = match &self.budget {
@@ -419,6 +450,10 @@ impl LoggerBuilder {
 
     /// Validate, preallocate, start the default worker and create the output
     /// namespaces. On error nothing keeps running and nothing is left on disk.
+    #[cfg_attr(
+        not(any(feature = "tracing-adapter", feature = "remote")),
+        allow(unused_mut)
+    )]
     pub fn start(mut self) -> Result<Logger, StartError> {
         // The tracing connection is one more channel and writer, declared last.
         #[cfg(feature = "tracing-adapter")]
@@ -470,9 +505,47 @@ impl LoggerBuilder {
             .collect::<Result<_, StartError>>()?;
         let quotas: Vec<_> = self.writers.iter().map(|(_, q)| *q).collect();
         let retention: Vec<Retention> = self.outputs.iter().map(|(_, r)| *r).collect();
-        let derived = budget::derive(&budget, &quotas, &storage, &retention)?;
+        #[cfg(feature = "remote")]
+        let remote = match self.remote.take() {
+            None => None,
+            Some((server, limits)) => {
+                let limits = match limits {
+                    Some(limits) => limits,
+                    None => remote::default_limits(
+                        &budget::resolve(&budget, &quotas).ok_or(StartError::InvalidBudget)?,
+                    ),
+                };
+                let reserve = limits.reservation().map_err(StartError::Remote)?;
+                Some((server, limits, reserve))
+            }
+        };
+        #[allow(unused_mut)]
+        let mut extra = budget::Extra::default();
+        #[cfg(feature = "remote")]
+        if let Some((_, _, reserve)) = &remote {
+            extra = budget::Extra {
+                external_bytes: *reserve,
+                threads: 1,
+            };
+        }
+        let derived = budget::derive(&budget, &quotas, &storage, &retention, extra)?;
         let plan = SessionBuilder::new(derived.session).validate(&derived.platform)?;
         let session = new_session_id();
+        // The listener binds before any namespace exists; dropping it on a
+        // later error stops and joins it.
+        #[allow(unused_mut)]
+        let mut running = remote::Remote::default();
+        #[cfg(feature = "remote")]
+        let (remote_addr, remote_placed) = match remote {
+            None => (None, None),
+            Some((server, limits, _)) => {
+                let (runtime, placed) =
+                    remote::Runtime::start(&plan, server, limits, session, derived.cpus.clone())?;
+                let address = runtime.address;
+                running.runtime = Some(runtime);
+                (Some(address), placed)
+            }
+        };
         let configs: Vec<ChannelConfig> = storage.iter().map(|c| c.channel).collect();
         let mut owner = CaptureOwner::new_tracked(
             &plan,
@@ -529,6 +602,8 @@ impl LoggerBuilder {
             _ => None,
         };
         let shared = Arc::new(Shared::new(self.outputs.len(), self.telemetry));
+        #[cfg(feature = "remote")]
+        shared.placed(remote_placed);
         let (commands, receive) = mpsc::channel();
         let drop_deadline = derived.tuning.drop_deadline;
         let overdue = derived.tuning.sync_every * 4 + Duration::from_secs(1);
@@ -547,6 +622,7 @@ impl LoggerBuilder {
             origin,
             shared: Arc::clone(&shared),
             cpus: derived.cpus,
+            remote: running,
         };
         let (directories, _detached) = match host::spawn(host, receive) {
             Ok(started) => started,
@@ -569,6 +645,8 @@ impl LoggerBuilder {
             overdue,
             #[cfg(feature = "tracing-adapter")]
             sink,
+            #[cfg(feature = "remote")]
+            remote_addr,
         })
     }
 }
@@ -597,6 +675,8 @@ pub struct Logger {
     overdue: Duration,
     #[cfg(feature = "tracing-adapter")]
     sink: Option<Arc<sink::SinkState>>,
+    #[cfg(feature = "remote")]
+    remote_addr: Option<std::net::SocketAddr>,
 }
 
 impl Logger {
@@ -653,6 +733,12 @@ impl Logger {
             health.tracing_dropped = self.sink.as_ref().map(|s| s.dropped());
         }
         health
+    }
+
+    /// Bound listener address of [`LoggerBuilder::remote`]; `None` without it.
+    #[cfg(feature = "remote")]
+    pub fn remote_addr(&self) -> Option<std::net::SocketAddr> {
+        self.remote_addr
     }
 
     /// The tracing/`log` sink declared with [`LoggerBuilder::tracing`].

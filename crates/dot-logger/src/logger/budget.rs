@@ -242,12 +242,28 @@ fn budget_error(resource: Resource, required: usize, available: usize) -> StartE
     }
 }
 
+/// Memory and threads an optional adapter (remote) adds to the plan.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Extra {
+    /// Adapter buffers charged to the external partition.
+    pub(crate) external_bytes: usize,
+    /// Additional worker threads (each with `STACK_BYTES`).
+    pub(crate) threads: usize,
+}
+
+/// Quotas with the budget default applied; `None` when one is missing.
+#[cfg(feature = "remote")]
+pub(crate) fn resolve(budget: &Budget, quotas: &[Option<WriterQuota>]) -> Option<Vec<WriterQuota>> {
+    quotas.iter().map(|q| q.or(budget.writer_quota)).collect()
+}
+
 /// Deterministic derivation; see API §18.2. All counts follow from the quotas.
 pub(crate) fn derive(
     budget: &Budget,
     quotas: &[Option<WriterQuota>],
     channels: &[StorageChannel],
     retention: &[Retention],
+    extra: Extra,
 ) -> Result<Derived, StartError> {
     let (Some(total), Some(sync_every), Some(drop_deadline)) =
         (budget.memory_bytes, budget.sync_every, budget.drop_deadline)
@@ -286,11 +302,15 @@ pub(crate) fn derive(
                 .ok_or_else(overflow)?;
         }
     }
-    let threads = budget.io_threads.checked_add(1).ok_or_else(overflow)?;
+    let threads = budget
+        .io_threads
+        .checked_add(1 + extra.threads)
+        .ok_or_else(overflow)?;
     let worker = threads.checked_mul(STACK_BYTES).ok_or_else(overflow)?;
     let fixed = raw
         .checked_add(input)
         .and_then(|n| n.checked_add(worker))
+        .and_then(|n| n.checked_add(extra.external_bytes))
         .ok_or_else(overflow)?;
     if fixed >= total {
         return Err(budget_error(Resource::Total, fixed + 1, total));
@@ -302,7 +322,7 @@ pub(crate) fn derive(
         input_bytes: input,
         raw_bytes: raw,
         output_bytes: rest - control,
-        external_bytes: 0,
+        external_bytes: extra.external_bytes,
         control_bytes: control,
         worker_bytes: worker,
     };

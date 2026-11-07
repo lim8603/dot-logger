@@ -61,8 +61,20 @@ struct SharedPermit {
     small: usize,
     raw: usize,
 }
+#[cfg(test)]
+thread_local! {
+    /// Permit releases on this thread, in order (release-order tests only).
+    static RELEASES: std::cell::RefCell<Vec<&'static str>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+#[cfg(test)]
+fn note_release(what: &'static str) {
+    RELEASES.with(|r| r.borrow_mut().push(what));
+}
 impl Drop for SharedPermit {
     fn drop(&mut self) {
+        #[cfg(test)]
+        note_release("shared");
         self.ledger.small.fetch_sub(self.small, Ordering::Release);
         self.ledger.raw.fetch_sub(self.raw, Ordering::Release);
         self.ledger.records.fetch_sub(1, Ordering::Release);
@@ -89,6 +101,8 @@ struct TargetPermit {
 }
 impl Drop for TargetPermit {
     fn drop(&mut self) {
+        #[cfg(test)]
+        note_release("target");
         self.ledger.bytes.fetch_sub(self.bytes, Ordering::Release);
         self.ledger.records.fetch_sub(1, Ordering::Release);
     }
@@ -107,8 +121,11 @@ impl Drop for TargetPermit {
 /// fn escape(item: Delivery<'_>) -> &[u8] { item.payload() }
 /// ```
 pub struct Delivery<'owner> {
-    shared: Arc<SharedPayload<'owner>>,
+    // Field order releases this target's permit before the shared record: the
+    // reverse lets the dispatcher take a fresh shared record while this
+    // target's ledger still counts the old one and drop it as Capacity.
     _permit: TargetPermit,
+    shared: Arc<SharedPayload<'owner>>,
     target_id: u32,
     required: bool,
     started: Instant,
@@ -1253,5 +1270,71 @@ impl<'owner> TargetWriter<'_, 'owner> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod release_order {
+    use super::*;
+    use crate::capture::{CaptureReceipt, Level, RecordMetadata};
+
+    /// TASK-023 S2b finding ②: a delivery must give back its target permit
+    /// before its shared record. The other order lets the dispatcher take a
+    /// fresh shared record while this target's ledger still counts the old
+    /// one, see the target as full and drop a required record as Capacity.
+    #[test]
+    fn delivery_releases_its_target_permit_before_the_shared_record() {
+        let shared_ledger = Arc::new(SharedLedger::default());
+        shared_ledger.records.store(1, Ordering::Relaxed);
+        shared_ledger.small.store(1, Ordering::Relaxed);
+        let target_ledger = Arc::new(TargetLedger::default());
+        target_ledger.records.store(1, Ordering::Relaxed);
+        target_ledger.bytes.store(1, Ordering::Relaxed);
+        let record = CapturedRecord {
+            receipt: CaptureReceipt {
+                session_id: 1,
+                producer_id: 0,
+                accepted_seq: 1,
+            },
+            metadata: RecordMetadata {
+                channel_id: 1,
+                schema_id: 0,
+                schema_version: 0,
+                mono_ns: 0,
+                real_ns: 0,
+                source_time: None,
+                level: Level::Info,
+                importance: None,
+            },
+            revision: 1,
+            payload_len: 1,
+        };
+        let shared = Arc::new(SharedPayload {
+            payload: Payload::Small(Box::new([7])),
+            record,
+            _permit: SharedPermit {
+                ledger: Arc::clone(&shared_ledger),
+                small: 1,
+                raw: 0,
+            },
+            _plan: None,
+        });
+        let delivery = Delivery {
+            shared,
+            _permit: TargetPermit {
+                ledger: Arc::clone(&target_ledger),
+                bytes: 1,
+            },
+            target_id: 1,
+            required: true,
+            started: Instant::now(),
+            completion: None,
+            abandon: None,
+        };
+        RELEASES.with(|r| r.borrow_mut().clear());
+        drop(delivery);
+        assert_eq!(RELEASES.with(|r| r.borrow().clone()), ["target", "shared"]);
+        assert_eq!(target_ledger.records.load(Ordering::Relaxed), 0);
+        assert_eq!(shared_ledger.records.load(Ordering::Relaxed), 0);
     }
 }

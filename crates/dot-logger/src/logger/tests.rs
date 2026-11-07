@@ -66,6 +66,8 @@ fn until_closing(writer: &mut super::Writer, channel: super::Channel<[u8]>, limi
 }
 
 #[test]
+// Real files, threads and the wall clock: outside Miri's isolation.
+#[cfg_attr(miri, ignore)]
 fn io_worker_panic_closes_admission_and_is_reported_as_failure() {
     let temp = Temp::new();
     let logger = start(&temp);
@@ -96,6 +98,8 @@ fn io_worker_panic_closes_admission_and_is_reported_as_failure() {
 }
 
 #[test]
+// Real files, threads and the wall clock: outside Miri's isolation.
+#[cfg_attr(miri, ignore)]
 fn host_panic_fails_fast_and_the_reaper_still_owns_every_release() {
     let temp = Temp::new();
     let logger = start(&temp);

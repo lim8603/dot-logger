@@ -317,6 +317,16 @@ impl fmt::Debug for Progress {
 
 impl PendingShutdown {
     /// Wait up to `timeout` for the next report.
+    ///
+    /// The worker reports `Incomplete` at most once, when the shutdown
+    /// deadline passes; every later report is the final `Closed`.
+    ///
+    /// # Errors
+    ///
+    /// [`ShutdownError::Unresponsive`] (returning this handle to wait again)
+    /// when no report arrives within `timeout` — after an `Incomplete` this
+    /// means the worker has not closed yet, not a second `Incomplete`.
+    /// [`ShutdownError::WorkerFailed`] when the worker ended without closing.
     pub fn wait(self, timeout: Duration) -> Result<Shutdown, ShutdownError> {
         match self.progress.recv_timeout(timeout) {
             Ok(Progress::Closed(report)) => Ok(Shutdown::Closed(report)),
@@ -415,6 +425,10 @@ impl LoggerBuilder {
         self
     }
     /// Register a channel for records of type `T`, routed to every file output.
+    ///
+    /// Records are sent at `Info` unless [`Channel::at`] picks another level;
+    /// the channel itself admits every level (its minimum is `Trace`), so a
+    /// lower sending level is never filtered out by the registration.
     pub fn channel<T: Record + ?Sized>(mut self, topic: &str) -> Self {
         self.channels.push(ChannelSpec {
             topic: topic.into(),
@@ -669,13 +683,11 @@ impl LoggerBuilder {
             let (mailbox, returned) = rtrb::RingBuffer::new(1);
             mailboxes.push(returned);
             let owned = Owned {
+                core: Arc::clone(&core),
                 write,
                 scratch: vec![0; bytes].into_boxed_slice(),
             };
-            writers.push((
-                name.clone(),
-                Some(Writer::new(owned, Arc::clone(&core), mailbox, id, origin)),
-            ));
+            writers.push((name.clone(), Some(Writer::new(owned, mailbox, id, origin))));
         }
         #[cfg(feature = "tracing-adapter")]
         let sink = match (tracing, writers.pop()) {
@@ -697,7 +709,7 @@ impl LoggerBuilder {
         shared.placed(remote_placed);
         let (commands, receive) = mpsc::channel();
         let drop_deadline = derived.tuning.drop_deadline;
-        let overdue = derived.tuning.sync_every * 4 + Duration::from_secs(1);
+        let overdue = budget::sync_overdue(derived.tuning.sync_every);
         let host = HostPlan {
             core,
             reads,
@@ -717,11 +729,18 @@ impl LoggerBuilder {
         };
         let (directories, _detached) = match host::spawn(host, receive) {
             Ok(started) => started,
-            Err(error) => {
-                // Dropping the writers returns their state to the (now dead)
-                // host's mailboxes on this management thread.
+            Err(failed) => {
+                // No writer was handed out yet: return every state to the
+                // failed host's reaper on this management thread, then wait
+                // until it stopped the listener and released the core, so
+                // nothing keeps running once `start` returns.
                 drop(writers);
-                return Err(error);
+                #[cfg(feature = "tracing-adapter")]
+                drop(sink);
+                if let Some(host) = failed.host {
+                    let _ = host.join();
+                }
+                return Err(failed.error);
             }
         };
         Ok(Logger {
@@ -864,11 +883,11 @@ impl Logger {
         let (reply, progress) = mpsc::channel();
         commands
             .send(Command::Shutdown {
-                deadline: Instant::now() + deadline,
+                deadline: budget::later(Instant::now(), deadline),
                 reply,
             })
             .map_err(|_| ShutdownError::WorkerFailed)?;
-        PendingShutdown { progress }.wait(deadline + REPORT_GRACE)
+        PendingShutdown { progress }.wait(deadline.saturating_add(REPORT_GRACE))
     }
 }
 

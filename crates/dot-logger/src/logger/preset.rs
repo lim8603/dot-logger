@@ -72,7 +72,11 @@ impl Sizing {
     }
 
     fn slots(&self, stream: Stream) -> usize {
-        let wanted = u128::from(stream.hz) * self.absorb.as_nanos() * SLOT_MARGIN_NUM;
+        // Saturates; an unrepresentable count becomes `usize::MAX` and the
+        // budget check rejects it (RV-123).
+        let wanted = u128::from(stream.hz)
+            .saturating_mul(self.absorb.as_nanos())
+            .saturating_mul(SLOT_MARGIN_NUM);
         let slots = wanted.div_ceil(1_000_000_000 * SLOT_MARGIN_DEN).max(1);
         usize::try_from(slots).unwrap_or(usize::MAX)
     }

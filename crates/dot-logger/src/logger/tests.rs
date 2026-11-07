@@ -117,3 +117,69 @@ fn host_panic_fails_fast_and_the_reaper_still_owns_every_release() {
     // Dropping the writer afterwards only moves its state to the mailbox.
     drop(writer);
 }
+
+/// REV-051 RV-120: the reaper may only release a writer's mailbox after the
+/// writer dropped its producer. A pushed-but-still-alive producer means the
+/// RT thread is still running `Writer`'s drop glue; releasing first would make
+/// that thread the second dropper and so the one that frees the ring.
+#[test]
+fn reaper_waits_until_the_writer_dropped_its_mailbox_producer() {
+    let (mut producer, consumer) = rtrb::RingBuffer::<u8>::new(1);
+    let mailboxes = [consumer];
+    assert!(!super::host::writers_returned(&mailboxes));
+    assert_eq!(super::host::writers_outstanding(&mailboxes), 1);
+    // `Writer::drop` body has run: state pushed, fields not yet dropped.
+    producer.push(7).unwrap();
+    assert!(
+        !super::host::writers_returned(&mailboxes),
+        "state pushed but producer alive: the RT thread is still dropping fields"
+    );
+    assert_eq!(super::host::writers_outstanding(&mailboxes), 1);
+    drop(producer);
+    assert!(super::host::writers_returned(&mailboxes));
+    assert_eq!(super::host::writers_outstanding(&mailboxes), 0);
+}
+
+/// REV-051 RV-121: with nothing held, an idle IO thread sleeps `idle_wait`
+/// whatever `batch_wait` is; a held batch shortens the sleep to its remainder.
+#[test]
+fn idle_io_sleep_ignores_batch_wait_until_a_batch_is_held() {
+    let idle = Duration::from_millis(2);
+    let now = Instant::now();
+    assert_eq!(super::host::idle_sleep(idle, Duration::ZERO, [], now), idle);
+    assert_eq!(
+        super::host::idle_sleep(idle, Duration::from_micros(100), [], now),
+        idle
+    );
+    let held = now.checked_sub(Duration::from_micros(300)).unwrap();
+    assert_eq!(
+        super::host::idle_sleep(idle, Duration::from_millis(1), [held], now),
+        Duration::from_micros(700)
+    );
+    assert_eq!(
+        super::host::idle_sleep(idle, Duration::from_millis(10), [held], now),
+        idle
+    );
+}
+
+/// REV-051 RV-125: a full retention is not an IO fault, but a failing flush of
+/// the written prefix is, and then the whole tail fails as IO.
+#[test]
+fn settle_promotes_a_failed_prefix_flush_to_io_failure() {
+    use super::host::tail_reason;
+    use crate::completion::FailureReason::{AdapterFailure, IoFailure};
+    use crate::storage::{RetentionError, StorageError};
+    assert_eq!(tail_reason(AdapterFailure, None), AdapterFailure);
+    assert_eq!(
+        tail_reason(AdapterFailure, Some(&RetentionError::Poisoned)),
+        IoFailure
+    );
+    assert_eq!(
+        tail_reason(
+            AdapterFailure,
+            Some(&RetentionError::Storage(StorageError::Poisoned))
+        ),
+        IoFailure
+    );
+    assert_eq!(tail_reason(IoFailure, None), IoFailure);
+}

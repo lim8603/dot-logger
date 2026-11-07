@@ -430,6 +430,8 @@ fn f9_health_reports_records_failed_when_continuous_retention_is_full() {
         panic!("shutdown did not close");
     };
     assert!(!report.is_success(), "lost records are never success");
+    // REV-051 RV-125: the report agrees with health — no IO fault.
+    assert!(!report.io_failed, "{report:?}");
 }
 
 #[test]

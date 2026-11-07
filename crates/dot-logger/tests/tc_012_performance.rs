@@ -247,3 +247,11 @@ fn periodic_calibration_converges_in_the_release_cycle() {
     assert!((1..=8).contains(&c.rounds));
     assert!(c.median_ns > 0);
 }
+
+/// REV-051 RV-127: a zero payload is a usage error, never a division panic.
+#[test]
+fn p0_record_count_rejects_a_zero_payload() {
+    assert!(records_for(64 * 1024 * 1024, 0).is_err());
+    assert_eq!(records_for(1000, 10).unwrap(), 100);
+    assert_eq!(records_for(5, 10).unwrap(), 0);
+}

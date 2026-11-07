@@ -46,6 +46,14 @@ impl Schema {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct EncodeError;
 
+impl std::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("record does not fit the encode buffer")
+    }
+}
+
+impl std::error::Error for EncodeError {}
+
 /// A message type a [`Writer`] can log.
 ///
 /// `encode` runs on the RT thread: it must not allocate, block or panic. The
@@ -151,7 +159,12 @@ impl From<CaptureError> for LogError {
 }
 
 /// State a writer owns exclusively and returns through its mailbox on Drop.
+///
+/// The core reference lives here too, so after the push in `Writer::drop` the
+/// RT thread holds no reference whose release could free shared memory
+/// (REV-051 RV-120).
 pub(crate) struct Owned {
+    pub(crate) core: Arc<CaptureCore>,
     pub(crate) write: WriteState,
     pub(crate) scratch: Box<[u8]>,
 }
@@ -173,7 +186,6 @@ pub(crate) struct Owned {
 /// ```
 pub struct Writer {
     state: Option<Owned>,
-    core: Arc<CaptureCore>,
     mailbox: rtrb::Producer<Owned>,
     id: usize,
     session: u128,
@@ -184,15 +196,13 @@ pub struct Writer {
 impl Writer {
     pub(crate) fn new(
         state: Owned,
-        core: Arc<CaptureCore>,
         mailbox: rtrb::Producer<Owned>,
         id: usize,
         origin: Instant,
     ) -> Self {
-        let session = core.session_id();
+        let session = state.core.session_id();
         Self {
             state: Some(state),
-            core,
             mailbox,
             id,
             session,
@@ -206,7 +216,7 @@ impl Writer {
     /// only: no allocation and no reference-count change.
     pub fn producer(&mut self) -> Producer<'_> {
         match self.state.as_mut() {
-            Some(owned) => self.core.producer(self.id, &mut owned.write),
+            Some(owned) => owned.core.producer(self.id, &mut owned.write),
             // `state` is only taken inside Drop, after which no method can run.
             None => unreachable!("writer state is present until drop"),
         }
@@ -260,7 +270,7 @@ impl Writer {
             level: channel.level,
             importance: None,
         };
-        match self
+        match owned
             .core
             .producer(self.id, &mut owned.write)
             .try_record_small(metadata, payload)?

@@ -271,6 +271,62 @@ fn f13_bind_failure_rejects_start_and_leaves_nothing_behind() {
     assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
 }
 
+/// REV-051 RV-122: a failure inside the host (here: the output namespace
+/// cannot be created) must not return before the listener is closed.
+#[cfg(unix)]
+#[test]
+fn f13_host_start_failure_closes_the_listener_before_returning() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = Temp::new();
+    let locked = temp.0.join("locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if std::fs::create_dir(locked.join("probe")).is_ok() {
+        // A privileged user ignores directory permissions; nothing to provoke.
+        return;
+    }
+    let address = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let error = Logger::builder()
+        .budget(budget())
+        .file_output(&locked, Retention::ring(256 * MIB as u64))
+        .channel::<[u8]>("blob")
+        .writer("control")
+        .remote(ServerConfig {
+            address,
+            ..server()
+        })
+        .start()
+        .unwrap_err();
+    assert!(matches!(error, StartError::Io(_)), "{error:?}");
+    // On error nothing keeps running: the address is free at once.
+    let rebound = std::net::TcpListener::bind(address);
+    assert!(rebound.is_ok(), "listener outlived start(): {rebound:?}");
+}
+
+/// REV-051 RV-123: default remote limits are derived before the quota check;
+/// an overflowing quota must still be rejected as an error, not a panic.
+#[test]
+fn f13_overflowing_quota_with_remote_is_rejected_not_panicking() {
+    let temp = Temp::new();
+    let result = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<[u8]>("blob")
+        .writer_with("control", WriterQuota::small(usize::MAX, 256))
+        .remote(server())
+        .plan();
+    assert!(
+        matches!(
+            result,
+            Err(StartError::InvalidBudget | StartError::Remote(_))
+        ),
+        "{result:?}"
+    );
+}
+
 #[test]
 fn f13_status_carries_the_operations_report_when_telemetry_is_enabled() {
     let temp = Temp::new();

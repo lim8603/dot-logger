@@ -187,3 +187,96 @@ fn f15_custom_sizing_mixes_streams_and_overrides_preset_defaults() {
         .unwrap();
     assert_eq!(tuned.sync_every, Duration::from_millis(200));
 }
+
+/// REV-051 RV-123: unbounded loss durations are accepted and shut down
+/// normally; they saturate internally instead of overflowing.
+#[test]
+fn f15_unbounded_durations_start_shut_down_and_drop_without_panic() {
+    let temp = Temp::new();
+    let unbounded = || {
+        Budget::new()
+            .memory_bytes(64 * MIB)
+            .sync_every(Duration::MAX)
+            .drop_deadline(Duration::MAX)
+            .writer_quota(WriterQuota::small(64, 64))
+    };
+    let logger = declared(&temp).budget(unbounded()).start().unwrap();
+    let Shutdown::Closed(report) = logger.shutdown(Duration::MAX).unwrap() else {
+        panic!("an unbounded deadline must still close");
+    };
+    assert!(report.is_success(), "{report:?}");
+    drop(declared(&temp).budget(unbounded()).start().unwrap());
+}
+
+/// REV-051 RV-123: sizes whose totals overflow are rejected as an invalid
+/// budget instead of panicking or wrapping.
+#[test]
+fn f15_overflowing_sizes_are_rejected_not_panicking() {
+    let temp = Temp::new();
+    let huge = declared(&temp)
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_secs(1))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(64, 64)),
+        )
+        .writer_with("other", WriterQuota::small(usize::MAX, 256))
+        .plan();
+    assert!(matches!(huge, Err(StartError::InvalidBudget)), "{huge:?}");
+    let sized = declared(&temp)
+        .preset(Preset::control(u32::MAX).absorb(Duration::MAX))
+        .plan();
+    assert!(matches!(sized, Err(StartError::InvalidBudget)), "{sized:?}");
+}
+
+/// REV-051 RV-124 (ADR-012): the facade's own preallocations — each writer's
+/// encode scratch and return mailbox, each output's write batch — are part of
+/// the worker partition and of `required_bytes`.
+#[test]
+fn f15_facade_buffers_are_charged_to_the_worker_partition() {
+    let temp = Temp::new();
+    let plan = |slot_bytes: usize, batch: usize| {
+        declared(&temp)
+            .budget(
+                Budget::new()
+                    .memory_bytes(64 * MIB)
+                    .sync_every(Duration::from_secs(1))
+                    .drop_deadline(Duration::from_secs(3))
+                    .writer_quota(WriterQuota::small(64, slot_bytes))
+                    .batching(batch, Duration::from_millis(10)),
+            )
+            .plan()
+            .unwrap()
+    };
+    let base = plan(64, 256);
+    let wide = plan(64 * 1024, 256);
+    let batched = plan(64, 4096);
+    // One writer: its scratch grows by exactly the slot growth.
+    assert_eq!(
+        wide.memory.worker_bytes - base.memory.worker_bytes,
+        64 * 1024 - 64
+    );
+    // One output: a larger batch reserves more worker memory.
+    assert!(batched.memory.worker_bytes > base.memory.worker_bytes);
+    assert!(batched.required_bytes > base.required_bytes);
+}
+
+/// REV-051 RV-126: the prelude covers the preset path and `EncodeError` is a
+/// standard error like the other facade errors.
+mod prelude_surface {
+    use dot_logger::prelude::*;
+
+    fn standard_error<E: std::error::Error + Send + Sync + 'static>() {}
+
+    #[test]
+    fn f15_prelude_has_presets_and_encode_error_is_an_error() {
+        let sizing: Sizing = Preset::control(1000);
+        assert_eq!(sizing, Preset::control(1000));
+        standard_error::<EncodeError>();
+        assert_eq!(
+            EncodeError.to_string(),
+            "record does not fit the encode buffer"
+        );
+    }
+}

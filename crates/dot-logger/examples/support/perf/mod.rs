@@ -125,6 +125,14 @@ impl Throughput {
 }
 /// Throughput up to the final file/directory sync; RAM acceptance alone and
 /// truncated runs are rejected.
+/// Records of `payload` bytes in `total_bytes`; a zero payload is a usage
+/// error rather than a division by zero (REV-051 RV-127).
+pub fn records_for(total_bytes: u64, payload: usize) -> Result<u64, Error> {
+    total_bytes
+        .checked_div(payload as u64)
+        .ok_or_else(|| "payload must be at least 1 byte".into())
+}
+
 pub fn throughput(run: &StorageRun) -> Result<Throughput, Rejection> {
     if run.stopped.is_some() {
         return Err(Rejection::Incomplete);
@@ -355,7 +363,7 @@ pub fn calibrate_periodic(
             sleep_until(origin + k as u64 * period_ns)?;
             let t = now_ns();
             work(iterations);
-            *sample = (now_ns() - t).max(1);
+            *sample = now_ns().saturating_sub(t).max(1);
         }
         samples.sort_unstable();
         let median_ns = samples[releases / 2];
@@ -438,7 +446,7 @@ pub fn run_control(config: ControlConfig, releases: u64) -> Result<ControlRun, E
         }
         r.wake.record(wake.saturating_sub(release));
         r.response.record(done.saturating_sub(release));
-        let c = account(k, period, deadline, done - origin);
+        let c = account(k, period, deadline, done.saturating_sub(origin));
         if c.missed {
             r.misses += 1;
         } else {

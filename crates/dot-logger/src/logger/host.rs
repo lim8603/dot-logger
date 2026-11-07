@@ -26,7 +26,7 @@ use crate::storage::{
 };
 
 use super::affinity::pin_current;
-use super::budget::{STACK_BYTES, Tuning};
+use super::budget::{self, STACK_BYTES, Tuning};
 use super::health::{AFFINITY_APPLIED, AFFINITY_FAILED, AFFINITY_NONE, OutputStatus, Shared};
 use super::remote::{Remote, Tap};
 use super::writer::Owned;
@@ -70,22 +70,37 @@ pub(crate) struct HostPlan {
     pub(crate) remote: Remote,
 }
 
+/// A host that failed to start. When `host` is present the thread is still
+/// cleaning up (listener, reaper) and must be joined once the caller dropped
+/// every writer it still holds (REV-051 RV-122).
+pub(crate) struct SpawnFailed {
+    pub(crate) error: StartError,
+    pub(crate) host: Option<JoinHandle<()>>,
+}
+
 /// Start the host and wait until it built every component or failed.
 pub(crate) fn spawn(
     plan: HostPlan,
     commands: Receiver<Command>,
-) -> Result<(Vec<PathBuf>, JoinHandle<()>), StartError> {
+) -> Result<(Vec<PathBuf>, JoinHandle<()>), SpawnFailed> {
     let (ready, started) = mpsc::sync_channel(1);
     let handle = std::thread::Builder::new()
         .name("dot-logger-host".into())
         .stack_size(STACK_BYTES)
         .spawn(move || host_main(plan, commands, ready))
-        .map_err(StartError::Io)?;
-    match started.recv() {
-        Ok(Ok(directories)) => Ok((directories, handle)),
-        Ok(Err(error)) => Err(error),
-        Err(_) => Err(StartError::WorkerFailed),
-    }
+        .map_err(|error| SpawnFailed {
+            error: StartError::Io(error),
+            host: None,
+        })?;
+    let error = match started.recv() {
+        Ok(Ok(directories)) => return Ok((directories, handle)),
+        Ok(Err(error)) => error,
+        Err(_) => StartError::WorkerFailed,
+    };
+    Err(SpawnFailed {
+        error,
+        host: Some(handle),
+    })
 }
 
 fn ns(origin: Instant, now: Instant) -> u64 {
@@ -106,6 +121,33 @@ impl Drop for StopOnExit<'_> {
     fn drop(&mut self) {
         self.0.stop.store(true, Ordering::Release);
     }
+}
+
+/// True once every writer finished dropping, i.e. released its mailbox
+/// producer. A pushed state alone is not enough: the writer's drop glue may
+/// still be running, and whichever side drops its ring end last frees the ring
+/// and the state in it. Waiting for abandonment keeps this thread the last
+/// dropper (REV-051 RV-120).
+pub(crate) fn writers_returned<T>(mailboxes: &[rtrb::Consumer<T>]) -> bool {
+    mailboxes.iter().all(rtrb::Consumer::is_abandoned)
+}
+
+/// Writers that have not finished dropping yet.
+pub(crate) fn writers_outstanding<T>(mailboxes: &[rtrb::Consumer<T>]) -> usize {
+    mailboxes.iter().filter(|m| !m.is_abandoned()).count()
+}
+
+/// Sleep of an idle IO thread: `idle_wait`, shortened only to the remaining
+/// hold time of a batch that is already held.
+pub(crate) fn idle_sleep(
+    idle_wait: Duration,
+    batch_wait: Duration,
+    held: impl IntoIterator<Item = Instant>,
+    now: Instant,
+) -> Duration {
+    held.into_iter()
+        .map(|since| batch_wait.saturating_sub(now.saturating_duration_since(since)))
+        .fold(idle_wait, Duration::min)
 }
 
 fn host_main(
@@ -182,12 +224,12 @@ fn host_main(
     // Every exit path (including failure and panic) stops the listener.
     remote.stop();
     // Reaper: an outstanding Writer still points into `core` and its rings.
-    // Keep this thread as their last owner until every writer state returned,
-    // so no RT thread ever performs the final release (ADR-012 §3).
+    // Keep this thread as their last owner until every writer finished
+    // dropping, so no RT thread ever performs the final release (ADR-012 §3).
     let mut wait = tuning.idle_wait.max(Duration::from_millis(1));
-    while mailboxes.iter().any(rtrb::Consumer::is_empty) {
+    while !writers_returned(&mailboxes) {
         std::thread::sleep(wait);
-        wait = (wait * 2).min(Duration::from_millis(100));
+        wait = wait.saturating_mul(2).min(Duration::from_millis(100));
     }
     drop(mailboxes);
     drop(reads);
@@ -374,7 +416,7 @@ fn run(
                 last_sync: Instant::now(),
                 tuning: config.tuning,
             };
-            let mut events = vec![None; 256];
+            let mut events = vec![None; budget::HOST_EVENTS];
             let mut shutdown: Option<ShutdownState> = None;
             let mut sampled: Option<Instant> = None;
             let closed = loop {
@@ -413,7 +455,7 @@ fn run(
                         Ok(Command::Shutdown { deadline, reply }) => Some((deadline, Some(reply))),
                         // The handle vanished without shutdown (leaked or panicked).
                         Err(TryRecvError::Disconnected) => {
-                            Some((now + config.tuning.drop_deadline, None))
+                            Some((budget::later(now, config.tuning.drop_deadline), None))
                         }
                         Err(TryRecvError::Empty) => None,
                     };
@@ -556,7 +598,7 @@ impl<'c, 'o> Host<'c, 'o> {
         }
         self.last_sync = now;
         let scope = completion.capture_scope(&mut self.ranges)?;
-        let deadline = now + self.tuning.sync_every * 4 + Duration::from_secs(1);
+        let deadline = budget::later(now, budget::sync_overdue(self.tuning.sync_every));
         // Busy/Capacity/Closing: try again at the next period.
         if let Ok(token) = self
             .control
@@ -594,7 +636,7 @@ fn facade_report(
 ) -> FacadeReport {
     FacadeReport {
         core,
-        writers_outstanding: mailboxes.iter().filter(|m| m.is_empty()).count(),
+        writers_outstanding: writers_outstanding(mailboxes),
         worker_failed: config.flags.worker_failed.load(Ordering::Acquire),
         io_failed: config.flags.io_failed.load(Ordering::Acquire),
         unconfirmed: Vec::new(),
@@ -696,8 +738,13 @@ fn io_loop(
                             syncs.push(work);
                         } else {
                             work.complete(SyncResult::Failed);
-                            flags.io_failed.store(true, Ordering::Release);
-                            target.status.fail();
+                            // A barrier over records this output never wrote
+                            // (e.g. a full retention) fails the barrier, not
+                            // the file (RV-125).
+                            if matches!(error.error, StorageError::Io(_) | StorageError::Poisoned) {
+                                flags.io_failed.store(true, Ordering::Release);
+                                target.status.fail();
+                            }
                         }
                     } else {
                         // The sync itself failed; the log is now poisoned.
@@ -728,7 +775,12 @@ fn io_loop(
             return;
         }
         if !busy {
-            std::thread::sleep(tuning.idle_wait.min(tuning.batch_wait));
+            let held = targets
+                .iter()
+                .filter(|t| !t.batch.is_empty())
+                .filter_map(|t| t.held_since);
+            let wait = idle_sleep(tuning.idle_wait, tuning.batch_wait, held, Instant::now());
+            std::thread::sleep(wait);
         }
     }
 }
@@ -757,6 +809,15 @@ fn failure(error: &RetentionError) -> FailureReason {
             FailureReason::IoFailure
         }
         _ => FailureReason::AdapterFailure,
+    }
+}
+
+/// Reason the unconfirmed tail of a failed batch is reported with: a prefix
+/// flush that hit the file itself turns any failure into an IO failure.
+pub(crate) fn tail_reason(write: FailureReason, flush: Option<&RetentionError>) -> FailureReason {
+    match flush {
+        Some(error) if failure(error) == FailureReason::IoFailure => FailureReason::IoFailure,
+        _ => write,
     }
 }
 
@@ -797,20 +858,27 @@ fn settle(
     for delivery in &batch[reported..written] {
         report(delivery, Update::Confirmed(Boundary::Written));
     }
-    let reason = failure(&error);
+    let mut reason = failure(&error);
     let mut done = written;
-    if reason == FailureReason::AdapterFailure && appended > written && log.flush().is_ok() {
-        for delivery in &batch[written..appended] {
-            report(delivery, Update::Confirmed(Boundary::Written));
+    if reason == FailureReason::AdapterFailure && appended > written {
+        match log.flush() {
+            Ok(()) => {
+                for delivery in &batch[written..appended] {
+                    report(delivery, Update::Confirmed(Boundary::Written));
+                }
+                done = appended;
+            }
+            Err(flush) => reason = tail_reason(reason, Some(&flush)),
         }
-        done = appended;
     }
     if done < batch.len() {
-        flags.io_failed.store(true, Ordering::Release);
         status.records_failed(batch.len() - done);
-        if reason == FailureReason::IoFailure {
-            status.fail();
-        }
+    }
+    // Only a fault of the file itself is an IO failure; a full retention or a
+    // rejected record fails records without failing the output (RV-125).
+    if reason == FailureReason::IoFailure {
+        flags.io_failed.store(true, Ordering::Release);
+        status.fail();
     }
     for delivery in &batch[done..] {
         report(delivery, Update::Failed(reason));

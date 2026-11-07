@@ -5,11 +5,11 @@
 //! idle wait) default here because a wrong choice changes speed, not loss
 //! (ADR-012 §6).
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::capture::CaptureOwner;
-use crate::completion::Registry;
 use crate::completion::{Boundaries, Boundary, CompletionConfig, TargetContract};
+use crate::completion::{ProducerRange, Registry};
 use crate::config::{
     ImportancePolicy, MemoryBudget, PoolQuota, ProducerQuota, Resource, SessionConfig,
     WorkerThreadingConfig,
@@ -19,12 +19,13 @@ use crate::control::ControlOwner;
 #[cfg(not(target_os = "linux"))]
 use crate::platform::CapabilityStatus;
 use crate::platform::{PlatformCapabilities, Requirement};
-use crate::routing::Router;
+use crate::routing::{Delivery, DispatchEvent, Router};
 use crate::routing::{Route, RoutingConfig, Schedule, TargetConfig};
 use crate::storage::log_required;
 use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfig};
 use crate::telemetry::Bank;
 
+use super::writer::Owned;
 use super::{Missing, StartError};
 
 /// Stack reserved for every facade thread, counted in the worker partition.
@@ -66,12 +67,17 @@ impl WriterQuota {
         self
     }
 
-    fn records(&self) -> usize {
-        self.small_slots + self.raw_slots
+    fn records(&self) -> Option<usize> {
+        self.small_slots.checked_add(self.raw_slots)
     }
 
-    fn payload_bytes(&self) -> usize {
-        self.small_slots * self.small_slot_bytes + self.raw_slots * self.raw_slot_bytes
+    fn small_bytes(&self) -> Option<usize> {
+        self.small_slots.checked_mul(self.small_slot_bytes)
+    }
+
+    fn payload_bytes(&self) -> Option<usize> {
+        self.small_bytes()?
+            .checked_add(self.raw_slots.checked_mul(self.raw_slot_bytes)?)
     }
 
     fn producer(&self) -> ProducerQuota {
@@ -226,6 +232,54 @@ impl Retention {
     }
 }
 
+/// Dispatch events the host drains per turn.
+pub(crate) const HOST_EVENTS: usize = 256;
+
+/// Heap the facade itself preallocates beside the core (ADR-012, REV-051
+/// RV-124): per writer the encode scratch (one small slot) and the 1-slot
+/// return mailbox; per output the IO write batch; on the host the dispatch
+/// event buffer and three per-producer sync range arrays. Thread stacks,
+/// channel queues and the bounded sync work list are not included.
+pub(crate) fn facade_bytes(
+    quotas: &[WriterQuota],
+    outputs: usize,
+    batch_records: usize,
+) -> Option<usize> {
+    use std::mem::size_of;
+    let mailbox = size_of::<rtrb::RingBuffer<Owned>>() + size_of::<Owned>();
+    let writers = quotas.iter().try_fold(0usize, |sum, q| {
+        sum.checked_add(q.small_slot_bytes.checked_add(mailbox)?)
+    })?;
+    let batches = outputs
+        .checked_mul(batch_records)?
+        .checked_mul(size_of::<Delivery<'static>>())?;
+    let host = HOST_EVENTS
+        .checked_mul(size_of::<Option<DispatchEvent>>())?
+        .checked_add(
+            quotas
+                .len()
+                .checked_mul(3)?
+                .checked_mul(size_of::<ProducerRange>())?,
+        )?;
+    writers.checked_add(batches)?.checked_add(host)
+}
+
+/// Longest horizon an `Instant` deadline is clamped to: far enough to mean
+/// "unbounded" for any caller, small enough never to overflow (RV-123).
+const HORIZON: Duration = Duration::from_secs(100 * 365 * 24 * 60 * 60);
+
+/// `now + by`, clamped to a far horizon instead of overflowing.
+pub(crate) fn later(now: Instant, by: Duration) -> Instant {
+    now.checked_add(by.min(HORIZON)).unwrap_or(now)
+}
+
+/// Deadline span of one ordinary sync: four periods plus one second.
+pub(crate) fn sync_overdue(sync_every: Duration) -> Duration {
+    sync_every
+        .saturating_mul(4)
+        .saturating_add(Duration::from_secs(1))
+}
+
 /// Facade performance settings resolved from a [`Budget`].
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Tuning {
@@ -347,7 +401,16 @@ pub(crate) fn derive(
         .io_threads
         .checked_add(1 + extra.threads)
         .ok_or_else(overflow)?;
-    let worker = threads.checked_mul(STACK_BYTES).ok_or_else(overflow)?;
+    let worker = threads
+        .checked_mul(STACK_BYTES)
+        .and_then(|n| {
+            n.checked_add(facade_bytes(
+                &quotas,
+                retention.len(),
+                budget.batch_records,
+            )?)
+        })
+        .ok_or_else(overflow)?;
     let fixed = raw
         .checked_add(input)
         .and_then(|n| n.checked_add(worker))
@@ -356,20 +419,24 @@ pub(crate) fn derive(
     // Routing: the shared record budget saturates before any target queue, so
     // overload backpressures into ingress and appears as RT Capacity rejection,
     // never as a silent required-target drop.
-    let records: usize = quotas.iter().map(WriterQuota::records).sum();
-    let bytes: usize = quotas.iter().map(WriterQuota::payload_bytes).sum();
-    let small_copy: usize = quotas
-        .iter()
-        .map(|q| q.small_slots * q.small_slot_bytes)
-        .sum();
+    let total = |each: fn(&WriterQuota) -> Option<usize>| {
+        quotas
+            .iter()
+            .try_fold(0usize, |sum, q| sum.checked_add(each(q)?))
+            .ok_or_else(overflow)
+    };
+    let records = total(WriterQuota::records)?;
+    let bytes = total(WriterQuota::payload_bytes)?;
+    let small_copy = total(WriterQuota::small_bytes)?;
     let max_payload = quotas
         .iter()
         .map(|q| q.small_slot_bytes.max(q.raw_slot_bytes))
         .max()
         .ok_or(StartError::InvalidBudget)?;
+    // Every per-writer count fits: their sum (`records`) did.
     let per_writer = quotas
         .iter()
-        .map(WriterQuota::records)
+        .filter_map(WriterQuota::records)
         .max()
         .ok_or(StartError::InvalidBudget)?;
     let max_raw = quotas.iter().map(|q| q.raw_slots).max().unwrap_or(0).max(1);

@@ -42,7 +42,7 @@ pub mod logger;
 /// Facade types for the common integration path.
 pub mod prelude {
     pub use crate::logger::{
-        Budget, Channel, EncodeError, LogError, Logged, Logger, Record, Retention, Schema,
-        Shutdown, Writer, WriterQuota,
+        Budget, Channel, EncodeError, LogError, Logged, Logger, Preset, Record, Retention, Schema,
+        Shutdown, Sizing, Writer, WriterQuota,
     };
 }

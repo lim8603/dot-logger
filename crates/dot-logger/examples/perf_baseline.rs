@@ -96,7 +96,7 @@ mod linux {
                 let rate: u64 = rate.parse()?;
                 let w = workload(
                     payload,
-                    rate.saturating_mul(seconds) / payload as u64,
+                    records_for(rate.saturating_mul(seconds), payload)?,
                     files.parse()?,
                     writers.parse()?,
                     Some(rate),
@@ -113,7 +113,7 @@ mod linux {
                 let payload: usize = payload.parse()?;
                 let w = workload(
                     payload,
-                    total.parse::<u64>()? / payload as u64,
+                    records_for(total.parse::<u64>()?, payload)?,
                     files.parse()?,
                     writers.parse()?,
                     None,

@@ -117,11 +117,18 @@ mod imp {
             .max()
             .unwrap_or(1)
             .max(1);
-        let records: usize = quotas.iter().map(|q| q.small_slots + q.raw_slots).sum();
-        let bytes: usize = quotas
-            .iter()
-            .map(|q| q.small_slots * q.small_slot_bytes + q.raw_slots * q.raw_slot_bytes)
-            .sum();
+        // Saturating: these run before the quota check rejects an overflowing
+        // quota as an invalid budget (RV-123).
+        let records = quotas.iter().fold(0usize, |sum, q| {
+            sum.saturating_add(q.small_slots.saturating_add(q.raw_slots))
+        });
+        let bytes = quotas.iter().fold(0usize, |sum, q| {
+            sum.saturating_add(
+                q.small_slots
+                    .saturating_mul(q.small_slot_bytes)
+                    .saturating_add(q.raw_slots.saturating_mul(q.raw_slot_bytes)),
+            )
+        });
         RemoteLimits {
             connections: 4,
             subscriptions: 4,

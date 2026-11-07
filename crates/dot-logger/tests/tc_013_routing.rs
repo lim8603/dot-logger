@@ -159,3 +159,40 @@ fn f16_default_options_route_to_every_output() {
         assert_eq!(stored(dir), vec![(1, vec![9; 2])]);
     }
 }
+
+/// An output that never receives a producer's records must still pass its
+/// periodic and final sync barriers. Found in TASK-023 S2b: with every record
+/// of the writer routed to output 0, output 1's barrier saw the writer's whole
+/// range as unverified and failed once it exceeded the completion window.
+#[test]
+fn f16_an_output_without_a_producers_records_still_syncs() {
+    let temp = Temp::new();
+    let (builder, _, _) = two_outputs(&temp);
+    let logger = builder
+        .channel_with::<[u8]>("only_a", ChannelOptions::new().outputs(&[0]))
+        .channel_with::<[u8]>("only_b", ChannelOptions::new().outputs(&[1]))
+        .writer("w")
+        .start()
+        .unwrap();
+    let only_a = logger.channel::<[u8]>("only_a").unwrap();
+    let mut writer = logger.take_writer("w").unwrap();
+    // Far more records than the completion window (2 × 64 slots), spread
+    // over several 20 ms sync periods.
+    for i in 0..1000_u32 {
+        while writer.try_log(only_a, &i.to_le_bytes()[..]).is_err() {
+            std::thread::yield_now();
+        }
+        if i % 100 == 0 {
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
+    drop(writer);
+    let directories = logger.directories().to_vec();
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert!(report.is_success(), "{report:?}");
+    assert!(!report.core.sync_failed, "{report:?}");
+    assert_eq!(stored(&directories[0]).len(), 1000);
+    assert!(stored(&directories[1]).is_empty());
+}

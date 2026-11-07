@@ -881,8 +881,17 @@ impl SyncWork<'_, '_> {
                 continue;
             }
             // A new segment cannot stand in for a previous segment's unsynced
-            // writes. Check only the portions outside this file's known range;
-            // an older range beyond retained metadata is conservatively rejected.
+            // writes. Check only the portions outside this file's known range:
+            // `first`/`last` span every record this log ever appended, in
+            // per-producer order, so a record routed here and written lies
+            // inside. Outside it only a record that is not yet terminal could
+            // still be owed to this file. A completion slot is reused only
+            // after its record turned terminal on every target, so every
+            // sequence older than the newest `window` is terminal, and an
+            // Expired one is terminal too. Polling the newest `window` of each
+            // portion therefore decides it, however sparse this target's
+            // share of the producer is (TASK-023 S2b, routed outputs).
+            let window = completion.registry.limits.window as u64;
             let mut outside = [(1, 0); 2];
             if first[p] == 0 {
                 outside[0] = (start, end);
@@ -894,13 +903,11 @@ impl SyncWork<'_, '_> {
                     outside[1] = (start.max(last[p] + 1), end);
                 }
             }
-            for (mut seq, end) in outside {
+            for (seq, end) in outside {
                 if end < seq {
                     continue;
                 }
-                if end - seq >= completion.registry.limits.window as u64 {
-                    return Ok(false);
-                }
+                let mut seq = seq.max(end.saturating_sub(window.saturating_sub(1)));
                 loop {
                     let receipt = crate::capture::CaptureReceipt {
                         session_id: self.token.session_id,
@@ -911,10 +918,7 @@ impl SyncWork<'_, '_> {
                     if status.outcome == QueryOutcome::Busy {
                         return Err(ControlError::Busy);
                     }
-                    if matches!(
-                        status.outcome,
-                        QueryOutcome::Pending | QueryOutcome::Expired
-                    ) {
+                    if status.outcome == QueryOutcome::Pending {
                         return Ok(false);
                     }
                     if seq == end {

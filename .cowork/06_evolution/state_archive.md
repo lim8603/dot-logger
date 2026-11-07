@@ -571,3 +571,25 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 | [REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) | TASK-027 S3b tracing 연결 자가 점검 | Closed | RV-105 재진입 교착 방지·RV-106 shutdown writer 회수 조치, RV-107~109 문서화. 독립 리뷰 미실시 |
 | [REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) | TASK-027 S3c remote 연결 자가 점검 | Closed | RV-110 멈춘 클라이언트가 shutdown을 막던 문제 2초 유예 후 중단으로 조치, RV-111~114 문서화. 독립 리뷰 미실시 |
 | [REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) | TASK-028 S1 정확 배정·preset·plan 자가 점검 | Closed | RV-115 공식 공유로 이중화 방지(F14), RV-116~119 문서화/후속. 독립 리뷰 미실시 |
+
+## #025 — 2026-11-07 #003 세션 종료 R1/R2 하베스트
+
+`project_state.md` 24 KiB 초과(24,926 B)로 이관한 원문이다. 현재 요약은 상태 문서, 근거는 링크된 EV·API·세션 로그를 따른다.
+
+- **2026-11-07 Human 결정 — TASK-023 S2b 발견 ⑥:** 「권고대로」. facade 보존 segment 개수 상한을 "크기·기록 수 회전이 만들 수 있는 가장 작은 segment" 기준으로 계산하고(storage 공용 공식 `smallest_rotated_segment`), 늘어난 catalog 예약은 예산·`plan()`에 반영한다. 시간 회전(60초)·종료로 닫히는 더 작은 segment는 이 계산 밖이다.
+
+- **2026-11-07 Human 결정 — TASK-023 S2b 측정 발견 조치(3건 모두 권고안):** ③ IO batch 실제 크기 = min(사용자 값, target별 기록 예산/2), start/plan에서 결정. ④ 주기 sync 발급 조건을 "target 큐가 빔"에서 "cutoff 이하로 이 target에 라우팅된 기록이 모두 기록됨"으로 core 수정(routing/control, TDD·Miri). ⑤ 측정 도구 P0에 파일당 최대 기록 수 회전을 추가해 facade(segment당 16,384건)와 같은 회전 조건으로 비교, 작은 기록의 파일 수 증가는 TASK-028/029 제품 사이징 과제로 기록. 발견 ①(부분 라우팅 sync coverage)은 `c93a44a` 수정, ②(`Delivery` drop 순서 → 필수 target 폐기)는 결함 수정으로 진행.
+
+- **2026-11-07 Human 결정 — TASK-023 S2a 채널별 출력 선택:** 「출력 순서 지정」. `.channel_with(topic, ChannelOptions::new().outputs(&[..]))`, `file_output` 선언 순서 0부터, 기본 전체 출력, 잘못된 선택은 `StartError::InvalidOutputs`. 16파일 측정을 P0와 같은 workload로 만들기 위함. [API §18.12](../03_design_artifacts/interface_contract.md#1812-채널별-출력-선택--2026-11-07-task-023-s2a).
+
+- **2026-11-05 Human 결정 — TASK-027 S1 facade 계약 승인:** 리뷰 포인트 5개를 하나씩 검토해 모두 권고안을 선택했다. ① [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted: 공유 `CaptureCore` + 소유 `Writer` + 빌림 `Producer<'_>` 뷰, Writer Drop은 반납함 이동만 하고 host/reaper가 최종 소유(ADR-008 borrowed core 유지). ② 성능 값(IO 1·CPU 고정 없음)은 facade 기본값, 손실 값(sync 주기·종료/Drop 기한·메모리·보존)은 `Budget`/preset 필수. ③ `Logger::drop`은 `drop_deadline` 기한 있는 종료. ④ NFR-008: L1 ≤20줄·≤6개념, L2 ≤40·≤10, L3 +6, facade 공개 ≤60. ⑤ `writer.try_log(channel, &msg)`. 계약은 [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05), 시험은 TC-013 F1~F8.
+
+- **2026-11-04 Human 결정 — 소비처 접점 경량화·시각화 범위 추가:** 사용성 평가(공개 항목 534개·기본 worker 없음·예산 명시 부담·Envelope 저장으로 표준 도구 판독 불가)에 동의하고 「권고대로」·「TASK-032 포함」·「MS 분리 가능」. [MS-008](../04_implementation/milestones/MS-008.md)(TASK-027 facade·기본 worker, TASK-028 preset·auto preset, TASK-029 레시피)와 [MS-009](../04_implementation/milestones/MS-009.md)(TASK-030 MCAP 표준 호환, TASK-031 viewer·Foxglove 계열 bridge, TASK-032 운영 대시보드) 등록. NFR-008 통합 용이성 추가, FR-006 viewer 확장, FR-015 장비 측정 auto preset만 TASK-028 S2로 부분 채택(질문 프리셋은 TASK-018 제안 유지). **순서:** TASK-027 → TASK-028 S1 → TASK-023 S2/S3(facade 경로)·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026. 11-03 결정의 "단독 작업 먼저, probe 연동 나중" 원칙 안에서 단독 작업 범위를 넓혔다. ADR 후보: facade 소유 모델(TASK-027 S1)·MCAP 표준 저장 모드(TASK-030 S2 전)·시각화 방식(TASK-031 S1).
+
+- 2026-11-07 #003(이어서): TASK-023 S2a 채널별 출력 선택(Human 결정)·S2b facade 경로 측정 도구. 측정 중 제품 결함 ①~⑤를 TDD로 조치(부분 라우팅 sync coverage·Delivery drop 순서 폐기·batch 예산 붕괴·연속 부하 주기 sync 미발급·기록 수 회전 대응), ⑥ 보존 segment 개수(Human 「권고대로」)·⑦ Busy 보고·⑧ `.active` 잔존까지 조치 — [EV-054](../05_verification/verification_evidence.md#ev-054).
+
+- 2026-11-07 #003: REV-051 RV-120~127을 TDD로 조치(Writer Drop reaper 경쟁·유휴 spin·시작 실패 정리·오버플로·facade 메모리 예산·IO 실패 분류·공개 표면·perf CLI). 1.96/1.85 각 493 Pass — [EV-053](../05_verification/verification_evidence.md#ev-053), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
+
+- 2026-11-05 #001: TASK-027 S1 ADR-012·API §18 승인과 S2 facade·기본 worker 구현(EV-047) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md).
+
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`1af172c`·`64c4d23`) → ~~S3a~~ EV-048(`2a805ef`: `health()`·계측·CPU 고정·GAP-009/010) → ~~S3b~~ EV-049(`91387ba`: tracing/log 연결 +2줄) → ~~S3c~~ EV-050(`c284354`: remote 관측 사본·상태 조회) → ~~S3e~~ EV-051(`ad5dadf`: api-consumer·feature matrix) → ~~TASK-028 S1~~ EV-052(`21cc198` 정확 배정·`4465be3` preset/plan) → ~~[REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) 조치~~ EV-053(`60ea9bb`, Closed) → **다음 TASK-023 S2**(S3d slot 직접 encode는 2026-11-07 Human 승인으로 S3 제외, 재설계 조건은 이월 T4; facade 경로 P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.

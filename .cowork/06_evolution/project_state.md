@@ -15,17 +15,13 @@
 | 상태 | Yellow — UPS 모의 수락, REV-051 Closed, 성능/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-07 / #003 / AI |
-| 세션 상태 | 진행 — 2026-11-07 #003 REV-051 Closed, TASK-023 S2a·S2b 완료(EV-054·055). 다음 S2c |
+| 갱신 | 2026-11-07 / #003 종료 / AI |
+| 세션 상태 | 종료 — 2026-11-07 #003 Human 「세션마무리」. REV-051 Closed, TASK-023 S2a·S2b 완료(EV-053~055). 다음 개발 세션은 S2c부터 |
 | 최근 세션 | [2026-11-07 #003](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md) — REV-051 RV-120~127 조치(EV-053) |
 
 ## 현재 결정과 제약
 
-- **2026-11-07 Human 결정 — TASK-023 S2b 발견 ⑥:** 「권고대로」. facade 보존 segment 개수 상한을 "크기·기록 수 회전이 만들 수 있는 가장 작은 segment" 기준으로 계산하고(storage 공용 공식 `smallest_rotated_segment`), 늘어난 catalog 예약은 예산·`plan()`에 반영한다. 시간 회전(60초)·종료로 닫히는 더 작은 segment는 이 계산 밖이다.
-
-- **2026-11-07 Human 결정 — TASK-023 S2b 측정 발견 조치(3건 모두 권고안):** ③ IO batch 실제 크기 = min(사용자 값, target별 기록 예산/2), start/plan에서 결정. ④ 주기 sync 발급 조건을 "target 큐가 빔"에서 "cutoff 이하로 이 target에 라우팅된 기록이 모두 기록됨"으로 core 수정(routing/control, TDD·Miri). ⑤ 측정 도구 P0에 파일당 최대 기록 수 회전을 추가해 facade(segment당 16,384건)와 같은 회전 조건으로 비교, 작은 기록의 파일 수 증가는 TASK-028/029 제품 사이징 과제로 기록. 발견 ①(부분 라우팅 sync coverage)은 `c93a44a` 수정, ②(`Delivery` drop 순서 → 필수 target 폐기)는 결함 수정으로 진행.
-
-- **2026-11-07 Human 결정 — TASK-023 S2a 채널별 출력 선택:** 「출력 순서 지정」. `.channel_with(topic, ChannelOptions::new().outputs(&[..]))`, `file_output` 선언 순서 0부터, 기본 전체 출력, 잘못된 선택은 `StartError::InvalidOutputs`. 16파일 측정을 P0와 같은 workload로 만들기 위함. [API §18.12](../03_design_artifacts/interface_contract.md#1812-채널별-출력-선택--2026-11-07-task-023-s2a).
+- **2026-11-07 Human 결정 — TASK-023 S2(4건, 모두 권고안):** S2a 채널별 출력 선택(`ChannelOptions::outputs`, 선언 순서), S2b ③ batch = min(값, 기록 예산/2) ④ 주기 sync 발급 = cutoff까지 이 target 기록이 Written ⑤ P0를 facade 16,384건 회전에 맞춤 ⑥ 보존 segment 개수를 가장 작은 회전 segment 기준으로 계산(시간 회전·종료 segment는 밖). [API §18.12·§19.5](../03_design_artifacts/interface_contract.md#195-task-023-s2b-조치-반영--2026-11-07), [EV-054](../05_verification/verification_evidence.md#ev-054)·[EV-055](../05_verification/verification_evidence.md#ev-055).
 
 - **2026-11-07 Human 결정 — TASK-028 S1 preset/사이징:** preset 3종(`control`·`sensor`·`black_box`) + `Sizing`, 흡수 1초 × slot 1.25·메모리 +10%(`black_box` 흡수 2초), start 시 계산 + `plan()`. preset은 빈 손실 값만 채우고 사용자 값을 덮어쓰지 않는다. [API §19](../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07).
 
@@ -33,9 +29,9 @@
 
 - **2026-11-07 Human 결정 — TASK-027 S3d 제외:** 「승인」으로 slot 직접 encode를 S3에서 빼고 scratch encode + byte ring 복사 경로를 유지한다(byte ring 감김·rtrb 0 채우기·unsafe/형식 변경 필요). TASK-023 S2 P1(256B)에서 encode·복사 비용이 의미 있게 나오면 별도 설계한다 — Human 요청으로 이월 백로그 T4에 기록. API §18.3 문구 정정.
 
-- **2026-11-05 Human 결정 — TASK-027 S1 facade 계약 승인:** 리뷰 포인트 5개를 하나씩 검토해 모두 권고안을 선택했다. ① [ADR-012](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted: 공유 `CaptureCore` + 소유 `Writer` + 빌림 `Producer<'_>` 뷰, Writer Drop은 반납함 이동만 하고 host/reaper가 최종 소유(ADR-008 borrowed core 유지). ② 성능 값(IO 1·CPU 고정 없음)은 facade 기본값, 손실 값(sync 주기·종료/Drop 기한·메모리·보존)은 `Budget`/preset 필수. ③ `Logger::drop`은 `drop_deadline` 기한 있는 종료. ④ NFR-008: L1 ≤20줄·≤6개념, L2 ≤40·≤10, L3 +6, facade 공개 ≤60. ⑤ `writer.try_log(channel, &msg)`. 계약은 [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05), 시험은 TC-013 F1~F8.
+- **2026-11-05 Human 결정 — TASK-027 S1 facade 계약:** ADR-012 Accepted(공유 `CaptureCore`·소유 `Writer`·빌림 `Producer<'_>`, Writer Drop은 반납함 이동만), 손실 값 필수·성능 값 기본값, `Logger::drop` 기한 종료, NFR-008 수치(L1 ≤20줄·≤6개념 등), `writer.try_log(channel, &msg)`. [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05).
 
-- **2026-11-04 Human 결정 — 소비처 접점 경량화·시각화 범위 추가:** 사용성 평가(공개 항목 534개·기본 worker 없음·예산 명시 부담·Envelope 저장으로 표준 도구 판독 불가)에 동의하고 「권고대로」·「TASK-032 포함」·「MS 분리 가능」. [MS-008](../04_implementation/milestones/MS-008.md)(TASK-027 facade·기본 worker, TASK-028 preset·auto preset, TASK-029 레시피)와 [MS-009](../04_implementation/milestones/MS-009.md)(TASK-030 MCAP 표준 호환, TASK-031 viewer·Foxglove 계열 bridge, TASK-032 운영 대시보드) 등록. NFR-008 통합 용이성 추가, FR-006 viewer 확장, FR-015 장비 측정 auto preset만 TASK-028 S2로 부분 채택(질문 프리셋은 TASK-018 제안 유지). **순서:** TASK-027 → TASK-028 S1 → TASK-023 S2/S3(facade 경로)·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026. 11-03 결정의 "단독 작업 먼저, probe 연동 나중" 원칙 안에서 단독 작업 범위를 넓혔다. ADR 후보: facade 소유 모델(TASK-027 S1)·MCAP 표준 저장 모드(TASK-030 S2 전)·시각화 방식(TASK-031 S1).
+- **2026-11-04 Human 결정 — MS-008/009:** 소비처 접점 경량화(TASK-027~029)와 MCAP 표준·viewer·대시보드(TASK-030~032) 등록, NFR-008 추가, FR-015는 auto preset만 TASK-028 S2로 부분 채택. **순서:** TASK-027 → TASK-028 S1 → TASK-023 S2/S3·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026. [MS-008](../04_implementation/milestones/MS-008.md)·[MS-009](../04_implementation/milestones/MS-009.md).
 
 - **2026-11-03 Human 결정 — probe 연동 전 dot-logger 단독 작업 선행:** 「이 프로젝트에서 할 수 있는걸 다 마치고 probe쪽에서 logger를 연동하는 세션을 진행」. ① 원격 ApplyConfig/Compare 운영 backend·CLI runtime metrics 구현(기존 API§15 범위), ② TASK-023 합성 행(P0 기준선·10ms 제어 off/on·P1~P3·P5·계측 비용)을 TASK-026 전에 generic 커널에서 실행 — 실앱 행은 TASK-026 뒤 유지, ③ 합성 측정 뒤 RT 준비/재시작 요청서를 제출하고 승인 후 RT 행 실행, ④ probe 연동 인계 패키지 작성 후 dot-probe 저장소 세션에서 TASK-026 진행. 24h soak(TASK-024)는 연동 뒤. dot-probe 저장소는 이 세션에서 수정하지 않는다.
 
@@ -95,7 +91,7 @@
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`1af172c`·`64c4d23`) → ~~S3a~~ EV-048(`2a805ef`: `health()`·계측·CPU 고정·GAP-009/010) → ~~S3b~~ EV-049(`91387ba`: tracing/log 연결 +2줄) → ~~S3c~~ EV-050(`c284354`: remote 관측 사본·상태 조회) → ~~S3e~~ EV-051(`ad5dadf`: api-consumer·feature matrix) → ~~TASK-028 S1~~ EV-052(`21cc198` 정확 배정·`4465be3` preset/plan) → ~~[REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) 조치~~ EV-053(`60ea9bb`, Closed) → **다음 TASK-023 S2**(S3d slot 직접 encode는 2026-11-07 Human 승인으로 S3 제외, 재설계 조건은 이월 T4; facade 경로 P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **다음 TASK-023 S2c**(P2 raw `producer()` loan 8 MiB, P3 혼합 `StorageWorkload` 크기 혼합·32생산자/16파일/128채널; S2a·S2b EV-054·055 완료) → S2d 시험 실행 → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이번 세션 core 변경(sync 발급 조건·segment 개수 등)이 많아 S2c 전후 독립 리뷰 세션 권장.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -123,7 +119,7 @@
 | T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 
-범위 밖 백로그 B: 없음. 현재 T1/T2/T3/T4는 미도래(T4는 TASK-023 S2 P1 결과로 판정). 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
+범위 밖 백로그 B: 없음. 현재 T1/T2/T3/T4는 미도래. T4 입력: S2b smoke(측정 아님)에서 256B `try_log` p50 143 ns 중 복사 p50 21 ns(시계 오버헤드와 같은 수준) — 정식 판정은 TASK-023 S3. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -141,10 +137,8 @@
 
 ## 최근 작업·이력
 
-- 2026-11-07 #003(이어서): TASK-023 S2a 채널별 출력 선택(Human 결정)·S2b facade 경로 측정 도구. 측정 중 제품 결함 ①~⑤를 TDD로 조치(부분 라우팅 sync coverage·Delivery drop 순서 폐기·batch 예산 붕괴·연속 부하 주기 sync 미발급·기록 수 회전 대응), ⑥ 보존 segment 개수(Human 「권고대로」)·⑦ Busy 보고·⑧ `.active` 잔존까지 조치 — [EV-054](../05_verification/verification_evidence.md#ev-054).
-- 2026-11-07 #003: REV-051 RV-120~127을 TDD로 조치(Writer Drop reaper 경쟁·유휴 spin·시작 실패 정리·오버플로·facade 메모리 예산·IO 실패 분류·공개 표면·perf CLI). 1.96/1.85 각 493 Pass — [EV-053](../05_verification/verification_evidence.md#ev-053), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
+- 2026-11-07 #003: REV-051 RV-120~127 조치·Closed(EV-053), TASK-023 S2a 채널별 출력 선택·S2b facade 측정 도구와 측정 중 제품 결함 ①~⑧ 조치(EV-054·055) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
 - 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`77013e7..49df7d3`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
 - 2026-11-07 #001: TASK-027 S3(health·계측·CPU 고정·tracing·remote·api-consumer, EV-048~051)과 TASK-028 S1(정확 배정·preset·plan, EV-052)을 로컬 완료했고 Human 결정 4건(S3d 제외·T4, remote 의미, preset 구성)을 반영했다 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_001.md).
-- 2026-11-05 #001: TASK-027 S1 ADR-012·API §18 승인과 S2 facade·기본 worker 구현(EV-047) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md).
 
-2026-11-04 이전 이력과 위 세션의 상세 이력 원문은 [상태 아카이브](state_archive.md) #023·#022, R1/R2 이관 원문은 #020/021을 따른다.
+2026-11-05 이전 이력과 상세 원문은 [상태 아카이브](state_archive.md) #025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.

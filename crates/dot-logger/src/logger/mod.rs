@@ -40,6 +40,7 @@ mod affinity;
 mod budget;
 mod health;
 mod host;
+mod preset;
 mod remote;
 #[cfg(feature = "tracing-adapter")]
 mod sink;
@@ -56,13 +57,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub use budget::{Budget, Retention, WriterQuota};
 pub use health::{Degradation, Failure, Health, HealthState, OutputHealth};
+pub use preset::{Preset, Sizing};
 #[cfg(feature = "tracing-adapter")]
 pub use sink::TracingSink;
 pub use writer::{Channel, EncodeError, LogError, Logged, Record, Schema, Writer};
 
 use crate::capture::{CaptureBuildError, CaptureOwner, ChannelConfig};
 use crate::completion::ProducerRange;
-use crate::config::{ConfigError, Resource, SessionBuilder};
+use crate::config::{ConfigError, MemoryBudget, Resource, SessionBuilder, ValidatedConfig};
 use crate::control::{ControlError, ShutdownReport};
 use crate::routing::RoutingError;
 use crate::storage::{RetentionError, StorageChannel, StorageError};
@@ -331,9 +333,42 @@ impl PendingShutdown {
 /// Grace beyond a shutdown deadline for the worker to report Incomplete.
 const REPORT_GRACE: Duration = Duration::from_secs(5);
 
+#[derive(Clone)]
 struct ChannelSpec {
     topic: String,
     schema: Schema,
+}
+
+/// What `resolve` decided before any allocation or IO.
+struct Resolved {
+    channels: Vec<ChannelSpec>,
+    writers: Vec<String>,
+    storage: Vec<StorageChannel>,
+    derived: budget::Derived,
+    plan: ValidatedConfig,
+    filled: Vec<Missing>,
+    default_quota: Option<WriterQuota>,
+    #[cfg(feature = "tracing-adapter")]
+    tracing: Option<::tracing::Level>,
+    #[cfg(feature = "remote")]
+    remote: Option<(crate::adapters::remote::RemoteLimits, usize)>,
+}
+
+/// Budget a builder resolves to, from [`LoggerBuilder::plan`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Plan {
+    /// Exact memory partitions `start()` reserves (total includes any margin).
+    pub memory: MemoryBudget,
+    /// Memory the core needs for this plan, before the preset's 10 % margin.
+    pub required_bytes: usize,
+    /// Ordinary sync period.
+    pub sync_every: Duration,
+    /// Bounded shutdown on `Logger` drop.
+    pub drop_deadline: Duration,
+    /// Quota of writers declared without their own.
+    pub writer_quota: Option<WriterQuota>,
+    /// Loss values the budget left unset and the preset filled, in order.
+    pub preset_filled: Vec<Missing>,
 }
 
 /// Collects declarations; allocates nothing until [`start`](Self::start).
@@ -344,6 +379,7 @@ pub struct LoggerBuilder {
     channels: Vec<ChannelSpec>,
     writers: Vec<(String, Option<WriterQuota>)>,
     telemetry: bool,
+    preset: Option<Sizing>,
     #[cfg(feature = "tracing-adapter")]
     tracing: Option<(String, ::tracing::Level, WriterQuota)>,
     #[cfg(feature = "remote")]
@@ -361,6 +397,14 @@ impl LoggerBuilder {
     /// Explicit budget; required.
     pub fn budget(mut self, budget: Budget) -> Self {
         self.budget = Some(budget);
+        self
+    }
+    /// Compute the loss values the budget leaves unset (or the whole budget,
+    /// without `budget`) from a [`Preset`] or custom [`Sizing`] at start, for
+    /// the declared writers, outputs and channels. Values set on the budget
+    /// are never overridden; [`plan`](Self::plan) shows the result.
+    pub fn preset(mut self, sizing: Sizing) -> Self {
+        self.preset = Some(sizing);
         self
     }
     /// Add a file output below an existing directory. A fresh session/target
@@ -428,44 +472,42 @@ impl LoggerBuilder {
         self
     }
 
-    fn missing(&self) -> Vec<Missing> {
-        let mut missing = match &self.budget {
+    /// Everything `start()` decides before any allocation or IO; shared with
+    /// [`plan`](Self::plan) so both report the same budget.
+    fn resolve(&self) -> Result<Resolved, StartError> {
+        #[cfg_attr(not(feature = "tracing-adapter"), allow(unused_mut))]
+        let mut channels = self.channels.clone();
+        #[cfg_attr(not(feature = "tracing-adapter"), allow(unused_mut))]
+        let mut writers = self.writers.clone();
+        // The tracing connection is one more channel and writer, declared last.
+        #[cfg(feature = "tracing-adapter")]
+        let tracing = self.tracing.as_ref().map(|(topic, min, quota)| {
+            channels.push(ChannelSpec {
+                topic: topic.clone(),
+                schema: sink::SCHEMA,
+            });
+            writers.push((TRACING_WRITER.into(), Some(*quota)));
+            *min
+        });
+        let mut budget = self.budget.clone();
+        let mut filled = Vec::new();
+        if let Some(sizing) = &self.preset {
+            filled = budget.get_or_insert_with(Budget::new).apply(sizing);
+        }
+        let quotas: Vec<_> = writers.iter().map(|(_, q)| *q).collect();
+        let mut missing = match &budget {
             None => vec![Missing::Budget],
-            Some(budget) => {
-                let quotas: Vec<_> = self.writers.iter().map(|(_, q)| *q).collect();
-                budget::missing(budget, &quotas)
-            }
+            Some(budget) => budget::missing(budget, &quotas),
         };
         for (absent, item) in [
             (self.outputs.is_empty(), Missing::FileOutput),
-            (self.channels.is_empty(), Missing::Channel),
-            (self.writers.is_empty(), Missing::Writer),
+            (channels.is_empty(), Missing::Channel),
+            (writers.is_empty(), Missing::Writer),
         ] {
             if absent {
                 missing.push(item);
             }
         }
-        missing
-    }
-
-    /// Validate, preallocate, start the default worker and create the output
-    /// namespaces. On error nothing keeps running and nothing is left on disk.
-    #[cfg_attr(
-        not(any(feature = "tracing-adapter", feature = "remote")),
-        allow(unused_mut)
-    )]
-    pub fn start(mut self) -> Result<Logger, StartError> {
-        // The tracing connection is one more channel and writer, declared last.
-        #[cfg(feature = "tracing-adapter")]
-        let tracing = self.tracing.take().map(|(topic, min, quota)| {
-            self.channels.push(ChannelSpec {
-                topic,
-                schema: sink::SCHEMA,
-            });
-            self.writers.push((TRACING_WRITER.into(), Some(quota)));
-            min
-        });
-        let missing = self.missing();
         if !missing.is_empty() {
             return Err(StartError::Missing(missing));
         }
@@ -475,19 +517,13 @@ impl LoggerBuilder {
                 .enumerate()
                 .any(|(i, name)| name.is_empty() || names[..i].contains(name))
         };
-        if duplicate(self.channels.iter().map(|c| c.topic.as_str()).collect())
-            || duplicate(self.writers.iter().map(|(n, _)| n.as_str()).collect())
+        if duplicate(channels.iter().map(|c| c.topic.as_str()).collect())
+            || duplicate(writers.iter().map(|(n, _)| n.as_str()).collect())
         {
             return Err(StartError::Duplicate);
         }
-        for (directory, _) in &self.outputs {
-            if !directory.is_dir() {
-                return Err(StartError::Io(std::io::ErrorKind::NotFound.into()));
-            }
-        }
-        let budget = self.budget.ok_or(StartError::InvalidBudget)?;
-        let storage: Vec<StorageChannel> = self
-            .channels
+        let budget = budget.ok_or(StartError::InvalidBudget)?;
+        let storage: Vec<StorageChannel> = channels
             .iter()
             .enumerate()
             .map(|(index, spec)| {
@@ -503,20 +539,19 @@ impl LoggerBuilder {
                 })
             })
             .collect::<Result<_, StartError>>()?;
-        let quotas: Vec<_> = self.writers.iter().map(|(_, q)| *q).collect();
         let retention: Vec<Retention> = self.outputs.iter().map(|(_, r)| *r).collect();
         #[cfg(feature = "remote")]
-        let remote = match self.remote.take() {
+        let remote = match &self.remote {
             None => None,
-            Some((server, limits)) => {
+            Some((_, limits)) => {
                 let limits = match limits {
-                    Some(limits) => limits,
+                    Some(limits) => limits.clone(),
                     None => remote::default_limits(
                         &budget::resolve(&budget, &quotas).ok_or(StartError::InvalidBudget)?,
                     ),
                 };
                 let reserve = limits.reservation().map_err(StartError::Remote)?;
-                Some((server, limits, reserve))
+                Some((limits, reserve))
             }
         };
         #[allow(unused_mut)]
@@ -525,12 +560,70 @@ impl LoggerBuilder {
             ..budget::Extra::default()
         };
         #[cfg(feature = "remote")]
-        if let Some((_, _, reserve)) = &remote {
+        if let Some((_, reserve)) = &remote {
             extra.external_bytes = *reserve;
             extra.threads = 1;
         }
         let derived = budget::derive(&budget, &quotas, &storage, &retention, extra)?;
-        let plan = SessionBuilder::new(derived.session).validate(&derived.platform)?;
+        let plan = SessionBuilder::new(derived.session.clone()).validate(&derived.platform)?;
+        Ok(Resolved {
+            channels,
+            writers: writers.into_iter().map(|(name, _)| name).collect(),
+            storage,
+            derived,
+            plan,
+            filled,
+            default_quota: budget.default_quota(),
+            #[cfg(feature = "tracing-adapter")]
+            tracing,
+            #[cfg(feature = "remote")]
+            remote,
+        })
+    }
+
+    /// The budget `start()` would use, without allocating, binding or creating
+    /// files: exact memory partitions, the requirement before any preset
+    /// margin, the loss values and which of them the preset filled. Record it
+    /// to reproduce a deployment. Errors are those `start()` would return
+    /// before IO (missing values, shortfalls with their amounts).
+    pub fn plan(&self) -> Result<Plan, StartError> {
+        let resolved = self.resolve()?;
+        Ok(Plan {
+            memory: resolved.plan.config().memory.clone(),
+            required_bytes: resolved.derived.required,
+            sync_every: resolved.derived.tuning.sync_every,
+            drop_deadline: resolved.derived.tuning.drop_deadline,
+            writer_quota: resolved.default_quota,
+            preset_filled: resolved.filled,
+        })
+    }
+
+    /// Validate, preallocate, start the default worker and create the output
+    /// namespaces. On error nothing keeps running and nothing is left on disk.
+    #[cfg_attr(not(feature = "remote"), allow(unused_mut))]
+    pub fn start(mut self) -> Result<Logger, StartError> {
+        let Resolved {
+            channels,
+            writers: names,
+            storage,
+            derived,
+            plan,
+            #[cfg(feature = "tracing-adapter")]
+            tracing,
+            #[cfg(feature = "remote")]
+            remote,
+            ..
+        } = self.resolve()?;
+        for (directory, _) in &self.outputs {
+            if !directory.is_dir() {
+                return Err(StartError::Io(std::io::ErrorKind::NotFound.into()));
+            }
+        }
+        #[cfg(feature = "remote")]
+        let remote = match (self.remote.take(), remote) {
+            (Some((server, _)), Some((limits, reserve))) => Some((server, limits, reserve)),
+            _ => None,
+        };
         let session = new_session_id();
         // The listener binds before any namespace exists; dropping it on a
         // later error stops and joins it.
@@ -570,11 +663,8 @@ impl LoggerBuilder {
         let origin = Instant::now();
         let mut mailboxes = Vec::with_capacity(writes.len());
         let mut writers = Vec::with_capacity(writes.len());
-        for (id, ((write, (name, _)), bytes)) in writes
-            .into_iter()
-            .zip(&self.writers)
-            .zip(slot_bytes)
-            .enumerate()
+        for (id, ((write, name), bytes)) in
+            writes.into_iter().zip(&names).zip(slot_bytes).enumerate()
         {
             let (mailbox, returned) = rtrb::RingBuffer::new(1);
             mailboxes.push(returned);
@@ -591,7 +681,7 @@ impl LoggerBuilder {
         let sink = match (tracing, writers.pop()) {
             (Some(min), Some((_, Some(writer)))) => {
                 let channel =
-                    u32::try_from(self.channels.len()).map_err(|_| StartError::InvalidBudget)?;
+                    u32::try_from(channels.len()).map_err(|_| StartError::InvalidBudget)?;
                 Some(Arc::new(sink::SinkState::new(
                     writer, session, channel, min,
                 )))
@@ -637,7 +727,7 @@ impl LoggerBuilder {
         Ok(Logger {
             commands: Some(commands),
             writers: Mutex::new(writers),
-            channels: self.channels,
+            channels,
             session,
             directories,
             drop_deadline,

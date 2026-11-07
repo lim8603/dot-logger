@@ -102,6 +102,8 @@ pub struct Budget {
     batch_wait: Duration,
     idle_wait: Duration,
     worker_cpus: Option<(Vec<usize>, Requirement)>,
+    /// Memory left to the preset: exact requirement plus 10 %.
+    memory_auto: bool,
 }
 
 impl Budget {
@@ -164,6 +166,34 @@ impl Budget {
     }
 }
 
+impl Budget {
+    /// Fill the loss values this budget leaves unset from `sizing`, in a
+    /// fixed order, and return which ones were filled. Set values are kept.
+    pub(crate) fn apply(&mut self, sizing: &super::preset::Sizing) -> Vec<Missing> {
+        let mut filled = Vec::new();
+        if self.memory_bytes.is_none() {
+            self.memory_auto = true;
+            filled.push(Missing::Memory);
+        }
+        if self.sync_every.is_none() {
+            self.sync_every = Some(sizing.sync_every);
+            filled.push(Missing::SyncEvery);
+        }
+        if self.drop_deadline.is_none() {
+            self.drop_deadline = Some(sizing.drop_deadline);
+            filled.push(Missing::DropDeadline);
+        }
+        if self.writer_quota.is_none() {
+            self.writer_quota = Some(sizing.quota());
+            filled.push(Missing::WriterQuota);
+        }
+        filled
+    }
+    pub(crate) fn default_quota(&self) -> Option<WriterQuota> {
+        self.writer_quota
+    }
+}
+
 /// File retention policy of one output directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Retention {
@@ -216,6 +246,8 @@ pub(crate) struct Derived {
     pub(crate) writer: WriterConfig,
     pub(crate) retention: Vec<RetentionConfig>,
     pub(crate) tuning: Tuning,
+    /// Memory the plan needs before any margin.
+    pub(crate) required: usize,
     /// Worker CPU list and the platform observation it was validated against.
     pub(crate) cpus: Option<(Vec<usize>, Requirement)>,
     pub(crate) platform: PlatformCapabilities,
@@ -224,7 +256,7 @@ pub(crate) struct Derived {
 /// Loss values absent from `budget`, in a fixed order.
 pub(crate) fn missing(budget: &Budget, quotas: &[Option<WriterQuota>]) -> Vec<Missing> {
     let mut missing = Vec::new();
-    if budget.memory_bytes.is_none() {
+    if budget.memory_bytes.is_none() && !budget.memory_auto {
         missing.push(Missing::Memory);
     }
     if budget.sync_every.is_none() {
@@ -272,11 +304,12 @@ pub(crate) fn derive(
     retention: &[Retention],
     extra: Extra,
 ) -> Result<Derived, StartError> {
-    let (Some(total), Some(sync_every), Some(drop_deadline)) =
-        (budget.memory_bytes, budget.sync_every, budget.drop_deadline)
-    else {
+    let (Some(sync_every), Some(drop_deadline)) = (budget.sync_every, budget.drop_deadline) else {
         return Err(StartError::Missing(missing(budget, quotas)));
     };
+    if budget.memory_bytes.is_none() && !budget.memory_auto {
+        return Err(StartError::Missing(missing(budget, quotas)));
+    }
     let quotas: Vec<WriterQuota> = quotas
         .iter()
         .map(|q| q.or(budget.writer_quota))
@@ -487,6 +520,11 @@ pub(crate) fn derive(
         .checked_add(control_need)
         .and_then(|n| n.checked_add(output_need))
         .ok_or_else(overflow)?;
+    // A preset leaves memory to the exact requirement plus 10 % (API §19.1).
+    let total = match budget.memory_bytes {
+        Some(total) => total,
+        None => need.checked_add(need.div_ceil(10)).ok_or_else(overflow)?,
+    };
     if need > total {
         return Err(budget_error(Resource::Total, need, total));
     }
@@ -534,6 +572,7 @@ pub(crate) fn derive(
             batch_wait: budget.batch_wait,
             idle_wait: budget.idle_wait,
         },
+        required: need,
         cpus: budget.worker_cpus.clone(),
         platform: platform(budget.worker_cpus.as_ref()),
     })

@@ -15,8 +15,8 @@
 | 상태 | Yellow — UPS 모의 수락, REV-051 P1/P2 조치 후 성능/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-07 / #002 리뷰세션 / AI |
-| 세션 상태 | 리뷰 완료 — REV-051 Open 등록(제품 코드 무수정). 다음 개발 세션에서 REV-051 조치 후 TASK-023 S2 착수 권장 |
+| 갱신 | 2026-11-07 / #002 종료 / AI |
+| 세션 상태 | 종료 — 2026-11-07 #002 Human 「리뷰 세션 마감」. REV-051 Open 등록 완료, 다음 개발 세션에서 REV-051 조치 후 TASK-023 S2 착수 |
 | 최근 세션 | [2026-11-07 #002](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md) — 누적 변경(GAP-008·TASK-023 S1·TASK-027·TASK-028 S1) 독립 코드리뷰(REV-051 Open) |
 
 ## 현재 결정과 제약
@@ -82,18 +82,10 @@
 | REV-018~022 | 원격·client·CLI | Closed | EV-026까지 수락. RV-049→TASK-022, RV-053→TASK-020 |
 | REV-023~028 | 계측·리포트·설정변경 자가/독립 리뷰 | Closed | EV-027~031 로컬 수락 마감, 비용·오차·실앱/native 후속 |
 | REV-029~041 | 간편 점검·DB·tracing/화면 예제 | Closed | EV-031~042 로컬 수락, 실앱/환경 후속은 각 Task 참조 |
-| [REV-042](../05_verification/reviews/REV-042_TASK-021_UPS_SIMULATION.md) | UPS 긴급 계획·모의 시험 자가 점검 | Closed | RV-084 기한 경합·RV-085 ext4 프로필 조치, EV-043 수락 |
-| [REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md) | TASK-021 UPS 긴급 계획·모의 시험 독립 코드리뷰 | Closed | RV-086/RV-087 rustdoc 선행조건·1회 관측 계약 보강(9cbbfb8), 동작 변경 없음 |
-| [REV-044](../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) | 운영 backend(status·apply·compare) 자가 점검 | Closed | RV-088~090 P3 문서 처리, EV-044 로컬 수락. 독립 리뷰 미실시 |
-| [REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md) | TASK-016 운영 backend 독립 코드리뷰 | Closed | RV-091 `# Errors`·RV-092 Debug·RV-093 snapshots ID 오름차순(API§15.8) 조치(497149b) |
-| [REV-046](../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md) | TASK-027 S2 facade·기본 worker 자가 점검 | Closed | RV-094→GAP-009(EV-048 Closed), RV-095/096 S3a 조치, RV-097~099 문서화. 독립 리뷰 미실시 |
-| [REV-047](../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) | TASK-027 S3a health·계측·CPU 고정 자가 점검 | Closed | RV-100 host 사망 시 shutdown 즉시 WorkerFailed 조치, RV-101~104 문서화/미실행(Linux 외). 독립 리뷰 미실시 |
-| [REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) | TASK-027 S3b tracing 연결 자가 점검 | Closed | RV-105 재진입 교착 방지·RV-106 shutdown writer 회수 조치, RV-107~109 문서화. 독립 리뷰 미실시 |
-| [REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) | TASK-027 S3c remote 연결 자가 점검 | Closed | RV-110 멈춘 클라이언트가 shutdown을 막던 문제 2초 유예 후 중단으로 조치, RV-111~114 문서화. 독립 리뷰 미실시 |
-| [REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) | TASK-028 S1 정확 배정·preset·plan 자가 점검 | Closed | RV-115 공식 공유로 이중화 방지(F14), RV-116~119 문서화/후속. 독립 리뷰 미실시 |
+| REV-042~050 | UPS·운영 backend·facade S2~S3·preset 자가/독립 리뷰 | Closed | EV-043~052 로컬 조치·마감(독립 REV-043·045 포함). 원문 [상태 아카이브](state_archive.md) #024 |
 | [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | **Open** | Conditional Pass(P1 1: RV-120 Writer Drop-reaper 경쟁 / P2 5: RV-121~125 / P3 2: RV-126~127). TASK-023 S2 전 조치 예정 |
 
-이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
+이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
 
 ## 다음 시작점
 

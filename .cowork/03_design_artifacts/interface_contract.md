@@ -1006,3 +1006,13 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 - **극단 입력(RV-123):** `Duration::MAX` 같은 무한 의도의 sync 주기·종료/Drop 기한은 허용하고 내부 `Instant` 기한을 100년 상한으로 클램프한다. 합이 `usize`를 넘는 writer quota·preset 크기는 `StartError::InvalidBudget`(remote 기본 한도가 먼저 걸리면 `StartError::Remote`)로 거절한다. 패닉하지 않는다.
 - **오류 분류(RV-125):** `FacadeReport::io_failed`와 `OutputHealth::failed`는 파일 자체 오류(`Io`/`Poisoned`)에만 켜진다. 보존 한도 도달은 `records_failed`(Degraded)와 core 실패 집계로만 보이며, 그 범위를 덮는 sync barrier 실패는 core `sync_failed`로 보고된다. `is_success()`는 core 실패 집계로 계속 false다.
 - **공개 표면(RV-126):** `prelude`에 `Preset`·`Sizing` 추가(새 타입 아님), `EncodeError: Display + Error`.
+
+### 19.5 TASK-023 S2b 조치 반영 — 2026-11-07
+
+[EV-054](../05_verification/verification_evidence.md#ev-054). Human 결정(2026-11-07, 권고안 3건)을 따른다.
+
+- **IO batch 상한(③):** 실제 batch = min(`Budget::batching` 값, target별 기록 예산/2). 기록 예산은 모든 writer slot 합이다. `Plan::batch_records`로 보이고, facade batch 버퍼 예산(§19.4)도 이 값으로 계산한다.
+- **주기 sync 발급(④):** Written 경계가 있는 target은 "cutoff까지의 기록이 각 생산자 ingress를 떠났고, 그중 이 target으로 라우팅된 기록이 모두 Written 이상(또는 종료)"일 때 barrier를 발급한다. 연속 부하에서도 1초 주기 sync가 일어난다. 확인은 최신 완료 window만 조회하고 (target, 생산자)별 단조 watermark로 비용을 나눈다. 다른 target은 기존 조건(진행 중 호출 0·feedback 비어 있음·target 장부 0)을 유지한다.
+- **부분 라우팅 sync coverage(①):** 파일이 받은 범위 밖 구간은 최신 window만 조회하고 Expired는 종료로 본다.
+- **폐기 없음(②):** 필수 target 입구 `Capacity` 폐기가 drop 순서 경쟁으로 일어나지 않는다. 과부하는 RT `Capacity` 거절로만 보인다.
+- **회전(⑤·⑥):** facade segment는 바이트 상한(§19.3)과 별도로 16,384건에서 회전한다. 이 때문에 작은 기록에서 보존 segment 개수 상한이 먼저 걸리는 문제(⑥)는 Open이다.

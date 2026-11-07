@@ -929,6 +929,23 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96 `-D warnings` exit0·rustdoc `-D warnings` exit0(병렬 실행 첫 회에 기존 CLI bin/lib 문서 파일명 충돌 경고와 함께 1회 실패, 단독 재실행 Pass)·Rust 1.96 workspace 493 Pass(5 ignore, 기존 DB 회귀; 신규 10)·MSRV 1.85 workspace 493 Pass·clippy 1.85 exit0·`check-feature-matrix.py` 1.96/1.85 exit0·api-consumer Pass(`9437184 bytes reserved`)·경쟁 민감 묶음(rt-allocation·logger 단위·tc_013_facade·facade_remote) 20회 반복 20/20.
 - **미실행:** TASK-023 S2/S3 실측(RV-121·RV-124 효과 포함), RT 커널 행, native(T3).
 
+## EV-054 — TASK-023 S2a·S2b facade 경로 측정 도구와 제품 발견 조치
+
+- **판정:** 로컬 구현 Pass(측정 도구·조치 4건). 정식 측정은 NotRun(S3). 발견 ⑥(기록 수 회전 시 보존 segment 개수 상한)은 Open — Human 결정 대기.
+- **대상/환경:** 소스 `1602d5e`(S2a)·`93e7241`(도구)·`c93a44a`(①)·`a92aee6`(②)·`97651f5`(③)·`49f097d`(④)·`eeec11f`(⑤). 2026-11-07 #003 AI, Ubuntu generic 7.0.0-42(RT 아님), governor powersave, `/data/build`(NVMe ext4, 여유 834 GB). Human 결정 2건(S2a 출력 순서 지정, S2b ③~⑤ 권고안). [API §18.12·§19.5](../03_design_artifacts/interface_contract.md#195-task-023-s2b-조치-반영--2026-11-07).
+- **측정 도구:** `write_logger`(공유 `StorageWorkload` → facade 공개 API만 사용, 기록 s → 채널 s % channels → 파일 s % files, P0 writer = logger IO 스레드, 생산자는 `LoggerLoad`), `verify_logger`(`SequenceOracle`: 각 seq 1회·올바른 파일·채널·(생산자, 파일)별 증가·정확한 payload·파일당 기록 수), `LatencyHistogram`(ns 로그-선형, 분위수 ≤1/8 상향), `call_cost`(T4: `try_log`·encode·미리 인코딩한 `try_record_small`·memcpy·시계), CLI `--p1`/`--p1-max`/`--p1-cost`. P0 회전 256 MiB·16,384건. 관측 불가 값(쓰기 호출·sync 횟수)은 `None`, 실패 보고는 `Unsuccessful`.
+- **제품 발견과 조치(모두 Red 확인 후 Green):**
+  - ① 부분 라우팅 출력의 sync coverage가 범위 밖 구간 > window에서 즉시 실패, Expired 거절 → 최신 window만 조회·Expired 통과(`c93a44a`, F16 재현). 돌연변이: window 제한이 재현을 고정, Expired 허용은 60초 이상 쉰 생산자 경우의 논증(시험 없음).
+  - ② `Delivery`가 공유 기록을 target 허가보다 먼저 놓아 필수 target에 `Capacity` 폐기(400k 무제한 실행당 3,490~12,168건) → 필드 순서 교체, `#[cfg(test)]` 해제 순서 단위 시험(`a92aee6`). 수정 후 3/3 폐기 0.
+  - ③ IO batch(256)가 slot(16)보다 커서 처리량이 slot/batch_wait로 붕괴(10만 건 70초) → batch = min(값, 기록 예산/2), `Plan::batch_records`(`97651f5`). 2만 건 약 1.5초.
+  - ④ 연속 부하에서 주기 sync가 11초간 발급 0회·만료 → 보고 실패 → 발급 조건을 "cutoff까지 ingress를 떠났고(`taken`) 이 target으로 간 기록이 Written 이상"으로, 최신 window·(target, 생산자) watermark(`49f097d`). F6: 1.5초 연속 부하 중 마지막 1초 안에 sync 성공·폐기 0·성공 종료. Written 경계가 없는 target은 기존 조건.
+  - ⑤ facade segment 16,384건 회전 → P0도 같은 기록 수로 회전(`eeec11f`).
+  - ⑥(Open) 기록 수 회전으로 segment가 작아지면 보존 segment 개수 상한(보존 바이트 / segment 바이트 + 2)에 먼저 걸려, continuous는 `failed`(256 MiB·4파일·8생산자 smoke에서 1,048,576건 중 393,216건), ring은 설정 용량보다 훨씬 일찍 삭제한다.
+- **부수 정리:** RV-127 때 어긋난 `throughput` 주석 위치 복원(`1602d5e`), GAP-009 파일 기반 단위 시험 2건 Miri 제외(실시간 시계, `a92aee6`).
+- **smoke(측정 아님, powersave):** `--p1-cost` 256B 20만 회 `try_log` p50 143·p99 175·p99.9 1,023 ns, encode p50 31 ns, `try_record_small` p50 63·p99 87 ns, memcpy p50 21 ns, 시계 쌍 21 ns(T4 입력: 복사 ≈ 시계 오버헤드 수준). P0 256 MiB·256B·4파일 736.6 MB/s 판독 1,048,576건 일치. logger 같은 조건은 ⑥으로 Unsuccessful.
+- **검증:** fmt·clippy 1.96/1.85 exit0·rustdoc exit0·workspace 1.96/1.85 각 507 Pass(5 ignore 기존 DB)·feature matrix 1.96 exit0·Miri lib 26(2 ignore)·tc_003 completion 15·control 18·routing 19 Pass.
+- **미실행:** 발견 ⑥ 조치, S2c(P2 raw·P3 혼합), S3 정식 측정, RT, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

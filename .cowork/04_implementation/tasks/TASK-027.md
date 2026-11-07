@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S3e api-consumer 갱신 → S3 마감. S3d는 S3 제외(이월 T4) |
+| 다음 액션 | S1~S3 로컬 완료. 다음 TASK-028 S1. 잔여: 성능(TASK-023 S2/S3)·NFR-008 정식 계수(TASK-029)·native(T3), S3d는 이월 T4 |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 |---|---|---|---|
 | S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | Done(2026-11-05 Human 승인) |
 | S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | 로컬 Pass(2026-11-05 [EV-047](../../05_verification/verification_evidence.md#ev-047)); worker panic 자동 시험만 GAP-009 |
-| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | In Progress — S3a [EV-048](../../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../../05_verification/verification_evidence.md#ev-050) 로컬 Pass, S3e 남음 |
+| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | In Progress — S3a [EV-048](../../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../../05_verification/verification_evidence.md#ev-051) 로컬 Pass → **Done(로컬)**, S3d 제외(T4) |
 
 ## 변경 대상과 첫 검증
 
@@ -42,9 +42,9 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 
 첫 실패/리뷰 조건: **support 코드 없이 builder→start→try_log→shutdown이 최종 file/directory sync까지 완료하고, try_log 구간 할당 0, 기한 초과 shutdown은 Incomplete와 미확인 범위를 보고**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-013`의 facade 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다(S2~S3 각 EV의 Red).
+- [x] 최소 구현 후 관련 `TC-013`의 facade 하위 시나리오를 통과시킨다(F1~F13).
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다(EV-047~051, API §18.8~18.11).
 
 ## S1 설계 초안 — 2026-11-05
 
@@ -69,7 +69,7 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 | S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | 로컬 Pass — 소스 `91387ba`, [EV-049](../../05_verification/verification_evidence.md#ev-049), [REV-048](../../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) Closed, API §18.10(연결 +2줄) |
 | S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | 로컬 Pass — 소스 `c284354`, [EV-050](../../05_verification/verification_evidence.md#ev-050), [REV-049](../../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) Closed, API §18.11(Human 결정 3건: 관측용 사본·상태 조회만·기본값+명시) |
 | S3d | slot 직접 encode | **제외(2026-11-07 Human 승인)** — 재설계 조건은 이월 T4 |
-| S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | Planned |
+| S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | 로컬 Pass — 소스 `ad5dadf`, [EV-051](../../05_verification/verification_evidence.md#ev-051)(feature-matrix 스크립트 두 toolchain 포함) |
 
 **S3d 조사 결과(결정 필요):** 현재 소형 기록은 per-writer scratch에 encode한 뒤 core가 byte ring으로 실제 길이만큼 복사한다. byte ring은 경계에서 감겨(wrap) 연속 slot을 보장하지 않는다. rtrb의 안전한 `write_chunk(n)`은 n바이트를 먼저 0으로 채우므로, 직접 encode하면 복사 대신 slot 전체 0 채우기가 들어가 작은 기록에서 오히려 비싸다. 부분 commit에는 `unsafe`(capture는 `deny`)가 필요하고, 감김 처리에는 queued record에 건너뛰기 길이를 넣는 core 형식 변경이 필요하다. 권고: S3에서 제외하고 scratch 경로를 유지하되, TASK-023 S2 P1(256B)에서 encode+복사 비용을 재고 유의하면 그때 별도 설계로 다룬다. §18.3의 "S3에서 slot 직접 encode로 교체" 문구를 바꾸므로 Human 결정 사항이다.
 
@@ -87,9 +87,9 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 
 ## 완료 기준
 
-- [ ] 기본 worker·typed channel·shutdown 보고 구현, 기존 RT·예산·완료 계약 회귀 없음.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] 기본 worker·typed channel·shutdown 보고 구현, 기존 RT·예산·완료 계약 회귀 없음(로컬, rt-allocation 포함).
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048), S3b [EV-049](../../05_verification/verification_evidence.md#ev-049), S3c [EV-050](../../05_verification/verification_evidence.md#ev-050). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.
+테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048), S3b [EV-049](../../05_verification/verification_evidence.md#ev-049), S3c [EV-050](../../05_verification/verification_evidence.md#ev-050), S3e [EV-051](../../05_verification/verification_evidence.md#ev-051). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.

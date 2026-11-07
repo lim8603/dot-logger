@@ -901,6 +901,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 477 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·F13/TC-013 binary 10회 반복 10/10.
 - **미실행:** 외부 TLS/token listener를 facade로 띄우는 시험(검증 규칙은 기존 `ServerConfig::validate`·TASK-012 시험), 구독자가 파일 쓰기 처리량에 주는 영향, RT 행, native(T3).
 
+<a id="ev-051"></a>
+## EV-051 — TASK-027 S3e api-consumer facade 경로·feature matrix
+
+- **판정:** 로컬 Pass. TASK-027 S3(S3a~S3c·S3e) 로컬 마감 근거. 성능·RT·native(T3)는 NotRun이다.
+- **대상/환경:** 소스 `ad5dadf`, base `8358ae4`. 2026-11-07 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음. [명령/결과/hash](../06_evolution/imported_context/task_027_s3e_2026-11-07/results.json).
+- **확인한 계약:** 독립 소비 crate가 support 없이 builder→start→일반 `std::thread::spawn` 안의 `try_log` 10건→`health()` Running→shutdown Closed·`is_success`·required complete 10을 수행한다. remote feature에서는 `.remote(ServerConfig)` 한 줄로 loopback listener가 뜬다. 기존 TC-001 기본 consumer의 network/runtime/tracing 의존 격리는 유지된다.
+- **검증:** `scripts/check-feature-matrix.py` 1.96.0·1.85.0 모두 exit0. 이 스크립트는 remote protocol 검사, 16조합 `cargo test -p dot-logger`, consumer 의존 격리, api-consumer 기본·remote, rt-allocation 기본·remote, scoped_capture 예제를 포함한다. S2 EV-047에서 미실행으로 남았던 스크립트 실행도 이것으로 해소된다. fmt·clippy 두 toolchain exit0.
+- **미실행:** api-consumer의 tracing 연결(소비자에 tracing crate를 추가하게 되므로 제외, tc_013_tracing이 대신), RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

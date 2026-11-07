@@ -26,7 +26,8 @@ log = { workspace = true, optional = true }
 subtle = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix.workspace = true
+# `thread`: optional facade worker CPU placement (sched_{get,set}affinity).
+rustix = { workspace = true, features = ["thread"] }
 
 [dev-dependencies]
 serde_json.workspace = true

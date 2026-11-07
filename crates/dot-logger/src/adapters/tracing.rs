@@ -118,11 +118,11 @@ fn header(output: &mut Buffer<'_>, target: &str) -> fmt::Result {
     quoted(output, format_args!("{target}"))?;
     output.write_str(",\"fields\":{")
 }
-fn finish<'a>(
-    mut output: Buffer<'a>,
+fn finish(
+    mut output: Buffer<'_>,
     result: fmt::Result,
     level: Level,
-) -> Result<EncodedLog<'a>, EncodeError> {
+) -> Result<EncodedLog<'_>, EncodeError> {
     if result.is_ok() {
         output.write_str("}}").map_err(|_| EncodeError::TooLarge)?;
     }

@@ -5,7 +5,7 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, SyncSender, TryRecvError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -18,13 +18,16 @@ use crate::control::{
     SyncWork,
 };
 use crate::diagnostics::linux_available_bytes;
+use crate::platform::Requirement;
 use crate::routing::{Delivery, Router, RoutingConfig, TargetConsumer};
 use crate::storage::{
     FileStore, RetentionBatchError, RetentionConfig, RetentionError, SegmentLog, StorageChannel,
     StorageError, WriterConfig,
 };
 
+use super::affinity::pin_current;
 use super::budget::{STACK_BYTES, Tuning};
+use super::health::{AFFINITY_APPLIED, AFFINITY_FAILED, AFFINITY_NONE, OutputStatus, Shared};
 use super::writer::Owned;
 use super::{FacadeReport, StartError};
 
@@ -45,15 +48,6 @@ pub(crate) enum Progress {
     Closed(FacadeReport),
 }
 
-/// Failure flags shared by the host, IO threads and the handle.
-#[derive(Default)]
-pub(crate) struct Flags {
-    pub(crate) worker_failed: AtomicBool,
-    pub(crate) io_failed: AtomicBool,
-    stop: AtomicBool,
-    finish: AtomicBool,
-}
-
 /// Everything the host thread owns. Moved in once; nothing returns.
 pub(crate) struct HostPlan {
     pub(crate) core: Arc<CaptureCore>,
@@ -68,7 +62,9 @@ pub(crate) struct HostPlan {
     pub(crate) outputs: Vec<PathBuf>,
     pub(crate) tuning: Tuning,
     pub(crate) origin: Instant,
-    pub(crate) flags: Arc<Flags>,
+    pub(crate) shared: Arc<Shared>,
+    /// Validated worker CPU list.
+    pub(crate) cpus: Option<(Vec<usize>, Requirement)>,
 }
 
 /// Start the host and wait until it built every component or failed.
@@ -102,7 +98,7 @@ impl Drop for CloseOnExit<'_> {
 }
 
 /// Stops IO threads on every host-loop exit path, including unwinding.
-struct StopOnExit<'a>(&'a Flags);
+struct StopOnExit<'a>(&'a Shared);
 impl Drop for StopOnExit<'_> {
     fn drop(&mut self) {
         self.0.stop.store(true, Ordering::Release);
@@ -127,11 +123,13 @@ fn host_main(
         outputs,
         tuning,
         origin,
-        flags,
+        shared,
+        cpus,
     } = plan;
     let mut ready = Some(ready);
     {
         let close = CloseOnExit(&core);
+        let flags = &*shared;
         let config = Config {
             plan: &plan,
             control,
@@ -141,9 +139,11 @@ fn host_main(
             outputs: &outputs,
             tuning,
             origin,
-            flags: &flags,
+            flags,
+            cpus: cpus.as_ref(),
         };
         let result = catch_unwind(AssertUnwindSafe(|| {
+            pin(&config)?;
             run(
                 &core,
                 &mut reads,
@@ -169,6 +169,9 @@ fn host_main(
         }
         drop(close);
     }
+    // No more commands are read: a later `shutdown` fails fast as WorkerFailed
+    // instead of waiting for a reply that never comes.
+    drop(commands);
     // Reaper: an outstanding Writer still points into `core` and its rings.
     // Keep this thread as their last owner until every writer state returned,
     // so no RT thread ever performs the final release (ADR-012 §3).
@@ -191,7 +194,36 @@ struct Config<'a> {
     outputs: &'a [PathBuf],
     tuning: Tuning,
     origin: Instant,
-    flags: &'a Flags,
+    flags: &'a Shared,
+    cpus: Option<&'a (Vec<usize>, Requirement)>,
+}
+
+/// Restrict the calling worker thread to the configured CPUs. A `Required`
+/// placement that fails rejects startup; an `Optional` one is reported.
+fn pin(config: &Config<'_>) -> Result<(), StartError> {
+    let Some((cpus, requirement)) = config.cpus else {
+        return Ok(());
+    };
+    match pin_current(cpus) {
+        Ok(()) => {
+            // Another worker may already have recorded a failure; keep it.
+            let _ = config.flags.affinity.compare_exchange(
+                AFFINITY_NONE,
+                AFFINITY_APPLIED,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+            Ok(())
+        }
+        Err(error) if *requirement == Requirement::Required => Err(StartError::Io(error)),
+        Err(_) => {
+            config
+                .flags
+                .affinity
+                .store(AFFINITY_FAILED, Ordering::Release);
+            Ok(())
+        }
+    }
 }
 
 /// Remove namespaces created by a failed start; never touches other paths.
@@ -257,18 +289,17 @@ fn run(
     let control = ControlOwner::new(config.plan, core.control(), config.control, config.origin)?;
     let mut router = Router::new(config.plan, consumers, routing)?;
     let (mut logs, directories) = open_logs(&router, config)?;
-    if let Some(ready) = ready.take() {
-        let _ = ready.send(Ok(directories));
-    }
     let completion = core.completion().ok_or(StartError::InvalidBudget)?;
     let producers = core.producers();
-    router.scope(|mut dispatcher, outputs| {
+    let telemetry = core.telemetry();
+    let result = router.scope(|mut dispatcher, outputs| {
         let mut targets: Vec<IoTarget<'_, '_>> = outputs
             .into_iter()
             .zip(logs.iter_mut())
             .enumerate()
             .map(|(index, (consumer, log))| IoTarget {
                 id: index as u32 + 1,
+                status: &config.flags.outputs[index],
                 consumer,
                 log,
                 batch: Vec::with_capacity(config.tuning.batch_records),
@@ -281,19 +312,30 @@ fn run(
         std::thread::scope(|scope| -> Result<Closed, StartError> {
             let stop = StopOnExit(config.flags);
             let mut senders = Vec::with_capacity(threads);
+            let (pinned, placed) = mpsc::sync_channel(threads);
             for chunk in targets.chunks_mut(per_thread) {
                 let (send, receive) = mpsc::channel::<SyncWork<'_, '_>>();
                 senders.push(send);
-                let tuning = config.tuning;
-                let flags = config.flags;
-                let origin = config.origin;
+                let pinned = pinned.clone();
                 std::thread::Builder::new()
                     .name("dot-logger-io".into())
                     .stack_size(STACK_BYTES)
                     .spawn_scoped(scope, move || {
-                        io_main(chunk, &receive, tuning, flags, origin)
+                        let placed = pin(config);
+                        let ok = placed.is_ok();
+                        let _ = pinned.send(placed);
+                        if ok {
+                            io_main(chunk, &receive, config);
+                        }
                     })
                     .map_err(StartError::Io)?;
+            }
+            drop(pinned);
+            for _ in 0..senders.len() {
+                placed.recv().map_err(|_| StartError::WorkerFailed)??;
+            }
+            if let Some(ready) = ready.take() {
+                let _ = ready.send(Ok(directories.clone()));
             }
             let send = |target: u32, work| {
                 let index = (target as usize - 1) / per_thread;
@@ -311,8 +353,27 @@ fn run(
             };
             let mut events = vec![None; 256];
             let mut shutdown: Option<ShutdownState> = None;
+            let mut sampled: Option<Instant> = None;
             let closed = loop {
                 let now = Instant::now();
+                #[cfg(test)]
+                if config.flags.inject.load(Ordering::Acquire) == 1 {
+                    panic!("injected host panic");
+                }
+                if let (Some(telemetry), Some(latest)) = (telemetry, &config.flags.telemetry) {
+                    if sampled.is_none_or(|t| now.saturating_duration_since(t) >= SAMPLE_PERIOD) {
+                        // TimeOrder cannot occur at this period; a poisoned
+                        // history leaves the last value to age into Stale.
+                        if let Ok(sample) =
+                            telemetry.sample(ns(config.origin, now), Some(completion))
+                        {
+                            if let Ok(mut latest) = latest.lock() {
+                                *latest = Some(sample);
+                            }
+                        }
+                        sampled = Some(now);
+                    }
+                }
                 let turn = dispatcher.turn(now, &mut events)?;
                 if let Some(fault) = turn.fault {
                     return Err(StartError::Routing(fault));
@@ -390,8 +451,17 @@ fn run(
                 let _ = reply.send(Progress::Closed(report));
             }
         })
-    })
+    });
+    if result.is_err() && ready.is_some() {
+        // Startup failed after the namespaces were created: remove them.
+        drop(logs);
+        remove_created(&directories);
+    }
+    result
 }
+
+/// Telemetry samples are retained at one-second resolution.
+const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 
 type Closed = (ShutdownReport, Vec<ProducerRange>, Option<Sender<Progress>>);
 
@@ -509,6 +579,7 @@ fn facade_report(
 /// from the host, so a panicking IO thread returns them for draining.
 struct IoTarget<'s, 'o> {
     id: u32,
+    status: &'s OutputStatus,
     consumer: TargetConsumer<'s, 'o>,
     log: &'s mut Log,
     batch: Vec<Delivery<'o>>,
@@ -518,10 +589,9 @@ struct IoTarget<'s, 'o> {
 fn io_main(
     targets: &mut [IoTarget<'_, '_>],
     work: &Receiver<SyncWork<'_, '_>>,
-    tuning: Tuning,
-    flags: &Flags,
-    origin: Instant,
+    config: &Config<'_>,
 ) {
+    let (tuning, flags, origin) = (config.tuning, config.flags, config.origin);
     let result = catch_unwind(AssertUnwindSafe(|| {
         io_loop(targets, work, tuning, flags, origin)
     }));
@@ -539,12 +609,16 @@ fn io_loop(
     targets: &mut [IoTarget<'_, '_>],
     work: &Receiver<SyncWork<'_, '_>>,
     tuning: Tuning,
-    flags: &Flags,
+    flags: &Shared,
     origin: Instant,
 ) {
     let mut syncs: Vec<SyncWork<'_, '_>> = Vec::new();
     loop {
         let now = Instant::now();
+        #[cfg(test)]
+        if flags.inject.load(Ordering::Acquire) == 2 {
+            panic!("injected IO panic");
+        }
         let mut busy = false;
         while let Ok(next) = work.try_recv() {
             syncs.push(next);
@@ -588,7 +662,7 @@ fn io_loop(
                 continue;
             }
             match target.log.sync_work(syncs.swap_remove(index)) {
-                Ok(()) => {}
+                Ok(()) => target.status.synced(ns(origin, Instant::now())),
                 Err(error) => {
                     if let Some(work) = error.work {
                         if matches!(error.error, StorageError::Busy) {
@@ -596,9 +670,12 @@ fn io_loop(
                         } else {
                             work.complete(SyncResult::Failed);
                             flags.io_failed.store(true, Ordering::Release);
+                            target.status.fail();
                         }
                     } else {
+                        // The sync itself failed; the log is now poisoned.
                         flags.io_failed.store(true, Ordering::Release);
+                        target.status.fail();
                     }
                 }
             }
@@ -612,6 +689,7 @@ fn io_loop(
                 }
                 if target.log.finish(now).is_err() {
                     flags.io_failed.store(true, Ordering::Release);
+                    target.status.fail();
                 }
             }
             for work in syncs.drain(..) {
@@ -655,10 +733,10 @@ fn failure(error: &RetentionError) -> FailureReason {
     }
 }
 
-fn write_batch(target: &mut IoTarget<'_, '_>, now: u64, flags: &Flags) {
+fn write_batch(target: &mut IoTarget<'_, '_>, now: u64, flags: &Shared) {
     let refs: Vec<&Delivery<'_>> = target.batch.iter().collect();
     if let Err(error) = target.log.write_batch(&refs, now) {
-        settle(target.log, &refs, error, flags);
+        settle(target.log, &refs, error, flags, target.status);
     }
     drop(refs);
     target.batch.clear();
@@ -666,7 +744,13 @@ fn write_batch(target: &mut IoTarget<'_, '_>, now: u64, flags: &Flags) {
 }
 
 /// Finish a partially failed batch without ever appending its prefix again.
-fn settle(log: &mut Log, batch: &[&Delivery<'_>], error: RetentionBatchError, flags: &Flags) {
+fn settle(
+    log: &mut Log,
+    batch: &[&Delivery<'_>],
+    error: RetentionBatchError,
+    flags: &Shared,
+    status: &OutputStatus,
+) {
     let RetentionBatchError {
         error,
         appended,
@@ -686,6 +770,10 @@ fn settle(log: &mut Log, batch: &[&Delivery<'_>], error: RetentionBatchError, fl
     }
     if done < batch.len() {
         flags.io_failed.store(true, Ordering::Release);
+        status.records_failed(batch.len() - done);
+        if reason == FailureReason::IoFailure {
+            status.fail();
+        }
     }
     for delivery in &batch[done..] {
         report(delivery, Update::Failed(reason));
@@ -697,7 +785,7 @@ fn drain_failed(
     targets: &mut [IoTarget<'_, '_>],
     work: &Receiver<SyncWork<'_, '_>>,
     tuning: Tuning,
-    flags: &Flags,
+    flags: &Shared,
 ) {
     loop {
         let now = Instant::now();
@@ -706,6 +794,7 @@ fn drain_failed(
             while let Some(next) = target.consumer.try_next(now) {
                 if let Ok(delivery) = next {
                     report(&delivery, Update::Failed(FailureReason::AdapterFailure));
+                    target.status.records_failed(1);
                 }
             }
         }

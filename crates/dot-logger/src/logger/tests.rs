@@ -1,0 +1,119 @@
+//! GAP-009 / TC-013 F5: worker panics injected through a crate-private test
+//! flag. No public or feature-gated hook exists (REV-046 RV-094).
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use super::{
+    Budget, Failure, HealthState, LogError, Logger, Retention, Shutdown, ShutdownError, WriterQuota,
+};
+
+const MIB: usize = 1024 * 1024;
+
+struct Temp(PathBuf);
+impl Temp {
+    fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "dot-logger-gap009-{}-{nanos}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&path).unwrap();
+        Self(path)
+    }
+}
+impl Drop for Temp {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn start(temp: &Temp) -> Logger {
+    Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_millis(20))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(64, 64)),
+        )
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<[u8]>("blob")
+        .writer("control")
+        .start()
+        .unwrap()
+}
+
+/// Retry `try_log` until the logger rejects with `Closing`, within `limit`.
+fn until_closing(writer: &mut super::Writer, channel: super::Channel<[u8]>, limit: Duration) {
+    let start = Instant::now();
+    loop {
+        match writer.try_log(channel, &[1, 2, 3][..]) {
+            Err(LogError::Closing) => return,
+            Ok(_) | Err(LogError::Capacity) => {}
+            Err(other) => panic!("unexpected rejection {other:?}"),
+        }
+        assert!(start.elapsed() < limit, "admission never closed");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn io_worker_panic_closes_admission_and_is_reported_as_failure() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    for _ in 0..10 {
+        while writer.try_log(blob, &[0u8; 8][..]).is_err() {
+            std::thread::yield_now();
+        }
+    }
+    logger.shared.inject.store(2, Ordering::Release);
+    until_closing(&mut writer, blob, Duration::from_secs(5));
+    assert!(logger.worker_failed());
+    assert_eq!(
+        logger.health().state,
+        HealthState::Failed(Failure::WorkerFailed)
+    );
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("a failed IO worker must still let shutdown close");
+    };
+    assert!(report.worker_failed, "{report:?}");
+    assert!(report.io_failed);
+    assert!(!report.is_success());
+    // The writer outlived shutdown; the host reaper still owns the release.
+    assert_eq!(report.writers_outstanding, 1);
+    assert_eq!(writer.try_log(blob, &[0][..]), Err(LogError::Closing));
+    drop(writer);
+}
+
+#[test]
+fn host_panic_fails_fast_and_the_reaper_still_owns_every_release() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    logger.shared.inject.store(1, Ordering::Release);
+    until_closing(&mut writer, blob, Duration::from_secs(5));
+    assert!(logger.worker_failed());
+    let begun = Instant::now();
+    let result = logger.shutdown(Duration::from_secs(10));
+    assert!(
+        matches!(result, Err(ShutdownError::WorkerFailed)),
+        "{result:?}"
+    );
+    assert!(
+        begun.elapsed() < Duration::from_secs(1),
+        "a dead host must not be awaited until the deadline"
+    );
+    // Dropping the writer afterwards only moves its state to the mailbox.
+    drop(writer);
+}

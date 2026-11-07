@@ -14,7 +14,9 @@ use crate::config::{
     WorkerThreadingConfig,
 };
 use crate::control::ControlConfig;
-use crate::platform::Requirement;
+#[cfg(not(target_os = "linux"))]
+use crate::platform::CapabilityStatus;
+use crate::platform::{PlatformCapabilities, Requirement};
 use crate::routing::{Route, RoutingConfig, Schedule, TargetConfig};
 use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfig};
 
@@ -94,6 +96,7 @@ pub struct Budget {
     batch_records: usize,
     batch_wait: Duration,
     idle_wait: Duration,
+    worker_cpus: Option<(Vec<usize>, Requirement)>,
 }
 
 impl Budget {
@@ -143,6 +146,15 @@ impl Budget {
     /// Longest sleep of an idle worker. RT writers never wake workers.
     pub fn idle_wait(mut self, wait: Duration) -> Self {
         self.idle_wait = wait;
+        self
+    }
+    /// Restrict every worker thread (host and IO) to these CPUs to reduce
+    /// interference with RT threads; this is not isolation. Default: no
+    /// restriction. An unknown or duplicate CPU always rejects `start()`. An
+    /// `Optional` placement that the platform cannot apply is reported by
+    /// `Health::affinity`; a `Required` one rejects `start()`.
+    pub fn worker_cpus(mut self, cpus: &[usize], requirement: Requirement) -> Self {
+        self.worker_cpus = (!cpus.is_empty()).then(|| (cpus.to_vec(), requirement));
         self
     }
 }
@@ -199,6 +211,9 @@ pub(crate) struct Derived {
     pub(crate) writer: WriterConfig,
     pub(crate) retention: Vec<RetentionConfig>,
     pub(crate) tuning: Tuning,
+    /// Worker CPU list and the platform observation it was validated against.
+    pub(crate) cpus: Option<(Vec<usize>, Requirement)>,
+    pub(crate) platform: PlatformCapabilities,
 }
 
 /// Loss values absent from `budget`, in a fixed order.
@@ -298,8 +313,14 @@ pub(crate) fn derive(
         workers: WorkerThreadingConfig {
             count: threads,
             stack_bytes: STACK_BYTES,
-            cpu_ids: Vec::new(),
-            affinity: Requirement::Optional,
+            cpu_ids: budget
+                .worker_cpus
+                .as_ref()
+                .map_or_else(Vec::new, |(cpus, _)| cpus.clone()),
+            affinity: budget
+                .worker_cpus
+                .as_ref()
+                .map_or(Requirement::Optional, |&(_, r)| r),
         },
         capabilities: Vec::new(),
     };
@@ -446,5 +467,29 @@ pub(crate) fn derive(
             batch_wait: budget.batch_wait,
             idle_wait: budget.idle_wait,
         },
+        cpus: budget.worker_cpus.clone(),
+        platform: platform(budget.worker_cpus.as_ref()),
     })
+}
+
+/// Observe only what placement validation needs. Without a CPU list nothing
+/// is probed. Off Linux the requested CPUs are taken as given and placement is
+/// Unsupported, so `Optional` falls back and `Required` is rejected.
+fn platform(cpus: Option<&(Vec<usize>, Requirement)>) -> PlatformCapabilities {
+    let Some((cpus, _)) = cpus else {
+        return PlatformCapabilities::default();
+    };
+    #[cfg(target_os = "linux")]
+    {
+        let _ = cpus;
+        super::affinity::observe()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        PlatformCapabilities {
+            available_cpu_ids: cpus.clone(),
+            worker_affinity: CapabilityStatus::Unsupported,
+            ..PlatformCapabilities::default()
+        }
+    }
 }

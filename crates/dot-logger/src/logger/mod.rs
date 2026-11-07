@@ -36,8 +36,12 @@
 //! the shared capture core lives behind one management-held `Arc`; each
 //! [`Writer`](crate::logger::Writer) owns its endpoint and only builds borrowed views of the core.
 
+mod affinity;
 mod budget;
+mod health;
 mod host;
+#[cfg(test)]
+mod tests;
 mod writer;
 
 use std::fmt;
@@ -48,17 +52,18 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub use budget::{Budget, Retention, WriterQuota};
+pub use health::{Degradation, Failure, Health, HealthState, OutputHealth};
 pub use writer::{Channel, EncodeError, LogError, Logged, Record, Schema, Writer};
 
 use crate::capture::{CaptureBuildError, CaptureOwner, ChannelConfig};
 use crate::completion::ProducerRange;
 use crate::config::{ConfigError, Resource, SessionBuilder};
 use crate::control::{ControlError, ShutdownReport};
-use crate::platform::PlatformCapabilities;
 use crate::routing::RoutingError;
 use crate::storage::{RetentionError, StorageChannel, StorageError};
 
-use host::{Command, Flags, HostPlan, Progress};
+use health::Shared;
+use host::{Command, HostPlan, Progress};
 use writer::Owned;
 
 /// A loss value or declaration that `start()` requires but did not receive.
@@ -330,6 +335,7 @@ pub struct LoggerBuilder {
     outputs: Vec<(PathBuf, Retention)>,
     channels: Vec<ChannelSpec>,
     writers: Vec<(String, Option<WriterQuota>)>,
+    telemetry: bool,
 }
 
 impl LoggerBuilder {
@@ -361,6 +367,13 @@ impl LoggerBuilder {
     /// Declare a writer with its own quota.
     pub fn writer_with(mut self, name: &str, quota: WriterQuota) -> Self {
         self.writers.push((name.into(), Some(quota)));
+        self
+    }
+    /// Enable fixed producer counters, sampled once per second into
+    /// [`Health::telemetry`]. Counters are reserved in the control partition;
+    /// each RT record then also updates producer-local atomics.
+    pub fn telemetry(mut self) -> Self {
+        self.telemetry = true;
         self
     }
 
@@ -428,11 +441,10 @@ impl LoggerBuilder {
         let quotas: Vec<_> = self.writers.iter().map(|(_, q)| *q).collect();
         let retention: Vec<Retention> = self.outputs.iter().map(|(_, r)| *r).collect();
         let derived = budget::derive(&budget, &quotas, &storage, &retention)?;
-        let plan =
-            SessionBuilder::new(derived.session).validate(&PlatformCapabilities::default())?;
+        let plan = SessionBuilder::new(derived.session).validate(&derived.platform)?;
         let session = new_session_id();
         let configs: Vec<ChannelConfig> = storage.iter().map(|c| c.channel).collect();
-        let owner = CaptureOwner::new_tracked(
+        let mut owner = CaptureOwner::new_tracked(
             &plan,
             session,
             1,
@@ -440,6 +452,9 @@ impl LoggerBuilder {
             &derived.routing,
             derived.completion,
         )?;
+        if self.telemetry {
+            owner.enable_telemetry()?;
+        }
         let slot_bytes: Vec<usize> = plan
             .config()
             .producers
@@ -468,9 +483,10 @@ impl LoggerBuilder {
                 Some(Writer::new(owned, Arc::clone(&core), mailbox, id, origin)),
             ));
         }
-        let flags = Arc::new(Flags::default());
+        let shared = Arc::new(Shared::new(self.outputs.len(), self.telemetry));
         let (commands, receive) = mpsc::channel();
         let drop_deadline = derived.tuning.drop_deadline;
+        let overdue = derived.tuning.sync_every * 4 + Duration::from_secs(1);
         let host = HostPlan {
             core,
             reads,
@@ -484,7 +500,8 @@ impl LoggerBuilder {
             outputs: self.outputs.iter().map(|(d, _)| d.clone()).collect(),
             tuning: derived.tuning,
             origin,
-            flags: Arc::clone(&flags),
+            shared: Arc::clone(&shared),
+            cpus: derived.cpus,
         };
         let (directories, _detached) = match host::spawn(host, receive) {
             Ok(started) => started,
@@ -502,7 +519,9 @@ impl LoggerBuilder {
             session,
             directories,
             drop_deadline,
-            flags,
+            shared,
+            origin,
+            overdue,
         })
     }
 }
@@ -526,7 +545,9 @@ pub struct Logger {
     session: u128,
     directories: Vec<PathBuf>,
     drop_deadline: Duration,
-    flags: Arc<Flags>,
+    shared: Arc<Shared>,
+    origin: Instant,
+    overdue: Duration,
 }
 
 impl Logger {
@@ -569,7 +590,14 @@ impl Logger {
 
     /// Whether the default worker has failed; new records are then rejected.
     pub fn worker_failed(&self) -> bool {
-        self.flags.worker_failed.load(Ordering::Acquire)
+        self.shared.worker_failed.load(Ordering::Acquire)
+    }
+
+    /// Current worker, output, placement and telemetry status. General path:
+    /// it allocates the per-output list and may briefly lock the sample.
+    pub fn health(&self) -> Health {
+        let now = u64::try_from(self.origin.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        self.shared.health(now, self.overdue)
     }
 
     /// Close admission, drain, synchronize and publish every file, then report.

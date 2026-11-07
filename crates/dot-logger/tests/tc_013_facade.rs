@@ -311,3 +311,178 @@ fn f7_drop_without_shutdown_syncs_and_publishes_within_its_deadline() {
     drop(logger);
     assert_eq!(stored_poses(&directory), sent);
 }
+
+/// Poll `health()` until `ready` holds or `limit` passes; returns the last value.
+fn health_until(
+    logger: &Logger,
+    limit: Duration,
+    ready: impl Fn(&dot_logger::logger::Health) -> bool,
+) -> dot_logger::logger::Health {
+    let start = std::time::Instant::now();
+    loop {
+        let health = logger.health();
+        if ready(&health) || start.elapsed() > limit {
+            return health;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn f9_health_is_running_and_tracks_periodic_sync_per_output() {
+    use dot_logger::logger::HealthState;
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let first = logger.health();
+    assert_eq!(first.state, HealthState::Running);
+    assert_eq!(first.outputs.len(), 1);
+    assert_eq!(first.affinity, None, "no CPU list was requested");
+    assert!(first.telemetry.is_none(), "telemetry is opt-in");
+    let _ = log_poses(&logger, 20);
+    let synced = health_until(&logger, Duration::from_secs(3), |h| {
+        h.outputs[0].since_sync.is_some()
+    });
+    assert!(
+        synced.outputs[0].since_sync.is_some(),
+        "a 20 ms periodic barrier must succeed within 3 s: {synced:?}"
+    );
+    assert_eq!(synced.state, HealthState::Running);
+    assert_eq!(synced.outputs[0].failed_records, 0);
+    assert!(!synced.outputs[0].failed);
+    // Idle past the overdue bound (4 × 20 ms + 1 s): barriers keep succeeding
+    // without new records, so an idle logger is never reported as late.
+    std::thread::sleep(Duration::from_millis(1500));
+    let idle = logger.health();
+    assert_eq!(idle.state, HealthState::Running, "{idle:?}");
+    assert!(idle.outputs[0].since_sync.unwrap() < Duration::from_millis(500));
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown did not close");
+    };
+    assert!(report.is_success(), "{report:?}");
+}
+
+#[test]
+fn f9_health_reports_a_poisoned_output_as_failed() {
+    use dot_logger::logger::{Failure, HealthState};
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let _ = log_poses(&logger, 10);
+    // Periodic directory sync fails once the namespace disappears (as in F5).
+    std::fs::remove_dir_all(&directory).unwrap();
+    let health = health_until(&logger, Duration::from_secs(5), |h| {
+        h.state != HealthState::Running
+    });
+    assert_eq!(
+        health.state,
+        HealthState::Failed(Failure::IoPoisoned),
+        "{health:?}"
+    );
+    assert!(health.outputs[0].failed);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("a failed file must still settle to Closed");
+    };
+    assert!(!report.is_success());
+}
+
+#[test]
+fn f9_health_reports_records_failed_when_continuous_retention_is_full() {
+    use dot_logger::logger::{Degradation, HealthState};
+    let temp = Temp::new();
+    let big = 64 * 1024;
+    let logger = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_millis(20))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(16, big)),
+        )
+        // Smallest valid retention for 64 KiB records; 12 MiB cannot fit.
+        .file_output(&temp.0, Retention::continuous(8 * MIB as u64))
+        .channel::<[u8]>("blob")
+        .writer("control")
+        .start()
+        .unwrap();
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    let payload = vec![7u8; big];
+    for _ in 0..192 {
+        while let Err(e) = writer.try_log(blob, &payload[..]) {
+            assert!(e.is_capacity(), "{e:?}");
+            std::thread::yield_now();
+        }
+    }
+    let health = health_until(&logger, Duration::from_secs(5), |h| {
+        h.outputs[0].failed_records > 0
+    });
+    assert!(health.outputs[0].failed_records > 0, "{health:?}");
+    assert!(
+        !health.outputs[0].failed,
+        "a full retention is not an IO fault"
+    );
+    assert_eq!(
+        health.state,
+        HealthState::Degraded(Degradation::RecordsFailed)
+    );
+    drop(writer);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown did not close");
+    };
+    assert!(!report.is_success(), "lost records are never success");
+}
+
+#[test]
+fn f10_opt_in_telemetry_samples_capture_counts_once_per_second() {
+    use dot_logger::telemetry::Observation;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .telemetry()
+        .start()
+        .unwrap();
+    let _ = log_poses(&logger, 30);
+    let health = health_until(&logger, Duration::from_secs(4), |h| {
+        matches!(
+            h.telemetry,
+            Some(Observation::Observed(s))
+                if matches!(s.capture, Observation::Observed(c) if c.accepted >= 30)
+        )
+    });
+    let Some(Observation::Observed(sample)) = health.telemetry else {
+        panic!("no fresh sample within 4 s: {health:?}");
+    };
+    let Observation::Observed(counts) = sample.capture else {
+        panic!("capture counts unavailable: {sample:?}");
+    };
+    assert_eq!(counts.accepted, 30);
+    assert_eq!(counts.rejected_contract, 0);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown did not close");
+    };
+    assert!(report.is_success(), "{report:?}");
+}
+
+#[test]
+fn f11_unknown_worker_cpu_is_rejected_before_anything_starts() {
+    use dot_logger::platform::Requirement;
+    let temp = Temp::new();
+    let error = Logger::builder()
+        .budget(budget().worker_cpus(&[usize::MAX], Requirement::Optional))
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .start()
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            StartError::Config(dot_logger::config::ConfigError::InvalidCpu { .. })
+        ),
+        "{error:?}"
+    );
+    assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+}

@@ -910,3 +910,22 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 - **worker panic(GAP-009):** crate 내부 `#[cfg(test)]` 주입 flag로만 시험한다. 공개·feature hook은 없다. host가 죽으면 command 수신단을 즉시 놓아 `shutdown`이 기한까지 기다리지 않고 `ShutdownError::WorkerFailed`를 반환한다(이전에는 deadline + 5초 뒤 `Unresponsive`).
 - **의존성:** Linux 대상 `rustix`에 `thread` feature를 켰다. Cargo.lock 변경 없음.
 - **남은 S3:** tracing·remote 선택 연결, api-consumer 갱신. slot 직접 encode는 2026-11-07 Human 승인으로 S3에서 제외했다(사유는 TASK-027 S3 계획, 재설계 조건은 이월 T4).
+
+### 18.10 S3b tracing 선택 연결 — 2026-11-07
+
+[EV-049](../05_verification/verification_evidence.md#ev-049)·[REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md), 소스 `91387ba`. feature `tracing-adapter`에서만 존재한다. §18.1 S3 범위 안의 구체화다.
+
+```rust
+let logger = Logger::builder()
+    /* L1 선언 … */
+    .tracing("app/log", tracing::Level::INFO, WriterQuota::small(256, 1024))   // +1줄
+    .start()?;
+tracing::subscriber::set_global_default(logger.tracing()?)?;                  // +1줄 (또는 log::set_boxed_logger)
+```
+
+- **`LoggerBuilder::tracing(topic, min: tracing::Level, quota: WriterQuota)`:** JSON text channel(schema 99/v1, encoding `"json"`, 기존 `adapters::tracing` 형식)과 내부 writer를 마지막 순서로 선언한다. quota는 유실을 정하는 손실 값이라 필수다. tracing만 선언해도 `Missing::Channel`/`Writer`가 되지 않는다. 내부 writer는 `take_writer`로 꺼낼 수 없다.
+- **`Logger::tracing() -> Result<TracingSink, LookupError>`:** `TracingSink`(Clone)는 `tracing::Subscriber`와 `log::Log`를 함께 구현한다. 선언하지 않았으면 `Unknown`. clone은 내부 writer 하나를 `Mutex`로 공유한다(일반 경로 전용, RT thread에서 이벤트를 내지 않는다).
+- **필터:** `min`보다 덜 심각한 이벤트는 `enabled`에서 거른다(formatting 없음). span은 추적하지 않는다(`enabled`가 span을 끈다). 이벤트 자체 필드만 기록한다.
+- **유실:** 채널 포화·slot 초과·formatter 오류·formatting 중 같은 thread에서 다시 sink로 들어온 이벤트(lock 재진입 교착 방지)·shutdown 뒤 이벤트는 버리고 `Health::tracing_dropped`에 센다. worker를 기다리지 않는다. 같은 thread의 중첩 `tracing` 이벤트는 tracing 자체가 sink에 전달하지 않는다(우리 카운트 밖). core level/sampling `Skipped`는 유실로 세지 않는다.
+- **종료:** `shutdown`/Drop은 시작 시 sink의 writer를 회수해 반납함으로 보낸다. 그래서 global subscriber로 설치된 sink가 살아 있어도 보고의 `writers_outstanding`이 0이고 host reaper가 끝난다.
+- **NFR-008 L3:** 연결 코드 +2줄(제한 +6줄), 사용자가 이름을 쓰는 새 개념 0개(`WriterQuota`는 L1에 이미 있음). 정식 계수는 TASK-029.

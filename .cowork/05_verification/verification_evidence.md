@@ -881,6 +881,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96/1.85(-D warnings, 둘 다 exit0)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 470 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·TC-013 두 binary와 logger unit 20회 반복 20/20. rt-allocation F2/F3 포함.
 - **미실행:** Linux 외 CPU 고정 경로(대상 미설치, 코드 검토만), 검증 통과 뒤 Required 적용 실패(재현 수단 없음), telemetry 비용·logger on 성능(TASK-023 S2/S3), RT 행, native(T3).
 
+<a id="ev-049"></a>
+## EV-049 — TASK-027 S3b tracing 선택 연결
+
+- **판정:** 로컬 구현 Pass. 다중 thread tracing 처리량·RT·native(T3)는 NotRun이다.
+- **대상/환경:** 소스 `91387ba`, base `7156c65`. 2026-11-07 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음. [명령/결과/hash](../06_evolution/imported_context/task_027_s3b_2026-11-07/results.json), [REV-048](reviews/REV-048_TASK-027_S3B_TRACING.md), [API §18.10](../03_design_artifacts/interface_contract.md#1810-s3b-tracing-선택-연결--2026-11-07).
+- **TDD:** F12 3개 작성 → `tracing()`·`tracing_dropped` 부재 컴파일 Red → 구현 → 2 Pass 1 Fail. 같은 thread의 중첩 `tracing` 이벤트는 tracing이 자체로 sink에 전달하지 않아, 실제 교착 경로인 `log` 재진입으로 시험을 고친 뒤 3 Pass. 돌연변이 2종(재진입 가드 제거 → 교착 timeout, shutdown 회수 제거 → `writers_outstanding` 1)으로 검출을 확인했다.
+- **확인한 계약:** tracing만 선언한 logger에서 INFO 이상 `tracing` 이벤트 2건과 WARN `log` 1건이 원 level·JSON(target·필드·메시지)으로 기록되고 DEBUG/TRACE는 제외. shutdown이 살아 있는 sink의 writer를 회수해 `is_success`·`writers_outstanding` 0, 이후 이벤트는 panic 없이 버림. 128B slot 초과 1건과 formatting 중 `log` 재진입 1건을 교착 없이 버려 `tracing_dropped = 2`, 바깥 이벤트는 기록. 미선언 logger는 `Unknown`·`None`.
+- **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 473 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·F12/facade 20회 반복 20/20.
+- **미실행:** 시험 프로세스의 global 설치(`with_default`·직접 `log::Log` 호출로 대체), 다중 thread 처리량, RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

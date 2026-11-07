@@ -66,6 +66,7 @@ ADR-008은 borrowed 모델을 고른 이유로 "Arc 마지막 Drop은 RT free �
 - `Writer::drop`은 소유 상태(`WriteState`·scratch)를 시작 때 미리 만든 1-slot 반환 mailbox(`rtrb`)로 **이동**만 한다. 그다음 Arc 감소와 mailbox endpoint 감소만 한다. 이동·감소에는 할당/해제가 없다.
 - 불변식: `Logger` 또는 worker host가 살아 있는 동안, 그리고 종료 뒤에는 **reaper**가 `Arc<CaptureCore>`·모든 `ReadState`·반환 mailbox 수신단을 보유한다. 그래서 `Writer`는 어떤 공유 자원의 마지막 소유자도 되지 않는다.
 - 종료 시 반환되지 않은 `Writer`가 있으면 보고서에 `writers_outstanding`으로 남긴다. 남은 자원은 management reaper thread로 옮긴다. reaper는 모든 반환을 확인한 뒤 management thread에서 해제한다. 강제 해제·무효화는 하지 않는다.
+- 구현 보강(2026-11-07, REV-051 RV-120, 결정 변경 없음): "반환 확인"은 상태가 mailbox에 들어온 시점이 아니라 `Writer`의 mailbox `Producer`가 drop된 시점(rtrb `Consumer::is_abandoned`)이다. 상태만 들어온 시점에 해제하면 RT 스레드가 링의 두 번째 dropper가 되어 링·상태를 해제할 수 있다. 또한 `Arc<CaptureCore>`도 반환 상태 안으로 옮겨, push 뒤 `Writer`에 남는 필드가 어떤 공유 자원의 감소도 하지 않게 했다.
 - 검증 조건(S2 DoD): `tests/rt-allocation` allocator guard로 다음 Drop에서 할당·해제가 0임을 확인한다. ① Logger 동작 중 Writer Drop, ② shutdown 반환 뒤 Writer Drop, ③ Logger Drop 뒤 Writer Drop.
 
 ### 4. worker 측은 facade 소유 thread 안에서 기존 scope API를 그대로 쓴다

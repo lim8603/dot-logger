@@ -920,6 +920,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 483 Pass(5 ignore, 기존 DB 회귀)·`scripts/check-feature-matrix.py` 두 toolchain exit0.
 - **미실행:** S2 auto preset, preset 예산의 실제 IO 정지 흡수 측정(TASK-023 S2/S3), RT 행, native(T3).
 
+## EV-053 — REV-051 조치(RV-120~127)
+
+- **판정:** 로컬 조치 Pass. REV-051 Resolved(Human 최종 구현 리뷰 대기). RT 커널 행·native(T3)·TASK-023 실측은 NotRun.
+- **대상/환경:** 소스 `60ea9bb`, base `c32cf5e`. 2026-11-07 #003 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), uid 1000, Cargo.lock 변경 없음. [REV-051](reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md), [API §19.4](../03_design_artifacts/interface_contract.md#194-rev-051-조치-반영--2026-11-07), [ADR-012 구현 보강](../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md).
+- **TDD(8건 모두 Red 확인 후 Green):** RV-120 reaper 판정 순수 함수 결정적 Red(push 후 Producer 생존을 반납 완료로 판단) → `is_abandoned` 기준·`Arc<CaptureCore>`를 반환 상태로 이동. RV-121 `batch_wait=0` 유휴 대기 0ns Red → 보류 배치 기준 대기. RV-122 host 내부 시작 실패 뒤 같은 주소 재bind 3/3 `AddrInUse` Red → writer 반납 후 host join. RV-123 `Duration::MAX`·preset `u128`·remote 기본 한도 패닉 3건 Red → 포화/checked·`InvalidBudget`. RV-124 slot 64B→64KiB에도 worker 증가 0 Red → `facade_bytes`. RV-125 단위 Red·F9 `io_failed` Red(settle 수정 뒤에도 sync barrier 경로로 true) → 파일 자체 오류만 IO 장애. RV-126·RV-127 컴파일 Red → prelude/`EncodeError`·`records_for`.
+- **확인한 계약:** RT 쪽 `Writer` drop 할당·해제 0(F3, rt-allocation 18건). 실패한 `start()`는 listener를 닫은 뒤 반환(0.00s). 무한 기한으로 시작·종료·Drop 성공. 넘치는 quota·preset은 오류로 거절. F14 정확 요구량 유지. 보존 한도는 `io_failed=false`·Degraded, 실제 파일 장애(F5)는 `io_failed=true`. `perf_baseline --payload 0`은 사용법 오류 exit 4.
+- **검증:** fmt·clippy 1.96 `-D warnings` exit0·rustdoc `-D warnings` exit0(병렬 실행 첫 회에 기존 CLI bin/lib 문서 파일명 충돌 경고와 함께 1회 실패, 단독 재실행 Pass)·Rust 1.96 workspace 493 Pass(5 ignore, 기존 DB 회귀; 신규 10)·MSRV 1.85 workspace 493 Pass·clippy 1.85 exit0·`check-feature-matrix.py` 1.96/1.85 exit0·api-consumer Pass(`9437184 bytes reserved`)·경쟁 민감 묶음(rt-allocation·logger 단위·tc_013_facade·facade_remote) 20회 반복 20/20.
+- **미실행:** TASK-023 S2/S3 실측(RV-121·RV-124 효과 포함), RT 커널 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

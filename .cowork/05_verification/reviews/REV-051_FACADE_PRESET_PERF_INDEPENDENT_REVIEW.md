@@ -50,7 +50,7 @@
   - Safe Rust 100% (`logger/`·`perf/`·`remote` 신규·변경 코드 내 `unsafe` 블록 0건)
 - **종합 판정:** **Conditional Pass** (P1 1건, P2 5건, P3 2건).
   - 아키텍처 분리(ADR-008 borrowed core 불변 보존 + ADR-012 facade 소유 핸들), RT 핫패스(`try_log`·`try_log_raw`) 무할당·무대기 구조, feature 격리, `unsafe` 0건은 매우 우수하나, **`Writer::drop`과 `host_main` reaper 간 파괴 순서 경쟁으로 RT 스레드에서 대규모 heap 해제가 일어날 수 있는 Critical 결함(RV-120)** 및 TASK-023 S2 성능·자원 측정에 직접 영향을 주는 worker 유휴 스핀·시작 실패 정리·산술 오버플로·facade 메모리 예산 누락·`settle` 오류 분류(RV-121~125)가 확인되어 TASK-023 S2 착수 전 조치가 필요하다.
-- **상태:** **Open**
+- **상태:** **Resolved** (2026-11-07 #003 개발 세션 조치, Human 최종 구현 리뷰 대기 — 승인 시 Closed)
 
 ---
 
@@ -74,14 +74,14 @@
 
 | ID | 중요도 | 위치·계약 | 발견된 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-120 | **P1** | [`logger/writer.rs#L174-L281`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/writer.rs#L174-L281), [`logger/host.rs#L188-L194`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L188-L194) — ADR-012 §3 `Writer::drop` 무해제 불변식 | `Writer::drop`이 `mailbox.push(owned)` 직후 필드를 해제하기 전에 `host_main` reaper가 `!is_empty()`를 관측하고 `mailboxes`·`core`를 먼저 drop하면, **RT 스레드가 마지막 `Arc<CaptureCore>`와 `rtrb` 링버퍼(`Owned`·`RawPool`·링 전체)를 직접 deallocate함** | `Arc<CaptureCore>`를 `Owned` 내부로 이동해 반납함과 함께 넘기고, reaper 대기 조건을 `Consumer::is_empty()` 대신 `!Consumer::is_abandoned()`(`rtrb` `Drop`의 마지막 `Release` 플래그)로 변경 | 대기 | Open |
-| RV-121 | **P2** | [`logger/host.rs#L730-L732`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L730-L732) — `io_loop` 유휴 대기 / `Budget::batching` | `batch_wait == Duration::ZERO` 허용 시 `idle_wait.min(batch_wait)`가 `Duration::ZERO`가 되어 유휴 상태에서 `dot-logger-io` 스레드가 100% CPU busy-spin 발생 (`batch_wait < idle_wait`일 때도 빈 배치에서 불필요 조기 기상) | 보류 중인 배치(`held_since.is_some()`)가 없을 때는 `tuning.idle_wait`만큼 대기하고, 보류 배치가 있을 때만 남은 `batch_wait` 기한과 `min` 계산 | 대기 | Open |
-| RV-122 | **P2** | [`logger/host.rs#L74-L89`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L74-L89), [`host.rs#L164-L195`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L164-L195), [`logger/mod.rs#L718-L726`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L718-L726) — API §18.2 시작 실패 원자성 | `host_main` 시작 실패(`open_logs`·`Required` affinity 등) 시 `ready.send(Err)`가 `remote.stop()`·reaper 정리보다 먼저 실행되고 `spawn`이 `JoinHandle`을 join하지 않아, `start()`가 `Err`를 반환한 뒤에도 백그라운드 스레드와 바인딩된 TCP 포트가 살아남음 | `start()` 실패 분기에서 외부로 노출되지 않은 `writers`·`sink`를 먼저 drop한 뒤 `host` `JoinHandle`을 동기 `join`하여 리스너·메모리 완전 정리 후 `Err` 반환 | 대기 | Open |
-| RV-123 | **P2** | [`logger/mod.rs#L700,L867-L886`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L700), [`host.rs#L190,L416,L559`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L190), [`remote.rs#L120-L124`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/remote.rs#L120-L124), [`preset.rs#L75`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/preset.rs#L75), [`budget.rs#L69-L75,L359-L364`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/budget.rs#L69-L75) | 큰 `Duration`(예: `Duration::MAX`)이나 미검증 `WriterQuota`·`Sizing` 입력 시 `Instant + Duration`, `sync_every * 4`, `u128` 곱셈, `remote::default_limits` 합산에서 산술 오버플로 패닉 가능 (`Logger::drop` 내부 패닉 포함) | 시간 기한은 `checked_add`/`saturating_*`로 상한 고정, `Sizing::slots`·`remote::default_limits`는 포화 연산, `budget::derive`는 `checked_add`/`checked_mul` 실패 시 `StartError::InvalidBudget` 반환 | 대기 | Open |
-| RV-124 | **P2** | [`logger/budget.rs#L332-L356,L483-L540`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/budget.rs#L332-L356), [`logger/mod.rs#L669-L674`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L669-L674), [`host.rs#L328,L377`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L328) — ADR-012 메모리 예산 계약 | ADR-012가 명시한 facade 고유 사전 할당(`Writer`당 `scratch`·1-slot 반납함, 타깃당 `IoTarget::batch`, host `events` 버퍼)이 `budget::derive` 요구량 및 `Plan::required_bytes`에서 누락됨 | `Writer`별 `small_slot_bytes + mailbox` 및 worker/host 고정 버퍼 바이트를 `budget::derive`(예: `worker`/`control` 파티션)에 반영하고 API §19.3 공식과 동기화 | 대기 | Open |
-| RV-125 | **P2** | [`logger/host.rs#L784-L818`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L784-L818) — `settle()` 오류 승격 및 `FacadeReport::io_failed` 정합성 | ① `continuous` 보존 한도 도달(`AdapterFailure`) 시 IO 장애가 아닌데도 `flags.io_failed`가 `true`로 설정되어 rustdoc·`OutputHealth::failed`(`false`)와 모순됨 ② `AdapterFailure` 분기 내 `log.flush()`가 실제 `StorageError::Io`/`Poisoned`로 실패해도 `reason`이 `IoFailure`로 승격되지 않아 `status.fail()`이 누락됨 | `log.flush()`가 `Io`/`Poisoned`로 실패하면 `reason = FailureReason::IoFailure`로 승격하고, `reason == FailureReason::IoFailure`일 때만 `flags.io_failed`와 `status.fail()`을 기록 | 대기 | Open |
-| RV-126 | **P3** | [`lib.rs#L43-L48`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/lib.rs#L43-L48), [`logger/writer.rs#L45-L47`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/writer.rs#L45-L47), [`logger/mod.rs#L318-L330,L529-L539`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L318-L330) — 공개 표면 일관성 및 rustdoc | ① `prelude`에 TASK-028 S1 `Preset`·`Sizing` 미포함 ② 공개 `logger::EncodeError`에 `Display`·`std::error::Error` 미구현 ③ `PendingShutdown::wait` 재호출 시 타임아웃 동작(`Unresponsive`) 및 채널 기본 `minimum_level`(`Trace`) vs `Channel` 기본 발신 레벨(`Info`) 문서 명확화 여지 | `prelude` 재수출 정리, `EncodeError`에 `Display`+`Error` 구현, `PendingShutdown::wait` 및 API §18.2/§18.8 rustdoc 보강 | 대기 | Open |
-| RV-127 | **P3** | [`examples/perf_baseline.rs#L99,L116`](file:///home/lim8603/src/dot-logger/crates/dot-logger/examples/perf_baseline.rs#L99), [`examples/support/perf/mod.rs#L358,L441`](file:///home/lim8603/src/dot-logger/crates/dot-logger/examples/support/perf/mod.rs#L358) — P0 CLI 경계값 방어 | `perf_baseline --p0` / `--p0-max`에서 `--payload 0` 전달 시 `write_p0` 검증 전에 `/ payload as u64` 0 나눗셈 패닉 발생; `perf/mod.rs` 시간 차 계산 2곳이 raw `-` 연산 사용 | CLI 인자에서 `payload == 0`을 선행 검증(또는 `.max(1)`)하고 타임스탬프 차이에 `saturating_sub` 적용 | 대기 | Open |
+| RV-120 | **P1** | [`logger/writer.rs#L174-L281`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/writer.rs#L174-L281), [`logger/host.rs#L188-L194`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L188-L194) — ADR-012 §3 `Writer::drop` 무해제 불변식 | `Writer::drop`이 `mailbox.push(owned)` 직후 필드를 해제하기 전에 `host_main` reaper가 `!is_empty()`를 관측하고 `mailboxes`·`core`를 먼저 drop하면, **RT 스레드가 마지막 `Arc<CaptureCore>`와 `rtrb` 링버퍼(`Owned`·`RawPool`·링 전체)를 직접 deallocate함** | `Arc<CaptureCore>`를 `Owned` 내부로 이동해 반납함과 함께 넘기고, reaper 대기 조건을 `Consumer::is_empty()` 대신 `!Consumer::is_abandoned()`(`rtrb` `Drop`의 마지막 `Release` 플래그)로 변경 | 수용 | Resolved |
+| RV-121 | **P2** | [`logger/host.rs#L730-L732`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L730-L732) — `io_loop` 유휴 대기 / `Budget::batching` | `batch_wait == Duration::ZERO` 허용 시 `idle_wait.min(batch_wait)`가 `Duration::ZERO`가 되어 유휴 상태에서 `dot-logger-io` 스레드가 100% CPU busy-spin 발생 (`batch_wait < idle_wait`일 때도 빈 배치에서 불필요 조기 기상) | 보류 중인 배치(`held_since.is_some()`)가 없을 때는 `tuning.idle_wait`만큼 대기하고, 보류 배치가 있을 때만 남은 `batch_wait` 기한과 `min` 계산 | 수용 | Resolved |
+| RV-122 | **P2** | [`logger/host.rs#L74-L89`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L74-L89), [`host.rs#L164-L195`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L164-L195), [`logger/mod.rs#L718-L726`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L718-L726) — API §18.2 시작 실패 원자성 | `host_main` 시작 실패(`open_logs`·`Required` affinity 등) 시 `ready.send(Err)`가 `remote.stop()`·reaper 정리보다 먼저 실행되고 `spawn`이 `JoinHandle`을 join하지 않아, `start()`가 `Err`를 반환한 뒤에도 백그라운드 스레드와 바인딩된 TCP 포트가 살아남음 | `start()` 실패 분기에서 외부로 노출되지 않은 `writers`·`sink`를 먼저 drop한 뒤 `host` `JoinHandle`을 동기 `join`하여 리스너·메모리 완전 정리 후 `Err` 반환 | 수용 | Resolved |
+| RV-123 | **P2** | [`logger/mod.rs#L700,L867-L886`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L700), [`host.rs#L190,L416,L559`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L190), [`remote.rs#L120-L124`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/remote.rs#L120-L124), [`preset.rs#L75`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/preset.rs#L75), [`budget.rs#L69-L75,L359-L364`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/budget.rs#L69-L75) | 큰 `Duration`(예: `Duration::MAX`)이나 미검증 `WriterQuota`·`Sizing` 입력 시 `Instant + Duration`, `sync_every * 4`, `u128` 곱셈, `remote::default_limits` 합산에서 산술 오버플로 패닉 가능 (`Logger::drop` 내부 패닉 포함) | 시간 기한은 `checked_add`/`saturating_*`로 상한 고정, `Sizing::slots`·`remote::default_limits`는 포화 연산, `budget::derive`는 `checked_add`/`checked_mul` 실패 시 `StartError::InvalidBudget` 반환 | 수용 | Resolved |
+| RV-124 | **P2** | [`logger/budget.rs#L332-L356,L483-L540`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/budget.rs#L332-L356), [`logger/mod.rs#L669-L674`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L669-L674), [`host.rs#L328,L377`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L328) — ADR-012 메모리 예산 계약 | ADR-012가 명시한 facade 고유 사전 할당(`Writer`당 `scratch`·1-slot 반납함, 타깃당 `IoTarget::batch`, host `events` 버퍼)이 `budget::derive` 요구량 및 `Plan::required_bytes`에서 누락됨 | `Writer`별 `small_slot_bytes + mailbox` 및 worker/host 고정 버퍼 바이트를 `budget::derive`(예: `worker`/`control` 파티션)에 반영하고 API §19.3 공식과 동기화 | 수용 | Resolved |
+| RV-125 | **P2** | [`logger/host.rs#L784-L818`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/host.rs#L784-L818) — `settle()` 오류 승격 및 `FacadeReport::io_failed` 정합성 | ① `continuous` 보존 한도 도달(`AdapterFailure`) 시 IO 장애가 아닌데도 `flags.io_failed`가 `true`로 설정되어 rustdoc·`OutputHealth::failed`(`false`)와 모순됨 ② `AdapterFailure` 분기 내 `log.flush()`가 실제 `StorageError::Io`/`Poisoned`로 실패해도 `reason`이 `IoFailure`로 승격되지 않아 `status.fail()`이 누락됨 | `log.flush()`가 `Io`/`Poisoned`로 실패하면 `reason = FailureReason::IoFailure`로 승격하고, `reason == FailureReason::IoFailure`일 때만 `flags.io_failed`와 `status.fail()`을 기록 | 수용 | Resolved |
+| RV-126 | **P3** | [`lib.rs#L43-L48`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/lib.rs#L43-L48), [`logger/writer.rs#L45-L47`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/writer.rs#L45-L47), [`logger/mod.rs#L318-L330,L529-L539`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs#L318-L330) — 공개 표면 일관성 및 rustdoc | ① `prelude`에 TASK-028 S1 `Preset`·`Sizing` 미포함 ② 공개 `logger::EncodeError`에 `Display`·`std::error::Error` 미구현 ③ `PendingShutdown::wait` 재호출 시 타임아웃 동작(`Unresponsive`) 및 채널 기본 `minimum_level`(`Trace`) vs `Channel` 기본 발신 레벨(`Info`) 문서 명확화 여지 | `prelude` 재수출 정리, `EncodeError`에 `Display`+`Error` 구현, `PendingShutdown::wait` 및 API §18.2/§18.8 rustdoc 보강 | 수용 | Resolved |
+| RV-127 | **P3** | [`examples/perf_baseline.rs#L99,L116`](file:///home/lim8603/src/dot-logger/crates/dot-logger/examples/perf_baseline.rs#L99), [`examples/support/perf/mod.rs#L358,L441`](file:///home/lim8603/src/dot-logger/crates/dot-logger/examples/support/perf/mod.rs#L358) — P0 CLI 경계값 방어 | `perf_baseline --p0` / `--p0-max`에서 `--payload 0` 전달 시 `write_p0` 검증 전에 `/ payload as u64` 0 나눗셈 패닉 발생; `perf/mod.rs` 시간 차 계산 2곳이 raw `-` 연산 사용 | CLI 인자에서 `payload == 0`을 선행 검증(또는 `.max(1)`)하고 타임스탬프 차이에 `saturating_sub` 적용 | 수용 | Resolved |
 
 ---
 
@@ -111,9 +111,9 @@
   3. 재현/회귀 시험: reaper 폴링 간격을 0(tight spin)으로 둔 스트레스 조건 또는 카운팅 할당자 하에서 `Logger` 종료 직후 다수 `Writer`를 동시 drop해도 RT 스레드 deallocation이 `0`임을 검증하는 테스트를 보강한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** ① reaper 판정을 `host::writers_returned`/`writers_outstanding`으로 꺼내 `Consumer::is_empty` 대신 `Consumer::is_abandoned`(Writer의 mailbox `Producer` drop 완료) 기준으로 바꿨다. host가 항상 두 번째 dropper가 되어 `drop_slow`·`Owned`·`CaptureCore` 해제를 맡는다. `facade_report`의 `writers_outstanding`도 같은 기준. ② `Arc<CaptureCore>`를 `Owned` 안으로 옮겨 push 뒤 RT 스레드가 공유 자원 참조를 하나도 갖지 않게 했다(필드 선언 순서에 의존하지 않음). ③ rtrb 0.4.0 `ArcRingBuffer::drop`(먼저 drop한 쪽은 플래그만, 나중 쪽이 `drop_slow`) 동작을 소스로 확인.
+- **검증 근거:** Red: `logger::tests::reaper_waits_until_the_writer_dropped_its_mailbox_producer` — push 후 Producer 생존 상태를 기존 판정이 "반납 완료"로 판단(결정적 재현). Green 후 RT 할당 F3(0/0) 포함 `dot-logger-rt-allocation` 18건 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -138,9 +138,9 @@
   - 모든 타깃의 `held_since`가 `None`(보류 중인 배치 없음)일 때는 `tuning.idle_wait`만큼 대기하고, 보류 중인 배치가 있는 타깃들이 존재할 때만 가장 이른 남은 보류 시간 `tuning.batch_wait.saturating_sub(now.saturating_duration_since(held))`와 `tuning.idle_wait` 중 작은 값으로 `sleep`하도록 개선한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** 유휴 대기를 `host::idle_sleep`으로 꺼냈다. 보류 배치가 없으면 `idle_wait`, 보류 배치가 있으면 그 남은 보류 시간과 `idle_wait` 중 작은 값만큼 잔다. `batch_wait = 0`에서도 유휴 spin이 없다. `idle_wait = 0`은 사용자가 명시한 성능 값이라 유지했다.
+- **검증 근거:** Red: `idle_io_sleep_ignores_batch_wait_until_a_batch_is_held`(`batch_wait=0`에서 0ns 대기). [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -162,9 +162,9 @@
   - `LoggerBuilder::start()`에서 `host::spawn`이 실패한 경우, 아직 외부 호출자에게 단 하나의 `Writer`나 `TracingSink`도 반환되지 않았으므로 호출자 스레드에서 로컬 `writers`와 `sink`를 먼저 명시적으로 `drop`한 뒤 `dot-logger-host`의 `JoinHandle`을 `join`하여 `remote.stop()`과 코어 메모리 해제가 완전히 끝난 상태에서 `Err(error)`를 반환하도록 정리한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** `host::spawn` 실패가 `SpawnFailed { error, host: Option<JoinHandle> }`를 돌려준다. `start()`는 아직 내보내지 않은 writer·tracing sink를 먼저 drop(상태를 reaper로 반납)한 뒤 host를 join하고 `Err`를 반환한다. 그래서 반환 시점에 listener·core 메모리가 모두 정리돼 있다. 실패 경로 소요는 시험에서 0.00s.
+- **검증 근거:** Red: `facade_remote::f13_host_start_failure_closes_the_listener_before_returning`(읽기 전용 출력 디렉터리로 host 내부 `open_logs` 실패 유도, 같은 주소 재bind가 3/3 `AddrInUse`). root 권한이면 유도 불가로 건너뜀. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -189,9 +189,9 @@
   - `budget::derive`의 `WriterQuota` 합산에는 `checked_add` / `checked_mul`을 적용해 오버플로 시 `Err(StartError::InvalidBudget { .. })`를 반환하도록 통일한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** `budget::later(now, d)`(100년 상한 클램프)와 `budget::sync_overdue`(포화 4배+1초)로 `Instant`/`Duration` 덧셈을 대체(`request_shutdown`·host 연결 끊김 종료·ordinary sync 기한·`overdue`), `REPORT_GRACE`는 `saturating_add`, reaper 백오프는 `saturating_mul`. `Sizing::slots`·`remote::default_limits`는 포화 연산, `WriterQuota::records/payload_bytes/small_bytes`는 `checked_*`로 바꿔 `derive`에서 `InvalidBudget`.
+- **검증 근거:** Red: `tc_013_preset::f15_unbounded_durations_start_shut_down_and_drop_without_panic`(`Duration::MAX` 덧셈 패닉), `f15_overflowing_sizes_are_rejected_not_panicking`(preset `u128` 곱셈 패닉), `facade_remote::f13_overflowing_quota_with_remote_is_rejected_not_panicking`(`default_limits` 곱셈 패닉 → 수정 뒤 `Remote(Limit)` 거절). [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -214,9 +214,9 @@
   - facade 고유 사전 할당량(`Writer`당 `scratch` + 1-slot `mailbox`, 타깃당 `batch` 벡터 용량, host 고정 이벤트 버퍼)을 순수 계산 함수(예: `facade_overhead_bytes`)로 산출해 `budget::derive`의 `worker`(또는 `control`) 파티션 요구량과 `Plan::required_bytes`에 포함시키고, API §19.3 설명과 `tc_013_preset` F14 검증식을 함께 갱신한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** `budget::facade_bytes`가 writer별 scratch(small slot)+1-slot mailbox(`size_of::<RingBuffer<Owned>>() + size_of::<Owned>()`), 출력별 IO batch(`batch_records × size_of::<Delivery>()`), host 이벤트 버퍼(`HOST_EVENTS=256`)·producer별 sync 범위 배열 3개를 계산해 worker partition과 `required_bytes`에 더한다. host는 같은 `HOST_EVENTS` 상수를 쓴다. 스레드 스택(기존 별도 계산)·채널 큐·유한 sync 작업 목록은 제외(rustdoc·API §19.4에 명시).
+- **검증 근거:** Red: `tc_013_preset::f15_facade_buffers_are_charged_to_the_worker_partition`(slot 64B→64KiB에도 worker 증가 0). F14 정확 요구량 시험 유지 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -233,9 +233,9 @@
   - 하단 플래그 갱신에서는 `if reason == FailureReason::IoFailure { flags.io_failed.store(true, Ordering::Release); target.status.fail(); }`로 통일하여 `Health`와 `FacadeReport::io_failed`가 동일한 IO 장애 의미를 갖도록 맞춘다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** ① `settle`: prefix flush가 `Io`/`Poisoned`로 실패하면 `host::tail_reason`으로 뒤쪽 전체를 `IoFailure`로 승격. `io_failed`·`status.fail()`은 `IoFailure`일 때만 기록하고 보존 한도 등은 `records_failed`만 올린다. ② 같은 결함 유형이 sync 경로에도 있어 함께 정리: 보존 한도로 기록되지 않은 범위를 덮는 barrier가 `InvalidRecord`로 실패하면 barrier만 `Failed`(core `sync_failed`)이고 출력 IO 장애로 표시하지 않는다. 실제 `Io`/`Poisoned`만 IO 장애.
+- **검증 근거:** Red: `settle_promotes_a_failed_prefix_flush_to_io_failure`(단위), `tc_013_facade::f9_*`에 `!report.io_failed` 단언 추가(settle 수정 뒤에도 sync 경로로 true → ② 수정 후 Pass). F5 실제 파일 장애는 계속 `io_failed`. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -257,9 +257,9 @@
   - `dot_logger::prelude`에 `Preset`, `Sizing`을 재수출하고, `logger::EncodeError`에 `fmt::Display`와 `std::error::Error`를 구현하며, `PendingShutdown::wait` `# Errors` 및 채널 기본 레벨 문구를 보강한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** `prelude`에 `Preset`·`Sizing` 재수출, `logger::EncodeError`에 `Display`("record does not fit the encode buffer")·`std::error::Error` 구현, `PendingShutdown::wait`에 `# Errors`(Incomplete 1회·이후 Unresponsive 의미), `LoggerBuilder::channel` rustdoc과 API §18.2 표에 발신 기본 `Info`·채널 수용 하한 `Trace` 구분.
+- **검증 근거:** Red(컴파일): `tc_013_preset::prelude_surface::f15_prelude_has_presets_and_encode_error_is_an_error`. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
 
 ---
 
@@ -276,6 +276,6 @@
   - `perf_baseline.rs`에서 `payload == 0`이면 즉시 사용법/검증 오류를 반환하도록 가드하고, `perf/mod.rs` 358·441행도 `saturating_sub`로 통일한다.
 
 #### [처리담당]
-- **판정 결과:** 대기 (`Open`)
-- **처리 내용:** —
-- **검증 근거:** —
+- **판정 결과:** 수용 (`Resolved`)
+- **처리 내용:** `perf::records_for(total, payload)`가 `payload == 0`을 사용법 오류로 반환하고 `--p0`·`--p0-max` 모두 이를 쓴다. `perf/mod.rs` 두 곳 `saturating_sub`. (리뷰 당시 서술한 `64MiB / payload` 식은 현재 `rate×seconds / payload`·`total / payload`였고 같은 0 나눗셈이다.)
+- **검증 근거:** Red(컴파일): `tc_012_performance::p0_record_count_rejects_a_zero_payload`. `perf_baseline --p0-max … 0 …` → `payload must be at least 1 byte`, exit 4. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`

@@ -820,9 +820,9 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 | `.budget(Budget)` / `.preset(..)`(TASK-028) | 둘 중 하나는 필수다. 없으면 `start()`가 `ConfigError::MissingBudget`으로 거절한다. **손실 값**(sync 주기, `shutdown`·`drop_deadline` 기한, 메모리·slot 크기, 보존 용량)은 필수이며, 빠지면 빠진 항목 목록과 함께 거절한다. **성능 값**(IO thread 1, CPU 고정 없음, idle 대기 상한)은 facade 기본값이 있다(ADR-012 §6). |
 | `Budget` | writer별 small slots·slot bytes·raw slots/bytes·중요 예약, 완료 window, IO thread 수·CPU 목록, sync 주기, 종료/Drop 기한. facade가 `MemoryBudget` 7분할·`RoutingConfig`·`CompletionConfig`·`WriterConfig` 세부를 **결정적 규칙**으로 계산한다. 부족하면 항목·부족량을 담은 오류를 반환한다. `Budget::advanced(core configs)`는 core 설정을 그대로 받는 탈출구다. |
 | `.file_output(dir, Retention)` | file target 하나를 추가한다(여러 번 호출 가능, TASK-023 S2의 16파일 대응). `Retention::{ring, continuous, event}` 상위 입력에서 `RetentionConfig`를 계산한다. 경로는 기존 `FileStore`의 신선한 session namespace 규칙을 따른다. |
-| `.channel::<T: Record>(topic)` / `.channel_with(topic, ChannelOptions)` | 시작 전에 고정 등록한다. 등록 순서가 channel ID 순서다. 기본 level=Info·importance=Normal·route=모든 file target. 런타임 채널 추가는 없다(core 고정 등록 계약). |
+| `.channel::<T: Record>(topic)` / `.channel_with(topic, ChannelOptions)` | 시작 전에 고정 등록한다. 등록 순서가 channel ID 순서다. 기본 발신 level=Info(`Channel::at`으로 변경)·채널 수용 하한=Trace(낮춘 발신도 등록에서 걸러지지 않음, REV-051 RV-126)·importance=Normal·route=모든 file target. 런타임 채널 추가는 없다(core 고정 등록 계약). |
 | `.writer(name)` / `.writer_with(name, WriterQuota)` | producer slot 하나를 선언한다. 기본 quota는 `Budget`에서 온다. |
-| `start()` | 검증 → 사전 할당·예열 → host thread와 IO thread 시작 → `Logger`. 실패 시 생성한 thread·파일을 모두 정리하고 오류를 반환한다. 부분적으로 시작된 상태는 남기지 않는다. |
+| `start()` | 검증 → 사전 할당·예열 → host thread와 IO thread 시작 → `Logger`. 실패 시 생성한 thread·파일을 모두 정리하고 오류를 반환한다. 부분적으로 시작된 상태는 남기지 않는다. host 내부 실패(출력 namespace·`Required` CPU 고정 등)도 아직 내보내지 않은 writer를 반납하고 host를 join한 뒤 반환하므로, 반환 시점에 remote listener가 닫혀 있다(REV-051 RV-122). |
 
 ### 18.3 기록 핸들(RT 경로)
 
@@ -834,7 +834,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 | `Writer::try_log_at(.., Stamp)` / `try_log_with(.., Meta)` | 시각·level·importance·source time을 호출자가 지정한다. 시계를 읽지 않는다. |
 | `Writer::producer(&mut self) -> Producer<'_>` | 고급 경로. 기존 `try_acquire`/`Loan`/`try_record_raw`/`apply_pending_config`를 그대로 쓰는 빌림 뷰(ADR-012 §2). |
 | `trait Record` | `const SCHEMA: Schema`(id·version·encoding·이름), `fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError>`. RT 구현은 할당하지 않아야 한다. 이는 사용자 책임이며 문서와 allocator guard 예제로 보인다. `[u8]`·`&[u8]` 고정 구현을 제공한다. |
-| `Writer::drop` | 상태를 반환 mailbox로 이동한다. 할당·해제 0(ADR-012 §3). |
+| `Writer::drop` | 상태(`Arc<CaptureCore>` 포함)를 반환 mailbox로 이동한다. 할당·해제 0(ADR-012 §3). reaper는 mailbox `Producer`가 폐기된 뒤(rtrb `is_abandoned`)에만 해제하므로 마지막 해제는 항상 관리 측이다(REV-051 RV-120). |
 
 `LogError`는 `Copy`이며 동적 진단을 포함하지 않는다: `Closing`, `Capacity(Resource)`, `TooLarge`, `SchemaMismatch`, `Encode`, `EmergencyPowerOff`. 기존 core 거절 이유를 손실 없이 대응시킨다. revision 적용(`apply_pending_config`)은 `try_log` 진입 시 고정 비용으로 수행한다. idle writer의 미적용은 core 계약대로 `RevisionBusy`로 보인다.
 
@@ -989,3 +989,12 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 - **수치:** slot = ⌈기록률 × 흡수 × 1.25⌉(최소 1). raw만 있는 Sizing은 소형 metadata pool을 raw와 같은 기록률·256B로 둔다. `control` = 256B·sync 1초·종료 3초·흡수 1초, `sensor` = control + raw, `black_box` = 256B·sync 100ms·종료 3초·흡수 2초. 메모리 = 정확 요구량 + ⌈10%⌉.
 - **plan():** start와 같은 해석(`resolve`)을 쓰며 할당·bind·파일 생성을 하지 않는다. 디렉터리 존재 확인과 remote bind는 start에서만 한다. 같은 builder의 plan은 결정적이다(F15).
 - **공개 표면:** 이번 세션 facade 추가 공개 타입은 `Health`·`HealthState`·`Degradation`·`Failure`·`OutputHealth`·`TracingSink`·`Preset`·`Sizing`·`Plan`이다. NFR-008 ≤60 계수는 TASK-029 회귀 가드에서 확인한다.
+
+### 19.4 REV-051 조치 반영 — 2026-11-07
+
+[EV-053](../05_verification/verification_evidence.md#ev-053)·[REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md). §19.1 결정은 바뀌지 않았다.
+
+- **facade 고유 할당(RV-124, ADR-012 단점 항목 이행):** worker partition = 스레드 스택(기존) + `facade_bytes`. `facade_bytes` = Σwriter(small slot bytes(encode scratch) + 1-slot 반환 mailbox `size_of::<RingBuffer<Owned>>() + size_of::<Owned>()`) + 출력 수 × `batch_records` × `size_of::<Delivery>()` + host 이벤트 버퍼 256 × `size_of::<Option<DispatchEvent>>()` + writer 수 × 3 × `size_of::<ProducerRange>()`. `required_bytes`에 포함되므로 preset +10%와 F14 정확성 계약이 그대로 적용된다. 채널 큐(mpsc)·유한 sync 작업 목록·IO batch 참조 벡터는 포함하지 않는다.
+- **극단 입력(RV-123):** `Duration::MAX` 같은 무한 의도의 sync 주기·종료/Drop 기한은 허용하고 내부 `Instant` 기한을 100년 상한으로 클램프한다. 합이 `usize`를 넘는 writer quota·preset 크기는 `StartError::InvalidBudget`(remote 기본 한도가 먼저 걸리면 `StartError::Remote`)로 거절한다. 패닉하지 않는다.
+- **오류 분류(RV-125):** `FacadeReport::io_failed`와 `OutputHealth::failed`는 파일 자체 오류(`Io`/`Poisoned`)에만 켜진다. 보존 한도 도달은 `records_failed`(Degraded)와 core 실패 집계로만 보이며, 그 범위를 덮는 sync barrier 실패는 core `sync_failed`로 보고된다. `is_success()`는 core 실패 집계로 계속 false다.
+- **공개 표면(RV-126):** `prelude`에 `Preset`·`Sizing` 추가(새 타입 아님), `EncodeError: Display + Error`.

@@ -95,7 +95,7 @@ pub fn log_record<'a>(
     })();
     finish(output, result, log_level(record.level()))
 }
-fn tracing_level(level: ::tracing::Level) -> Level {
+pub(crate) fn tracing_level(level: ::tracing::Level) -> Level {
     match level {
         ::tracing::Level::TRACE => Level::Trace,
         ::tracing::Level::DEBUG => Level::Debug,
@@ -104,7 +104,7 @@ fn tracing_level(level: ::tracing::Level) -> Level {
         ::tracing::Level::ERROR => Level::Error,
     }
 }
-fn log_level(level: log::Level) -> Level {
+pub(crate) fn log_level(level: log::Level) -> Level {
     match level {
         log::Level::Trace => Level::Trace,
         log::Level::Debug => Level::Debug,

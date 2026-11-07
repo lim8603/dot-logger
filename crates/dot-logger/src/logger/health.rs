@@ -64,6 +64,9 @@ pub struct Health {
     /// Latest one-second capture sample; `None` unless enabled with
     /// `LoggerBuilder::telemetry`. Older than two seconds is `Stale`.
     pub telemetry: Option<Observation<Sample>>,
+    /// Tracing/`log` events dropped by the tracing connection; `None` unless
+    /// declared with `LoggerBuilder::tracing`.
+    pub tracing_dropped: Option<u64>,
 }
 
 /// Affinity result codes in [`Shared::affinity`].
@@ -181,6 +184,7 @@ impl Shared {
                 _ => None,
             },
             telemetry,
+            tracing_dropped: None,
         }
     }
 }

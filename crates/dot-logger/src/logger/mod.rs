@@ -40,6 +40,8 @@ mod affinity;
 mod budget;
 mod health;
 mod host;
+#[cfg(feature = "tracing-adapter")]
+mod sink;
 #[cfg(test)]
 mod tests;
 mod writer;
@@ -53,6 +55,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub use budget::{Budget, Retention, WriterQuota};
 pub use health::{Degradation, Failure, Health, HealthState, OutputHealth};
+#[cfg(feature = "tracing-adapter")]
+pub use sink::TracingSink;
 pub use writer::{Channel, EncodeError, LogError, Logged, Record, Schema, Writer};
 
 use crate::capture::{CaptureBuildError, CaptureOwner, ChannelConfig};
@@ -336,7 +340,13 @@ pub struct LoggerBuilder {
     channels: Vec<ChannelSpec>,
     writers: Vec<(String, Option<WriterQuota>)>,
     telemetry: bool,
+    #[cfg(feature = "tracing-adapter")]
+    tracing: Option<(String, ::tracing::Level, WriterQuota)>,
 }
+
+/// Internal writer of the tracing connection; never returned by `take_writer`.
+#[cfg(feature = "tracing-adapter")]
+const TRACING_WRITER: &str = "dot-logger/tracing";
 
 impl LoggerBuilder {
     /// Explicit budget; required.
@@ -376,6 +386,16 @@ impl LoggerBuilder {
         self.telemetry = true;
         self
     }
+    /// Connect `tracing` and `log` events at `min` level or more severe to a
+    /// JSON text channel `topic` (schema 99/v1 `"json"`), served by an
+    /// internal writer with `quota`. The quota is a loss value: events that
+    /// do not fit are dropped and counted. Get the sink from
+    /// [`Logger::tracing`]. Ordinary threads only.
+    #[cfg(feature = "tracing-adapter")]
+    pub fn tracing(mut self, topic: &str, min: ::tracing::Level, quota: WriterQuota) -> Self {
+        self.tracing = Some((topic.into(), min, quota));
+        self
+    }
 
     fn missing(&self) -> Vec<Missing> {
         let mut missing = match &self.budget {
@@ -399,7 +419,17 @@ impl LoggerBuilder {
 
     /// Validate, preallocate, start the default worker and create the output
     /// namespaces. On error nothing keeps running and nothing is left on disk.
-    pub fn start(self) -> Result<Logger, StartError> {
+    pub fn start(mut self) -> Result<Logger, StartError> {
+        // The tracing connection is one more channel and writer, declared last.
+        #[cfg(feature = "tracing-adapter")]
+        let tracing = self.tracing.take().map(|(topic, min, quota)| {
+            self.channels.push(ChannelSpec {
+                topic,
+                schema: sink::SCHEMA,
+            });
+            self.writers.push((TRACING_WRITER.into(), Some(quota)));
+            min
+        });
         let missing = self.missing();
         if !missing.is_empty() {
             return Err(StartError::Missing(missing));
@@ -483,6 +513,21 @@ impl LoggerBuilder {
                 Some(Writer::new(owned, Arc::clone(&core), mailbox, id, origin)),
             ));
         }
+        #[cfg(feature = "tracing-adapter")]
+        let sink = match (tracing, writers.pop()) {
+            (Some(min), Some((_, Some(writer)))) => {
+                let channel =
+                    u32::try_from(self.channels.len()).map_err(|_| StartError::InvalidBudget)?;
+                Some(Arc::new(sink::SinkState::new(
+                    writer, session, channel, min,
+                )))
+            }
+            (None, Some(last)) => {
+                writers.push(last);
+                None
+            }
+            _ => None,
+        };
         let shared = Arc::new(Shared::new(self.outputs.len(), self.telemetry));
         let (commands, receive) = mpsc::channel();
         let drop_deadline = derived.tuning.drop_deadline;
@@ -522,6 +567,8 @@ impl LoggerBuilder {
             shared,
             origin,
             overdue,
+            #[cfg(feature = "tracing-adapter")]
+            sink,
         })
     }
 }
@@ -548,6 +595,8 @@ pub struct Logger {
     shared: Arc<Shared>,
     origin: Instant,
     overdue: Duration,
+    #[cfg(feature = "tracing-adapter")]
+    sink: Option<Arc<sink::SinkState>>,
 }
 
 impl Logger {
@@ -597,7 +646,25 @@ impl Logger {
     /// it allocates the per-output list and may briefly lock the sample.
     pub fn health(&self) -> Health {
         let now = u64::try_from(self.origin.elapsed().as_nanos()).unwrap_or(u64::MAX);
-        self.shared.health(now, self.overdue)
+        #[allow(unused_mut)]
+        let mut health = self.shared.health(now, self.overdue);
+        #[cfg(feature = "tracing-adapter")]
+        {
+            health.tracing_dropped = self.sink.as_ref().map(|s| s.dropped());
+        }
+        health
+    }
+
+    /// The tracing/`log` sink declared with [`LoggerBuilder::tracing`].
+    /// Clones share one internal writer; shutdown reclaims it.
+    #[cfg(feature = "tracing-adapter")]
+    pub fn tracing(&self) -> Result<TracingSink, LookupError> {
+        self.sink
+            .as_ref()
+            .map(|state| TracingSink {
+                state: Arc::clone(state),
+            })
+            .ok_or(LookupError::Unknown)
     }
 
     /// Close admission, drain, synchronize and publish every file, then report.
@@ -612,6 +679,10 @@ impl Logger {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
+        #[cfg(feature = "tracing-adapter")]
+        if let Some(sink) = &self.sink {
+            drop(sink.reclaim());
+        }
         let commands = self.commands.take().ok_or(ShutdownError::WorkerFailed)?;
         let (reply, progress) = mpsc::channel();
         commands

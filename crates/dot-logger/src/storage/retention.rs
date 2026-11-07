@@ -236,6 +236,24 @@ fn catalog_extra(
 /// Peak output bytes one log holds: its catalog plus one active writer
 /// (rotation publishes the old writer before opening the next). Shared
 /// with the facade sizing so both use the constructors' formulas.
+/// Bytes an MCAP message record adds besides its data: opcode, length,
+/// channel, sequence, log time and publish time.
+const MESSAGE_HEADER_BYTES: u64 = 1 + 8 + 2 + 4 + 8 + 8;
+
+/// Smallest closed segment a size- or count-based rotation can produce. A
+/// segment rotates once its per-record upper bounds (`record_bound`) reach
+/// `max_segment_bytes` or it holds `max_records`, while each record really
+/// adds at least its MCAP message header. Time rotation and shutdown can
+/// close smaller segments. Shared with the facade's segment-count sizing.
+pub(crate) fn smallest_rotated_segment(max_segment_bytes: u64, max_records: usize) -> u64 {
+    let by_bytes = max_segment_bytes.saturating_mul(MESSAGE_HEADER_BYTES) / RECORD_BOUND_OVERHEAD;
+    let by_records = (max_records as u64).saturating_mul(MESSAGE_HEADER_BYTES);
+    by_bytes.min(by_records).max(1)
+}
+
+/// `record_bound` of an empty payload.
+const RECORD_BOUND_OVERHEAD: u64 = codec::OVERHEAD as u64 + 2048;
+
 pub(crate) fn log_required(
     config: WriterConfig,
     channels: &[StorageChannel],
@@ -321,7 +339,7 @@ impl<S: SegmentStore> SegmentLog<S> {
     }
     fn record_bound(bytes: usize) -> Result<u64, RetentionError> {
         (bytes as u64)
-            .checked_add(codec::OVERHEAD as u64 + 2048)
+            .checked_add(RECORD_BOUND_OVERHEAD)
             .ok_or(RetentionError::InvalidRecord)
     }
     fn clock(&mut self, now: u64) -> Result<(), RetentionError> {

@@ -600,3 +600,43 @@ fn f17_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
     assert!(!report.core.sync_failed, "{report:?}");
     assert!(report.is_success(), "{report:?}");
 }
+
+/// TASK-023 S2b finding ⑥ (Human 2026-11-07, recommended option): small
+/// records rotate after 16,384 records, far below the segment byte limit, so
+/// the segment-count limit must follow that smallest segment. Before, a
+/// 64 MiB continuous output allowed 10 segments and failed records although
+/// most of its bytes were unused.
+#[test]
+fn f18_small_record_segments_still_fill_the_configured_retention() {
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_millis(200))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(4096, 8)),
+        )
+        .file_output(&temp.0, Retention::continuous(64 * MIB as u64))
+        .channel::<[u8]>("tick")
+        .writer("w")
+        .start()
+        .unwrap();
+    let tick = logger.channel::<[u8]>("tick").unwrap();
+    let mut writer = logger.take_writer("w").unwrap();
+    for i in 0..200_000_u64 {
+        while writer.try_log(tick, &i.to_le_bytes()[..]).is_err() {
+            std::hint::spin_loop();
+        }
+    }
+    drop(writer);
+    let directory = logger.directories()[0].clone();
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(30)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert_eq!(report.core.totals.failed, 0, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+    let (files, _) = closed_files(&directory);
+    // More segments than the old byte-derived limit of 64 MiB / 8 MiB + 2.
+    assert!(files.len() > 10, "{}", files.len());
+}

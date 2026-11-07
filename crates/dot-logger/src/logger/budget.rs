@@ -21,8 +21,8 @@ use crate::platform::CapabilityStatus;
 use crate::platform::{PlatformCapabilities, Requirement};
 use crate::routing::{Delivery, DispatchEvent, Router};
 use crate::routing::{Route, RoutingConfig, Schedule, TargetConfig};
-use crate::storage::log_required;
 use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfig};
+use crate::storage::{log_required, smallest_rotated_segment};
 use crate::telemetry::Bank;
 
 use super::writer::Owned;
@@ -543,9 +543,17 @@ pub(crate) fn derive(
                 protected_bytes: 0,
                 pre_ns: 0,
                 post_ns: 0,
-                max_segments: usize::try_from(r.bytes / segment)
-                    .map_err(|_| StartError::InvalidBudget)?
-                    + 2,
+                // Small records close segments far below `segment` bytes (by
+                // record bounds or `max_records`); size the count for the
+                // smallest such segment so the configured bytes are what
+                // limits retention (TASK-023 S2b ⑥, Human 2026-11-07).
+                max_segments: usize::try_from(
+                    r.bytes
+                        .div_ceil(smallest_rotated_segment(segment, writer.max_records)),
+                )
+                .map_err(|_| StartError::InvalidBudget)?
+                .checked_add(2)
+                .ok_or(StartError::InvalidBudget)?,
                 max_events: 0,
                 max_pins: 0,
                 max_pin_bytes: 0,

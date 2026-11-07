@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S2c — P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합, 32생산자·16파일·128채널) |
+| 다음 액션 | [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) RV-128~130 조치·검증 후 S2c — P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합, 32생산자·16파일·128채널) |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -70,3 +70,5 @@ S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../cra
 - **제어 루프:** 단조 시계 절대 release, 기한이 지난 release는 skipped이자 miss. wake/response는 2의 거듭제곱 µs histogram과 정확한 max, 다른 CPU 관측 수를 기록한다. 보정은 powersave governor 아래 busy-loop 보정이 2.15M~4.87M으로 흔들려, 실제 10ms 주기 안의 중앙값 보정(±5%)으로 바꿨다. governor는 기록만 하며 변경하지 않는다.
 - **smoke(측정 아님):** logger off control/safety 각 500 release miss0. P0 실제 쓰기 5초 5,033,164,800B read-back 일치, 수락 5.35초·durable 20.69초(243MB/s) — RAM 수락 분모였다면 약4배 과대. 대용량 삭제 직후라 성능 수치로 쓰지 않는다.
 - **환경:** `/data/build` 여유 부족(68.3GB)은 Human 결정으로 build cache를 정리해 472.9GB로 회복했다. 측정 run 전에 다시 cap+reserve를 검사한다.
+
+2026-11-07 독립 리뷰: [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional, P1 2·P2 1). 공개 L4 sync coverage·부분 scope watermark와 P0/logger 측정 구간을 후속 개발 세션에서 조치·검증한 뒤 S2c/S3로 진행한다. EV-054·055의 로컬 구현·과거 실행 결과와 정식 측정 NotRun은 유지한다.

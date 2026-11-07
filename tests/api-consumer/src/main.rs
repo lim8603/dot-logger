@@ -314,10 +314,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
     })?;
     report_contract();
+    facade_contract()?;
     #[cfg(feature = "remote")]
     remote_contract(&plan)?;
     println!(
-        "tracked admission/routing/MCAP file sync/shutdown passed; {} bytes reserved",
+        "tracked admission/routing/MCAP file sync/shutdown and facade passed; {} bytes reserved",
         plan.reserved_bytes()
     );
     Ok(())
@@ -379,6 +380,65 @@ fn remote_contract(
     assert_eq!(ack.receipt, record.receipt);
     drop((receiver, hub, inbox));
     assert_eq!(budget.used_bytes(), 0);
+    Ok(())
+}
+
+/// TASK-027 facade (API §18): the default path an application uses, without
+/// support modules, scopes or lifetimes. With `remote`, one more line serves
+/// subscribers and status (§18.11).
+fn facade_contract() -> Result<(), Box<dyn std::error::Error>> {
+    use dot_logger::logger::{
+        Budget, EncodeError, HealthState, Logger, Record, Retention, Schema, Shutdown, WriterQuota,
+    };
+    struct Pose(i32, i32);
+    impl Record for Pose {
+        const SCHEMA: Schema = Schema::new(0x504f_5345, 1, "le-i32x2");
+        fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError> {
+            let bytes = out.get_mut(..8).ok_or(EncodeError)?;
+            bytes[..4].copy_from_slice(&self.0.to_le_bytes());
+            bytes[4..].copy_from_slice(&self.1.to_le_bytes());
+            Ok(8)
+        }
+    }
+    let dir = std::env::temp_dir().join(format!("dot-logger-api-consumer-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let builder = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 << 20)
+                .sync_every(Duration::from_millis(50))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(64, 64)),
+        )
+        .file_output(&dir, Retention::ring(64 << 20))
+        .channel::<Pose>("robot/pose")
+        .writer("control");
+    #[cfg(feature = "remote")]
+    let builder = builder.remote(dot_logger::adapters::remote::ServerConfig {
+        enabled: true,
+        ..Default::default()
+    });
+    let logger = builder.start()?;
+    #[cfg(feature = "remote")]
+    assert!(logger.remote_addr().is_some_and(|a| a.ip().is_loopback()));
+    let pose = logger.channel::<Pose>("robot/pose")?;
+    let mut writer = logger.take_writer("control")?;
+    std::thread::spawn(move || {
+        for i in 0..10 {
+            while writer.try_log(pose, &Pose(i, -i)).is_err() {
+                std::thread::yield_now();
+            }
+        }
+    })
+    .join()
+    .map_err(|_| "writer thread panicked")?;
+    assert_eq!(logger.health().state, HealthState::Running);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(5))? else {
+        return Err("facade shutdown did not close".into());
+    };
+    assert!(report.is_success(), "{report:?}");
+    assert_eq!(report.core.required.complete, 10);
+    std::fs::remove_dir_all(&dir)?;
     Ok(())
 }
 

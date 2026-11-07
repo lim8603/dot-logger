@@ -150,7 +150,9 @@ impl Budget {
         self.io_threads = threads;
         self
     }
-    /// Largest write batch and longest hold before flushing it.
+    /// Largest write batch and longest hold before flushing it. The batch is
+    /// capped at half of a target's record budget (all writers' slots); see
+    /// `Plan::batch_records`.
     pub fn batching(mut self, records: usize, wait: Duration) -> Self {
         self.batch_records = records;
         self.batch_wait = wait;
@@ -402,15 +404,18 @@ pub(crate) fn derive(
         .io_threads
         .checked_add(1 + extra.threads)
         .ok_or_else(overflow)?;
+    // A batch never holds more than half of a target's record budget (every
+    // target's queue holds all writers' records): otherwise a writer with
+    // fewer slots than the batch waits `batch_wait` for each slot-full
+    // (TASK-023 S2b ③, Human 2026-11-07).
+    let budget_records = quotas
+        .iter()
+        .try_fold(0usize, |sum, q| sum.checked_add(q.records()?))
+        .ok_or_else(overflow)?;
+    let batch_records = budget.batch_records.min((budget_records / 2).max(1));
     let worker = threads
         .checked_mul(STACK_BYTES)
-        .and_then(|n| {
-            n.checked_add(facade_bytes(
-                &quotas,
-                retention.len(),
-                budget.batch_records,
-            )?)
-        })
+        .and_then(|n| n.checked_add(facade_bytes(&quotas, retention.len(), batch_records)?))
         .ok_or_else(overflow)?;
     let fixed = raw
         .checked_add(input)
@@ -637,7 +642,7 @@ pub(crate) fn derive(
             sync_every,
             drop_deadline,
             io_threads: budget.io_threads.min(targets.len().max(1)),
-            batch_records: budget.batch_records,
+            batch_records,
             batch_wait: budget.batch_wait,
             idle_wait: budget.idle_wait,
         },

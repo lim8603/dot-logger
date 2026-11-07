@@ -249,9 +249,11 @@ fn f15_facade_buffers_are_charged_to_the_worker_partition() {
             .plan()
             .unwrap()
     };
-    let base = plan(64, 256);
-    let wide = plan(64 * 1024, 256);
-    let batched = plan(64, 4096);
+    // Batches stay within the cap of half the 64-record budget (finding ③).
+    let base = plan(64, 4);
+    let wide = plan(64 * 1024, 4);
+    let batched = plan(64, 32);
+    assert_eq!((base.batch_records, batched.batch_records), (4, 32));
     // One writer: its scratch grows by exactly the slot growth.
     assert_eq!(
         wide.memory.worker_bytes - base.memory.worker_bytes,
@@ -279,4 +281,54 @@ mod prelude_surface {
             "record does not fit the encode buffer"
         );
     }
+}
+
+/// TASK-023 S2b finding ③ (Human 2026-11-07): the IO batch never holds more
+/// than half of a target's record budget, otherwise a writer with fewer slots
+/// than the batch waits `batch_wait` for every slot-full of records.
+#[test]
+fn f15_batch_is_capped_at_half_the_record_budget() {
+    let temp = Temp::new();
+    let builder = || {
+        declared(&temp).budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_secs(1))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(16, 64)),
+        )
+    };
+    // Default batch 256 against 16 records: 8.
+    assert_eq!(builder().plan().unwrap().batch_records, 8);
+    // A smaller user value is kept.
+    let small = builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_secs(1))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(16, 64))
+                .batching(4, Duration::from_millis(10)),
+        )
+        .plan()
+        .unwrap();
+    assert_eq!(small.batch_records, 4);
+    // 20k records through 16 slots: at one slot-full per 10 ms batch wait this
+    // took about 14 s; with the cap it is bounded by the file writes.
+    let logger = builder().start().unwrap();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    let started = std::time::Instant::now();
+    for _ in 0..20_000 {
+        while writer.try_log(pose, &Pose).is_err() {
+            std::hint::spin_loop();
+        }
+    }
+    let elapsed = started.elapsed();
+    drop(writer);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(30)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert_eq!(report.core.totals.dropped, 0, "{report:?}");
+    assert!(elapsed < Duration::from_secs(10), "{elapsed:?}");
 }

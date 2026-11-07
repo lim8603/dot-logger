@@ -407,6 +407,9 @@ pub struct Plan {
     pub writer_quota: Option<WriterQuota>,
     /// Loss values the budget left unset and the preset filled, in order.
     pub preset_filled: Vec<Missing>,
+    /// IO batch actually used: the budget's batch size capped at half of a
+    /// target's record budget.
+    pub batch_records: usize,
 }
 
 /// Collects declarations; allocates nothing until [`start`](Self::start).
@@ -655,6 +658,7 @@ impl LoggerBuilder {
             drop_deadline: resolved.derived.tuning.drop_deadline,
             writer_quota: resolved.default_quota,
             preset_filled: resolved.filled,
+            batch_records: resolved.derived.tuning.batch_records,
         })
     }
 

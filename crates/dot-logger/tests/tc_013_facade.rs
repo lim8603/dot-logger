@@ -553,7 +553,7 @@ fn f14_reported_memory_requirement_is_exact_and_sufficient() {
 /// queue that never comes and then expiring (Human 2026-11-07: readiness is
 /// "every record up to the cutoff routed here was written").
 #[test]
-fn f6_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
+fn f17_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
     let temp = Temp::new();
     let logger = Logger::builder()
         .budget(

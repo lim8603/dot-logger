@@ -755,6 +755,11 @@ fn io_loop(
             }
             busy = true;
         }
+        // Read `stop` before `finish`: the host stores `finish` before it
+        // releases `stop`, so a seen stop implies a seen finish. Reading them
+        // the other way round could see neither finish nor, a moment later,
+        // stop alone, and leave the last segment active after Closed.
+        let stopping = flags.stop.load(Ordering::Acquire);
         if flags.finish.load(Ordering::Acquire) {
             let now = ns(origin, Instant::now());
             for target in targets.iter_mut() {
@@ -771,7 +776,7 @@ fn io_loop(
             }
             return;
         }
-        if flags.stop.load(Ordering::Acquire) {
+        if stopping {
             return;
         }
         if !busy {
@@ -793,10 +798,34 @@ impl IoTarget<'_, '_> {
 
 /// Report with a bounded Busy retry; a failed report leaves the guard Unknown.
 fn report(delivery: &Delivery<'_>, update: Update) {
-    for _ in 0..1024 {
-        match delivery.report(update) {
-            Err(CompletionError::Busy) => std::thread::yield_now(),
-            _ => return,
+    let _ = retry_busy(|| delivery.report(update), REPORT_PATIENCE);
+}
+
+/// How long an IO thread keeps retrying a Busy completion report.
+const REPORT_PATIENCE: Duration = Duration::from_secs(1);
+
+/// Retry `attempt` while it answers Busy, until `patience` elapsed.
+pub(crate) fn retry_busy(
+    mut attempt: impl FnMut() -> Result<(), CompletionError>,
+    patience: Duration,
+) -> Result<(), CompletionError> {
+    let started = Instant::now();
+    let mut tries = 0_u32;
+    loop {
+        match attempt() {
+            Err(CompletionError::Busy) => {}
+            other => return other,
+        }
+        if started.elapsed() >= patience {
+            return Err(CompletionError::Busy);
+        }
+        // The holder's critical section is short unless it was preempted:
+        // yield first, then sleep briefly so a starved holder can run.
+        tries = tries.saturating_add(1);
+        if tries < 64 {
+            std::thread::yield_now();
+        } else {
+            std::thread::sleep(Duration::from_micros(50));
         }
     }
 }

@@ -187,3 +187,41 @@ fn settle_promotes_a_failed_prefix_flush_to_io_failure() {
     );
     assert_eq!(tail_reason(IoFailure, None), IoFailure);
 }
+
+/// TASK-023 S2b finding ⑦: a completion report that meets Busy while another
+/// thread briefly holds the slot must not give up after a fixed number of
+/// yields; under CPU contention that turned written records into Unknown.
+#[test]
+fn busy_reports_are_retried_for_the_patience_not_a_yield_count() {
+    use crate::completion::CompletionError;
+    let mut calls = 0_u32;
+    let result = super::host::retry_busy(
+        || {
+            calls += 1;
+            if calls < 5000 {
+                Err(CompletionError::Busy)
+            } else {
+                Ok(())
+            }
+        },
+        // Generous: Miri's clock advances with interpretation time.
+        Duration::from_secs(3600),
+    );
+    assert_eq!(result, Ok(()));
+    assert_eq!(calls, 5000);
+    // A slot that never frees ends as Busy once the patience is spent.
+    let started = Instant::now();
+    let stuck = super::host::retry_busy(|| Err(CompletionError::Busy), Duration::from_millis(20));
+    assert_eq!(stuck, Err(CompletionError::Busy));
+    assert!(started.elapsed() >= Duration::from_millis(20));
+    // Other outcomes return at once.
+    let mut once = 0;
+    let other = super::host::retry_busy(
+        || {
+            once += 1;
+            Err(CompletionError::Expired)
+        },
+        Duration::from_secs(5),
+    );
+    assert_eq!((other, once), (Err(CompletionError::Expired), 1));
+}

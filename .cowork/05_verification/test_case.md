@@ -251,7 +251,7 @@ P3 최소60초 및 RAM2배 이상, 마지막 sync까지 시간 포함. P4 receiv
 ### TC-013 — 통합 접점·preset·레시피
 
 - 관련: MS-008 / FR-001·003·008·012·013·015(장비 측정)·016 / NFR-001·004·005·006·008
-- 상태: Partial(2026-11-07 facade F1~F17 로컬 Pass, F5 worker panic 포함; auto preset S2 미실행) / 최근 실행: 2026-11-07 / EV: [EV-047](verification_evidence.md#ev-047), [EV-048](verification_evidence.md#ev-048), [EV-049](verification_evidence.md#ev-049), [EV-050](verification_evidence.md#ev-050), [EV-052](verification_evidence.md#ev-052)
+- 상태: Partial(2026-11-07 facade F1~F18 로컬 Pass, F5 worker panic 포함; auto preset S2 미실행) / 최근 실행: 2026-11-07 / EV: [EV-047](verification_evidence.md#ev-047), [EV-048](verification_evidence.md#ev-048), [EV-049](verification_evidence.md#ev-049), [EV-050](verification_evidence.md#ev-050), [EV-052](verification_evidence.md#ev-052)
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -282,6 +282,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 | F15 | `Preset::{control, sensor, black_box}`·custom `Sizing`·사용자 값 혼합·부하 대비 메모리 부족, `plan()`(TASK-028 S1b) | 비어 있는 손실 값만 채우고 `preset_filled`에 기록, 사용자 값 유지, slot = ⌈rate×흡수×1.25⌉, 메모리 = 요구량+10%, 부족은 plan·start가 같은 `required`로 거절, plan은 결정적·파일 없음 |
 | F16 | 출력 2개에 `channel_with(.., ChannelOptions::new().outputs(&[i]))`·기본 채널·빈/범위 밖/중복 선택(TASK-023 S2a) | 선택한 출력에만 기록, 기본은 모든 출력, 잘못된 선택은 plan/start `InvalidOutputs`·파일 없음, 한 생산자의 기록을 전혀 받지 않는 출력도 주기·종료 sync 성공(발견 ①) |
 | F17 | slot 16 writer를 1.5초 무제한 부하·sync 50 ms(TASK-023 S2b 발견 ②④) | 부하 중 마지막 1초 안에 주기 sync 성공, 필수 target 폐기 0, `sync_failed` 없음·성공 종료 |
+| F18 | 64 MiB continuous 출력에 8B 기록 20만 건(TASK-023 S2b 발견 ⑥) | 기록당 상한 추정으로 작아진 segment가 10개를 넘어도 failed 0·성공 종료(설정 보존 바이트가 한도) |
 
 <a id="tc-014"></a>
 ### TC-014 — 표준 MCAP 판독·원격 시각화

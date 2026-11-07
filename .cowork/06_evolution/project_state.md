@@ -10,16 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-023 S2 — S2a·S2b 도구·발견 ①~⑤ 조치 완료([EV-054](../05_verification/verification_evidence.md#ev-054)), 발견 ⑥(보존 segment 개수 상한) Human 결정 대기 → S2c |
+| 활성 Task | TASK-023 S2 — S2a·S2b 완료(제품 발견 ①~⑧ 조치, [EV-054](../05_verification/verification_evidence.md#ev-054)·[EV-055](../05_verification/verification_evidence.md#ev-055)), 다음 S2c(P2 raw·P3 혼합) |
 | 미처리 리뷰 | 없음 — [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Closed(2026-11-07 Human 「승인」, [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`) |
 | 상태 | Yellow — UPS 모의 수락, REV-051 Closed, 성능/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-07 / #003 / AI |
-| 세션 상태 | 진행 — 2026-11-07 #003 REV-051 Closed, TASK-023 S2a·S2b(EV-054). 발견 ⑥ 결정 대기 |
+| 세션 상태 | 진행 — 2026-11-07 #003 REV-051 Closed, TASK-023 S2a·S2b 완료(EV-054·055). 다음 S2c |
 | 최근 세션 | [2026-11-07 #003](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md) — REV-051 RV-120~127 조치(EV-053) |
 
 ## 현재 결정과 제약
+
+- **2026-11-07 Human 결정 — TASK-023 S2b 발견 ⑥:** 「권고대로」. facade 보존 segment 개수 상한을 "크기·기록 수 회전이 만들 수 있는 가장 작은 segment" 기준으로 계산하고(storage 공용 공식 `smallest_rotated_segment`), 늘어난 catalog 예약은 예산·`plan()`에 반영한다. 시간 회전(60초)·종료로 닫히는 더 작은 segment는 이 계산 밖이다.
 
 - **2026-11-07 Human 결정 — TASK-023 S2b 측정 발견 조치(3건 모두 권고안):** ③ IO batch 실제 크기 = min(사용자 값, target별 기록 예산/2), start/plan에서 결정. ④ 주기 sync 발급 조건을 "target 큐가 빔"에서 "cutoff 이하로 이 target에 라우팅된 기록이 모두 기록됨"으로 core 수정(routing/control, TDD·Miri). ⑤ 측정 도구 P0에 파일당 최대 기록 수 회전을 추가해 facade(segment당 16,384건)와 같은 회전 조건으로 비교, 작은 기록의 파일 수 증가는 TASK-028/029 제품 사이징 과제로 기록. 발견 ①(부분 라우팅 sync coverage)은 `c93a44a` 수정, ②(`Delivery` drop 순서 → 필수 target 폐기)는 결함 수정으로 진행.
 
@@ -74,7 +76,7 @@
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | AI | In Progress | 2026-11-01 | S1~S3 EV-037~039 로컬 수락; REV-038 Closed·통합/환경/native 후속 |
 | TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경/native 대기 |
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
-| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-07 | S2a·S2b 완료(EV-054, 제품 발견 ①~⑤ 조치) → ⑥ 결정·조치 → S2c P2/P3 → S2d(S1 EV-046) |
+| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-07 | S2a·S2b 완료(EV-054·055, 제품 발견 ①~⑧ 조치) → S2c P2/P3 → S2d(S1 EV-046) |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-07 | S3a [EV-048](../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../05_verification/verification_evidence.md#ev-051) 로컬 Pass(F1~F13) — S1~S3 로컬 완료, Human 리뷰 대기; 잔여 TASK-023 성능·TASK-029 계수·T3, S3d는 T4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
@@ -139,7 +141,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-07 #003(이어서): TASK-023 S2a 채널별 출력 선택(Human 결정)·S2b facade 경로 측정 도구. 측정 중 제품 결함 ①~⑤를 TDD로 조치(부분 라우팅 sync coverage·Delivery drop 순서 폐기·batch 예산 붕괴·연속 부하 주기 sync 미발급·기록 수 회전 대응), ⑥ 보존 segment 개수 상한 Open — [EV-054](../05_verification/verification_evidence.md#ev-054).
+- 2026-11-07 #003(이어서): TASK-023 S2a 채널별 출력 선택(Human 결정)·S2b facade 경로 측정 도구. 측정 중 제품 결함 ①~⑤를 TDD로 조치(부분 라우팅 sync coverage·Delivery drop 순서 폐기·batch 예산 붕괴·연속 부하 주기 sync 미발급·기록 수 회전 대응), ⑥ 보존 segment 개수(Human 「권고대로」)·⑦ Busy 보고·⑧ `.active` 잔존까지 조치 — [EV-054](../05_verification/verification_evidence.md#ev-054).
 - 2026-11-07 #003: REV-051 RV-120~127을 TDD로 조치(Writer Drop reaper 경쟁·유휴 spin·시작 실패 정리·오버플로·facade 메모리 예산·IO 실패 분류·공개 표면·perf CLI). 1.96/1.85 각 493 Pass — [EV-053](../05_verification/verification_evidence.md#ev-053), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
 - 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`77013e7..49df7d3`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
 - 2026-11-07 #001: TASK-027 S3(health·계측·CPU 고정·tracing·remote·api-consumer, EV-048~051)과 TASK-028 S1(정확 배정·preset·plan, EV-052)을 로컬 완료했고 Human 결정 4건(S3d 제외·T4, remote 의미, preset 구성)을 반영했다 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_001.md).

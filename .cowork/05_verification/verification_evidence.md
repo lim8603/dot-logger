@@ -946,6 +946,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96/1.85 exit0·rustdoc exit0·workspace 1.96/1.85 각 507 Pass(5 ignore 기존 DB)·feature matrix 1.96 exit0·Miri lib 26(2 ignore)·tc_003 completion 15·control 18·routing 19 Pass.
 - **미실행:** 발견 ⑥ 조치, S2c(P2 raw·P3 혼합), S3 정식 측정, RT, native(T3).
 
+## EV-055 — TASK-023 S2b 발견 ⑥~⑧ 조치
+
+- **판정:** 로컬 조치 Pass. S2b 완료(발견 ①~⑧ 조치). 정식 측정은 NotRun(S3).
+- **대상/환경:** 소스 `d0c4851`(⑥)·`a6938ca`(⑦⑧), base `9d8d211`. 2026-11-07 #003 AI, Ubuntu generic 7.0.0-42(RT 아님), powersave, `/data/build` NVMe ext4. Human 결정 ⑥ 「권고대로」. [API §19.5](../03_design_artifacts/interface_contract.md#195-task-023-s2b-조치-반영--2026-11-07).
+- **⑥ 보존 segment 개수:** 작은 기록의 segment는 16,384건 이전에 기록당 상한 추정(payload + 2,560B)으로 닫혀 8 MiB segment가 실제 약 400 KB였다. storage 공용 `smallest_rotated_segment` = min(segment × 31/2,560, 16,384 × 31B)로 facade `max_segments`를 계산(catalog 예약은 예산 포함). F18 Red(64 MiB continuous·8B 20만 건 중 167,430건 failed, 파일 10개) → Green. 시간 회전(60초)·종료로 닫히는 더 작은 segment는 계산 밖(저속 장기 기록은 개수 상한에 걸릴 수 있음).
+- **⑦ 완료 보고 Busy 포기:** IO 스레드가 Busy 보고를 1,024 yield 뒤 포기 → 쓴 기록이 Unknown(부하 겹친 반복 약 1/60). 시간 제한 1초(yield → 50 µs sleep) `retry_busy`, 단위 시험 Red→Green(Miri는 가상 시계 때문에 인내 시간 1시간으로 시험).
+- **⑧ 마지막 segment `.active` 잔존:** IO 루프가 `finish`를 `stop`보다 먼저 읽어 종료 경쟁 시 확정 누락(약 1/60). 읽는 순서 교체(host는 finish → stop 순서로 Release 저장). 결정적 시험 없음, 부하 반복 8×15 = 120회 실패 0(수정 전 60회 중 1), tc_013 facade·routing·preset 4×8씩 실패 0.
+- **smoke(측정 아님):** P1 무제한 256 MiB·256B·4파일·IO 2·생산자 8·채널 16: logger 73.7 MB/s(약 28.8만 건/s), 판독 1,048,576건 일치, 파일 64개(각 16,384건), failed·dropped·unknown 0, sync 정상, `try_log` 수락 p50 239·p99 511·p99.9 895 ns, `Capacity` 거절 30,142,555회. 같은 조건 P0 956.4 MB/s → 효율 7.7%(작은 기록 무제한에서 logger dispatch가 병목, S3 분석 대상).
+- **검증:** fmt·clippy 1.96/1.85 exit0·rustdoc exit0·workspace 1.96/1.85 각 509 Pass(5 ignore)·feature matrix 1.96 exit0, 1.85는 4회 중 1회 실패(로그 미보존, 원인 미상)·3회 exit0·Miri CI 묶음 lib 27(2 ignore)·tc_002/003/005/006·fault_storage Pass.
+- **미실행:** S2c(P2 raw·P3 혼합), S3 정식 측정·병목 분석, RT, native(T3). 1.85 matrix 1회 실패 원인.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -1015,4 +1015,5 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 - **주기 sync 발급(④):** Written 경계가 있는 target은 "cutoff까지의 기록이 각 생산자 ingress를 떠났고, 그중 이 target으로 라우팅된 기록이 모두 Written 이상(또는 종료)"일 때 barrier를 발급한다. 연속 부하에서도 1초 주기 sync가 일어난다. 확인은 최신 완료 window만 조회하고 (target, 생산자)별 단조 watermark로 비용을 나눈다. 다른 target은 기존 조건(진행 중 호출 0·feedback 비어 있음·target 장부 0)을 유지한다.
 - **부분 라우팅 sync coverage(①):** 파일이 받은 범위 밖 구간은 최신 window만 조회하고 Expired는 종료로 본다.
 - **폐기 없음(②):** 필수 target 입구 `Capacity` 폐기가 drop 순서 경쟁으로 일어나지 않는다. 과부하는 RT `Capacity` 거절로만 보인다.
-- **회전(⑤·⑥):** facade segment는 바이트 상한(§19.3)과 별도로 16,384건에서 회전한다. 이 때문에 작은 기록에서 보존 segment 개수 상한이 먼저 걸리는 문제(⑥)는 Open이다.
+- **회전(⑤·⑥):** facade segment는 바이트 상한(§19.3), 기록당 상한 추정(payload + 2,560B)의 누적, 16,384건 중 먼저 닿는 것으로 회전한다. 보존 segment 개수 상한은 이 회전이 만들 수 있는 가장 작은 segment(min(segment × 31/2,560, 16,384 × 31B), storage 공용 공식) 기준으로 계산해 설정 보존 바이트가 실제 한도가 되게 한다(Human 2026-11-07 「권고대로」). 시간 회전(60초)·종료로 닫히는 더 작은 segment는 이 계산 밖이다.
+- **IO 스레드 견고성(⑦·⑧):** Busy 완료 보고는 최대 1초 재시도한다. IO 루프는 `stop`을 `finish`보다 먼저 읽어, Closed 뒤 `.active` segment가 남지 않는다. [EV-055](../05_verification/verification_evidence.md#ev-055).

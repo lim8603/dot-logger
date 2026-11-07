@@ -871,6 +871,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96(-D warnings)·workspace rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 460 Pass(5 ignore, 기존 DB 회귀)·feature matrix 두 toolchain 16조합 exit0. MSRV 1.85 clippy는 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 exit101이며 변경 전 HEAD에서도 같다(GAP-010).
 - **미실행:** worker panic 자동 시험(GAP-009), Miri(새 unsafe 없음·필드 이동만), logger on 성능(TASK-023 S2), RT 행, native(T3).
 
+<a id="ev-048"></a>
+## EV-048 — TASK-027 S3a health·선택 계측·CPU 고정·worker panic 시험
+
+- **판정:** 로컬 구현 Pass. telemetry 비용·logger on 성능·RT·native(T3)는 NotRun이다.
+- **대상/환경:** 소스 `2a805ef`, base `b4ee5ce`. 2026-11-07 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음(rustix `thread` feature만 추가). [명령/결과/hash](../06_evolution/imported_context/task_027_s3a_2026-11-07/results.json), [REV-047](reviews/REV-047_TASK-027_S3A_HEALTH.md), [API §18.9](../03_design_artifacts/interface_contract.md#189-s3a-구현-반영--2026-11-07).
+- **TDD:** F9~F11 작성 → `Health`·`health()`·`telemetry()`·`worker_cpus` 부재 컴파일 Red → 구현 → Green. F11은 같은 프로세스의 병렬 시험 worker thread가 섞여 처음 실패했고, 별도 binary(`tc_013_affinity`)로 분리해 해결했다. 돌연변이 2종(host 사망 뒤 command 수신단 유지, 출력 실패 표시 전부 제거)으로 GAP-009 host 시험과 F9가 실패함을 확인했다.
+- **확인한 계약:** `health()` Running·출력별 `since_sync`(첫 sync 전 `None`, 1.5초 유휴에도 갱신)(F9). 출력 디렉터리 소실 → `Failed(IoPoisoned)`, continuous 8 MiB 보존 가득 → `Degraded(RecordsFailed)`·실패 기록 수, shutdown 실패 판정(F9). telemetry 꺼짐 `None`, 켜면 1초 표본 accepted 30 = 실제 30(F10). `worker_cpus` Required → host·IO thread `Cpus_allowed_list`가 지정 CPU, `affinity = Some(true)`. 미허용 CPU는 `InvalidCpu` 거절·namespace 없음(F11). IO worker panic → 수락 `Closing`·`Failed(WorkerFailed)`·보고 `worker_failed`/`io_failed`·실패 판정, shutdown 뒤 writer Drop. host panic → `shutdown`이 1초 안에 `WorkerFailed`(GAP-009).
+- **검증:** fmt·`git diff --check`·clippy 1.96/1.85(-D warnings, 둘 다 exit0)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 470 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·TC-013 두 binary와 logger unit 20회 반복 20/20. rt-allocation F2/F3 포함.
+- **미실행:** Linux 외 CPU 고정 경로(대상 미설치, 코드 검토만), 검증 통과 뒤 Required 적용 실패(재현 수단 없음), telemetry 비용·logger on 성능(TASK-023 S2/S3), RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -882,8 +892,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `13523f1`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |
-| GAP-009 | TC-013 F5의 worker panic 절반: host/IO panic 처리(catch_unwind·Failed 배출·closing·`worker_failed`)는 `64c4d23`에 구현했지만 panic 주입점이 없어 자동 시험이 없다(RV-094) | AI, TASK-027 S3에서 crate 내부 시험 또는 feature-gated 주입점 검토 | Open |
-| GAP-010 | Rust 1.85 clippy `-D warnings`가 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 실패. `0165260`(변경 전)에서도 동일하며 1.96 clippy는 Pass | AI, 해당 파일을 다음에 수정할 때 lint 정리 후 두 toolchain clippy 재확인 | Open — 기존 lint |
+| GAP-009 | TC-013 F5의 worker panic 절반: host/IO panic 처리는 `64c4d23`에 구현했지만 주입점이 없어 자동 시험이 없었다(RV-094). `2a805ef`에서 crate 내부 `#[cfg(test)]` 주입 flag로 host·IO panic 시험을 추가했고, host 사망 시 shutdown이 기한까지 기다리던 문제(RV-100)도 고쳤다(EV-048) | AI, 공개·feature hook 없음 유지 | Closed — 로컬 시험 범위 |
+| GAP-010 | Rust 1.85 clippy `-D warnings`가 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 실패했다. `2a805ef`에서 lifetime 생략으로 정리해 1.85/1.96 clippy 모두 exit0(EV-048) | AI | Closed |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
 
 

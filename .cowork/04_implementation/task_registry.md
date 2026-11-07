@@ -39,7 +39,7 @@
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-31 | 현재 PC24h/장애·UPS 시뮬레이션·native/OS 교환 공개 후 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Planned | 2026-10-26 | 문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치 | TASK-024 | [상세](tasks/TASK-025.md) | 1~2 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | MS-006 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-10-26 | 실제 앱에서 logger off/on 동일 제어 시나리오·record→query→replay→관측 조절 | TASK-020·TASK-021 | [상세](tasks/TASK-026.md) | 2~4 |
-| TASK-027 | 기본 실행 계층(facade)과 기본 worker | MS-008 | INT-001 | US-001·002·003 | AI | In Progress | 2026-11-05 | S3 — 선택 연결·`health()`·CPU 고정(S2 EV-047 로컬 Pass) | TASK-006·TASK-008·TASK-014·TASK-021 | [상세](tasks/TASK-027.md) | 4~6 |
+| TASK-027 | 기본 실행 계층(facade)과 기본 worker | MS-008 | INT-001 | US-001·002·003 | AI | In Progress | 2026-11-07 | S3b tracing·S3c remote 선택 연결·api-consumer(S3a EV-048 로컬 Pass, S3d slot 직접 encode Human 결정 대기) | TASK-006·TASK-008·TASK-014·TASK-021 | [상세](tasks/TASK-027.md) | 4~6 |
 | TASK-028 | 예산 preset·사이징 도우미·장비 측정 auto preset | MS-008 | INT-001 | US-002·004·005 | AI | Planned | 2026-11-04 | S1 — TASK-027 뒤 상위 부하 입력→예산 결정적 계산·preset | TASK-027·TASK-017·TASK-023 | [상세](tasks/TASK-028.md) | 3~5 |
 | TASK-029 | 연결 레시피·문서·접점 회귀 가드 | MS-008 | INT-001 | US-001·003 | AI | Planned | 2026-11-04 | TASK-027·028 S1 뒤 레시피 3단계·quickstart·공개 API 회귀 가드 | TASK-027·TASK-028 | [상세](tasks/TASK-029.md) | 1~2 |
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | Planned | 2026-11-04 | S1 — Envelope 해제 표준 MCAP export와 독립 reader·Foxglove 계열 판독 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |

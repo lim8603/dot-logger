@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted, ADR-007 범위 안. 소유 모델 [ADR-012](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-05 |
-| 다음 액션 | S3 — slot 직접 encode·tracing/remote/계측 선택 연결·`health()`·CPU 고정·worker panic 시험(GAP-009)·api-consumer 갱신 |
+| 마지막 갱신일 | 2026-11-07 |
+| 다음 액션 | S3b tracing 선택 연결 → S3c remote 선택 연결 → api-consumer 갱신. slot 직접 encode는 Human 결정 대기(S3 계획) |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 |---|---|---|---|
 | S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | Done(2026-11-05 Human 승인) |
 | S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | 로컬 Pass(2026-11-05 [EV-047](../../05_verification/verification_evidence.md#ev-047)); worker panic 자동 시험만 GAP-009 |
-| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | Planned |
+| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | In Progress — S3a(`health()`·계측·CPU 고정·GAP-009) 로컬 Pass [EV-048](../../05_verification/verification_evidence.md#ev-048) |
 
 ## 변경 대상과 첫 검증
 
@@ -59,6 +59,20 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 - 구현하며 구체화한 규칙(완료 경계 Written + sync barrier, 메모리 분할, routing·파일 규칙, `LogError` variant)은 [API §18.8](../../03_design_artifacts/interface_contract.md#188-s2-구현-반영--2026-11-05).
 - 잔여: worker panic 자동 시험(GAP-009), CPU 고정·`health()`(S3), 기존 MSRV clippy lint(GAP-010).
 
+## S3 계획과 S3a 실행 — 2026-11-07
+
+S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커밋 단위다.
+
+| 하위 | 범위 | 상태 |
+|---|---|---|
+| S3a | `health()`(RV-095)·선택 계측 `telemetry()`·CPU 고정 `worker_cpus`(RV-096)·worker panic 시험(GAP-009) | 로컬 Pass — 소스 `2a805ef`, [EV-048](../../05_verification/verification_evidence.md#ev-048), [REV-047](../../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) Closed, API §18.9 |
+| S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | Planned |
+| S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | Planned |
+| S3d | slot 직접 encode | **Human 결정 대기** — 아래 |
+| S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | Planned |
+
+**S3d 조사 결과(결정 필요):** 현재 소형 기록은 per-writer scratch에 encode한 뒤 core가 byte ring으로 실제 길이만큼 복사한다. byte ring은 경계에서 감겨(wrap) 연속 slot을 보장하지 않는다. rtrb의 안전한 `write_chunk(n)`은 n바이트를 먼저 0으로 채우므로, 직접 encode하면 복사 대신 slot 전체 0 채우기가 들어가 작은 기록에서 오히려 비싸다. 부분 commit에는 `unsafe`(capture는 `deny`)가 필요하고, 감김 처리에는 queued record에 건너뛰기 길이를 넣는 core 형식 변경이 필요하다. 권고: S3에서 제외하고 scratch 경로를 유지하되, TASK-023 S2 P1(256B)에서 encode+복사 비용을 재고 유의하면 그때 별도 설계로 다룬다. §18.3의 "S3에서 slot 직접 encode로 교체" 문구를 바꾸므로 Human 결정 사항이다.
+
 ## S1 Human 결정 — 2026-11-05
 
 리뷰 포인트 5개 모두 권고안: ① ADR-012 옵션 F, ② 기본값 혼합(성능 값은 기본값, 손실 값은 필수), ③ `Logger::drop` 기한 있는 종료, ④ NFR-008 수치 제안대로, ⑤ `writer.try_log(channel, &msg)`. S2 DoD에 TC-013 F1~F8(특히 F2·F3 allocator guard)을 포함한다. 상세는 [API §18.7](../../03_design_artifacts/interface_contract.md#187-human-결정--2026-11-05).
@@ -76,4 +90,4 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 - [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 제품 코드·테스트 실행 결과: 없음. 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.
+테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.

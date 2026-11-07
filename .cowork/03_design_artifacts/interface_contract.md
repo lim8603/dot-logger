@@ -895,3 +895,18 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 - **API 표면:** `Budget::new()`의 손실 값 setter(`memory_bytes`·`sync_every`·`drop_deadline`·`writer_quota`)와 성능 값 setter(`io_threads`·`batching`·`idle_wait`), `WriterQuota::small(..).with_raw(..)`, `Retention::{ring, continuous}.reserve(..)`, `Channel::at(level)`, `Writer::{try_log, try_log_at, producer, now_ns}`, `Logger::{channel, take_writer, directories, worker_failed, shutdown}`, `PendingShutdown::wait`.
 - **S3 이후:** CPU 고정(RV-096), `health()`(주기 sync 실패 노출 포함, RV-095), slot 직접 encode, tracing·remote·telemetry 선택 연결, worker panic 자동 시험(GAP-009). 비 Linux Unix에서는 여유 공간 관측이 없어 `start()`가 거절된다(RV-098, Tier 2).
 
+
+### 18.9 S3a 구현 반영 — 2026-11-07
+
+[EV-048](../05_verification/verification_evidence.md#ev-048)·[REV-047](../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md), 소스 `2a805ef`. §18.4·§18.5 범위 안의 구체화이며 승인된 계약과 다른 결정은 없다. 단, §18.5의 `Closing` 상태는 넣지 않았다(아래).
+
+- **`Logger::health() -> Health`(일반 경로, 목록 할당):** `state: HealthState`, `outputs: Vec<OutputHealth>`(file_output 선언 순서), `affinity: Option<bool>`, `telemetry: Option<Observation<Sample>>`.
+  - `HealthState`는 심각한 것부터 `Failed(Failure::WorkerFailed)`(worker panic·정지, 수락 Closing) → `Failed(Failure::IoPoisoned)`(어느 출력이든 쓰기·sync·게시 IO 실패로 정지. 모든 출력이 required라 이후 기록이 모두 실패한다) → `Degraded(Degradation::RecordsFailed)`(IO 고장 없이 출력이 기록을 거절, 예: continuous 보존 가득) → `Degraded(Degradation::SyncOverdue)`(마지막 성공 sync, 없으면 시작 시점부터 `4 × sync_every + 1 s` 초과) → `Running`.
+  - `OutputHealth { since_sync: Option<Duration>, failed_records: u64, failed: bool }`. 첫 sync 성공 전 `since_sync`는 `None`이며 0으로 쓰지 않는다. 기록이 없는 유휴 상태에서도 주기 barrier는 계속 성공한다(F9).
+  - `Closing`은 넣지 않았다. `shutdown(self)`이 handle을 소비하므로 정상 종료 중에는 `health()`를 부를 수 없고, worker 실패로 닫힌 경우는 `Failed(WorkerFailed)`로 보인다.
+  - RV-095: 주기 sync 실패·지연이 shutdown 전에 `IoPoisoned`/`SyncOverdue`로 보인다.
+- **선택 계측 `LoggerBuilder::telemetry()`:** 기존 `CaptureOwner::enable_telemetry`(control partition 예약)를 켜고 host가 1초마다 `Telemetry::sample`을 기록한다. `Health.telemetry`는 꺼져 있으면 `None`, 첫 표본 전 `Unavailable(IncompleteWindow)`, 2초보다 오래되면 `Stale`이다. 10/60/300초 window 노출은 하지 않았다(TASK-028/032에서 필요 시).
+- **CPU 고정 `Budget::worker_cpus(&[usize], Requirement)`(RV-096):** host와 모든 IO thread를 목록 전체로 제한한다(스레드별 1:1 배정 아님, 간섭 감소이지 격리 아님). 목록이 있을 때만 Linux `sched_getaffinity`로 허용 CPU를 관측해 기존 `SessionBuilder::validate`(미허용·중복 CPU는 Requirement와 무관하게 `InvalidCpu`/`DuplicateCpu`)를 거친다. 적용은 각 worker thread가 시작 시 수행하고, IO thread 결과까지 받은 뒤에 `start()`가 반환한다. `Required` 적용 실패는 `start()` 거절(namespace 제거), `Optional` 실패는 `Health.affinity = Some(false)`. Linux 외에서는 Unsupported로 관측해 `Optional`은 미적용 보고, `Required`는 `CapabilityRequired` 거절이다(미실행, 코드 검토만).
+- **worker panic(GAP-009):** crate 내부 `#[cfg(test)]` 주입 flag로만 시험한다. 공개·feature hook은 없다. host가 죽으면 command 수신단을 즉시 놓아 `shutdown`이 기한까지 기다리지 않고 `ShutdownError::WorkerFailed`를 반환한다(이전에는 deadline + 5초 뒤 `Unresponsive`).
+- **의존성:** Linux 대상 `rustix`에 `thread` feature를 켰다. Cargo.lock 변경 없음.
+- **남은 S3:** tracing·remote 선택 연결, api-consumer 갱신. slot 직접 encode는 아래 사유로 Human 결정 대기(TASK-027 S3 계획).

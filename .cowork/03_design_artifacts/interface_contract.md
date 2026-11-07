@@ -830,7 +830,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 |---|---|
 | `Logger::channel::<T>(topic) -> Result<Channel<T>, LookupError>` | 등록 topic과 `T::SCHEMA` 대조(일반 경로). `Channel<T>`는 `Copy`이며 메모리를 소유하지 않는다. |
 | `Logger::take_writer(name) -> Result<Writer, LookupError>` | 각 writer를 한 번만 꺼낸다. 두 번째 호출은 `AlreadyTaken`. |
-| `Writer::try_log(&mut self, Channel<T>, &T) -> Result<Logged, LogError>` | 무대기·무할당·Arc clone 0. 단조·실시간 시계를 읽는다. 사전 할당 scratch에 encode한 뒤 기존 `try_record_small`을 호출한다(S3에서 slot 직접 encode로 교체). `Logged::{Accepted(receipt), Skipped}`. |
+| `Writer::try_log(&mut self, Channel<T>, &T) -> Result<Logged, LogError>` | 무대기·무할당·Arc clone 0. 단조·실시간 시계를 읽는다. 사전 할당 scratch에 encode한 뒤 기존 `try_record_small`을 호출한다. slot 직접 encode는 2026-11-07 Human 결정으로 S3에서 제외했고, TASK-023 S2 P1 측정 결과에 따라 별도 설계한다(이월 T4). `Logged::{Accepted(receipt), Skipped}`. |
 | `Writer::try_log_at(.., Stamp)` / `try_log_with(.., Meta)` | 시각·level·importance·source time을 호출자가 지정한다. 시계를 읽지 않는다. |
 | `Writer::producer(&mut self) -> Producer<'_>` | 고급 경로. 기존 `try_acquire`/`Loan`/`try_record_raw`/`apply_pending_config`를 그대로 쓰는 빌림 뷰(ADR-012 §2). |
 | `trait Record` | `const SCHEMA: Schema`(id·version·encoding·이름), `fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError>`. RT 구현은 할당하지 않아야 한다. 이는 사용자 책임이며 문서와 allocator guard 예제로 보인다. `[u8]`·`&[u8]` 고정 구현을 제공한다. |
@@ -909,4 +909,4 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 - **CPU 고정 `Budget::worker_cpus(&[usize], Requirement)`(RV-096):** host와 모든 IO thread를 목록 전체로 제한한다(스레드별 1:1 배정 아님, 간섭 감소이지 격리 아님). 목록이 있을 때만 Linux `sched_getaffinity`로 허용 CPU를 관측해 기존 `SessionBuilder::validate`(미허용·중복 CPU는 Requirement와 무관하게 `InvalidCpu`/`DuplicateCpu`)를 거친다. 적용은 각 worker thread가 시작 시 수행하고, IO thread 결과까지 받은 뒤에 `start()`가 반환한다. `Required` 적용 실패는 `start()` 거절(namespace 제거), `Optional` 실패는 `Health.affinity = Some(false)`. Linux 외에서는 Unsupported로 관측해 `Optional`은 미적용 보고, `Required`는 `CapabilityRequired` 거절이다(미실행, 코드 검토만).
 - **worker panic(GAP-009):** crate 내부 `#[cfg(test)]` 주입 flag로만 시험한다. 공개·feature hook은 없다. host가 죽으면 command 수신단을 즉시 놓아 `shutdown`이 기한까지 기다리지 않고 `ShutdownError::WorkerFailed`를 반환한다(이전에는 deadline + 5초 뒤 `Unresponsive`).
 - **의존성:** Linux 대상 `rustix`에 `thread` feature를 켰다. Cargo.lock 변경 없음.
-- **남은 S3:** tracing·remote 선택 연결, api-consumer 갱신. slot 직접 encode는 아래 사유로 Human 결정 대기(TASK-027 S3 계획).
+- **남은 S3:** tracing·remote 선택 연결, api-consumer 갱신. slot 직접 encode는 2026-11-07 Human 승인으로 S3에서 제외했다(사유는 TASK-027 S3 계획, 재설계 조건은 이월 T4).

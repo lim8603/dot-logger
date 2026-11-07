@@ -55,7 +55,7 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 | 단계 | 범위 | 상태 |
 |---|---|---|
 | S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `3740671`. 정식 측정 NotRun |
-| S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle. TASK-027 facade 기본 worker 경로로 측정 | TASK-027 뒤 |
+| S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle. TASK-027 facade 기본 worker 경로로 측정. P1에서 `try_log`의 encode·복사 비용을 분리해 기록한다(이월 T4 판정 입력) | TASK-027 뒤 |
 | S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·P5 동시 조회·계측 비용≤5% | S2 뒤 |
 | RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
 

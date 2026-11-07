@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S3b tracing 선택 연결 → S3c remote 선택 연결 → api-consumer 갱신. slot 직접 encode는 Human 결정 대기(S3 계획) |
+| 다음 액션 | S3b tracing 선택 연결 → S3c remote 선택 연결 → S3e api-consumer 갱신. S3d는 S3 제외(이월 T4) |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -68,10 +68,12 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 | S3a | `health()`(RV-095)·선택 계측 `telemetry()`·CPU 고정 `worker_cpus`(RV-096)·worker panic 시험(GAP-009) | 로컬 Pass — 소스 `2a805ef`, [EV-048](../../05_verification/verification_evidence.md#ev-048), [REV-047](../../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) Closed, API §18.9 |
 | S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | Planned |
 | S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | Planned |
-| S3d | slot 직접 encode | **Human 결정 대기** — 아래 |
+| S3d | slot 직접 encode | **제외(2026-11-07 Human 승인)** — 재설계 조건은 이월 T4 |
 | S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | Planned |
 
 **S3d 조사 결과(결정 필요):** 현재 소형 기록은 per-writer scratch에 encode한 뒤 core가 byte ring으로 실제 길이만큼 복사한다. byte ring은 경계에서 감겨(wrap) 연속 slot을 보장하지 않는다. rtrb의 안전한 `write_chunk(n)`은 n바이트를 먼저 0으로 채우므로, 직접 encode하면 복사 대신 slot 전체 0 채우기가 들어가 작은 기록에서 오히려 비싸다. 부분 commit에는 `unsafe`(capture는 `deny`)가 필요하고, 감김 처리에는 queued record에 건너뛰기 길이를 넣는 core 형식 변경이 필요하다. 권고: S3에서 제외하고 scratch 경로를 유지하되, TASK-023 S2 P1(256B)에서 encode+복사 비용을 재고 유의하면 그때 별도 설계로 다룬다. §18.3의 "S3에서 slot 직접 encode로 교체" 문구를 바꾸므로 Human 결정 사항이다.
+
+**2026-11-07 Human 결정:** 「승인」 — 권고대로 S3에서 제외하고 §18.3 문구를 정정했다. "TASK-023 S2 P1(256B)에서 encode·복사 비용이 의미 있게 나오면 별도 설계"는 Human 요청으로 [이월 백로그 T4](../../06_evolution/project_state.md#이월-백로그)에 기록했다.
 
 ## S1 Human 결정 — 2026-11-05
 

@@ -123,8 +123,6 @@ impl Throughput {
         self.payload_bytes as f64 * 1e9 / self.durable_ns as f64
     }
 }
-/// Throughput up to the final file/directory sync; RAM acceptance alone and
-/// truncated runs are rejected.
 /// Records of `payload` bytes in `total_bytes`; a zero payload is a usage
 /// error rather than a division by zero (REV-051 RV-127).
 pub fn records_for(total_bytes: u64, payload: usize) -> Result<u64, Error> {
@@ -133,6 +131,8 @@ pub fn records_for(total_bytes: u64, payload: usize) -> Result<u64, Error> {
         .ok_or_else(|| "payload must be at least 1 byte".into())
 }
 
+/// Throughput up to the final file/directory sync; RAM acceptance alone and
+/// truncated runs are rejected.
 pub fn throughput(run: &StorageRun) -> Result<Throughput, Rejection> {
     if run.stopped.is_some() {
         return Err(Rejection::Incomplete);

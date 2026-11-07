@@ -103,6 +103,9 @@ pub enum StartError {
     Duplicate,
     /// A value is zero or inconsistent (for example raw slots without bytes).
     InvalidBudget,
+    /// A channel's output selection is empty, repeats an output or names an
+    /// output index that was not declared.
+    InvalidOutputs,
     /// The memory budget is short: `resource` needs `required` bytes.
     Budget {
         /// Partition that does not fit.
@@ -347,6 +350,31 @@ const REPORT_GRACE: Duration = Duration::from_secs(5);
 struct ChannelSpec {
     topic: String,
     schema: Schema,
+    /// Selected output indices; `None` routes to every output.
+    outputs: Option<Vec<usize>>,
+}
+
+/// Registration options of one channel (API §18.2).
+///
+/// `ChannelOptions::new()` keeps the defaults of
+/// [`LoggerBuilder::channel`]: every file output.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ChannelOptions {
+    outputs: Option<Vec<usize>>,
+}
+
+impl ChannelOptions {
+    /// Defaults: routed to every file output.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Route only to these file outputs, by `file_output` declaration order
+    /// starting at 0. An empty, repeated or undeclared index rejects
+    /// `start()` and `plan()` with [`StartError::InvalidOutputs`].
+    pub fn outputs(mut self, outputs: &[usize]) -> Self {
+        self.outputs = Some(outputs.to_vec());
+        self
+    }
 }
 
 /// What `resolve` decided before any allocation or IO.
@@ -429,10 +457,20 @@ impl LoggerBuilder {
     /// Records are sent at `Info` unless [`Channel::at`] picks another level;
     /// the channel itself admits every level (its minimum is `Trace`), so a
     /// lower sending level is never filtered out by the registration.
-    pub fn channel<T: Record + ?Sized>(mut self, topic: &str) -> Self {
+    pub fn channel<T: Record + ?Sized>(self, topic: &str) -> Self {
+        self.channel_with::<T>(topic, ChannelOptions::new())
+    }
+    /// Register a channel for records of type `T` with explicit options, for
+    /// example routed to a subset of the file outputs.
+    pub fn channel_with<T: Record + ?Sized>(
+        mut self,
+        topic: &str,
+        options: ChannelOptions,
+    ) -> Self {
         self.channels.push(ChannelSpec {
             topic: topic.into(),
             schema: T::SCHEMA,
+            outputs: options.outputs,
         });
         self
     }
@@ -466,7 +504,9 @@ impl LoggerBuilder {
     /// Serve a gRPC listener (`server.enabled` must be true; loopback-only
     /// unless TLS and tokens are set, as `ServerConfig::validate` requires).
     /// Subscribers receive best-effort copies of records the first file output
-    /// wrote; they are not completion targets, and their overflow is their own
+    /// wrote, so a channel routed away from output 0 with
+    /// [`ChannelOptions::outputs`] is not observed; copies are not completion
+    /// targets, and their overflow is their own
     /// Gap/Disconnect. GetStatus is answered; other requests are Unsupported.
     /// Limits are derived from the writer quotas (see API §18.11) and their
     /// buffers are charged to `Budget::memory_bytes`.
@@ -499,6 +539,7 @@ impl LoggerBuilder {
             channels.push(ChannelSpec {
                 topic: topic.clone(),
                 schema: sink::SCHEMA,
+                outputs: None,
             });
             writers.push((TRACING_WRITER.into(), Some(*quota)));
             *min
@@ -537,6 +578,11 @@ impl LoggerBuilder {
             return Err(StartError::Duplicate);
         }
         let budget = budget.ok_or(StartError::InvalidBudget)?;
+        // Output targets per channel, 1-based like the core target IDs.
+        let routes = channels
+            .iter()
+            .map(|spec| route_targets(spec.outputs.as_deref(), self.outputs.len()))
+            .collect::<Result<Vec<_>, _>>()?;
         let storage: Vec<StorageChannel> = channels
             .iter()
             .enumerate()
@@ -578,7 +624,7 @@ impl LoggerBuilder {
             extra.external_bytes = *reserve;
             extra.threads = 1;
         }
-        let derived = budget::derive(&budget, &quotas, &storage, &retention, extra)?;
+        let derived = budget::derive(&budget, &quotas, &storage, &routes, &retention, extra)?;
         let plan = SessionBuilder::new(derived.session.clone()).validate(&derived.platform)?;
         Ok(Resolved {
             channels,
@@ -759,6 +805,26 @@ impl LoggerBuilder {
             remote_addr,
         })
     }
+}
+
+/// Core target IDs (1-based) for a channel's output selection.
+fn route_targets(selected: Option<&[usize]>, outputs: usize) -> Result<Vec<u32>, StartError> {
+    let all = 1..=u32::try_from(outputs).map_err(|_| StartError::InvalidOutputs)?;
+    let Some(selected) = selected else {
+        return Ok(all.collect());
+    };
+    if selected.is_empty()
+        || selected
+            .iter()
+            .enumerate()
+            .any(|(i, o)| *o >= outputs || selected[..i].contains(o))
+    {
+        return Err(StartError::InvalidOutputs);
+    }
+    selected
+        .iter()
+        .map(|&o| u32::try_from(o + 1).map_err(|_| StartError::InvalidOutputs))
+        .collect()
 }
 
 fn new_session_id() -> u128 {

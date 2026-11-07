@@ -355,6 +355,7 @@ pub(crate) fn derive(
     budget: &Budget,
     quotas: &[Option<WriterQuota>],
     channels: &[StorageChannel],
+    routes: &[Vec<u32>],
     retention: &[Retention],
     extra: Extra,
 ) -> Result<Derived, StartError> {
@@ -456,7 +457,8 @@ pub(crate) fn derive(
             .collect(),
         routes: channels
             .iter()
-            .map(|c| Route {
+            .zip(routes)
+            .map(|(c, targets)| Route {
                 channel_id: c.channel.channel_id,
                 targets: targets.clone(),
             })

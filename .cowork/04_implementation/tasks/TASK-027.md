@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S3c remote 선택 연결 → S3e api-consumer 갱신. S3d는 S3 제외(이월 T4) |
+| 다음 액션 | S3e api-consumer 갱신 → S3 마감. S3d는 S3 제외(이월 T4) |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 |---|---|---|---|
 | S1 | 소유 모델·공개 API·worker 구성 설계 | 소유 모델 ADR 초안(Arc 소유 `'static` 핸들 vs scope 유지+내부 thread, RT 경로 Arc clone·할당 0)·API §18·NFR-008 수치 Human 승인 | Done(2026-11-05 Human 승인) |
 | S2 | 기본 worker와 파일 경로 | builder→start→raw/소형 기록→회전/sync→shutdown(정상·기한 초과·IO 실패·worker panic) 통합 시험과 RT allocator guard 회귀 Pass | 로컬 Pass(2026-11-05 [EV-047](../../05_verification/verification_evidence.md#ev-047)); worker panic 자동 시험만 GAP-009 |
-| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | In Progress — S3a [EV-048](../../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../../05_verification/verification_evidence.md#ev-049) 로컬 Pass, S3c·S3e 남음 |
+| S3 | typed channel과 선택 연결 | typed encode(slot 직접 encode)·tracing 어댑터·remote 서버·계측 표본 선택 연결, `health()` 상태 조회, api-consumer 갱신 | In Progress — S3a [EV-048](../../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../../05_verification/verification_evidence.md#ev-050) 로컬 Pass, S3e 남음 |
 
 ## 변경 대상과 첫 검증
 
@@ -67,7 +67,7 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 |---|---|---|
 | S3a | `health()`(RV-095)·선택 계측 `telemetry()`·CPU 고정 `worker_cpus`(RV-096)·worker panic 시험(GAP-009) | 로컬 Pass — 소스 `2a805ef`, [EV-048](../../05_verification/verification_evidence.md#ev-048), [REV-047](../../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) Closed, API §18.9 |
 | S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | 로컬 Pass — 소스 `91387ba`, [EV-049](../../05_verification/verification_evidence.md#ev-049), [REV-048](../../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) Closed, API §18.10(연결 +2줄) |
-| S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | Planned |
+| S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | 로컬 Pass — 소스 `c284354`, [EV-050](../../05_verification/verification_evidence.md#ev-050), [REV-049](../../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) Closed, API §18.11(Human 결정 3건: 관측용 사본·상태 조회만·기본값+명시) |
 | S3d | slot 직접 encode | **제외(2026-11-07 Human 승인)** — 재설계 조건은 이월 T4 |
 | S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | Planned |
 
@@ -92,4 +92,4 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 - [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048), S3b [EV-049](../../05_verification/verification_evidence.md#ev-049). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.
+테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048), S3b [EV-049](../../05_verification/verification_evidence.md#ev-049), S3c [EV-050](../../05_verification/verification_evidence.md#ev-050). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.

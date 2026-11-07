@@ -891,6 +891,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 473 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·F12/facade 20회 반복 20/20.
 - **미실행:** 시험 프로세스의 global 설치(`with_default`·직접 `log::Log` 호출로 대체), 다중 thread 처리량, RT 행, native(T3).
 
+<a id="ev-050"></a>
+## EV-050 — TASK-027 S3c remote 선택 연결
+
+- **판정:** 로컬 구현 Pass. 구독자 영향 처리량·외부 TLS listener·RT·native(T3)는 NotRun이다.
+- **대상/환경:** 소스 `c284354`, base `cc6df46`. 2026-11-07 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음. Human 결정 3건(관측용 사본·상태 조회만·기본값+명시). [명령/결과/hash](../06_evolution/imported_context/task_027_s3c_2026-11-07/results.json), [REV-049](reviews/REV-049_TASK-027_S3C_REMOTE.md), [API §18.11](../03_design_artifacts/interface_contract.md#1811-s3c-remote-선택-연결--2026-11-07).
+- **TDD:** F13 작성(client crate, 실제 gRPC) → `remote`·`remote_with`·`StartError::Remote` 부재 컴파일 Red → 구현 → shutdown이 멈춘 클라이언트 때문에 15초 뒤 `Unresponsive`(RV-110) → 2초 유예 후 runtime 중단으로 조치 → Green. tap을 끄는 돌연변이에서 구독 수신 TimedOut 실패 확인.
+- **확인한 계약:** loopback 기본 listener·`remote_addr`. 구독자가 첫 output이 쓴 5건을 원 channel·payload로 수신·handoff ACK. GetStatus revision 1(telemetry 켜면 `dot_logger.status.v1` report), ReadBlob은 Unsupported. 구독 중(클라이언트 runtime 정지) shutdown이 4초 미만에 Closed·`is_success`, stream 종료·listener 닫힘. 큰 한도는 `Budget{Total}` 거절, 사용 중 포트는 `StartError::Remote`이고 두 경우 모두 디렉터리 없음.
+- **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 477 Pass(5 ignore, 기존 DB 회귀)·feature 16조합 두 toolchain 32/32·F13/TC-013 binary 10회 반복 10/10.
+- **미실행:** 외부 TLS/token listener를 facade로 띄우는 시험(검증 규칙은 기존 `ServerConfig::validate`·TASK-012 시험), 구독자가 파일 쓰기 처리량에 주는 영향, RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

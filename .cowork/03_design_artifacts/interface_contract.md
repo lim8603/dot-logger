@@ -929,3 +929,23 @@ tracing::subscriber::set_global_default(logger.tracing()?)?;                  //
 - **유실:** 채널 포화·slot 초과·formatter 오류·formatting 중 같은 thread에서 다시 sink로 들어온 이벤트(lock 재진입 교착 방지)·shutdown 뒤 이벤트는 버리고 `Health::tracing_dropped`에 센다. worker를 기다리지 않는다. 같은 thread의 중첩 `tracing` 이벤트는 tracing 자체가 sink에 전달하지 않는다(우리 카운트 밖). core level/sampling `Skipped`는 유실로 세지 않는다.
 - **종료:** `shutdown`/Drop은 시작 시 sink의 writer를 회수해 반납함으로 보낸다. 그래서 global subscriber로 설치된 sink가 살아 있어도 보고의 `writers_outstanding`이 0이고 host reaper가 끝난다.
 - **NFR-008 L3:** 연결 코드 +2줄(제한 +6줄), 사용자가 이름을 쓰는 새 개념 0개(`WriterQuota`는 L1에 이미 있음). 정식 계수는 TASK-029.
+
+### 18.11 S3c remote 선택 연결 — 2026-11-07
+
+[EV-050](../05_verification/verification_evidence.md#ev-050)·[REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md), 소스 `c284354`. feature `remote`에서만 존재한다. 2026-11-07 Human 결정(아래 3항목 모두 권고안)에 따른다.
+
+```rust
+let logger = Logger::builder()
+    /* L1 선언 … */
+    .remote(ServerConfig { enabled: true, ..Default::default() })   // +1줄 (loopback·read-only 기본)
+    .start()?;
+let address = logger.remote_addr();                                   // 선택(포트 0일 때)
+```
+
+- **Human 결정 — 2026-11-07:** ① 구독 기록은 **관측용 사본**이다. 첫 file output이 쓴 기록의 사본을 활성 구독마다 offer하고 completion target에 넣지 않는다. 구독 포화는 그 구독의 기존 정책(Gap/Disconnect)으로만 보이고 파일 기록·종료 판정에 영향이 없다. ② 관리 요청은 **상태 조회만** 처리한다. telemetry가 켜져 있으면 기존 `OperationsHost`가 GetStatus(`dot_logger.status.v1`)를 응답하고, ApplyConfig는 facade에 live 설정 경로가 없어 Unsupported, Compare는 등록 snapshot이 없어 Gone이다. telemetry가 꺼져 있으면 GetStatus는 빈 report(지표 backend 없음, 0 아님)다. Query/ReadBlob/Replay/PlanCheck/RunCheck/GetCompletion은 Unsupported이며 이력 조회·재생은 MS-009 TASK-031에서 다룬다. ③ 한도는 **기본값 + 명시 옵션**이다.
+- **`LoggerBuilder::remote(ServerConfig)`:** writer quota에서 결정적으로 `RemoteLimits`를 계산한다. 연결·구독·command 각 4, `record_bytes` = 가장 큰 slot, `subscription_records` = 모든 slot 수 합, `subscription_bytes` = min(모든 slot bytes 합, 4 MiB)이며 `record_bytes` 이상, `message_bytes` 32 KiB, `max_age` 10초, `request_timeout` 5초다. `remote_with(ServerConfig, RemoteLimits)`는 직접 지정한다. 구독 유실은 Gap으로 보이는 관측 손실이므로 성능 값처럼 기본값을 둔다(ADR-012 §6의 손실 값 필수 원칙은 파일 기록에 적용).
+- **메모리:** `RemoteLimits::reservation()`을 `Budget::memory_bytes`에서 먼저 빼서 core external partition으로 둔다. remote thread stack 1개는 worker partition에 더한다. 부족하면 `StartError::Budget { resource: Resource::Total, .. }`다(core `Resource`에 external 항목이 없어 공개 enum을 바꾸지 않았다). 한도 자체가 잘못되면 `StartError::Remote(InvalidInput)`이다.
+- **시작:** listener는 namespace를 만들기 전에 `dot-logger-remote` thread(current-thread tokio runtime)에서 bind한다. bind 실패는 `StartError::Remote`, 남는 디렉터리 없음. `worker_cpus`가 있으면 이 thread도 같은 규칙으로 고정한다. `Logger::remote_addr()`가 bind된 주소를 준다.
+- **처리 위치:** 사본 offer는 첫 output의 IO thread가 batch 쓰기 성공분(오류 시 기록된 prefix)에 대해 수행한다. command는 host turn마다 비대기로 처리한다.
+- **종료:** host는 Closed를 보고하기 전에 inbox를 놓고(대기 command는 Gone) hub를 닫고(구독 종료) listener를 멈춘 뒤 thread를 join한다. 클라이언트가 연결을 닫지 않으면 graceful 종료가 끝나지 않으므로 정지 신호 뒤 **2초 유예**가 지나면 runtime을 내려 남은 연결을 끊는다. 그래서 정지된 클라이언트가 있어도 shutdown은 최대 2초 더 걸릴 뿐 막히지 않는다(F13).
+- **NFR-008 L3:** 연결 코드 +1줄(주소 조회 포함 +2줄), 새 개념 `ServerConfig` 1개. 정식 계수는 TASK-029.

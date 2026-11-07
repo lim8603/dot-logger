@@ -949,3 +949,32 @@ let address = logger.remote_addr();                                   // 선택(
 - **처리 위치:** 사본 offer는 첫 output의 IO thread가 batch 쓰기 성공분(오류 시 기록된 prefix)에 대해 수행한다. command는 host turn마다 비대기로 처리한다.
 - **종료:** host는 Closed를 보고하기 전에 inbox를 놓고(대기 command는 Gone) hub를 닫고(구독 종료) listener를 멈춘 뒤 thread를 join한다. 클라이언트가 연결을 닫지 않으면 graceful 종료가 끝나지 않으므로 정지 신호 뒤 **2초 유예**가 지나면 runtime을 내려 남은 연결을 끊는다. 그래서 정지된 클라이언트가 있어도 shutdown은 최대 2초 더 걸릴 뿐 막히지 않는다(F13).
 - **NFR-008 L3:** 연결 코드 +1줄(주소 조회 포함 +2줄), 새 개념 `ServerConfig` 1개. 정식 계수는 TASK-029.
+
+## 19. 예산 preset·사이징 계약 — 2026-11-07
+
+상태: **Accepted(2026-11-07 Human, TASK-028 S1 결정 3건 모두 권고안)**. TASK-028 S1에서 구현하며, 구현 중 구체화는 §19.x로 덧붙인다. §18의 `Budget` 계약(손실 값 필수, 성능 값 기본값)을 유지하고 그 위에서 값을 계산한다.
+
+### 19.1 Human 결정 — 2026-11-07
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | preset 구성 | 3종 + `Sizing`. `Preset::control(hz)`(256B 소형 기록 제어 루프), `Preset::sensor(hz, bytes)`(raw 원본 + 소형 메타), `Preset::black_box(hz)`(소형, sync 100ms·흡수 2초로 내구성 우선). 혼합·writer별 다른 부하는 `Sizing`으로 직접 지정 |
+| 2 | 안전 여유 기본값 | 흡수 시간 1초(파일 IO가 멈춰도 RT 기록이 거절되지 않는 시간, local-pc-v1 sync 1초와 일치), slot 여유 ×1.25, 메모리는 계산된 정확 요구량 +10%. `black_box`만 흡수 2초 |
+| 3 | 계산 시점 | builder `.preset(..)`을 start 때 선언된 writer·출력·채널 수로 계산. `LoggerBuilder::plan()`이 시작·할당 없이 계산된 `Budget`과 항목별 근거·부족 항목을 반환 |
+
+### 19.2 계약 초안
+
+```rust
+let logger = Logger::builder()
+    .preset(Preset::control(1000))                       // 1 kHz × 256 B per writer
+    .file_output("/data/logs", Retention::ring(64 * GIB))
+    .channel::<Pose>("robot/pose")
+    .writer("control")
+    .start()?;
+let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기록용)
+```
+
+- **사용자 값 우선:** `.budget(..)`과 `.preset(..)`을 함께 쓰면 preset은 `Budget`에서 비어 있는 손실 값(메모리·sync 주기·종료 기한·writer quota)만 채운다. 사용자가 정한 값은 덮어쓰지 않으며 근거에 출처(사용자/preset)를 남긴다.
+- **slot:** small slots = ⌈기록률 × 흡수 × 1.25⌉, slot bytes = payload 크기. raw도 같은 규칙.
+- **메모리:** core 각 구성요소(capture·routing·completion·control·storage catalog/writer·telemetry·remote)의 실제 예약 공식을 생성자와 같은 순수 함수로 계산한 정확 요구량 합 × 1.1. 이 계산은 facade의 기존 control 1/4·output 3/4 고정 분할(RV-097)도 대체한다. 명시 `memory_bytes`에서는 요구량을 먼저 배정하고 나머지를 output에 준다.
+- **부족:** 명시 값으로는 부족하면 `StartError::Budget { resource, required, available }`로 항목·부족량을 보고한다.

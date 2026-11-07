@@ -29,6 +29,10 @@ const MIB: u64 = 1024 * 1024;
 /// floor, ceiling), floor = max(8 MiB, 2 × largest payload + 1 MiB).
 const SEGMENT_FLOOR: u64 = 8 * MIB;
 const SEGMENT_CEILING: u64 = 256 * MIB;
+/// Records per facade segment (`WriterConfig::max_records` in the facade
+/// budget): the facade rotates at this count whatever the byte limit, so a
+/// comparable P0 workload rotates at it too (TASK-023 S2b ⑤).
+pub const FACADE_SEGMENT_RECORDS: u64 = 16_384;
 /// Shutdown is given ample time; the durable time is measured, not bounded.
 const SHUTDOWN: Duration = Duration::from_secs(600);
 const DROP_DEADLINE: Duration = Duration::from_secs(30);
@@ -92,6 +96,8 @@ pub struct LoggerVerified {
     pub files: u64,
     /// Largest closed file.
     pub largest_file: u64,
+    /// Most records found in one file.
+    pub largest_file_records: u64,
 }
 
 fn topic(channel: usize) -> String {
@@ -150,6 +156,7 @@ pub fn write_logger(
         || load.channels % w.files != 0
         || load.slots == 0
         || w.offered_bytes_per_second == Some(0)
+        || w.file_record_limit != FACADE_SEGMENT_RECORDS
     {
         return Err(invalid("invalid logger workload"));
     }
@@ -374,11 +381,13 @@ pub fn verify_logger(run: &LoggerRun) -> Result<LoggerVerified, Error> {
         payload_bytes: 0,
         files,
         largest_file: 0,
+        largest_file_records: 0,
     };
     for (f, list) in lists.iter().enumerate() {
         for path in list {
             let bytes = fs::read(path)?;
             v.largest_file = v.largest_file.max(bytes.len() as u64);
+            let mut in_file = 0_u64;
             for message in mcap::MessageStream::new(&bytes)? {
                 let message = message?;
                 let stored = decode_record(&message.data, w.record_payload_bytes)
@@ -393,6 +402,11 @@ pub fn verify_logger(run: &LoggerRun) -> Result<LoggerVerified, Error> {
                     return Err(invalid("record differs from the oracle"));
                 }
                 oracle.see(f, seq)?;
+                in_file += 1;
+                if in_file > w.file_record_limit {
+                    return Err(invalid("file holds more records than the limit"));
+                }
+                v.largest_file_records = v.largest_file_records.max(in_file);
                 v.records += 1;
                 v.payload_bytes += payload.len() as u64;
             }

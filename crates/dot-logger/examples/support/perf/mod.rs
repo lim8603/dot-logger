@@ -18,7 +18,8 @@ use std::{
 mod facade;
 #[allow(unused_imports)]
 pub use facade::{
-    CallCost, LoggerLoad, LoggerRun, LoggerVerified, call_cost, verify_logger, write_logger,
+    CallCost, FACADE_SEGMENT_RECORDS, LoggerLoad, LoggerRun, LoggerVerified, call_cost,
+    verify_logger, write_logger,
 };
 
 /// Ordinary harness error; no measurement result is implied.
@@ -52,6 +53,10 @@ pub struct StorageWorkload {
     pub writers: usize,
     /// Rotate before a file would exceed this many bytes.
     pub file_limit_bytes: u64,
+    /// Rotate before a file would hold more than this many records: the
+    /// facade's fixed segment record limit (`FACADE_SEGMENT_RECORDS`) for
+    /// logger comparisons, `u64::MAX` for none.
+    pub file_record_limit: u64,
     /// Write request size; sync and rotation flush shorter tails.
     pub block_bytes: usize,
     /// Periodic flush + fdatasync of every file a writer owns.
@@ -569,6 +574,7 @@ struct Output {
     rotation: u32,
     file: File,
     written: u64,
+    records: u64,
     buf: Vec<u8>,
     closed: Vec<File>,
 }
@@ -583,6 +589,7 @@ impl Output {
             rotation,
             file,
             written: 0,
+            records: 0,
             buf: Vec::with_capacity(block),
             closed: Vec::new(),
         })
@@ -643,6 +650,7 @@ pub fn write_p0(
         || !(1..=w.files).contains(&w.writers)
         || w.block_bytes == 0
         || frame > w.file_limit_bytes
+        || w.file_record_limit == 0
         || w.offered_bytes_per_second == Some(0)
     {
         return Err(invalid("invalid P0 workload"));
@@ -745,7 +753,7 @@ fn writer(
         }
         let out = &mut outputs[f / w.writers];
         let frame = (FRAME_HEADER + w.record_payload_bytes) as u64;
-        if out.pending() + frame > w.file_limit_bytes {
+        if out.pending() + frame > w.file_limit_bytes || out.records >= w.file_record_limit {
             if available_bytes(dir)? < reserve_bytes.saturating_add(w.file_limit_bytes) {
                 stop.store(true, Ordering::Release);
                 break;
@@ -763,6 +771,7 @@ fn writer(
         payload.fill(fill(seq));
         out.push(&mut stats, &header, w.block_bytes)?;
         out.push(&mut stats, &payload, w.block_bytes)?;
+        out.records += 1;
         stats.payload += w.record_payload_bytes as u64;
         stats.records += 1;
         stats.accepted_ns = u64::try_from(start.elapsed().as_nanos())?;
@@ -797,6 +806,8 @@ pub struct Verified {
     pub payload_bytes: u64,
     /// Files read.
     pub files: u64,
+    /// Most records found in one file.
+    pub largest_file_records: u64,
 }
 /// Every file must hold exactly a prefix of its arithmetic sequence
 /// `f, f + files, ...`, with matching length and fill bytes, across rotations.
@@ -813,6 +824,7 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
         records: 0,
         payload_bytes: 0,
         files: names.len() as u64,
+        largest_file_records: 0,
     };
     let mut expect: Vec<u64> = (0..w.files as u64).collect();
     let mut chunk = vec![0_u8; w.record_payload_bytes.min(1 << 20)];
@@ -822,6 +834,7 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
         }
         let mut r = BufReader::with_capacity(1 << 20, File::open(path)?);
         let mut header = [0_u8; FRAME_HEADER];
+        let mut in_file = 0_u64;
         loop {
             match r.read_exact(&mut header) {
                 Ok(()) => {}
@@ -843,6 +856,11 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
                 left -= n;
             }
             expect[*file] += w.files as u64;
+            in_file += 1;
+            if in_file > w.file_record_limit {
+                return Err(invalid("file holds more records than the limit"));
+            }
+            v.largest_file_records = v.largest_file_records.max(in_file);
             v.records += 1;
             v.payload_bytes += len;
         }

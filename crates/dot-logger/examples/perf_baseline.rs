@@ -224,6 +224,7 @@ mod linux {
             files,
             writers,
             file_limit_bytes: FILE_LIMIT,
+            file_record_limit: FACADE_SEGMENT_RECORDS,
             block_bytes: BLOCK,
             sync_interval: SYNC,
             offered_bytes_per_second: rate,
@@ -255,8 +256,8 @@ mod linux {
         json!({"count":h.count().to_string(),"p50_ns":q(0.5),"p99_ns":q(0.99),
             "p999_ns":q(0.999),"max_ns":(h.count() > 0).then(|| h.max().to_string())})
     }
+    /// A failed read-back is reported next to the run facts, never hidden.
     fn logger_json(r: &LoggerRun) -> Result<Value, Error> {
-        let v = verify_logger(r)?;
         let mut value = storage_facts(&r.storage);
         value["scope"] = json!("LoggerStorage");
         value["load"] = json!({"producers":r.load.producers,"channels":r.load.channels,
@@ -267,9 +268,15 @@ mod linux {
         value["rejected_calls"] = latency(&r.rejected);
         value["rejections"] = json!(r.rejections.to_string());
         value["report"] = json!(r.report);
-        value["verified_records"] = json!(v.records.to_string());
-        value["verified_payload_bytes"] = json!(v.payload_bytes.to_string());
-        value["largest_file"] = json!(v.largest_file.to_string());
+        match verify_logger(r) {
+            Ok(v) => {
+                value["verified_records"] = json!(v.records.to_string());
+                value["verified_payload_bytes"] = json!(v.payload_bytes.to_string());
+                value["largest_file"] = json!(v.largest_file.to_string());
+                value["largest_file_records"] = json!(v.largest_file_records.to_string());
+            }
+            Err(e) => value["verify_error"] = json!(e.to_string()),
+        }
         Ok(value)
     }
     fn calibrated(cpu: usize, target: Duration) -> Result<Calibration, Error> {

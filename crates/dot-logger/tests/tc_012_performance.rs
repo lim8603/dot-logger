@@ -13,6 +13,7 @@ fn workload() -> StorageWorkload {
         files: 4,
         writers: 2,
         file_limit_bytes: 64 * 1024,
+        file_record_limit: u64::MAX,
         block_bytes: 4096,
         sync_interval: Duration::from_millis(1000),
         offered_bytes_per_second: None,
@@ -366,6 +367,7 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         files: 4,
         writers: 2,
         file_limit_bytes: 8 * MIB,
+        file_record_limit: FACADE_SEGMENT_RECORDS,
         block_bytes: 64 * 1024,
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
@@ -414,6 +416,7 @@ fn logger_load_must_route_whole_files() {
         files: 4,
         writers: 2,
         file_limit_bytes: 8 * 1024 * 1024,
+        file_record_limit: FACADE_SEGMENT_RECORDS,
         block_bytes: 4096,
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
@@ -460,4 +463,43 @@ fn call_cost_separates_encode_admission_copy_and_clock() {
     }
     assert_eq!(cost.payload_bytes, 256);
     assert!(cost.success, "{}", cost.report);
+}
+
+/// TASK-023 S2b finding ⑤ (Human 2026-11-07): the facade also rotates after
+/// a fixed number of records per segment, so P0 rotates at the same count and
+/// the logger run refuses any other count.
+#[test]
+fn p0_rotates_at_the_shared_record_limit_and_the_logger_requires_it() {
+    let parent = std::env::temp_dir();
+    let w = StorageWorkload {
+        file_record_limit: 50,
+        records: 1000,
+        files: 1,
+        writers: 1,
+        ..workload()
+    };
+    let dir = RunDir::create(&parent).unwrap();
+    let r = write_p0(dir.path(), w, 0, &[]).unwrap();
+    // 50 frames of 1016 B stay below the 64 KiB byte limit (64 frames), so
+    // the record count rotates first: 1000 records make 20 files.
+    assert_eq!(r.files_created, 20);
+    let v = verify_p0(dir.path(), &r).unwrap();
+    assert_eq!(v.records, 1000);
+    assert_eq!(v.largest_file_records, 50);
+    let logger_dir = RunDir::create(&parent).unwrap();
+    let load = LoggerLoad {
+        producers: 1,
+        channels: 1,
+        slots: 64,
+        memory_bytes: 64 << 20,
+        producer_cpus: Vec::new(),
+        worker_cpus: Vec::new(),
+    };
+    let w = StorageWorkload {
+        record_payload_bytes: 64,
+        file_limit_bytes: 8 << 20,
+        ..w
+    };
+    assert!(write_logger(logger_dir.path(), w, &load, 0).is_err());
+    assert_eq!(FACADE_SEGMENT_RECORDS, 16_384);
 }

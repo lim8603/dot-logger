@@ -950,6 +950,14 @@ let address = logger.remote_addr();                                   // 선택(
 - **종료:** host는 Closed를 보고하기 전에 inbox를 놓고(대기 command는 Gone) hub를 닫고(구독 종료) listener를 멈춘 뒤 thread를 join한다. 클라이언트가 연결을 닫지 않으면 graceful 종료가 끝나지 않으므로 정지 신호 뒤 **2초 유예**가 지나면 runtime을 내려 남은 연결을 끊는다. 그래서 정지된 클라이언트가 있어도 shutdown은 최대 2초 더 걸릴 뿐 막히지 않는다(F13).
 - **NFR-008 L3:** 연결 코드 +1줄(주소 조회 포함 +2줄), 새 개념 `ServerConfig` 1개. 정식 계수는 TASK-029.
 
+### 18.12 채널별 출력 선택 — 2026-11-07 (TASK-023 S2a)
+
+- **Human 결정 — 2026-11-07:** §18.2의 `.channel_with(topic, ChannelOptions)`를 **출력 선언 순서 지정** 방식으로 구현한다(대안: 출력 이름 지정, 제품 변경 없이 측정). 계기는 TASK-023 S2: 모든 채널이 모든 출력으로 복제되면 16파일 측정이 P0(기록 s → 파일 s % 16)와 같은 workload가 되지 않는다.
+- **계약:** `ChannelOptions::new()`(기본 = 모든 file output, `.channel(topic)`과 동일)·`.outputs(&[usize])`(`file_output` 선언 순서 0부터). 빈 목록·중복·선언되지 않은 index는 `start()`/`plan()`을 `StartError::InvalidOutputs`로 거절한다. core `Route.targets`에 그대로 반영되며 완료 추적도 선택된 출력만 대상으로 한다. 모든 출력의 MCAP channel 표에는 등록된 채널이 모두 기록된다(기록이 없는 채널 포함).
+- **remote 영향:** 구독 사본은 첫 번째 출력이 쓴 기록에서 만들어지므로(§18.11), 출력 0으로 가지 않는 채널은 구독에 보이지 않는다(rustdoc 명시).
+- **공개 표면:** 새 공개 타입 `ChannelOptions` 1개, 메서드 `channel_with`·`ChannelOptions::{new, outputs}`, `StartError::InvalidOutputs` 변형 1개. level·importance 옵션은 필요할 때 같은 타입에 추가한다. NFR-008 계수는 TASK-029.
+- **검증:** 소스 `1602d5e`. TC-013 F16(`tc_013_routing.rs`) — 선택 출력만 기록·기본 전체 출력·잘못된 선택 거절. 출력 선택을 무시하는 돌연변이에서 F16 실패 확인.
+
 ## 19. 예산 preset·사이징 계약 — 2026-11-07
 
 상태: **Accepted(2026-11-07 Human, TASK-028 S1 결정 3건 모두 권고안)**. TASK-028 S1에서 구현하며, 구현 중 구체화는 §19.x로 덧붙인다. §18의 `Budget` 계약(손실 값 필수, 성능 값 기본값)을 유지하고 그 위에서 값을 계산한다.

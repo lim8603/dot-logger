@@ -10,7 +10,7 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-023 S2 — facade·preset 경로 logger on 측정 착수(이월 T4 판정 입력). REV-051 조치 완료(EV-053). TASK-027 S1~S3·TASK-028 S1 로컬 완료 |
+| 활성 Task | TASK-023 S2 — S2a 채널별 출력 선택 완료, 다음 S2b facade 경로 측정 도구(이월 T4 판정 입력). TASK-027 S1~S3·TASK-028 S1 로컬 완료 |
 | 미처리 리뷰 | 없음 — [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Closed(2026-11-07 Human 「승인」, [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`) |
 | 상태 | Yellow — UPS 모의 수락, REV-051 Closed, 성능/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
@@ -20,6 +20,8 @@
 | 최근 세션 | [2026-11-07 #003](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md) — REV-051 RV-120~127 조치(EV-053) |
 
 ## 현재 결정과 제약
+
+- **2026-11-07 Human 결정 — TASK-023 S2a 채널별 출력 선택:** 「출력 순서 지정」. `.channel_with(topic, ChannelOptions::new().outputs(&[..]))`, `file_output` 선언 순서 0부터, 기본 전체 출력, 잘못된 선택은 `StartError::InvalidOutputs`. 16파일 측정을 P0와 같은 workload로 만들기 위함. [API §18.12](../03_design_artifacts/interface_contract.md#1812-채널별-출력-선택--2026-11-07-task-023-s2a).
 
 - **2026-11-07 Human 결정 — TASK-028 S1 preset/사이징:** preset 3종(`control`·`sensor`·`black_box`) + `Sizing`, 흡수 1초 × slot 1.25·메모리 +10%(`black_box` 흡수 2초), start 시 계산 + `plan()`. preset은 빈 손실 값만 채우고 사용자 값을 덮어쓰지 않는다. [API §19](../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07).
 
@@ -70,7 +72,7 @@
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | AI | In Progress | 2026-11-01 | S1~S3 EV-037~039 로컬 수락; REV-038 Closed·통합/환경/native 후속 |
 | TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경/native 대기 |
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
-| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-04 | S2 — TASK-027 facade 기본 worker 경로로 logger on 측정(S1 EV-046 완료) |
+| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-07 | S2a 채널별 출력 선택 완료(API §18.12·F16) → S2b facade 경로 측정 도구 → S2c P2/P3 → S2d 시험 실행(S1 EV-046) |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-07 | S3a [EV-048](../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../05_verification/verification_evidence.md#ev-051) 로컬 Pass(F1~F13) — S1~S3 로컬 완료, Human 리뷰 대기; 잔여 TASK-023 성능·TASK-029 계수·T3, S3d는 T4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 

@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-04 |
-| 다음 액션 | S2 — TASK-027 facade 기본 worker 경로로 logger on(P1/P2/P3 혼합 workload·무결성 oracle)을 같은 P0 workload와 대조 |
+| 마지막 갱신일 | 2026-11-07 |
+| 다음 액션 | S2b — facade 경로 logger on 측정 도구(P1 `try_log`·MCAP 판독 oracle·호출 지연 ns 분포·encode/복사 분리). S2a 채널별 출력 선택 완료 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -56,6 +56,10 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 |---|---|---|
 | S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `3740671`. 정식 측정 NotRun |
 | S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle. TASK-027 facade 기본 worker 경로로 측정. P1에서 `try_log`의 encode·복사 비용을 분리해 기록한다(이월 T4 판정 입력) | TASK-027 뒤 |
+| S2a | facade 채널별 출력 선택(`channel_with`·`ChannelOptions::outputs`) — 16파일 workload를 P0와 같게 만드는 제품 변경(Human 2026-11-07 「출력 순서 지정」) | 로컬 완료 — 소스 `1602d5e`, API §18.12, TC-013 F16, 1.96/1.85 각 496 Pass |
+| S2b | facade 경로 logger on 측정 도구: P1 `try_log`, 같은 workload의 `StorageRun{tool: Logger}`, MCAP 판독 무결성 oracle, 호출 지연 ns 분포(p99/p99.9), encode·복사 비용 분리(T4 입력). P0 회전은 facade segment 상한 256 MiB에 맞춤 | 다음 |
+| S2c | P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합 확장, 32생산자·16파일·128채널) | S2b 뒤 |
+| S2d | 짧은 시험 실행(측정 아님)·EV 기록. 정식 측정은 S3 | S2c 뒤 |
 | S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·P5 동시 조회·계측 비용≤5% | S2 뒤 |
 | RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
 

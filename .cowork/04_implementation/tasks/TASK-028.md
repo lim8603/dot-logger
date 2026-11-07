@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S1a 정확 partition 요구량 계산(RV-097 대체) → S1b `Sizing`·`Preset`·`plan()` |
+| 다음 액션 | S1 로컬 완료. 다음은 TASK-023 S2(facade·preset 경로 logger on 측정, 이월 T4 판정 입력). S2 auto preset은 TASK-023 S3 정식 결과 뒤 |
 | 의존 | TASK-027(S1 계약)·TASK-017·TASK-023(S2의 정확도 oracle) |
 | 예상 소요 | S1 1~2 + S2 2~3 인일, 측정/리뷰 대기 제외 |
 
@@ -22,7 +22,7 @@
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | 결정적 사이징·preset | `Sizing` 입력→설정·계산 근거, preset 3~4종(제어 경량·센서 원본·블랙박스 순환·혼합; 수치 근거는 TASK-022 local-pc-v1), 부족 항목·부족량 설명 오류 | In Progress — 2026-11-07 Human 결정 3건, [API §19](../../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07) |
+| S1 | 결정적 사이징·preset | `Sizing` 입력→설정·계산 근거, preset 3~4종(제어 경량·센서 원본·블랙박스 순환·혼합; 수치 근거는 TASK-022 local-pc-v1), 부족 항목·부족량 설명 오류 | Done(로컬) — 2026-11-07 Human 결정 3건, [API §19](../../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07), [EV-052](../../05_verification/verification_evidence.md#ev-052) |
 | S2 | 장비 측정 auto preset | 아래 설계로 측정 프로필 파일 생성→`Preset::from_profile` 적용, TASK-023 정식 결과 대비 오차 기록 | Planned |
 
 ## S1 Human 결정과 계획 — 2026-11-07
@@ -31,8 +31,8 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 
 | 하위 | 범위 | 상태 |
 |---|---|---|
-| S1a | core 예약 공식을 생성자와 공유하는 순수 함수로 추출하고 facade `derive`를 정확 요구량 배정으로 교체(RV-097) | Planned |
-| S1b | `Sizing`·`Preset` 3종·builder `.preset`·`plan()`과 근거, 사용자 값 우선, 부족 항목·부족량 | Planned |
+| S1a | core 예약 공식을 생성자와 공유하는 순수 함수로 추출하고 facade `derive`를 정확 요구량 배정으로 교체(RV-097) | 로컬 Pass — 소스 `21cc198`, F14 |
+| S1b | `Sizing`·`Preset` 3종·builder `.preset`·`plan()`과 근거, 사용자 값 우선, 부족 항목·부족량 | 로컬 Pass — 소스 `4465be3`, F15, [EV-052](../../05_verification/verification_evidence.md#ev-052), [REV-050](../../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) Closed, API §19.3 |
 
 ## S2 auto preset 설계 — 2026-11-04 Human 요청
 

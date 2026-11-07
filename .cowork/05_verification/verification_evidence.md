@@ -910,6 +910,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** `scripts/check-feature-matrix.py` 1.96.0·1.85.0 모두 exit0. 이 스크립트는 remote protocol 검사, 16조합 `cargo test -p dot-logger`, consumer 의존 격리, api-consumer 기본·remote, rt-allocation 기본·remote, scoped_capture 예제를 포함한다. S2 EV-047에서 미실행으로 남았던 스크립트 실행도 이것으로 해소된다. fmt·clippy 두 toolchain exit0.
 - **미실행:** api-consumer의 tracing 연결(소비자에 tracing crate를 추가하게 되므로 제외, tc_013_tracing이 대신), RT 행, native(T3).
 
+<a id="ev-052"></a>
+## EV-052 — TASK-028 S1 정확 partition 배정·preset·plan
+
+- **판정:** 로컬 구현 Pass. preset 예산의 실측(IO 정지 흡수)·auto preset(S2)·RT·native(T3)는 NotRun이다.
+- **대상/환경:** 소스 `21cc198`(S1a)·`4465be3`(S1b), base `3515a97`. 2026-11-07 AI, 현재 Ubuntu generic 7.0.0-42(RT 아님), Cargo.lock 변경 없음. Human 결정 3건(API §19.1). [명령/결과/hash](../06_evolution/imported_context/task_028_s1_2026-11-07/results.json), [REV-050](reviews/REV-050_TASK-028_S1_PRESET.md), [API §19.3](../03_design_artifacts/interface_contract.md#193-s1-구현-반영--2026-11-07).
+- **TDD:** F14 Red(고정 1/4 분할 때문에 보고값 4,209,633B로도 control 0으로 거절) → core 예약 공식 추출·정확 배정 → Green. F15 컴파일 Red → `Sizing`·`Preset`·`plan()` → Green. slot 여유 돌연변이(1.25→1.0)에서 F15 4/5 실패 확인.
+- **확인한 계약:** 보고된 메모리 요구량이 정확하고 충분(F14, 다중 writer·raw·출력 2개·telemetry 형태 포함). `Preset::control(1000)`이 quota 1250×256B·sync 1초·종료 3초·메모리 = 요구량+10%를 채우고 시작·기록 100건·성공 종료. 사용자 메모리·sync 주기 유지와 `preset_filled` 목록. 부하 대비 메모리 부족은 plan·start 모두 같은 `required`로 거절, 파일 없음. `sensor(30, 8MiB)` raw 38 slot, `black_box(100)` sync 100ms·250 slot, custom 혼합 Sizing과 preset 조정(F15). plan은 결정적이고 파일을 만들지 않는다.
+- **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 483 Pass(5 ignore, 기존 DB 회귀)·`scripts/check-feature-matrix.py` 두 toolchain exit0.
+- **미실행:** S2 auto preset, preset 예산의 실제 IO 정지 흡수 측정(TASK-023 S2/S3), RT 행, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -251,7 +251,7 @@ P3 최소60초 및 RAM2배 이상, 마지막 sync까지 시간 포함. P4 receiv
 ### TC-013 — 통합 접점·preset·레시피
 
 - 관련: MS-008 / FR-001·003·008·012·013·015(장비 측정)·016 / NFR-001·004·005·006·008
-- 상태: Partial(2026-11-07 facade F1~F13 로컬 Pass, F5 worker panic 포함) / 최근 실행: 2026-11-07 / EV: [EV-047](verification_evidence.md#ev-047), [EV-048](verification_evidence.md#ev-048), [EV-049](verification_evidence.md#ev-049), [EV-050](verification_evidence.md#ev-050)
+- 상태: Partial(2026-11-07 facade F1~F15 로컬 Pass, F5 worker panic 포함; auto preset S2 미실행) / 최근 실행: 2026-11-07 / EV: [EV-047](verification_evidence.md#ev-047), [EV-048](verification_evidence.md#ev-048), [EV-049](verification_evidence.md#ev-049), [EV-050](verification_evidence.md#ev-050), [EV-052](verification_evidence.md#ev-052)
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -278,6 +278,8 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 | F11 | `worker_cpus` Required·미허용 CPU(S3a) | host·IO thread 모두 지정 CPU로 제한·`affinity = Some(true)`, 미허용 CPU는 `start()` 거절·namespace 없음 |
 | F12 | `tracing(topic, min, quota)`·sink를 `tracing`/`log`로 사용, slot 초과·formatting 중 재진입, 미선언(S3b) | 최소 level 이상만 원 level·JSON으로 기록, 초과·재진입은 교착 없이 버리고 `tracing_dropped`에 계수, shutdown이 살아 있는 sink의 writer를 회수(`writers_outstanding` 0), 미선언은 `Unknown`·`None` |
 | F13 | `remote(ServerConfig)`로 gRPC 구독·GetStatus·미지원 요청, 구독 중 shutdown(클라이언트 정지 상태), remote 한도 예산 초과, 사용 중 포트(S3c) | 첫 output이 쓴 기록 사본을 원 channel·payload로 수신, Status revision 1(telemetry 켜면 `dot_logger.status.v1`), ReadBlob은 Unsupported, shutdown 4초 미만·성공·listener 닫힘, 예산 초과는 `Budget{Total}`·bind 실패는 `StartError::Remote`이고 디렉터리 없음 |
+| F14 | 명시 메모리 부족(다중 writer·raw·출력 2개·telemetry 포함 형태)(TASK-028 S1a) | 보고된 `required`로 시작·종료 성공, 1바이트 적으면 같은 `required`로 거절 — 보고값이 정확하고 충분 |
+| F15 | `Preset::{control, sensor, black_box}`·custom `Sizing`·사용자 값 혼합·부하 대비 메모리 부족, `plan()`(TASK-028 S1b) | 비어 있는 손실 값만 채우고 `preset_filled`에 기록, 사용자 값 유지, slot = ⌈rate×흡수×1.25⌉, 메모리 = 요구량+10%, 부족은 plan·start가 같은 `required`로 거절, plan은 결정적·파일 없음 |
 
 <a id="tc-014"></a>
 ### TC-014 — 표준 MCAP 판독·원격 시각화

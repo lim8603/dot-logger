@@ -978,3 +978,14 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 - **slot:** small slots = ⌈기록률 × 흡수 × 1.25⌉, slot bytes = payload 크기. raw도 같은 규칙.
 - **메모리:** core 각 구성요소(capture·routing·completion·control·storage catalog/writer·telemetry·remote)의 실제 예약 공식을 생성자와 같은 순수 함수로 계산한 정확 요구량 합 × 1.1. 이 계산은 facade의 기존 control 1/4·output 3/4 고정 분할(RV-097)도 대체한다. 명시 `memory_bytes`에서는 요구량을 먼저 배정하고 나머지를 output에 준다.
 - **부족:** 명시 값으로는 부족하면 `StartError::Budget { resource, required, available }`로 항목·부족량을 보고한다.
+
+### 19.3 S1 구현 반영 — 2026-11-07
+
+[EV-052](../05_verification/verification_evidence.md#ev-052)·[REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md), 소스 `21cc198`(S1a)·`4465be3`(S1b). §19.1 결정과 다른 점은 없다.
+
+- **S1a 정확 배정(RV-097 해소):** capture 등록·completion registry·control owner·routing·storage(catalog + 활성 writer 1개)의 예약 공식을 각 생성자와 공유하는 crate 내부 순수 함수로 꺼냈다(생성자 동작 불변). facade `derive`는 control = 정확 요구량, output = 나머지 전부(writer buffering에 쓰임)로 배정한다. 명시 `memory_bytes`가 모자라면 `StartError::Budget { resource: Total, required, available }`이며, 보고된 `required`는 정확하고 충분하다(F14: 그 값으로 성공, 1바이트 적으면 같은 값으로 거절).
+- **S1b 공개 API:** `Sizing::new(sync_every, drop_deadline)`·`.small(hz, bytes)`·`.raw(hz, bytes)`·`.absorb(d)`·`.sync_every(d)`·`.drop_deadline(d)`, `Preset::{control(hz), sensor(hz, bytes), black_box(hz)}`(Sizing 반환, 이어서 조정 가능), `LoggerBuilder::preset(Sizing)`, `LoggerBuilder::plan() -> Result<Plan, StartError>`, `Plan { memory: MemoryBudget, required_bytes, sync_every, drop_deadline, writer_quota, preset_filled: Vec<Missing> }`.
+- **채우기 규칙:** preset은 `Budget`에서 비어 있는 손실 값만 정해진 순서(메모리→sync 주기→종료 기한→writer quota)로 채우고 `preset_filled`에 남긴다. `.budget(..)` 없이 쓰면 빈 `Budget::new()`(성능 값 기본값)에서 시작한다. writer별 `writer_with` quota는 그대로다.
+- **수치:** slot = ⌈기록률 × 흡수 × 1.25⌉(최소 1). raw만 있는 Sizing은 소형 metadata pool을 raw와 같은 기록률·256B로 둔다. `control` = 256B·sync 1초·종료 3초·흡수 1초, `sensor` = control + raw, `black_box` = 256B·sync 100ms·종료 3초·흡수 2초. 메모리 = 정확 요구량 + ⌈10%⌉.
+- **plan():** start와 같은 해석(`resolve`)을 쓰며 할당·bind·파일 생성을 하지 않는다. 디렉터리 존재 확인과 remote bind는 start에서만 한다. 같은 builder의 plan은 결정적이다(F15).
+- **공개 표면:** 이번 세션 facade 추가 공개 타입은 `Health`·`HealthState`·`Degradation`·`Failure`·`OutputHealth`·`TracingSink`·`Preset`·`Sizing`·`Plan`이다. NFR-008 ≤60 계수는 TASK-029 회귀 가드에서 확인한다.

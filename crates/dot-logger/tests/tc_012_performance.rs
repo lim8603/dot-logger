@@ -25,10 +25,12 @@ fn run(tool: Tool, durable_ns: Option<u64>) -> StorageRun {
         payload_bytes: 3_000_000,
         framing_bytes: 48_000,
         files_created: 52,
-        write_calls: 800,
-        largest_write: 4096,
-        smallest_write: 16,
-        periodic_syncs: 0,
+        writes: Some(WriteCalls {
+            calls: 800,
+            largest: 4096,
+            smallest: 16,
+        }),
+        periodic_syncs: Some(0),
         accepted_ns: 1_000_000,
         durable_ns,
         stopped: None,
@@ -52,6 +54,11 @@ fn throughput_uses_final_sync_and_rejects_ram_acceptance_only() {
     let mut stopped = run(Tool::P0SimpleFile, Some(3_000_000));
     stopped.stopped = Some(Stop::Reserve);
     assert_eq!(throughput(&stopped), Err(Rejection::Incomplete));
+    // TASK-023 S2b: a logger run whose report was not a success never gives
+    // a rate, even with a final sync time.
+    let mut lost = run(Tool::Logger, Some(3_000_000));
+    lost.stopped = Some(Stop::Unsuccessful);
+    assert_eq!(throughput(&lost), Err(Rejection::Unsuccessful));
 }
 
 #[test]
@@ -191,7 +198,7 @@ fn p0_writer_rotates_syncs_and_matches_the_oracle() {
     assert!(r.stopped.is_none());
     // 64 KiB files hold 64 records of 1016 B: 3000 records need > 4 files.
     assert!(r.files_created > 4);
-    assert!(r.largest_write <= 4096);
+    assert!(r.writes.unwrap().largest <= 4096);
     let v = verify_p0(owned.path(), &r).unwrap();
     assert_eq!(v.records, 3000);
     assert_eq!(v.payload_bytes, 3_000_000);
@@ -254,4 +261,203 @@ fn p0_record_count_rejects_a_zero_payload() {
     assert!(records_for(64 * 1024 * 1024, 0).is_err());
     assert_eq!(records_for(1000, 10).unwrap(), 100);
     assert_eq!(records_for(5, 10).unwrap(), 0);
+}
+
+/// TASK-023 S2b: call latency is judged at p99 ≤ 5 µs / p99.9 ≤ 20 µs, so
+/// quantiles come from nanosecond log-linear buckets with ≤ 1/8 relative
+/// error, an exact maximum and no answer for an empty run.
+#[test]
+fn latency_histogram_bounds_quantiles_within_an_eighth() {
+    let mut empty = LatencyHistogram::default();
+    assert_eq!(empty.quantile(0.99), None);
+    for ns in [3, 3, 5] {
+        empty.record(ns);
+    }
+    // Small values are exact.
+    assert_eq!(empty.quantile(0.5), Some(3));
+    assert_eq!(empty.quantile(1.0), Some(5));
+    let mut h = LatencyHistogram::default();
+    for ns in 1..=100_000_u64 {
+        h.record(ns);
+    }
+    assert_eq!(h.count(), 100_000);
+    assert_eq!(h.max(), 100_000);
+    for (q, exact) in [(0.5, 50_000_u64), (0.99, 99_000), (0.999, 99_900)] {
+        let got = h.quantile(q).unwrap();
+        assert!(got >= exact && got <= exact + exact / 8, "{q}: {got}");
+    }
+    // Never above the observed maximum.
+    assert_eq!(h.quantile(1.0), Some(100_000));
+    let mut merged = LatencyHistogram::default();
+    merged.merge(&h);
+    merged.merge(&empty);
+    assert_eq!(merged.count(), 100_003);
+    assert_eq!(merged.max(), 100_000);
+}
+
+/// TASK-023 S2b: a logger record carries its sequence in the first eight
+/// payload bytes and the P0 fill pattern after it, so read-back finds both
+/// identity and content errors with the same payload size as P0.
+#[test]
+fn p1_payload_carries_its_sequence_and_detects_corruption() {
+    let mut out = [0_u8; 64];
+    assert_eq!(p1_payload(77, &mut out), Some(64));
+    assert_eq!(payload_sequence(&out), Some(77));
+    assert!(check_p1_payload(77, &out));
+    assert!(!check_p1_payload(78, &out));
+    out[40] ^= 1;
+    assert!(!check_p1_payload(77, &out));
+    // Eight bytes are the smallest payload that can carry a sequence.
+    assert_eq!(p1_payload(1, &mut [0_u8; 7]), None);
+}
+
+/// TASK-023 S2b: with several producers per file the file order interleaves,
+/// so the oracle demands each sequence exactly once, in file `seq % files`,
+/// increasing per (producer, file), and nothing missing at the end.
+#[test]
+fn sequence_oracle_checks_placement_duplicates_order_and_gaps() {
+    // 8 records, 2 files, 2 producers: producer = seq % 2, file = seq % 2.
+    let mut o = SequenceOracle::new(8, 2, 2);
+    for (file, seq) in [
+        (0, 0),
+        (1, 1),
+        (0, 2),
+        (1, 3),
+        (0, 4),
+        (1, 5),
+        (0, 6),
+        (1, 7),
+    ] {
+        o.see(file, seq).unwrap();
+    }
+    assert_eq!(o.finish().unwrap(), 8);
+    let mut wrong_file = SequenceOracle::new(8, 2, 2);
+    assert!(wrong_file.see(1, 0).is_err());
+    let mut duplicate = SequenceOracle::new(8, 2, 2);
+    duplicate.see(0, 0).unwrap();
+    assert!(duplicate.see(0, 0).is_err());
+    let mut reordered = SequenceOracle::new(8, 2, 2);
+    reordered.see(0, 4).unwrap();
+    assert!(reordered.see(0, 2).is_err());
+    let mut outside = SequenceOracle::new(8, 2, 2);
+    assert!(outside.see(0, 8).is_err());
+    let mut missing = SequenceOracle::new(8, 2, 2);
+    missing.see(0, 0).unwrap();
+    assert!(missing.finish().is_err());
+    // Producers 4, files 2: producers 0 and 2 both feed file 0 and may
+    // interleave; each stays increasing on its own.
+    let mut shared = SequenceOracle::new(8, 2, 4);
+    for (file, seq) in [(0, 2), (0, 0), (0, 6), (0, 4)] {
+        shared.see(file, seq).unwrap();
+    }
+}
+
+/// TASK-023 S2b: the facade run shares the P0 workload — same records,
+/// payload, files, rotation, sync period and IO-thread count — writes through
+/// `Writer::try_log` from several producers into channels routed one file
+/// each, passes the read-back oracle and forms a ratio against P0.
+#[test]
+fn logger_run_matches_the_p0_workload_and_passes_read_back() {
+    const MIB: u64 = 1024 * 1024;
+    let parent = std::env::temp_dir();
+    let w = StorageWorkload {
+        record_payload_bytes: 64,
+        records: 20_000,
+        files: 4,
+        writers: 2,
+        file_limit_bytes: 8 * MIB,
+        block_bytes: 64 * 1024,
+        sync_interval: Duration::from_millis(100),
+        offered_bytes_per_second: None,
+    };
+    let load = LoggerLoad {
+        producers: 4,
+        channels: 8,
+        slots: 1024,
+        memory_bytes: 64 * MIB as usize,
+        producer_cpus: Vec::new(),
+        worker_cpus: Vec::new(),
+    };
+    let p0_dir = RunDir::create(&parent).unwrap();
+    let p0 = write_p0(p0_dir.path(), w, 0, &[]).unwrap();
+    let dir = RunDir::create(&parent).unwrap();
+    let run = write_logger(dir.path(), w, &load, 0).unwrap();
+    assert_eq!(run.storage.tool, Tool::Logger);
+    assert_eq!(run.storage.workload, w);
+    assert_eq!(run.storage.payload_bytes, 20_000 * 64);
+    assert!(run.storage.stopped.is_none(), "{}", run.report);
+    assert!(run.storage.durable_ns.unwrap() >= run.storage.accepted_ns);
+    // The internal writer's requests and sync rounds are not observable.
+    assert_eq!(run.storage.writes, None);
+    assert_eq!(run.storage.periodic_syncs, None);
+    // Every admitted call was timed once.
+    assert_eq!(run.accepted.count(), 20_000);
+    assert_eq!(run.rejected.count(), run.rejections);
+    let v = verify_logger(&run).unwrap();
+    assert_eq!(v.records, 20_000);
+    assert_eq!(v.payload_bytes, 20_000 * 64);
+    assert_eq!(v.files, run.storage.files_created);
+    // Rotation follows the shared file limit.
+    assert!(v.largest_file <= w.file_limit_bytes, "{v:?}");
+    efficiency(&run.storage, Some(&p0)).unwrap();
+    // The run directory is cleaned up with the logger outputs inside it.
+    let path = dir.path().to_owned();
+    drop(dir);
+    assert!(!path.exists());
+}
+
+#[test]
+fn logger_load_must_route_whole_files() {
+    let w = StorageWorkload {
+        record_payload_bytes: 64,
+        records: 10,
+        files: 4,
+        writers: 2,
+        file_limit_bytes: 8 * 1024 * 1024,
+        block_bytes: 4096,
+        sync_interval: Duration::from_millis(100),
+        offered_bytes_per_second: None,
+    };
+    let load = LoggerLoad {
+        producers: 1,
+        channels: 6,
+        slots: 16,
+        memory_bytes: 64 << 20,
+        producer_cpus: Vec::new(),
+        worker_cpus: Vec::new(),
+    };
+    let dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    // Channel c goes to file c % files only when files divides channels.
+    assert!(write_logger(dir.path(), w, &load, 0).is_err());
+    // A payload must fit the eight-byte sequence.
+    let tiny = StorageWorkload {
+        record_payload_bytes: 4,
+        ..w
+    };
+    let fine = LoggerLoad {
+        channels: 8,
+        ..load
+    };
+    assert!(write_logger(dir.path(), tiny, &fine, 0).is_err());
+}
+
+/// TASK-023 S2b / backlog T4: the call cost is split into `try_log` as a
+/// whole, the encode alone, admission of a pre-encoded payload through
+/// `producer().try_record_small`, a same-size copy and the clock pair itself,
+/// with one sample per kind per round and a clean shutdown.
+#[test]
+fn call_cost_separates_encode_admission_copy_and_clock() {
+    let dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    let cost = call_cost(dir.path(), 256, 2000).unwrap();
+    for (name, h) in [
+        ("try_log", &cost.try_log),
+        ("encode", &cost.encode),
+        ("record_small", &cost.record_small),
+        ("copy", &cost.copy),
+        ("clock", &cost.clock),
+    ] {
+        assert_eq!(h.count(), 2000, "{name}");
+    }
+    assert_eq!(cost.payload_bytes, 256);
+    assert!(cost.success, "{}", cost.report);
 }

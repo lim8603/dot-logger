@@ -15,6 +15,12 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::{Duration, Instant},
 };
+mod facade;
+#[allow(unused_imports)]
+pub use facade::{
+    CallCost, LoggerLoad, LoggerRun, LoggerVerified, call_cost, verify_logger, write_logger,
+};
+
 /// Ordinary harness error; no measurement result is implied.
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 fn invalid(text: &'static str) -> Error {
@@ -53,11 +59,24 @@ pub struct StorageWorkload {
     /// Paced input rate, or `None` for the device's unpaced capability.
     pub offered_bytes_per_second: Option<u64>,
 }
+/// Write requests (`write_all` calls); the kernel may split them further.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WriteCalls {
+    /// Requests issued.
+    pub calls: u64,
+    /// Largest request.
+    pub largest: usize,
+    /// Smallest request.
+    pub smallest: usize,
+}
 /// Why admission stopped before the offered records.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stop {
     /// Free space would fall below the declared reserve.
     Reserve,
+    /// The logger's shutdown report was not a success: records were lost,
+    /// failed or left unconfirmed.
+    Unsuccessful,
 }
 /// Facts of one storage run. Times are from the run start.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -72,14 +91,11 @@ pub struct StorageRun {
     pub framing_bytes: u64,
     /// Files created, including rotations.
     pub files_created: u64,
-    /// Write requests (`write_all` calls); the kernel may split them further.
-    pub write_calls: u64,
-    /// Largest write request.
-    pub largest_write: usize,
-    /// Smallest write request.
-    pub smallest_write: usize,
-    /// Periodic sync rounds over all writers.
-    pub periodic_syncs: u64,
+    /// Write requests the tool issued; `None` when the tool cannot observe
+    /// them (the logger's internal writer), never a fabricated zero.
+    pub writes: Option<WriteCalls>,
+    /// Periodic sync rounds over all writers; `None` when not observable.
+    pub periodic_syncs: Option<u64>,
     /// Last record handed to a writer in memory. Never a throughput denominator.
     pub accepted_ns: u64,
     /// Final file and directory sync completed; `None` if never reached.
@@ -94,6 +110,8 @@ pub enum Rejection {
     NoFinalSync,
     /// Admission stopped before the offered workload.
     Incomplete,
+    /// The logger lost, failed or left records unconfirmed.
+    Unsuccessful,
     /// Durable time of zero cannot form a rate.
     ZeroDuration,
     /// A logger ratio without any P0 baseline.
@@ -134,8 +152,10 @@ pub fn records_for(total_bytes: u64, payload: usize) -> Result<u64, Error> {
 /// Throughput up to the final file/directory sync; RAM acceptance alone and
 /// truncated runs are rejected.
 pub fn throughput(run: &StorageRun) -> Result<Throughput, Rejection> {
-    if run.stopped.is_some() {
-        return Err(Rejection::Incomplete);
+    match run.stopped {
+        Some(Stop::Unsuccessful) => return Err(Rejection::Unsuccessful),
+        Some(Stop::Reserve) => return Err(Rejection::Incomplete),
+        None => {}
     }
     let durable_ns = run.durable_ns.ok_or(Rejection::NoFinalSync)?;
     if durable_ns == 0 {
@@ -462,7 +482,8 @@ pub fn run_control(config: ControlConfig, releases: u64) -> Result<ControlRun, E
 }
 
 /// Exclusive `dot-logger-verification-*` directory. Drop removes only the
-/// simple-file names this harness creates, then the directory if empty.
+/// simple-file names and the `out-NNN` logger output directories this
+/// harness creates, then the directory if empty.
 pub struct RunDir {
     path: PathBuf,
 }
@@ -489,11 +510,19 @@ impl Drop for RunDir {
             for e in entries.flatten() {
                 if parse_name(&e.file_name()).is_some() {
                     let _ = fs::remove_file(e.path());
+                } else if is_output_dir(&e.file_name()) {
+                    let _ = fs::remove_dir_all(e.path());
                 }
             }
         }
         let _ = fs::remove_dir(&self.path);
     }
+}
+/// `out-NNN`: a logger output directory created by `write_logger`.
+fn is_output_dir(name: &std::ffi::OsStr) -> bool {
+    name.to_str()
+        .and_then(|n| n.strip_prefix("out-"))
+        .is_some_and(|n| n.len() == 3 && n.bytes().all(|b| b.is_ascii_digit()))
 }
 fn file_name(file: usize, rotation: u32) -> String {
     format!("p0-{file:03}-{rotation:05}.bin")
@@ -644,31 +673,31 @@ pub fn write_p0(
         payload_bytes: 0,
         framing_bytes: 0,
         files_created: 0,
-        write_calls: 0,
-        largest_write: 0,
-        smallest_write: 0,
-        periodic_syncs: 0,
+        writes: None,
+        periodic_syncs: None,
         accepted_ns: 0,
         durable_ns: None,
         stopped: None,
     };
+    let mut writes = WriteCalls::default();
     for r in results {
         let s = r?;
         run.payload_bytes += s.payload;
         run.framing_bytes += s.records * FRAME_HEADER as u64;
         run.files_created += s.files;
         if s.writes > 0 {
-            run.smallest_write = if run.write_calls == 0 {
+            writes.smallest = if writes.calls == 0 {
                 s.smallest
             } else {
-                run.smallest_write.min(s.smallest)
+                writes.smallest.min(s.smallest)
             };
         }
-        run.write_calls += s.writes;
-        run.largest_write = run.largest_write.max(s.largest);
-        run.periodic_syncs += s.syncs;
+        writes.calls += s.writes;
+        writes.largest = writes.largest.max(s.largest);
+        *run.periodic_syncs.get_or_insert(0) += s.syncs;
         run.accepted_ns = run.accepted_ns.max(s.accepted_ns);
     }
+    run.writes = Some(writes);
     // Every file was synced by its writer; the directory makes names durable.
     File::open(dir)?.sync_all()?;
     run.durable_ns = Some(u64::try_from(start.elapsed().as_nanos())?);
@@ -822,4 +851,161 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
         return Err(invalid("read-back totals differ from the run"));
     }
     Ok(v)
+}
+
+/// Nanosecond latency histogram for RT call costs: values below 8 ns are
+/// exact, larger ones fall into 8 linear sub-buckets per power of two, so a
+/// quantile is reported as its bucket's upper bound with ≤ 1/8 relative
+/// error, capped at the exact maximum.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LatencyHistogram {
+    count: u64,
+    max: u64,
+    buckets: Vec<u64>,
+}
+const SUB_BITS: u32 = 3;
+const SUB: u64 = 1 << SUB_BITS;
+const LATENCY_BUCKETS: usize = (SUB as usize) * (64 - SUB_BITS as usize + 1);
+impl Default for LatencyHistogram {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            max: 0,
+            buckets: vec![0; LATENCY_BUCKETS],
+        }
+    }
+}
+impl LatencyHistogram {
+    fn index(ns: u64) -> usize {
+        if ns < SUB {
+            return ns as usize;
+        }
+        let exp = 63 - ns.leading_zeros();
+        let sub = (ns >> (exp - SUB_BITS)) & (SUB - 1);
+        (SUB + u64::from(exp - SUB_BITS) * SUB + sub) as usize
+    }
+    fn upper(index: usize) -> u64 {
+        let index = index as u64;
+        if index < SUB {
+            return index;
+        }
+        let exp = (index - SUB) / SUB + u64::from(SUB_BITS);
+        let sub = (index - SUB) % SUB;
+        ((SUB + sub + 1) << (exp - u64::from(SUB_BITS))).saturating_sub(1)
+    }
+    /// Add one sample.
+    pub fn record(&mut self, ns: u64) {
+        self.buckets[Self::index(ns)] += 1;
+        self.count += 1;
+        self.max = self.max.max(ns);
+    }
+    /// Add every sample of `other`.
+    pub fn merge(&mut self, other: &Self) {
+        for (a, b) in self.buckets.iter_mut().zip(&other.buckets) {
+            *a += b;
+        }
+        self.count += other.count;
+        self.max = self.max.max(other.max);
+    }
+    /// Recorded samples.
+    pub fn count(&self) -> u64 {
+        self.count
+    }
+    /// Exact largest sample.
+    pub fn max(&self) -> u64 {
+        self.max
+    }
+    /// Upper bound of the `q` quantile (0 < q ≤ 1); `None` when empty.
+    pub fn quantile(&self, q: f64) -> Option<u64> {
+        if self.count == 0 {
+            return None;
+        }
+        let rank = ((q * self.count as f64).ceil() as u64).clamp(1, self.count);
+        let mut seen = 0;
+        for (i, n) in self.buckets.iter().enumerate() {
+            seen += n;
+            if seen >= rank {
+                return Some(Self::upper(i).min(self.max));
+            }
+        }
+        Some(self.max)
+    }
+}
+
+/// Smallest logger payload: it starts with the record's sequence.
+pub const SEQUENCE_BYTES: usize = 8;
+/// Encode the logger record `seq`: its sequence (LE u64) then the P0 fill
+/// byte. Returns the payload length, or `None` below eight bytes.
+pub fn p1_payload(seq: u64, out: &mut [u8]) -> Option<usize> {
+    if out.len() < SEQUENCE_BYTES {
+        return None;
+    }
+    let (head, tail) = out.split_at_mut(SEQUENCE_BYTES);
+    head.copy_from_slice(&seq.to_le_bytes());
+    tail.fill(fill(seq));
+    Some(out.len())
+}
+/// Sequence carried by a logger payload.
+pub fn payload_sequence(payload: &[u8]) -> Option<u64> {
+    Some(u64::from_le_bytes(
+        payload.get(..SEQUENCE_BYTES)?.try_into().ok()?,
+    ))
+}
+/// The payload is exactly what `p1_payload(seq, ..)` wrote.
+pub fn check_p1_payload(seq: u64, payload: &[u8]) -> bool {
+    payload_sequence(payload) == Some(seq)
+        && payload[SEQUENCE_BYTES..].iter().all(|&b| b == fill(seq))
+}
+
+/// Read-back oracle for runs where record `seq` comes from producer
+/// `seq % producers` and lands in file `seq % files`.
+pub struct SequenceOracle {
+    records: u64,
+    files: u64,
+    producers: u64,
+    seen: Vec<u64>,
+    count: u64,
+    /// Next allowed sequence per (producer, file).
+    next: Vec<u64>,
+}
+impl SequenceOracle {
+    /// Expect sequences `0..records`.
+    pub fn new(records: u64, files: usize, producers: usize) -> Self {
+        Self {
+            records,
+            files: files.max(1) as u64,
+            producers: producers.max(1) as u64,
+            seen: vec![0; records.div_ceil(64) as usize],
+            count: 0,
+            next: vec![0; files.max(1) * producers.max(1)],
+        }
+    }
+    /// Account one stored record of `file`.
+    pub fn see(&mut self, file: usize, seq: u64) -> Result<(), Error> {
+        if seq >= self.records {
+            return Err(invalid("sequence outside the workload"));
+        }
+        if seq % self.files != file as u64 {
+            return Err(invalid("record stored in the wrong file"));
+        }
+        let (word, bit) = ((seq / 64) as usize, 1_u64 << (seq % 64));
+        if self.seen[word] & bit != 0 {
+            return Err(invalid("duplicate record"));
+        }
+        let slot = (seq % self.producers * self.files + file as u64) as usize;
+        if seq < self.next[slot] {
+            return Err(invalid("producer order broken within a file"));
+        }
+        self.seen[word] |= bit;
+        self.next[slot] = seq + 1;
+        self.count += 1;
+        Ok(())
+    }
+    /// Every expected record was seen; returns their number.
+    pub fn finish(&self) -> Result<u64, Error> {
+        if self.count != self.records {
+            return Err(invalid("records missing from the files"));
+        }
+        Ok(self.count)
+    }
 }

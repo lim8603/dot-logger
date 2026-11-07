@@ -34,14 +34,19 @@ mod linux {
     const CONTROL_WORK: Duration = Duration::from_micros(500);
     const SAFETY_WORK: Duration = Duration::from_micros(200);
     const WORKER_CPUS: [usize; 8] = [4, 5, 6, 7, 12, 13, 14, 15];
-    const FILE_LIMIT: u64 = 1 << 30;
+    /// Rotation of both tools: the facade segment ceiling (API §19), so P0
+    /// and logger runs share the same file limit (TASK-023 S2b).
+    const FILE_LIMIT: u64 = 256 << 20;
     const BLOCK: usize = 1 << 20;
     const SYNC: Duration = Duration::from_secs(1);
     const RESERVE: u64 = 64 << 30;
     const USAGE: &str = "usage: perf_baseline --plan | --calibrate | \
         --control <seconds> <control_iters> <safety_iters> | \
         --p0 <parent> <seconds> <payload> <bytes_per_second> <files> <writers> <control_iters> <safety_iters> | \
-        --p0-max <parent> <total_bytes> <payload> <files> <writers>";
+        --p0-max <parent> <total_bytes> <payload> <files> <writers> | \
+        --p1 <parent> <seconds> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <control_iters> <safety_iters> | \
+        --p1-max <parent> <total_bytes> <payload> <files> <writers> <producers> <channels> <slots> <memory_mib> | \
+        --p1-cost <parent> <payload> <samples>";
 
     pub fn execute() -> Result<(), Error> {
         let args: Vec<String> = std::env::args().skip(1).collect();
@@ -122,6 +127,87 @@ mod linux {
                 let run = write_p0(dir.path(), w, RESERVE, &WORKER_CPUS)?;
                 line(&mut out, storage_json(dir.path(), &run)?)
             }
+            [
+                "--p1",
+                parent,
+                seconds,
+                payload,
+                rate,
+                files,
+                writers,
+                producers,
+                channels,
+                slots,
+                memory,
+                control,
+                safety,
+            ] => {
+                let seconds: u64 = seconds.parse()?;
+                let payload: usize = payload.parse()?;
+                let rate: u64 = rate.parse()?;
+                let w = workload(
+                    payload,
+                    records_for(rate.saturating_mul(seconds), payload)?,
+                    files.parse()?,
+                    writers.parse()?,
+                    Some(rate),
+                );
+                let load = logger_load(producers, channels, slots, memory)?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let ((c, run), s) = loops(seconds, control.parse()?, safety.parse()?, || {
+                    write_logger(dir.path(), w, &load, RESERVE)
+                })?;
+                line(&mut out, control_json("control", "on", &c))?;
+                line(&mut out, control_json("safety", "on", &s))?;
+                line(&mut out, logger_json(&run)?)
+            }
+            [
+                "--p1-max",
+                parent,
+                total,
+                payload,
+                files,
+                writers,
+                producers,
+                channels,
+                slots,
+                memory,
+            ] => {
+                let payload: usize = payload.parse()?;
+                let w = workload(
+                    payload,
+                    records_for(total.parse::<u64>()?, payload)?,
+                    files.parse()?,
+                    writers.parse()?,
+                    None,
+                );
+                let load = logger_load(producers, channels, slots, memory)?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let run = write_logger(dir.path(), w, &load, RESERVE)?;
+                line(&mut out, logger_json(&run)?)
+            }
+            ["--p1-cost", parent, payload, samples] => {
+                let dir = RunDir::create(Path::new(parent))?;
+                let cost = std::thread::spawn({
+                    let path = dir.path().to_owned();
+                    let payload: usize = payload.parse()?;
+                    let samples: u64 = samples.parse()?;
+                    move || -> Result<CallCost, Error> {
+                        perf::pin(CONTROL_CPU)?;
+                        call_cost(&path, payload, samples)
+                    }
+                })
+                .join()
+                .map_err(|_| "call cost panicked")??;
+                line(
+                    &mut out,
+                    json!({"scope":"P1CallCost","kernel":kernel()?,"cpu":CONTROL_CPU,
+                        "governor":governor(CONTROL_CPU),"payload_bytes":cost.payload_bytes,
+                        "try_log":latency(&cost.try_log),"encode":latency(&cost.encode),
+                        "record_small":latency(&cost.record_small),"copy":latency(&cost.copy),
+                        "clock":latency(&cost.clock),"success":cost.success,"report":cost.report}),
+                )
+            }
             _ => Err(USAGE.into()),
         }
     }
@@ -142,6 +228,49 @@ mod linux {
             sync_interval: SYNC,
             offered_bytes_per_second: rate,
         }
+    }
+    /// Producers unpinned; logger IO and host threads on the worker CPUs.
+    fn logger_load(
+        producers: &str,
+        channels: &str,
+        slots: &str,
+        memory_mib: &str,
+    ) -> Result<LoggerLoad, Error> {
+        Ok(LoggerLoad {
+            producers: producers.parse()?,
+            channels: channels.parse()?,
+            slots: slots.parse()?,
+            memory_bytes: memory_mib
+                .parse::<usize>()?
+                .checked_mul(1 << 20)
+                .ok_or("memory")?,
+            producer_cpus: Vec::new(),
+            worker_cpus: WORKER_CPUS.to_vec(),
+        })
+    }
+    /// Quantiles are bucket upper bounds (≤ 1/8 above the true value); the
+    /// maximum is exact; an empty histogram reports nulls.
+    fn latency(h: &LatencyHistogram) -> Value {
+        let q = |q| h.quantile(q).map(|n| n.to_string());
+        json!({"count":h.count().to_string(),"p50_ns":q(0.5),"p99_ns":q(0.99),
+            "p999_ns":q(0.999),"max_ns":(h.count() > 0).then(|| h.max().to_string())})
+    }
+    fn logger_json(r: &LoggerRun) -> Result<Value, Error> {
+        let v = verify_logger(r)?;
+        let mut value = storage_facts(&r.storage);
+        value["scope"] = json!("LoggerStorage");
+        value["load"] = json!({"producers":r.load.producers,"channels":r.load.channels,
+            "slots":r.load.slots,"memory_bytes":r.load.memory_bytes.to_string(),
+            "producer_cpus":r.load.producer_cpus,"worker_cpus":r.load.worker_cpus});
+        value["required_bytes"] = json!(r.required_bytes.to_string());
+        value["accepted_calls"] = latency(&r.accepted);
+        value["rejected_calls"] = latency(&r.rejected);
+        value["rejections"] = json!(r.rejections.to_string());
+        value["report"] = json!(r.report);
+        value["verified_records"] = json!(v.records.to_string());
+        value["verified_payload_bytes"] = json!(v.payload_bytes.to_string());
+        value["largest_file"] = json!(v.largest_file.to_string());
+        Ok(value)
     }
     fn calibrated(cpu: usize, target: Duration) -> Result<Calibration, Error> {
         std::thread::spawn(move || {
@@ -198,24 +327,29 @@ mod linux {
     }
     fn storage_json(dir: &Path, r: &StorageRun) -> Result<Value, Error> {
         let v = verify_p0(dir, r)?;
+        let mut value = storage_facts(r);
+        value["dir"] = json!(dir.display().to_string());
+        value["verified_records"] = json!(v.records.to_string());
+        value["verified_payload_bytes"] = json!(v.payload_bytes.to_string());
+        Ok(value)
+    }
+    fn storage_facts(r: &StorageRun) -> Value {
         let w = r.workload;
         let rate = match throughput(r) {
             Ok(t) => json!({"bytes_per_second":t.bytes_per_second()}),
             Err(e) => json!({"rejected":format!("{e:?}")}),
         };
-        Ok(
-            json!({"scope":"P0Storage","tool":format!("{:?}",r.tool),"dir":dir.display().to_string(),
-            "workload":{"record_payload_bytes":w.record_payload_bytes,"records":w.records.to_string(),
-                "files":w.files,"writers":w.writers,"file_limit_bytes":w.file_limit_bytes.to_string(),
-                "block_bytes":w.block_bytes,"sync_interval_ms":w.sync_interval.as_millis() as u64,
-                "offered_bytes_per_second":w.offered_bytes_per_second.map(|b| b.to_string())},
-            "payload_bytes":r.payload_bytes.to_string(),"framing_bytes":r.framing_bytes.to_string(),
-            "files_created":r.files_created,"write_calls":r.write_calls.to_string(),
-            "largest_write":r.largest_write,"smallest_write":r.smallest_write,
-            "periodic_syncs":r.periodic_syncs,"accepted_ns":r.accepted_ns.to_string(),
-            "durable_ns":r.durable_ns.map(|n| n.to_string()),"stopped":r.stopped.map(|s| format!("{s:?}")),
-            "throughput":rate,"verified_records":v.records.to_string(),"verified_payload_bytes":v.payload_bytes.to_string()}),
-        )
+        json!({"scope":"P0Storage","tool":format!("{:?}",r.tool),
+        "workload":{"record_payload_bytes":w.record_payload_bytes,"records":w.records.to_string(),
+            "files":w.files,"writers":w.writers,"file_limit_bytes":w.file_limit_bytes.to_string(),
+            "block_bytes":w.block_bytes,"sync_interval_ms":w.sync_interval.as_millis() as u64,
+            "offered_bytes_per_second":w.offered_bytes_per_second.map(|b| b.to_string())},
+        "payload_bytes":r.payload_bytes.to_string(),"framing_bytes":r.framing_bytes.to_string(),
+        "files_created":r.files_created,
+        "writes":r.writes.map(|w| json!({"calls":w.calls.to_string(),"largest":w.largest,"smallest":w.smallest})),
+        "periodic_syncs":r.periodic_syncs,"accepted_ns":r.accepted_ns.to_string(),
+        "durable_ns":r.durable_ns.map(|n| n.to_string()),"stopped":r.stopped.map(|s| format!("{s:?}")),
+        "throughput":rate})
     }
     fn line(out: &mut impl Write, value: Value) -> Result<(), Error> {
         writeln!(out, "{value}")?;

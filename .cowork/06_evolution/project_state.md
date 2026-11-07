@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-023 S2 — facade·preset 경로 logger on 측정(다음 착수, 이월 T4 판정 입력). TASK-027 S1~S3·TASK-028 S1 로컬 완료, Human 리뷰 대기 |
-| 미처리 리뷰 | 없음 — REV-050 자가 점검 Closed(4465be3) |
-| 상태 | Yellow — UPS 모의 수락, 운영/실앱·성능/RT/장기·native 후속 |
+| 활성 Task | TASK-023 S2 — REV-051(독립 리뷰) 조치 후 facade·preset 경로 logger on 측정 착수(이월 T4 판정 입력). TASK-027 S1~S3·TASK-028 S1 로컬 완료 |
+| 미처리 리뷰 | [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open — 누적 변경 독립 리뷰 Conditional Pass(P1 1: RV-120 Writer Drop-reaper 경쟁 / P2 5: RV-121~125 / P3 2: RV-126~127) |
+| 상태 | Yellow — UPS 모의 수락, REV-051 P1/P2 조치 후 성능/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-07 / #001 / AI |
-| 세션 상태 | 종료 — 2026-11-07 #001 Human 요청. 다음 TASK-023 S2(대량 쓰기·장시간 측정이라 시작 시 실행 범위 확인) |
-| 최근 세션 | [2026-11-07 #001](../members/lim8603/workspace/session_logs/session_2026-11-07_001.md) — TASK-027 S3(health·계측·CPU 고정·tracing·remote·api-consumer)·TASK-028 S1(정확 배정·preset·plan) |
+| 갱신 | 2026-11-07 / #002 리뷰세션 / AI |
+| 세션 상태 | 리뷰 완료 — REV-051 Open 등록(제품 코드 무수정). 다음 개발 세션에서 REV-051 조치 후 TASK-023 S2 착수 권장 |
+| 최근 세션 | [2026-11-07 #002](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md) — 누적 변경(GAP-008·TASK-023 S1·TASK-027·TASK-028 S1) 독립 코드리뷰(REV-051 Open) |
 
 ## 현재 결정과 제약
 
@@ -91,12 +91,13 @@
 | [REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) | TASK-027 S3b tracing 연결 자가 점검 | Closed | RV-105 재진입 교착 방지·RV-106 shutdown writer 회수 조치, RV-107~109 문서화. 독립 리뷰 미실시 |
 | [REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) | TASK-027 S3c remote 연결 자가 점검 | Closed | RV-110 멈춘 클라이언트가 shutdown을 막던 문제 2초 유예 후 중단으로 조치, RV-111~114 문서화. 독립 리뷰 미실시 |
 | [REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) | TASK-028 S1 정확 배정·preset·plan 자가 점검 | Closed | RV-115 공식 공유로 이중화 방지(F14), RV-116~119 문서화/후속. 독립 리뷰 미실시 |
+| [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | **Open** | Conditional Pass(P1 1: RV-120 Writer Drop-reaper 경쟁 / P2 5: RV-121~125 / P3 2: RV-126~127). TASK-023 S2 전 조치 예정 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014 이관을 따른다.
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`1af172c`·`64c4d23`) → ~~S3a~~ EV-048(`2a805ef`: `health()`·계측·CPU 고정·GAP-009/010) → ~~S3b~~ EV-049(`91387ba`: tracing/log 연결 +2줄) → ~~S3c~~ EV-050(`c284354`: remote 관측 사본·상태 조회) → ~~S3e~~ EV-051(`ad5dadf`: api-consumer·feature matrix) → ~~TASK-028 S1~~ EV-052(`21cc198` 정확 배정·`4465be3` preset/plan) → **다음 TASK-023 S2**(S3d slot 직접 encode는 2026-11-07 Human 승인으로 S3 제외, 재설계 조건은 이월 T4) → TASK-028 S1 → TASK-023 S2(facade 경로; P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`1af172c`·`64c4d23`) → ~~S3a~~ EV-048(`2a805ef`: `health()`·계측·CPU 고정·GAP-009/010) → ~~S3b~~ EV-049(`91387ba`: tracing/log 연결 +2줄) → ~~S3c~~ EV-050(`c284354`: remote 관측 사본·상태 조회) → ~~S3e~~ EV-051(`ad5dadf`: api-consumer·feature matrix) → ~~TASK-028 S1~~ EV-052(`21cc198` 정확 배정·`4465be3` preset/plan) → **[REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) 조치·회귀 마감(RV-120~127)** → **다음 TASK-023 S2**(S3d slot 직접 encode는 2026-11-07 Human 승인으로 S3 제외, 재설계 조건은 이월 T4; facade 경로 P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -142,8 +143,8 @@
 
 ## 최근 작업·이력
 
+- 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`77013e7..49df7d3`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
 - 2026-11-07 #001: TASK-027 S3(health·계측·CPU 고정·tracing·remote·api-consumer, EV-048~051)과 TASK-028 S1(정확 배정·preset·plan, EV-052)을 로컬 완료했고 Human 결정 4건(S3d 제외·T4, remote 의미, preset 구성)을 반영했다 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_001.md).
 - 2026-11-05 #001: TASK-027 S1 ADR-012·API §18 승인과 S2 facade·기본 worker 구현(EV-047) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md).
-- 2026-11-04 #001: 사용성 평가 뒤 MS-008/009·TASK-027~032·NFR-008 계획 등록(제품 코드 변경 없음).
 
-2026-11-03 이전 이력과 위 세션의 상세 이력 원문은 [상태 아카이브](state_archive.md) #023·#022, R1/R2 이관 원문은 #020/021을 따른다.
+2026-11-04 이전 이력과 위 세션의 상세 이력 원문은 [상태 아카이브](state_archive.md) #023·#022, R1/R2 이관 원문은 #020/021을 따른다.

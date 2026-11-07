@@ -488,3 +488,67 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-02 #001: TASK-020 S3 화면 예제·TASK-021 UPS 시뮬레이션을 EV-042/043·REV-041/042로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-02_001.md).
 - 2026-11-01 #015: TASK-020 S2 실제 파일/DB/구독·명시 설정 비교 예제를 EV-041/REV-040으로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_015.md).
 - 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md).
+
+## #023 — 2026-11-07 #001 세션 종료 R1/R2 하베스트
+
+`project_state.md`가 34 KiB로 24 KiB 경고선을 넘어 원문을 그대로 옮겼다. 현재 제약은 Task·API 문서와 GAP-002/004에 유지된다.
+
+### 현재 결정과 제약 — TASK-009~022 계약 요약 원문
+
+- **TASK-011 현재 계약:** frozen Snapshot·mono ns 동기 replay·prefetch≤1·checked generation/누적 읽기, 늦은 소비 시계/End 원본 수명·실제 reader close 후 반환을 유지한다. 상세 [TASK-011](../04_implementation/tasks/TASK-011.md)·[API§14.2](../03_design_artifacts/interface_contract.md#142-task-011-로컬-재생-api--2026-10-30).
+
+- **TASK-010 현재 계약:** 고정 session/revision·독립 read-only source·완전 chunk prefix·유한 index/page/blob/read 예산·reader-owned pin은 실제 Drop 뒤 반환한다. closed bounded scan·pin 분실/forget 강제 회수 없음. [TASK-010](../04_implementation/tasks/TASK-010.md)·[API§14.1](../03_design_artifacts/interface_contract.md#141-task-010-로컬-api--2026-10-30).
+
+- **TASK-009 현재 계약:** 원 session/revision/등록 순서·불변 read-only 원본·독립 빈 출력, 완전 검증 prefix만 복구한다. 자동 재동기화/과거 completion 복원/실패 파일 삭제·재시도 없음. [TASK-009](../04_implementation/tasks/TASK-009.md)·[API§13.5](../03_design_artifacts/interface_contract.md#135-task-009-중단-복구-api--2026-10-30).
+
+- **2026-10-31 Human 구현 승인:** TASK-008/010/011 EV-012/013/016/017/020 및 REV-009/010/013/014/017 수락·Closed. 낮은 pin 유실/forget 강제 회수 없음·실제 reader close 뒤 반환과 실측/native 이월은 유지한다. 상세는 각 Task/API를 따른다.
+
+- **TASK-012 계약:** remote 기본 disabled/loopback/read-only·외부 TLS/인증·bounded 구독/256KiB·handoff ACK/Gap/Unknown·세대 gate·host inbox. EV-023 소스4f79119는 이전 기준, server 오류 조치·구독 경계는 [EV-026](../05_verification/verification_evidence.md#ev-026)/b3c08bd·API§14.5를 따른다. 포화10ms 냉각 유지·실측은 TASK-022. native/실앱·LAN/RSS/보안 수락은 후속이며 OS keyring·CI/계정/과금 조회/차단 재시도 없음을 유지한다.
+
+- **TASK-013:** EV-025/026 로컬 수락·최신 EV-029 회귀. local wait timeout은 같은 구독 유지, ttl은 record/idle lease 겸용·새 구독 간 Gap 연속성 미보장(S3 EV-042 화면 예제 수락). CLI runtime metrics Unavailable·config apply/compare Unsupported·실앱/native/성능 후속. [TASK-013](../04_implementation/tasks/TASK-013.md)·API§14.5.
+
+- **TASK-014/015:** EV-029/REV-025 Closed. 제출·대여의 capacity/contract/lifecycle 분리·총계 보존, 과부하는 capacity만 사용한다. 부하율은 accepted+rejected_capacity 시도율(재시도 포함)이며 고유 입력/손실이 아니다. CounterCell128B/RT 할당·해제0, checked control 예약·Observation 이력/독점 reset 계약 유지. 원 session/revision/epoch/구간·장비/부하/target/boundary/clock을 대조하고 정확 terminal 차분·pending을 공급한다. 물리 bytes/slots·출력정지·filesystem/quota·보존을 분리하며 누락/foreign/Busy/overflow는 Unavailable이다. 실제 물리 gauge·운영 worker/CLI·실앱·PC/RT 비용≤5%/오차≤20%/native는 미검증. [TASK-014](../04_implementation/tasks/TASK-014.md)·[TASK-015](../04_implementation/tasks/TASK-015.md)·[API§15](../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안).
+
+- **TASK-016:** EV-030/031 로컬 수락·REV-027/028 Closed. startup enable·두 bank·producer posted/ack/cutoff/완료·실제 raw/Delivery guard 해제 뒤 회수, Busy/Conflict/checked revision을 유지한다. level/Normal sampling/기존 route만 live 변경하며 Important 우회·같은 loan·과거 수락 route 보존·혼합 revision Window 금지다. Comparison은 원 Report/profile/시계/입력/환경 차이와 skip/거절/출력 손실을 분리한다. revision별 파일은 별도 writer/예산이다. 운영 backend/CLI·실앱·PC/RT 비용/오차/native는 후속. [TASK-016](../04_implementation/tasks/TASK-016.md)·[API§15.2](../03_design_artifacts/interface_contract.md#152-task-016-로컬-설정-변경전후-비교--2026-11-01).
+
+- **TASK-017 현재 계약:** EV-035·REV-034 조치 EV-036 로컬 수락. 고정 single-use File/Routed host·원 source/시계/권한·≤64KiB snapshot raw→TCP 수신 큐 ACK/원 receipt를 유지한다. 예제2초/요구24MiB·허용32MiB, capacity/freshness/LAN/RSS 미측정. 지속 앱/화면/off-on·실측/UPS/장기/native(T3) 미수락으로 Task/TC Partial 유지. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API§15.7](../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01).
+
+- **TASK-019:** S1~S3 EV-037~039 로컬 수락, REV-037/038 Closed. 새 독점 namespace·equal/older timestamp 거절·원 schema/receipt/real ns·actual IO/guard 수명을 유지한다. 통합/환경/정량 성능/native 잔여. [TASK-019](../04_implementation/tasks/TASK-019.md)·[API§14.8](../03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).
+
+- **TASK-020:** S1~S3 EV-040~042 로컬 수락·REV-041/RV-083 Closed. TimedOut은 보류/같은 구독 확인, 종료/새 구독은 새 segment·연결 금지·누락 Unknown, 구독 내 Gap만 transfer 범위·새 span이다. 화면 포화 미ACK·종료행 보존·실제 owner 정리, 큰 ID/시각 문자열 계약 유지. 지속 앱/화면·장기 tail/복원·PC/RT/native는 후속. [전체 단계](../04_implementation/tasks/TASK-020.md#단계별-실행--2026-11-01-014).
+
+- **TASK-021:** S1~S3 EV-043/REV-042 Closed·로컬 구현/UPS 시뮬레이션 수락. 기본 off·startup 계획·원 기한 최소값·rank/ID·동일 종료 coordinator·진행 IO 실제 수명·post-alarm snapshot0/사전 보호·partial 계약을 유지한다. 현재 PC ext4의8/64MiB×전달4조건×두 Rust Pass, 실제 sync/프로세스 중단/복구 oracle 일치. **실물 UPS는 필수 입력 아님.** native T3·장기/RT·실앱은 별도 후속. [전체 단계](../04_implementation/tasks/TASK-021.md#단계별-실행수락--2026-11-02-001).
+
+- **TASK-022 승인 기준:** local-pc-v1의10ms 주기/기한·500µs 합성 연산·2GiB·P3 120초×3회·160GiB cap/64GiB reserve·UPS 모의3초/8·64MiB는 Human 승인 완료다. [EV-021](../05_verification/verification_evidence.md#ev-021)은 프로필 준비/승인 근거이며 실제 성능/RT는 NotRun, UPS 하위는 EV-043 시뮬레이션 수락이다.
+
+### 열린 결정과 검증 공백 — Closed 행 원문
+
+| ID | 상태/현재 제약 | 다음 행동 |
+|---|---|---|
+| GAP-009 | Closed — crate 내부 `#[cfg(test)]` 주입으로 host·IO panic 시험(EV-048, 2a805ef) | 공개 hook 없음 유지 |
+| GAP-010 | Closed — tracing 어댑터 lifetime 생략, 1.85/1.96 clippy exit0(EV-048) | — |
+| GAP-008 | Closed — hyper stream task가 serve 반환 뒤 hub 예약을 보유하던 순서 문제. serve가 서버 측 handle 해제까지 대기(EV-045, 13523f1), 동시4 19/200→0/200 | 재발 시 같은 방법으로 재측정 |
+| GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·로컬 회귀 Pass로 Closed | Human 승인 완료·native GAP-004 후속, 기존 이력 보존 |
+| GAP-007 | RV-005는 EV-009 로컬 수정/회귀 Pass·Human 승인으로 Closed | native는 후속, 수정 전 EV-008 이력 보존 |
+| RV-015~017 | 최종 sync 취소는 EV-014, 방어적 슬라이싱/스택 포맷은 EV-015에서 반영·REV-011/012 Closed·Human 승인 | native·장비 검증 대기 |
+| RV-024/025 | TASK-011 늦은 소비 중 배속 변경/오류 정리 반례를 EV-018에서 조치, REV-015 Closed·2026-10-31 Human 승인 | native·장비 검증 대기 |
+| RV-026~028 | RV-026 현 불변식상 overflow 불가·방어 정리, RV-027/028 진단 API 조치·EV-019 Pass·REV-016 Closed·2026-10-31 Human 승인 | native·장비 검증 대기 |
+| RV-032~035 | TASK-012 auth/세대/reply capacity/blob 요청 길이 반례 조치·EV-022 Pass·REV-018 Closed | 2026-10-31 Human 수락·REV-018 Closed, native/실앱·LAN/전체RSS 후속 |
+| RV-029~031 | REV-017 반입·MSRV 유지/비율 비교/오류 진단·EV-020 Pass, Closed·Human 승인 | native·PC 실측 후속 |
+| RV-021~023 | 동일 Query 정렬 재사용·Page inline/누적 읽기 예산 안내를 EV-017에서 조치, REV-014 Closed·Human 승인 | native·PC 실측 후속 |
+| RV-018~020 | TASK-010 만료 복원·blob Gone·frame Limit을 EV-016에서 조치, REV-013 Closed·Human 승인 | native·PC 실측 후속 |
+| RV-006~010 | EV-011 로컬 수정·Human 승인 완료, REV-008 Closed | native GAP-004·장비 성능은 잔여 |
+
+### 최근 작업·이력 원문
+
+- 2026-11-07 #001: TASK-028 S1 — S1a core 예약 공식을 생성자와 공유하는 순수 함수로 추출해 facade 정확 배정(RV-097 해소, F14), S1b `Preset`·`Sizing`·`.preset()`·`plan()`(F15). 소스 `21cc198`·`4465be3`, 1.96/1.85 각 483 Pass·matrix 두 toolchain(EV-052), REV-050 Closed.
+- 2026-11-07 #001: TASK-027 S3e — api-consumer에 facade 경로(일반 thread 기록·health·shutdown, remote 한 줄) 추가, `scripts/check-feature-matrix.py` 1.96/1.85 exit0(EV-051, 소스 `ad5dadf`). TASK-027 S1~S3 로컬 완료.
+- 2026-11-07 #001: TASK-027 S3c — `LoggerBuilder::remote/remote_with`·`Logger::remote_addr`, 첫 output 기록 사본을 구독자에 전달(완료 대상 아님), GetStatus만 응답, remote 버퍼를 memory_bytes external partition으로 차감, Closed 전 listener 정지(멈춘 클라이언트는 2초 유예 후 중단, RV-110). 소스 `c284354`, 1.96/1.85 각 477 Pass(EV-050), REV-049 Closed.
+- 2026-11-07 #001: TASK-027 S3b — `LoggerBuilder::tracing(topic, min, quota)`·`Logger::tracing()`→`TracingSink`(`tracing::Subscriber`+`log::Log`), 유실 계수 `Health::tracing_dropped`, formatting 중 재진입 교착 방지(RV-105)·shutdown이 global sink의 writer 회수(RV-106). 소스 `91387ba`, 1.96/1.85 각 473 Pass(EV-049), REV-048 Closed. 같은 날 S3d 제외 Human 승인·이월 T4 기록(`7156c65`).
+- 2026-11-07 #001: TASK-027 S3a — `Logger::health()`(출력별 sync 경과·실패 기록·IO 정지, RV-095)·`LoggerBuilder::telemetry()`·`Budget::worker_cpus`(RV-096)·worker panic 주입 시험(GAP-009)·host 사망 시 shutdown 즉시 실패(RV-100)·MSRV lint 정리(GAP-010). 소스 `2a805ef`, 1.96/1.85 각 470 Pass(EV-048), REV-047 Closed. slot 직접 encode는 byte ring 감김·0 채우기·unsafe 필요로 S3 제외를 권고 → Human 승인, 재설계 조건은 이월 T4로 기록.
+- 2026-11-05 #001: TASK-027 S2 — capture를 공유 core/endpoint로 분해(`1af172c`, 공개 시그니처 불변)하고 facade·기본 worker를 구현(`64c4d23`). TC-013 F1~F8·allocator F2/F3, workspace 1.96/1.85 각 460 Pass(EV-047), REV-046 Closed.
+- 2026-11-05 #001: TASK-027 S1 — core 빌림 구조 조사 후 ADR-012·API §18·NFR-008 수치를 제안했고, Human이 리뷰 포인트 5개를 모두 권고안으로 승인했다(ADR-012 Accepted, MS-008 In Progress, TC-013 F1~F8 상세화). 제품 코드 변경 없음.
+- 2026-11-04 #001: 객관 평가(엔진은 가벼운 설계·통합 접점은 무거움, Envelope 저장으로 표준 MCAP 도구 판독 불가) 후 MS-008/009·TASK-027~032·NFR-008·TC-013/014 계획 등록. 제품 코드 변경 없음.
+- 2026-11-03 #003: TASK-023 S1 P0 기준선 harness·판정 규칙·합성 제어 루프(EV-046, 소스 3740671). `/data/build` 여유 부족은 Human 승인으로 build cache(target/debug·gate-target) 정리해 472.9GB 회복.
+- 2026-11-03 #003: GAP-008 원인(hyper HTTP/2 stream task의 hub handle 지연 해제)을 확인하고 serve drain 대기로 수정(EV-045, 소스 13523f1), Closed.
+- 2026-11-03 #003: REV-045 RV-091~093 수용·조치(소스 497149b: `# Errors` rustdoc·Debug·status snapshots ID 오름차순)·회귀 Pass, Closed.

@@ -9,7 +9,9 @@
 //! cleanup, not a successful drain, completion acknowledgment, or shutdown.
 
 use crate::capture::{CaptureConsumer, CapturedRecord, ReadError};
-use crate::completion::{AbandonMarker, Completion, CompletionError, ProducerRange, Update};
+use crate::completion::{
+    AbandonMarker, Boundary, Completion, CompletionError, ProducerRange, QueryOutcome, Update,
+};
 use crate::config::{ConfigError, Resource, ValidatedConfig};
 use crate::pool::RawRecord;
 use std::sync::Arc;
@@ -224,6 +226,8 @@ struct Input<'owner> {
     consumer: CaptureConsumer<'owner>,
     deficit: usize,
     max_payload: usize,
+    /// Highest sequence taken out of this ingress; every lower one left too.
+    taken: u64,
 }
 struct Target<'owner> {
     config: TargetConfig,
@@ -233,6 +237,9 @@ struct Target<'owner> {
     ledger: Arc<TargetLedger>,
     outcomes_write: Option<rtrb::Producer<DispatchEvent>>,
     outcomes_read: Option<rtrb::Consumer<DispatchEvent>>,
+    /// Per producer: every sequence up to here is written or terminal on this
+    /// target (monotonic sync readiness watermark).
+    written: Box<[u64]>,
 }
 struct TargetWriter<'scope, 'owner> {
     config: &'scope TargetConfig,
@@ -241,6 +248,7 @@ struct TargetWriter<'scope, 'owner> {
     ledger: &'scope Arc<TargetLedger>,
     outcomes: Option<&'scope mut rtrb::Consumer<DispatchEvent>>,
     completion: Option<Completion<'owner>>,
+    written: &'scope mut [u64],
 }
 #[derive(Default)]
 struct Cursor {
@@ -412,6 +420,7 @@ impl<'owner> Router<'owner> {
                 &mut reserved,
                 array_bytes(target.queue_slots, size_of::<Delivery<'_>>())?,
             )?;
+            add(&mut reserved, array_bytes(producers, size_of::<u64>())?)?;
             add(
                 &mut reserved,
                 array_bytes(target.pending_slots, size_of::<Option<Pending<'_>>>())?,
@@ -561,11 +570,13 @@ impl<'owner> Router<'owner> {
             .map(|(consumer, p)| Input {
                 consumer,
                 deficit: 0,
+                taken: 0,
                 max_payload: p.raw.as_ref().map_or(p.small.slot_bytes, |raw| {
                     raw.slot_bytes.max(p.small.slot_bytes)
                 }),
             })
-            .collect();
+            .collect::<Box<[_]>>();
+        let producers = inputs.len();
         let targets = config
             .targets
             .into_iter()
@@ -586,6 +597,7 @@ impl<'owner> Router<'owner> {
                     read,
                     pending,
                     ledger: Arc::new(TargetLedger::default()),
+                    written: vec![0; producers].into_boxed_slice(),
                 }
             })
             .collect();
@@ -674,6 +686,7 @@ impl<'owner> Router<'owner> {
                 ledger: &target.ledger,
                 outcomes: target.outcomes_read.as_mut(),
                 completion: self.completion,
+                written: &mut target.written,
             });
             readers.push(TargetConsumer {
                 config: &target.config,
@@ -795,6 +808,78 @@ impl Dispatcher<'_, '_> {
         {
             return Err(RoutingError::InputsMismatch);
         }
+        let Some(writer) = self
+            .targets
+            .iter_mut()
+            .find(|writer| writer.config.id == target)
+        else {
+            return Err(RoutingError::InputsMismatch);
+        };
+        let written = completion
+            .targets()
+            .iter()
+            .find(|contract| contract.id == target)
+            .is_some_and(|contract| contract.supported.contains(Boundary::Written));
+        if !written {
+            return self.drained_for_sync(completion, target, ranges);
+        }
+        // Ready once every record up to the cutoff routed here was written
+        // (or ended), so continuous load cannot starve the barrier the way
+        // waiting for an empty queue did (TASK-023 S2b ④, Human 2026-11-07).
+        let window = completion.registry.limits.window as u64;
+        let now = Instant::now();
+        for range in ranges {
+            if range.last == 0 {
+                continue;
+            }
+            let p = range.producer_id as usize;
+            let input = self.inputs.get(p).ok_or(RoutingError::InputsMismatch)?;
+            // `accepted` (the cutoff) is published before the ingress envelope,
+            // so a record up to the cutoff may not be visible yet: wait until
+            // it was taken out of this producer's ingress.
+            if input.taken < range.last {
+                return Ok(false);
+            }
+            let mark = writer
+                .written
+                .get_mut(p)
+                .ok_or(RoutingError::InputsMismatch)?;
+            // A completion slot is reused only after its record ended on every
+            // target, so only the newest `window` sequences can be pending.
+            let mut seq = (*mark + 1)
+                .max(range.last.saturating_sub(window.saturating_sub(1)))
+                .max(range.first);
+            while seq <= range.last {
+                let receipt = crate::capture::CaptureReceipt {
+                    session_id: self.session_id,
+                    producer_id: range.producer_id,
+                    accepted_seq: seq,
+                };
+                match completion.poll_at(receipt, target, Boundary::Written, now) {
+                    Ok(status)
+                        if !matches!(
+                            status.outcome,
+                            QueryOutcome::Pending | QueryOutcome::Busy
+                        ) =>
+                    {
+                        *mark = seq;
+                        seq += 1;
+                    }
+                    Ok(_) | Err(CompletionError::Busy) => return Ok(false),
+                    Err(error) => return Err(RoutingError::Completion(error)),
+                }
+            }
+        }
+        Ok(true)
+    }
+    /// Readiness for a target without a Written boundary: everything up to
+    /// the cutoff left ingress and this target holds nothing.
+    fn drained_for_sync(
+        &mut self,
+        completion: Completion<'_>,
+        target: u32,
+        ranges: &[ProducerRange],
+    ) -> Result<bool, RoutingError> {
         if completion.active_calls() != 0 || self.feedback.len != 0 {
             return Ok(false);
         }
@@ -1121,6 +1206,7 @@ fn take_shared<'owner>(
     ledger.records.fetch_add(1, Ordering::Relaxed);
     ledger.small.fetch_add(small, Ordering::Relaxed);
     ledger.raw.fetch_add(raw, Ordering::Relaxed);
+    input.taken = head.receipt.accepted_seq;
     Ok(Some(Arc::new(SharedPayload {
         payload,
         record: head,

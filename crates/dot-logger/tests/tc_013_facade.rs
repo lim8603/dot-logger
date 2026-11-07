@@ -546,3 +546,57 @@ fn f14_reported_memory_requirement_is_exact_and_sufficient() {
         assert!(report.is_success(), "{report:?}");
     }
 }
+
+/// TASK-023 S2b findings ② and ④: an unpaced writer is held back by RT
+/// `Capacity`, never by required-target drops, and the periodic sync keeps
+/// happening under that continuous load instead of waiting for an empty
+/// queue that never comes and then expiring (Human 2026-11-07: readiness is
+/// "every record up to the cutoff routed here was written").
+#[test]
+fn f6_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_millis(50))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(16, 64)),
+        )
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<[u8]>("blob")
+        .writer("w")
+        .start()
+        .unwrap();
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("w").unwrap();
+    let payload = [5u8; 64];
+    let started = std::time::Instant::now();
+    let mut freshest = None;
+    // Keep the writer saturated for 1.5 s, sampling how stale the last
+    // successful sync is while the load continues.
+    while started.elapsed() < Duration::from_millis(1500) {
+        for _ in 0..256 {
+            loop {
+                match writer.try_log(blob, &payload[..]) {
+                    Ok(_) => break,
+                    Err(e) if e.is_capacity() => std::hint::spin_loop(),
+                    Err(e) => panic!("{e:?}"),
+                }
+            }
+        }
+        if started.elapsed() > Duration::from_millis(1000) {
+            freshest = logger.health().outputs[0].since_sync;
+        }
+    }
+    drop(writer);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(30)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    // A sync succeeded within the last second of continuous load.
+    let since = freshest.expect("no periodic sync succeeded under load");
+    assert!(since < Duration::from_millis(500), "{since:?}");
+    assert_eq!(report.core.totals.dropped, 0, "{report:?}");
+    assert!(!report.core.sync_failed, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+}

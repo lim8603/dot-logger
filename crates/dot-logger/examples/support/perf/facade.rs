@@ -470,7 +470,8 @@ pub fn write_logger(
             start_ns: start,
             accepted_ns,
             durable_ns: Some(durable_ns),
-            stopped: (!report.is_success()).then_some(Stop::Unsuccessful),
+            stopped: (!report.is_success() && !overdue_only(&report)).then_some(Stop::Unsuccessful),
+            sync_overdue: overdue_only(&report),
         },
         load: load.clone(),
         accepted,
@@ -481,6 +482,24 @@ pub fn write_logger(
         report: format!("{report:?}"),
         directories,
     })
+}
+
+/// The only shortfall is a periodic sync past its deadline: every record
+/// completed, nothing failed, dropped or stayed unknown, the shutdown met its
+/// deadline and no output or worker failed. Read-back still has to pass.
+fn overdue_only(report: &dot_logger::logger::FacadeReport) -> bool {
+    let core = &report.core;
+    let t = &core.required;
+    core.sync_failed
+        && !core.deadline_elapsed
+        && !report.io_failed
+        && !report.worker_failed
+        && report.writers_outstanding == 0
+        && t.failed == 0
+        && t.dropped == 0
+        && t.unknown == 0
+        && t.pending == 0
+        && t.complete == t.assigned
 }
 
 /// Closed MCAP files of every output: count, total bytes, per-output lists in

@@ -47,6 +47,9 @@ mod linux {
         --p1 <parent> <seconds> <warmup_s> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <telemetry> <control_iters> <safety_iters> | \
         --p1-max <parent> <total_bytes> <payload> <files> <writers> <producers> <channels> <slots> <memory_mib> | \
         --p1-cost <parent> <payload> <samples> | \
+        --sustained <parent> <max_bytes> <files> <writers> <stable_s> | \
+        --p0-mix-max <parent> <total_bytes> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> | \
+        --p1-mix-max <parent> <total_bytes> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <telemetry> | \
         --p0-mix <parent> <seconds> <warmup_s> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <control_iters> <safety_iters> | \
         --p1-mix <parent> <seconds> <warmup_s> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <telemetry> <control_iters> <safety_iters>";
 
@@ -276,6 +279,84 @@ mod linux {
                 line(&mut out, window_json("on", &c, &s, &run.storage))?;
                 line(&mut out, logger_json(&run)?)
             }
+            // Long-run rule (Human 2026-11-08): the device's write rate after
+            // its SLC cache ran out.
+            ["--sustained", parent, max_bytes, files, writers, stable] => {
+                let dir = RunDir::create(Path::new(parent))?;
+                let run = measure_sustained(
+                    dir.path(),
+                    files.parse()?,
+                    writers.parse()?,
+                    BLOCK,
+                    max_bytes.parse()?,
+                    stable.parse()?,
+                    &WORKER_CPUS,
+                )?;
+                let s = run.sustained;
+                line(
+                    &mut out,
+                    json!({"scope":"Sustained","files":files.parse::<usize>()?,"writers":writers.parse::<usize>()?,
+                        "block_bytes":BLOCK,"total_bytes":run.total_bytes.to_string(),
+                        "peak_bytes_per_second":s.peak_bytes_per_second.to_string(),
+                        "drop_at_s":s.drop_at,"bytes_per_second":s.bytes_per_second.to_string(),
+                        "stable":s.stable,"series":run.series}),
+                )
+            }
+            // Efficiency: the unpaced mix on both tools.
+            [
+                "--p0-mix-max",
+                parent,
+                total,
+                small,
+                small_rate,
+                large,
+                large_rate,
+                streams,
+                files,
+                writers,
+            ] => {
+                let w = unpaced_mix(
+                    total, small, small_rate, large, large_rate, streams, files, writers,
+                )?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let run = write_p0(
+                    dir.path(),
+                    w,
+                    RESERVE,
+                    &WORKER_CPUS,
+                    &Gate::new(w.writers, 0),
+                )?;
+                line(&mut out, storage_json(dir.path(), &run)?)
+            }
+            [
+                "--p1-mix-max",
+                parent,
+                total,
+                small,
+                small_rate,
+                large,
+                large_rate,
+                streams,
+                files,
+                writers,
+                producers,
+                channels,
+                slots,
+                raw_slots,
+                memory,
+                telemetry,
+            ] => {
+                let w = unpaced_mix(
+                    total, small, small_rate, large, large_rate, streams, files, writers,
+                )?;
+                let mut load = logger_load(producers, channels, slots, memory)?;
+                load.raw_slots = raw_slots.parse()?;
+                load.telemetry = flag(telemetry)?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let gate = Gate::new(load.producers, 0);
+                let run = write_logger(dir.path(), w, &load, RESERVE, &gate)?;
+                line(&mut out, logger_json(&run)?)
+            }
             ["--p1-cost", parent, payload, samples] => {
                 let dir = RunDir::create(Path::new(parent))?;
                 let cost = std::thread::spawn({
@@ -390,6 +471,31 @@ mod linux {
         });
         w.offered_bytes_per_second = Some(w.total_payload_bytes() / total_seconds);
         w.warmup = Duration::from_secs(warmup);
+        w.validate()?;
+        Ok(w)
+    }
+    /// The paced mix's record ratio without pacing, sized to `total` payload
+    /// bytes.
+    #[allow(clippy::too_many_arguments)]
+    fn unpaced_mix(
+        total: &str,
+        small: &str,
+        small_rate: &str,
+        large: &str,
+        large_rate: &str,
+        streams: &str,
+        files: &str,
+        writers: &str,
+    ) -> Result<StorageWorkload, Error> {
+        let mut w = mixed_workload(
+            1, "0", small, small_rate, large, large_rate, streams, files, writers,
+        )?;
+        let per_second = w.records;
+        let per_second_bytes = w.total_payload_bytes().max(1);
+        w.records = (u128::from(total.parse::<u64>()?) * u128::from(per_second)
+            / u128::from(per_second_bytes))
+        .try_into()?;
+        w.offered_bytes_per_second = None;
         w.validate()?;
         Ok(w)
     }
@@ -556,6 +662,7 @@ mod linux {
         "writes":r.writes.map(|w| json!({"calls":w.calls.to_string(),"largest":w.largest,"smallest":w.smallest})),
         "periodic_syncs":r.periodic_syncs,"accepted_ns":r.accepted_ns.to_string(),
         "durable_ns":r.durable_ns.map(|n| n.to_string()),"stopped":r.stopped.map(|s| format!("{s:?}")),
+        "sync_overdue":r.sync_overdue,
         "throughput":rate})
     }
     fn line(out: &mut impl Write, value: Value) -> Result<(), Error> {

@@ -236,6 +236,10 @@ pub struct StorageRun {
     pub durable_ns: Option<u64>,
     /// Admission stopped early.
     pub stopped: Option<Stop>,
+    /// A periodic sync missed its deadline although nothing was lost. Fails
+    /// a paced normal load; an unpaced efficiency run keeps its rate and
+    /// reports it (Human 2026-11-08, long-run rule).
+    pub sync_overdue: bool,
 }
 /// A result that must not be reported as the requested figure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -391,6 +395,166 @@ pub fn load_window(control: &ControlRun, load: &StorageRun) -> LoadWindow {
         covered_ns,
     }
 }
+/// Device sustained write rate after its SLC cache ran out (long-run rule,
+/// Human 2026-11-08).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sustained {
+    /// Highest 10-second average.
+    pub peak_bytes_per_second: u64,
+    /// First second whose 10-second average fell below 70 % of the peak.
+    pub drop_at: Option<usize>,
+    /// Mean of the last `stable` seconds.
+    pub bytes_per_second: u64,
+    /// The drop was seen and `stable` seconds followed it.
+    pub stable: bool,
+}
+/// Judge a per-second byte series: the cache drop is the first 10-second
+/// average below 70 % of the peak before it; S is the mean of the last
+/// `stable` seconds, valid only when they all follow the drop.
+pub fn sustained_rate(series: &[u64], stable: usize) -> Sustained {
+    const SPAN: usize = 10;
+    let avg = |i: usize| series[i + 1 - SPAN..=i].iter().sum::<u64>() / SPAN as u64;
+    let mut peak = 0;
+    let mut drop_at = None;
+    for i in SPAN - 1..series.len() {
+        let a = avg(i);
+        if drop_at.is_none() && peak > 0 && a * 10 < peak * 7 {
+            drop_at = Some(i);
+        }
+        if drop_at.is_none() {
+            peak = peak.max(a);
+        }
+    }
+    let tail = &series[series.len().saturating_sub(stable.max(1))..];
+    let mean = if tail.is_empty() {
+        0
+    } else {
+        tail.iter().sum::<u64>() / tail.len() as u64
+    };
+    Sustained {
+        peak_bytes_per_second: peak,
+        drop_at,
+        bytes_per_second: mean,
+        stable: drop_at.is_some_and(|d| d + stable <= series.len()),
+    }
+}
+/// Facts of one sustained-write measurement.
+#[derive(Clone, Debug)]
+pub struct SustainedRun {
+    /// Bytes written in each second (the last one may be partial).
+    pub series: Vec<u64>,
+    /// Bytes written in total.
+    pub total_bytes: u64,
+    /// Judgment of the series.
+    pub sustained: Sustained,
+}
+/// Measure the device's long-run write rate with the P0 writer pattern:
+/// `writers` threads append `block`-byte writes round-robin to their files,
+/// rotate at 256 MiB and fdatasync every second, until the SLC cache drop
+/// was followed by `stable` seconds or `max_bytes` were written. Files are
+/// removed afterwards.
+pub fn measure_sustained(
+    dir: &Path,
+    files: usize,
+    writers: usize,
+    block: usize,
+    max_bytes: u64,
+    stable: usize,
+    writer_cpus: &[usize],
+) -> Result<SustainedRun, Error> {
+    const ROTATE: u64 = 256 << 20;
+    if files == 0 || !(1..=files).contains(&writers) || block == 0 || max_bytes == 0 {
+        return Err(invalid("invalid sustained-write run"));
+    }
+    let written = AtomicU64::new(0);
+    let stop = AtomicBool::new(false);
+    let mut series = Vec::new();
+    let result: Result<(), Error> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..writers)
+            .map(|id| {
+                let (written, stop) = (&written, &stop);
+                let cpu = (!writer_cpus.is_empty()).then(|| writer_cpus[id % writer_cpus.len()]);
+                scope.spawn(move || -> Result<(), Error> {
+                    if let Some(cpu) = cpu {
+                        pin(cpu)?;
+                    }
+                    let mut outs = Vec::new();
+                    for f in (id..files).step_by(writers) {
+                        outs.push((f, 0_u32, Output::open(dir, f, 0, block)?.file, 0_u64));
+                    }
+                    let data = vec![0xa5_u8; block];
+                    let mut last_sync = Instant::now();
+                    let mut next = 0;
+                    while !stop.load(Ordering::Acquire) {
+                        let count = outs.len();
+                        let (f, rotation, file, size) = &mut outs[next];
+                        next = (next + 1) % count;
+                        if *size + block as u64 > ROTATE {
+                            file.sync_data()?;
+                            *rotation += 1;
+                            *file = Output::open(dir, *f, *rotation, block)?.file;
+                            *size = 0;
+                        }
+                        file.write_all(&data)?;
+                        *size += block as u64;
+                        if written.fetch_add(block as u64, Ordering::AcqRel) + block as u64
+                            >= max_bytes
+                        {
+                            stop.store(true, Ordering::Release);
+                        }
+                        if last_sync.elapsed() >= Duration::from_secs(1) {
+                            for (_, _, file, _) in &outs {
+                                file.sync_data()?;
+                            }
+                            last_sync = Instant::now();
+                        }
+                    }
+                    for (_, _, file, _) in &outs {
+                        file.sync_data()?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect();
+        let mut seen = 0;
+        let mut tick = Instant::now();
+        while !stop.load(Ordering::Acquire) && handles.iter().all(|h| !h.is_finished()) {
+            tick += Duration::from_secs(1);
+            std::thread::sleep(tick.saturating_duration_since(Instant::now()));
+            let now = written.load(Ordering::Acquire);
+            series.push(now - seen);
+            seen = now;
+            if sustained_rate(&series, stable).stable {
+                stop.store(true, Ordering::Release);
+            }
+        }
+        stop.store(true, Ordering::Release);
+        let mut result = Ok(());
+        for h in handles {
+            let r = h.join().unwrap_or_else(|_| Err(invalid("writer panicked")));
+            result = result.and(r);
+        }
+        let last = written.load(Ordering::Acquire) - seen;
+        if last > 0 {
+            series.push(last);
+        }
+        result
+    });
+    for e in fs::read_dir(dir)? {
+        let e = e?;
+        if parse_name(&e.file_name()).is_some() {
+            fs::remove_file(e.path())?;
+        }
+    }
+    result?;
+    let total_bytes = series.iter().sum();
+    let sustained = sustained_rate(&series, stable);
+    Ok(SustainedRun {
+        series,
+        total_bytes,
+        sustained,
+    })
+}
 /// Payload bytes over the time to durability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Throughput {
@@ -425,6 +589,9 @@ pub fn throughput(run: &StorageRun) -> Result<Throughput, Rejection> {
     // final sync. A complete run admitted every record, so the warm-up's
     // payload is exactly the workload's.
     let w = run.workload;
+    if run.sync_overdue && w.offered_bytes_per_second.is_some() {
+        return Err(Rejection::Unsuccessful);
+    }
     let durable_ns = run
         .durable_ns
         .ok_or(Rejection::NoFinalSync)?
@@ -975,6 +1142,7 @@ pub fn write_p0(
         accepted_ns: 0,
         durable_ns: None,
         stopped: None,
+        sync_overdue: false,
     };
     let mut writes = WriteCalls::default();
     for r in results {

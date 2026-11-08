@@ -58,6 +58,7 @@ def main(path):
             if storage:
                 row["MBps"] = (rate(storage) or 0) / 1e6 or None
                 row["rejected"] = storage["throughput"].get("rejected")
+                row["sync_overdue"] = storage.get("sync_overdue")
                 row["verified"] = storage.get("verified_records")
                 row["verify_error"] = storage.get("verify_error")
                 if "accepted_calls" in storage:
@@ -75,17 +76,17 @@ def main(path):
             rows.append(row)
     # Efficiency against the P0 run of the same workload and repetition.
     by = {(r["label"], r["rep"]): r for r in rows}
-    pairs = {"p2-logger": "p2-p0", "p3-logger": "p3-p0", "p3-logger-telemetry": "p3-p0"}
     for r in rows:
-        base = pairs.get(r["label"])
-        if r["label"].startswith("p1-logger-"):
-            base = "p1-p0-" + r["label"].split("-")[-1]
+        label = r["label"]
+        base = None
+        if "-logger" in label:
+            base = label.split("-logger")[0] + "-p0"
         if base and (base, r["rep"]) in by and r.get("MBps") and by[(base, r["rep"])].get("MBps"):
             r["eff_%"] = 100 * r["MBps"] / by[(base, r["rep"])]["MBps"]
     # Instrumentation cost: telemetry-on throughput relative to off, same rep.
     for r in rows:
-        if r["label"] == "p3-logger-telemetry":
-            off = by.get(("p3-logger", r["rep"]))
+        if r["label"].endswith("-logger-telemetry"):
+            off = by.get((r["label"][: -len("-telemetry")], r["rep"]))
             if off and off.get("MBps") and r.get("MBps"):
                 r["telemetry_cost_%"] = 100 * (1 - r["MBps"] / off["MBps"])
     keys = []

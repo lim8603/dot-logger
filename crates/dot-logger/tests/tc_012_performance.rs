@@ -38,6 +38,7 @@ fn run(tool: Tool, durable_ns: Option<u64>) -> StorageRun {
         accepted_ns: 1_000_000,
         durable_ns,
         stopped: None,
+        sync_overdue: false,
     }
 }
 
@@ -837,4 +838,46 @@ fn logger_latencies_leave_out_the_warmup_records() {
     assert!(run.storage.stopped.is_none(), "{}", run.report);
     assert_eq!(run.accepted.count(), 1_500);
     assert_eq!(verify_logger(&run).unwrap().records, 2_000);
+}
+
+/// Human 2026-11-08 (long-run rule): a periodic sync that missed its deadline
+/// fails a paced normal-load run, while an unpaced efficiency run that lost
+/// nothing keeps its rate and reports the overdue sync.
+#[test]
+fn an_overdue_sync_fails_only_the_paced_normal_load() {
+    let mut paced = run(Tool::Logger, Some(3_000_000));
+    paced.workload.offered_bytes_per_second = Some(1_000_000_000);
+    paced.sync_overdue = true;
+    assert_eq!(throughput(&paced), Err(Rejection::Unsuccessful));
+    let mut unpaced = run(Tool::Logger, Some(3_000_000));
+    unpaced.sync_overdue = true;
+    assert!(throughput(&unpaced).is_ok());
+}
+/// Long-run rule: S is the stable rate after the SLC cache ran out, never the
+/// cached burst.
+#[test]
+fn sustained_rate_is_the_stable_window_after_the_cache_drop() {
+    let mut series = vec![1_000_u64; 40];
+    series.extend(std::iter::repeat_n(500, 200));
+    let s = sustained_rate(&series, 120);
+    assert_eq!(s.peak_bytes_per_second, 1_000);
+    let drop = s.drop_at.unwrap();
+    assert!((40..=50).contains(&drop), "{drop}");
+    assert_eq!(s.bytes_per_second, 500);
+    assert!(s.stable);
+    // No drop yet: the rate is reported but not taken as sustained.
+    let flat = vec![900_u64; 100];
+    let s = sustained_rate(&flat, 30);
+    assert_eq!(s.drop_at, None);
+    assert!(!s.stable);
+    assert_eq!(s.bytes_per_second, 900);
+}
+#[test]
+fn sustained_write_samples_every_second_and_cleans_up() {
+    let owned = RunDir::create(&std::env::temp_dir()).unwrap();
+    let run = measure_sustained(owned.path(), 2, 2, 64 * 1024, 32 << 20, 2, &[]).unwrap();
+    assert!(run.total_bytes >= 32 << 20);
+    assert!(!run.series.is_empty());
+    assert_eq!(run.series.iter().sum::<u64>(), run.total_bytes);
+    assert_eq!(std::fs::read_dir(owned.path()).unwrap().count(), 0);
 }

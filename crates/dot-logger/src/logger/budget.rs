@@ -485,6 +485,11 @@ pub(crate) fn derive(
     let window = per_writer.checked_mul(2).ok_or_else(overflow)?;
     let feedback = records.checked_mul(2).ok_or_else(overflow)?;
     let reconcile = window.checked_mul(quotas.len()).ok_or_else(overflow)?;
+    // Reconcile only marks abandoned deliveries Unknown, so one writer's
+    // window per turn sweeps the table every `writers` turns. Sweeping all of
+    // it on every turn cost ~3 ms at 32 writers and capped dispatch below
+    // 100k small records/s (TASK-023 S2d finding ⑨).
+    let sweep = window;
     let completion = CompletionConfig {
         history_retention: Duration::from_secs(60),
         window_records: window,
@@ -492,7 +497,7 @@ pub(crate) fn derive(
         page_items: 64,
         feedback_events: feedback,
         updates_per_turn: feedback,
-        reconcile_per_turn: reconcile,
+        reconcile_per_turn: sweep,
         targets: targets
             .iter()
             .map(|&id| TargetContract {

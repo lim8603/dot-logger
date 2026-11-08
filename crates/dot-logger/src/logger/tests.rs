@@ -225,3 +225,37 @@ fn busy_reports_are_retried_for_the_patience_not_a_yield_count() {
     );
     assert_eq!((other, once), (Err(CompletionError::Expired), 1));
 }
+
+/// TASK-023 S2d finding ⑨: the dispatcher reconciled the whole completion
+/// table (window × writers slots) on every turn and every shutdown poll. With
+/// 32 writers that is 262,144 slots per turn (≈3 ms), so 100k small records/s
+/// fell behind, and the backlog outlived the periodic sync deadline. A turn
+/// now covers one writer's window; the table is swept over `writers` turns.
+#[test]
+fn a_dispatcher_turn_reconciles_one_writer_window_not_the_whole_table() {
+    use crate::capture::ChannelConfig;
+    use crate::storage::StorageChannel;
+    let budget = Budget::new()
+        .memory_bytes(2048 * MIB)
+        .sync_every(Duration::from_secs(1))
+        .drop_deadline(Duration::from_secs(3))
+        .writer_quota(WriterQuota::small(4096, 256));
+    let channels = [StorageChannel {
+        channel: ChannelConfig::new(1, 7, 1),
+        topic: "t".into(),
+        payload_encoding: "opaque".into(),
+        schema: None,
+    }];
+    let derived = super::budget::derive(
+        &budget,
+        &[None; 32],
+        &channels,
+        &[vec![1]],
+        &[Retention::ring(256 * MIB as u64)],
+        super::budget::Extra::default(),
+    )
+    .unwrap();
+    let window = derived.completion.window_records;
+    assert_eq!(window, 8192);
+    assert_eq!(derived.completion.reconcile_per_turn, window);
+}

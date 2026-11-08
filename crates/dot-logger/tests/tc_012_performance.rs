@@ -17,6 +17,7 @@ fn workload() -> StorageWorkload {
         block_bytes: 4096,
         sync_interval: Duration::from_millis(1000),
         offered_bytes_per_second: None,
+        large: None,
     }
 }
 fn run(tool: Tool, durable_ns: Option<u64>) -> StorageRun {
@@ -373,11 +374,13 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         block_bytes: 64 * 1024,
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
+        large: None,
     };
     let load = LoggerLoad {
         producers: 4,
         channels: 8,
         slots: 1024,
+        raw_slots: 0,
         memory_bytes: 64 * MIB as usize,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
@@ -422,11 +425,13 @@ fn logger_load_must_route_whole_files() {
         block_bytes: 4096,
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
+        large: None,
     };
     let load = LoggerLoad {
         producers: 1,
         channels: 6,
         slots: 16,
+        raw_slots: 0,
         memory_bytes: 64 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
@@ -493,6 +498,7 @@ fn p0_rotates_at_the_shared_record_limit_and_the_logger_requires_it() {
         producers: 1,
         channels: 1,
         slots: 64,
+        raw_slots: 0,
         memory_bytes: 64 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
@@ -634,4 +640,127 @@ fn a_load_that_ends_early_is_not_concurrent_with_the_control_window() {
     // Unpaced 3 MB is admitted long before the 2 s control window ends.
     assert!(r.accepted_ns < 1_900_000_000, "{}", r.accepted_ns);
     assert_eq!(load_window(&c, &r).judge(), Err(Rejection::NotConcurrent));
+}
+
+/// TASK-023 S2c: a mixed workload (P3) puts every `every`-th record at the
+/// large size on one of `streams` dedicated files; both tools share its
+/// placement, sizes and paced schedule.
+#[test]
+fn mixed_workload_places_sizes_and_schedule_identically_for_both_tools() {
+    let mut w = workload();
+    w.records = 10;
+    w.record_payload_bytes = 100;
+    w.large = Some(LargeRecords {
+        bytes: 1_000,
+        every: 4,
+        streams: 2,
+    });
+    w.offered_bytes_per_second = Some(1_000_000);
+    // Records 0, 4, 8 are large: streams 0, 1, 0 on files 0, 2, 0.
+    assert_eq!(w.payload_of(0), 1_000);
+    assert_eq!(w.payload_of(1), 100);
+    assert_eq!(w.stream_of(4), Some(1));
+    assert_eq!(w.stream_of(5), None);
+    assert_eq!(w.file_of(0), 0);
+    assert_eq!(w.file_of(4), 2);
+    assert_eq!(w.file_of(8), 0);
+    assert_eq!(w.file_of(5), 1);
+    assert_eq!(w.max_payload(), 1_000);
+    // 7 small + 3 large.
+    assert_eq!(w.total_payload_bytes(), 7 * 100 + 3 * 1_000);
+    // Record 5 is due after 0..5: 3 small + 2 large = 2,300 B at 1 MB/s.
+    assert_eq!(w.due_ns(5), Some(2_300_000));
+    assert_eq!(w.due_ns(0), Some(0));
+    w.offered_bytes_per_second = None;
+    assert_eq!(w.due_ns(5), None);
+    // Large streams need whole groups of files.
+    w.large = Some(LargeRecords {
+        bytes: 1_000,
+        every: 4,
+        streams: 3,
+    });
+    assert!(w.validate().is_err());
+}
+fn mixed() -> StorageWorkload {
+    StorageWorkload {
+        record_payload_bytes: 64,
+        records: 3_000,
+        files: 4,
+        writers: 2,
+        file_limit_bytes: 8 * 1024 * 1024,
+        file_record_limit: FACADE_SEGMENT_RECORDS,
+        block_bytes: 64 * 1024,
+        sync_interval: Duration::from_millis(100),
+        offered_bytes_per_second: None,
+        large: Some(LargeRecords {
+            bytes: 256 * 1024,
+            every: 100,
+            streams: 2,
+        }),
+    }
+}
+#[test]
+fn p0_mixed_run_matches_the_oracle() {
+    let w = mixed();
+    let owned = RunDir::create(&std::env::temp_dir()).unwrap();
+    let r = write_p0(owned.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
+    assert_eq!(r.payload_bytes, w.total_payload_bytes());
+    let v = verify_p0(owned.path(), &r).unwrap();
+    assert_eq!(v.records, 3_000);
+    assert_eq!(v.payload_bytes, w.total_payload_bytes());
+    throughput(&r).unwrap();
+}
+fn mixed_load(producers: usize) -> LoggerLoad {
+    LoggerLoad {
+        producers,
+        channels: 8,
+        slots: 256,
+        raw_slots: 4,
+        memory_bytes: 64 << 20,
+        producer_cpus: Vec::new(),
+        worker_cpus: Vec::new(),
+    }
+}
+/// S2c P3: large records go through `Writer::producer()` raw loans on their
+/// stream's producer, small ones through `try_log`; read-back and the P0
+/// ratio use the same workload.
+#[test]
+fn logger_mixed_run_sends_large_records_as_raw_loans_and_matches_p0() {
+    let w = mixed();
+    let load = mixed_load(4);
+    let p0_dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    let p0 = write_p0(p0_dir.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
+    let dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    let run = write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).unwrap();
+    assert!(run.storage.stopped.is_none(), "{}", run.report);
+    assert_eq!(run.storage.payload_bytes, w.total_payload_bytes());
+    // 30 large records (0, 100, ..) as raw loans, the rest through try_log.
+    assert_eq!(run.raw_accepted.count(), 30);
+    assert_eq!(run.accepted.count(), 2_970);
+    let v = verify_logger(&run).unwrap();
+    assert_eq!(v.records, 3_000);
+    assert_eq!(v.payload_bytes, w.total_payload_bytes());
+    efficiency(&run.storage, Some(&p0)).unwrap();
+}
+/// S2c P2: every record large, one raw producer per stream.
+#[test]
+fn logger_all_large_run_uses_only_raw_producers() {
+    let mut w = mixed();
+    w.records = 40;
+    w.large = Some(LargeRecords {
+        bytes: 512 * 1024,
+        every: 1,
+        streams: 2,
+    });
+    let load = mixed_load(2);
+    let dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    let run = write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).unwrap();
+    assert!(run.storage.stopped.is_none(), "{}", run.report);
+    assert_eq!(run.raw_accepted.count(), 40);
+    assert_eq!(run.accepted.count(), 0);
+    assert_eq!(verify_logger(&run).unwrap().payload_bytes, 40 * 512 * 1024);
+    // Small records need a producer besides the raw streams.
+    let mut mixed_w = mixed();
+    mixed_w.records = 10;
+    assert!(write_logger(dir.path(), mixed_w, &mixed_load(2), 0, &Gate::new(2, 0)).is_err());
 }

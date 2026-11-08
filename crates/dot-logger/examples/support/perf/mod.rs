@@ -43,14 +43,28 @@ pub enum Tool {
     /// dot-logger under the same workload.
     Logger,
 }
+/// Large records mixed into a workload (TASK-023 S2c: P2 originals, P3 mix).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LargeRecords {
+    /// Payload of a large record.
+    pub bytes: usize,
+    /// Record `s` is large when `s % every == 0`; `1` makes every record
+    /// large (P2).
+    pub every: u64,
+    /// Streams the large records rotate over: large record `n = s / every`
+    /// belongs to stream `n % streams`, on file `stream × files / streams`.
+    /// The logger sends each stream from its own raw producer and channel.
+    pub streams: usize,
+}
 /// Every condition a logger run must share with its P0 baseline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StorageWorkload {
-    /// Payload of every record; framing is reported separately.
+    /// Payload of every small record; framing is reported separately.
     pub record_payload_bytes: usize,
     /// Records offered over the run.
     pub records: u64,
-    /// Concurrently open output files; record `s` goes to file `s % files`.
+    /// Concurrently open output files; small record `s` goes to file
+    /// `s % files`, a large one to its stream's file (`file_of`).
     pub files: usize,
     /// Writer threads; file `f` belongs to writer `f % writers`.
     pub writers: usize,
@@ -65,7 +79,86 @@ pub struct StorageWorkload {
     /// Periodic flush + fdatasync of every file a writer owns.
     pub sync_interval: Duration,
     /// Paced input rate, or `None` for the device's unpaced capability.
+    /// Record `s` is offered at `due_ns(s)` on one schedule for all threads.
     pub offered_bytes_per_second: Option<u64>,
+    /// Large records mixed in, or `None` for one record size.
+    pub large: Option<LargeRecords>,
+}
+impl StorageWorkload {
+    /// Placement rules both tools rely on: large streams cover whole groups
+    /// of files and records fit the eight-byte sequence of logger payloads.
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.files == 0 || self.record_payload_bytes == 0 {
+            return Err(invalid("invalid workload"));
+        }
+        if let Some(l) = self.large {
+            if l.bytes == 0
+                || l.every == 0
+                || l.streams == 0
+                || l.streams > self.files
+                || self.files % l.streams != 0
+            {
+                return Err(invalid("large streams must split the files evenly"));
+            }
+        }
+        Ok(())
+    }
+    /// Large stream of record `s`, or `None` for a small record.
+    pub fn stream_of(&self, s: u64) -> Option<usize> {
+        let l = self.large?;
+        (s % l.every == 0).then(|| ((s / l.every) % l.streams as u64) as usize)
+    }
+    /// Payload length of record `s`.
+    pub fn payload_of(&self, s: u64) -> usize {
+        match (self.large, self.stream_of(s)) {
+            (Some(l), Some(_)) => l.bytes,
+            _ => self.record_payload_bytes,
+        }
+    }
+    /// Output file of record `s`.
+    pub fn file_of(&self, s: u64) -> usize {
+        match self.stream_of(s) {
+            Some(j) => j * self.files / self.large.map_or(1, |l| l.streams),
+            None => (s % self.files as u64) as usize,
+        }
+    }
+    /// Largest payload of any record.
+    pub fn max_payload(&self) -> usize {
+        self.large.map_or(self.record_payload_bytes, |l| {
+            l.bytes.max(self.record_payload_bytes)
+        })
+    }
+    /// Large records among `0..s`.
+    fn large_before(&self, s: u64) -> u64 {
+        self.large.map_or(0, |l| s.div_ceil(l.every))
+    }
+    /// Payload of records `0..s`.
+    pub fn payload_before(&self, s: u64) -> u64 {
+        let large = self.large_before(s);
+        let size = self.large.map_or(0, |l| l.bytes as u64);
+        (s - large) * self.record_payload_bytes as u64 + large * size
+    }
+    /// Payload of every offered record.
+    pub fn total_payload_bytes(&self) -> u64 {
+        self.payload_before(self.records)
+    }
+    /// When record `s` is offered, from the run start: after the payload of
+    /// every earlier record at the offered rate. `None` when unpaced.
+    pub fn due_ns(&self, s: u64) -> Option<u64> {
+        let rate = self.offered_bytes_per_second?;
+        let ns = u128::from(self.payload_before(s)) * 1_000_000_000 / u128::from(rate.max(1));
+        Some(u64::try_from(ns).unwrap_or(u64::MAX))
+    }
+}
+/// Sleep until record `s` is due when more than 1 ms ahead of `elapsed_ns`.
+fn pace(w: &StorageWorkload, s: u64, start: u64) -> Result<(), Error> {
+    if let Some(due) = w.due_ns(s) {
+        let due = start.saturating_add(due);
+        if due > now_ns().saturating_add(1_000_000) {
+            sleep_until(due)?;
+        }
+    }
+    Ok(())
 }
 /// Write requests (`write_all` calls); the kernel may split them further.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -790,10 +883,9 @@ pub fn write_p0(
     gate: &Gate,
 ) -> Result<StorageRun, Error> {
     let w = workload;
-    let frame = (FRAME_HEADER + w.record_payload_bytes) as u64;
-    if w.record_payload_bytes == 0
-        || w.files == 0
-        || !(1..=w.files).contains(&w.writers)
+    w.validate()?;
+    let frame = (FRAME_HEADER + w.max_payload()) as u64;
+    if !(1..=w.files).contains(&w.writers)
         || w.block_bytes == 0
         || frame > w.file_limit_bytes
         || w.file_record_limit == 0
@@ -882,31 +974,23 @@ fn writer(
         if available_bytes(dir)? < reserve_bytes.saturating_add(w.file_limit_bytes) {
             stop.store(true, Ordering::Release);
         }
-        Ok((outputs, vec![0_u8; w.record_payload_bytes]))
+        Ok((outputs, vec![0_u8; w.max_payload()]))
     })?;
     stats.files = outputs.len() as u64;
     let elapsed = || Duration::from_nanos(now_ns().saturating_sub(start));
-    let share = w
-        .offered_bytes_per_second
-        .map(|rate| rate as f64 * outputs.len() as f64 / w.files as f64);
     let mut last_sync = Instant::now();
     let mut seq = 0_u64;
     while seq < w.records && !stop.load(Ordering::Acquire) {
-        let f = (seq % w.files as u64) as usize;
+        let f = w.file_of(seq);
         if f % w.writers != id {
             seq += 1;
             continue;
         }
-        if let Some(share) = share {
-            // Sleep only when more than 1 ms ahead of the offered schedule.
-            let due = Duration::from_secs_f64(stats.payload as f64 / share);
-            let ahead = due.saturating_sub(elapsed());
-            if ahead > Duration::from_millis(1) {
-                std::thread::sleep(ahead);
-            }
-        }
+        pace(&w, seq, start)?;
+        let len = w.payload_of(seq);
+        let payload = &mut payload[..len];
         let out = &mut outputs[f / w.writers];
-        let frame = (FRAME_HEADER + w.record_payload_bytes) as u64;
+        let frame = (FRAME_HEADER + len) as u64;
         if out.pending() + frame > w.file_limit_bytes || out.records >= w.file_record_limit {
             if available_bytes(dir)? < reserve_bytes.saturating_add(w.file_limit_bytes) {
                 stop.store(true, Ordering::Release);
@@ -921,12 +1005,12 @@ fn writer(
         }
         let mut header = [0_u8; FRAME_HEADER];
         header[..8].copy_from_slice(&seq.to_le_bytes());
-        header[8..].copy_from_slice(&(w.record_payload_bytes as u64).to_le_bytes());
+        header[8..].copy_from_slice(&(len as u64).to_le_bytes());
         payload.fill(fill(seq));
         out.push(&mut stats, &header, w.block_bytes)?;
-        out.push(&mut stats, &payload, w.block_bytes)?;
+        out.push(&mut stats, payload, w.block_bytes)?;
         out.records += 1;
-        stats.payload += w.record_payload_bytes as u64;
+        stats.payload += len as u64;
         stats.records += 1;
         stats.accepted_ns = u64::try_from(elapsed().as_nanos())?;
         if last_sync.elapsed() >= w.sync_interval {
@@ -963,8 +1047,9 @@ pub struct Verified {
     /// Most records found in one file.
     pub largest_file_records: u64,
 }
-/// Every file must hold exactly a prefix of its arithmetic sequence
-/// `f, f + files, ...`, with matching length and fill bytes, across rotations.
+/// Every file must hold, across rotations, exactly the records `file_of`
+/// places there, in increasing order and with matching length and fill
+/// bytes; together the files hold every admitted record once.
 pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
     let w = run.workload;
     let mut names: Vec<(usize, u32, PathBuf)> = Vec::new();
@@ -980,8 +1065,8 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
         files: names.len() as u64,
         largest_file_records: 0,
     };
-    let mut expect: Vec<u64> = (0..w.files as u64).collect();
-    let mut chunk = vec![0_u8; w.record_payload_bytes.min(1 << 20)];
+    let mut oracle = SequenceOracle::new(w.records, w.files, 1);
+    let mut chunk = vec![0_u8; w.max_payload().min(1 << 20)];
     for (file, _, path) in &names {
         if *file >= w.files {
             return Err(invalid("file outside workload"));
@@ -997,10 +1082,12 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
             }
             let seq = u64::from_le_bytes(header[..8].try_into()?);
             let len = u64::from_le_bytes(header[8..].try_into()?);
-            if seq != expect[*file] || len != w.record_payload_bytes as u64 {
+            if seq >= w.records || len != w.payload_of(seq) as u64 {
                 return Err(invalid("sequence or length differs from oracle"));
             }
-            let mut left = w.record_payload_bytes;
+            // One writer per file: the per-file order is the writer's order.
+            oracle.see_at(*file, seq, w.file_of(seq), 0)?;
+            let mut left = len as usize;
             while left > 0 {
                 let n = left.min(chunk.len());
                 r.read_exact(&mut chunk[..n])?;
@@ -1009,7 +1096,6 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
                 }
                 left -= n;
             }
-            expect[*file] += w.files as u64;
             in_file += 1;
             if in_file > w.file_record_limit {
                 return Err(invalid("file holds more records than the limit"));
@@ -1018,6 +1104,11 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
             v.records += 1;
             v.payload_bytes += len;
         }
+    }
+    // A reserve stop admits a prefix of each writer's records, so only a
+    // complete run must hold every record.
+    if run.stopped.is_none() {
+        oracle.finish()?;
     }
     if v.payload_bytes != run.payload_bytes || v.files != run.files_created {
         return Err(invalid("read-back totals differ from the run"));
@@ -1152,19 +1243,31 @@ impl SequenceOracle {
             next: vec![0; files.max(1) * producers.max(1)],
         }
     }
-    /// Account one stored record of `file`.
+    /// Account one stored record of `file` under the modulo placement.
     pub fn see(&mut self, file: usize, seq: u64) -> Result<(), Error> {
+        let home = (seq % self.files) as usize;
+        self.see_at(file, seq, home, (seq % self.producers) as usize)
+    }
+    /// Account one stored record of `file` that belongs in `home`, sent by
+    /// `producer`.
+    pub fn see_at(
+        &mut self,
+        file: usize,
+        seq: u64,
+        home: usize,
+        producer: usize,
+    ) -> Result<(), Error> {
         if seq >= self.records {
             return Err(invalid("sequence outside the workload"));
         }
-        if seq % self.files != file as u64 {
+        if home != file || producer as u64 >= self.producers {
             return Err(invalid("record stored in the wrong file"));
         }
         let (word, bit) = ((seq / 64) as usize, 1_u64 << (seq % 64));
         if self.seen[word] & bit != 0 {
             return Err(invalid("duplicate record"));
         }
-        let slot = (seq % self.producers * self.files + file as u64) as usize;
+        let slot = (producer as u64 * self.files + file as u64) as usize;
         if seq < self.next[slot] {
             return Err(invalid("producer order broken within a file"));
         }

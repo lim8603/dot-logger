@@ -46,7 +46,9 @@ mod linux {
         --p0-max <parent> <total_bytes> <payload> <files> <writers> | \
         --p1 <parent> <seconds> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <control_iters> <safety_iters> | \
         --p1-max <parent> <total_bytes> <payload> <files> <writers> <producers> <channels> <slots> <memory_mib> | \
-        --p1-cost <parent> <payload> <samples>";
+        --p1-cost <parent> <payload> <samples> | \
+        --p0-mix <parent> <seconds> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <control_iters> <safety_iters> | \
+        --p1-mix <parent> <seconds> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <control_iters> <safety_iters>";
 
     pub fn execute() -> Result<(), Error> {
         let args: Vec<String> = std::env::args().skip(1).collect();
@@ -206,6 +208,77 @@ mod linux {
                 let run = write_logger(dir.path(), w, &load, RESERVE, &gate)?;
                 line(&mut out, logger_json(&run)?)
             }
+            // TASK-023 S2c: P2 originals (`small_per_second` 0) and the P3
+            // mix, paced, beside the control loops.
+            [
+                "--p0-mix",
+                parent,
+                seconds,
+                small,
+                small_rate,
+                large,
+                large_rate,
+                streams,
+                files,
+                writers,
+                control,
+                safety,
+            ] => {
+                let seconds: u64 = seconds.parse()?;
+                let w = mixed_workload(
+                    seconds, small, small_rate, large, large_rate, streams, files, writers,
+                )?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let ((c, run), s) = loops(
+                    seconds,
+                    control.parse()?,
+                    safety.parse()?,
+                    w.writers,
+                    |gate| write_p0(dir.path(), w, RESERVE, &WORKER_CPUS, gate),
+                )?;
+                line(&mut out, control_json("control", "p0", &c))?;
+                line(&mut out, control_json("safety", "p0", &s))?;
+                line(&mut out, window_json("p0", &c, &s, &run))?;
+                line(&mut out, storage_json(dir.path(), &run)?)
+            }
+            [
+                "--p1-mix",
+                parent,
+                seconds,
+                small,
+                small_rate,
+                large,
+                large_rate,
+                streams,
+                files,
+                writers,
+                producers,
+                channels,
+                slots,
+                raw_slots,
+                memory,
+                control,
+                safety,
+            ] => {
+                let seconds: u64 = seconds.parse()?;
+                let w = mixed_workload(
+                    seconds, small, small_rate, large, large_rate, streams, files, writers,
+                )?;
+                let mut load = logger_load(producers, channels, slots, memory)?;
+                load.raw_slots = raw_slots.parse()?;
+                let dir = RunDir::create(Path::new(parent))?;
+                let ((c, run), s) = loops(
+                    seconds,
+                    control.parse()?,
+                    safety.parse()?,
+                    load.producers,
+                    |gate| write_logger(dir.path(), w, &load, RESERVE, gate),
+                )?;
+                line(&mut out, control_json("control", "on", &c))?;
+                line(&mut out, control_json("safety", "on", &s))?;
+                line(&mut out, window_json("on", &c, &s, &run.storage))?;
+                line(&mut out, logger_json(&run)?)
+            }
             ["--p1-cost", parent, payload, samples] => {
                 let dir = RunDir::create(Path::new(parent))?;
                 let cost = std::thread::spawn({
@@ -248,7 +321,44 @@ mod linux {
             block_bytes: BLOCK,
             sync_interval: SYNC,
             offered_bytes_per_second: rate,
+            large: None,
         }
+    }
+    /// `seconds` of `small_per_second` small and `large_per_second` large
+    /// records: every `round(total / large)`-th record is large, rotating over
+    /// `streams`, and the offered rate is the run's payload over `seconds`.
+    #[allow(clippy::too_many_arguments)]
+    fn mixed_workload(
+        seconds: u64,
+        small: &str,
+        small_rate: &str,
+        large: &str,
+        large_rate: &str,
+        streams: &str,
+        files: &str,
+        writers: &str,
+    ) -> Result<StorageWorkload, Error> {
+        let small_rate: u64 = small_rate.parse()?;
+        let large_rate: u64 = large_rate.parse()?;
+        let per_second = small_rate + large_rate;
+        if seconds == 0 || large_rate == 0 {
+            return Err(USAGE.into());
+        }
+        let mut w = workload(
+            small.parse()?,
+            per_second * seconds,
+            files.parse()?,
+            writers.parse()?,
+            None,
+        );
+        w.large = Some(LargeRecords {
+            bytes: large.parse()?,
+            every: (per_second + large_rate / 2) / large_rate,
+            streams: streams.parse()?,
+        });
+        w.validate()?;
+        w.offered_bytes_per_second = Some(w.total_payload_bytes() / seconds);
+        Ok(w)
     }
     /// Producers unpinned; logger IO and host threads on the worker CPUs.
     fn logger_load(
@@ -261,6 +371,7 @@ mod linux {
             producers: producers.parse()?,
             channels: channels.parse()?,
             slots: slots.parse()?,
+            raw_slots: 0,
             memory_bytes: memory_mib
                 .parse::<usize>()?
                 .checked_mul(1 << 20)
@@ -285,6 +396,8 @@ mod linux {
             "producer_cpus":r.load.producer_cpus,"worker_cpus":r.load.worker_cpus});
         value["required_bytes"] = json!(r.required_bytes.to_string());
         value["accepted_calls"] = latency(&r.accepted);
+        value["raw_accepted_calls"] = latency(&r.raw_accepted);
+        value["load"]["raw_slots"] = json!(r.load.raw_slots);
         value["rejected_calls"] = latency(&r.rejected);
         value["rejections"] = json!(r.rejections.to_string());
         value["report"] = json!(r.report);
@@ -395,7 +508,8 @@ mod linux {
         "workload":{"record_payload_bytes":w.record_payload_bytes,"records":w.records.to_string(),
             "files":w.files,"writers":w.writers,"file_limit_bytes":w.file_limit_bytes.to_string(),
             "block_bytes":w.block_bytes,"sync_interval_ms":w.sync_interval.as_millis() as u64,
-            "offered_bytes_per_second":w.offered_bytes_per_second.map(|b| b.to_string())},
+            "offered_bytes_per_second":w.offered_bytes_per_second.map(|b| b.to_string()),
+            "large":w.large.map(|l| json!({"bytes":l.bytes,"every":l.every.to_string(),"streams":l.streams}))},
         "payload_bytes":r.payload_bytes.to_string(),"framing_bytes":r.framing_bytes.to_string(),
         "files_created":r.files_created,
         "writes":r.writes.map(|w| json!({"calls":w.calls.to_string(),"largest":w.largest,"smallest":w.smallest})),

@@ -9,20 +9,21 @@
 //! by producer `s % producers`.
 use super::{
     Error, Gate, LatencyHistogram, SEQUENCE_BYTES, SequenceOracle, Stop, StorageRun,
-    StorageWorkload, Tool, available_bytes, check_p1_payload, invalid, now_ns, p1_payload,
+    StorageWorkload, Tool, available_bytes, check_p1_payload, invalid, now_ns, p1_payload, pace,
     payload_sequence, pin,
 };
-use dot_logger::capture::{CaptureError, Level, RecordMetadata, RecordOutcome};
+use dot_logger::capture::{CaptureError, Importance, RecordOutcome};
 use dot_logger::logger::{
     Budget, Channel, ChannelOptions, EncodeError, LogError, Logged, Logger, Record, Retention,
-    Schema, Shutdown, WriterQuota,
+    Schema, Shutdown, Writer, WriterQuota,
 };
 use dot_logger::platform::Requirement;
+use dot_logger::pool::RawRecordOutcome;
 use dot_logger::storage::decode_record;
 use std::{
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 const MIB: u64 = 1024 * 1024;
@@ -37,6 +38,49 @@ pub const FACADE_SEGMENT_RECORDS: u64 = 16_384;
 /// Shutdown is given ample time; the durable time is measured, not bounded.
 const SHUTDOWN: Duration = Duration::from_secs(600);
 const DROP_DEADLINE: Duration = Duration::from_secs(30);
+
+/// Producer of record `s`: large stream `j` has its own raw producer `j`;
+/// small records rotate over the remaining producers.
+fn producer_of(w: &StorageWorkload, producers: usize, s: u64) -> usize {
+    let streams = w.large.map_or(0, |l| l.streams);
+    match w.stream_of(s) {
+        Some(j) => j,
+        None => streams + (s % (producers - streams).max(1) as u64) as usize,
+    }
+}
+/// Channel index of record `s`: routed to output `channel % files`, which is
+/// `file_of(s)` for both kinds.
+fn channel_of(w: &StorageWorkload, channels: usize, s: u64) -> usize {
+    match w.stream_of(s) {
+        Some(_) => w.file_of(s),
+        None => (s % channels as u64) as usize,
+    }
+}
+/// Records of producer `p` in increasing order, without scanning the others.
+fn records_of(w: StorageWorkload, producers: usize, p: usize) -> Box<dyn Iterator<Item = u64>> {
+    match w.large {
+        Some(l) if p < l.streams => Box::new(
+            (p as u64..)
+                .step_by(l.streams)
+                .map(move |n| n * l.every)
+                .take_while(move |&s| s < w.records),
+        ),
+        large => {
+            let streams = large.map_or(0, |l| l.streams);
+            let share = (producers - streams) as u64;
+            Box::new(
+                ((p - streams) as u64..w.records)
+                    .step_by(share as usize)
+                    .filter(move |&s| w.stream_of(s).is_none()),
+            )
+        }
+    }
+}
+fn wall_ns() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_nanos()).unwrap_or(i64::MAX))
+}
 
 /// Harness record: its sequence and the P0 fill pattern, written straight
 /// into the writer's encode scratch (one small slot = the payload size).
@@ -57,6 +101,8 @@ pub struct LoggerLoad {
     pub channels: usize,
     /// Small slots per producer.
     pub slots: usize,
+    /// Raw (zero-copy original) slots of each large-stream producer.
+    pub raw_slots: usize,
     /// `Budget::memory_bytes`.
     pub memory_bytes: usize,
     /// Producer `p` pins to `producer_cpus[p % len]` when not empty.
@@ -72,9 +118,12 @@ pub struct LoggerRun {
     pub storage: StorageRun,
     /// Logger-side load.
     pub load: LoggerLoad,
-    /// Duration of every accepted `try_log` call.
+    /// Duration of every accepted `try_log` call (small records).
     pub accepted: LatencyHistogram,
-    /// Duration of every rejected (`Capacity`) `try_log` call.
+    /// Duration of every accepted `try_record_raw` call (large records;
+    /// acquiring and filling the loan are the application's own work).
+    pub raw_accepted: LatencyHistogram,
+    /// Duration of every rejected (`Capacity`) call of either kind.
     pub rejected: LatencyHistogram,
     /// Capacity rejections; each was retried until accepted.
     pub rejections: u64,
@@ -105,10 +154,26 @@ fn topic(channel: usize) -> String {
     format!("perf/{channel:03}")
 }
 
+/// Upper bound of the payload one file receives: its share of the small
+/// records plus, on a stream's file, that stream's large records.
+fn max_file_payload(w: &StorageWorkload) -> u64 {
+    let small = w
+        .records
+        .div_ceil(w.files as u64)
+        .saturating_mul(w.record_payload_bytes as u64);
+    let large = w.large.map_or(0, |l| {
+        w.records
+            .div_ceil(l.every)
+            .div_ceil(l.streams as u64)
+            .saturating_mul(l.bytes as u64)
+    });
+    small.saturating_add(large)
+}
+
 /// Retention per output that makes the facade segment equal the workload's
 /// file limit, and still holds the run's volume.
 fn retention_bytes(w: &StorageWorkload) -> Result<u64, Error> {
-    let payload = w.record_payload_bytes as u64;
+    let payload = w.max_payload() as u64;
     let floor = SEGMENT_FLOOR.max(payload.saturating_mul(2).saturating_add(MIB));
     let ceiling = SEGMENT_CEILING.max(floor);
     if !(floor..=ceiling).contains(&w.file_limit_bytes) {
@@ -116,10 +181,7 @@ fn retention_bytes(w: &StorageWorkload) -> Result<u64, Error> {
     }
     // Encoding at most doubles small records; two more segments cover the
     // active one and rotation.
-    let need = w
-        .records
-        .div_ceil(w.files as u64)
-        .saturating_mul(payload)
+    let need = max_file_payload(w)
         .saturating_mul(2)
         .saturating_add(w.file_limit_bytes.saturating_mul(2));
     let exact = w.file_limit_bytes.saturating_mul(8);
@@ -136,9 +198,86 @@ fn retention_bytes(w: &StorageWorkload) -> Result<u64, Error> {
 
 struct Produced {
     accepted: LatencyHistogram,
+    raw_accepted: LatencyHistogram,
     rejected: LatencyHistogram,
     rejections: u64,
     accepted_ns: u64,
+}
+
+/// One small record through `try_log`, retried while `Capacity`.
+fn log_small(
+    writer: &mut Writer,
+    channel: Channel<Seq>,
+    seq: u64,
+    out: &mut Produced,
+) -> Result<(), Error> {
+    loop {
+        let t0 = now_ns();
+        let result = writer.try_log(channel, &Seq(seq));
+        let spent = now_ns().saturating_sub(t0);
+        match result {
+            Ok(Logged::Accepted(_)) => {
+                out.accepted.record(spent);
+                return Ok(());
+            }
+            Ok(Logged::Skipped) => return Err(invalid("record skipped")),
+            Err(e) if e.is_capacity() => {
+                out.rejected.record(spent);
+                out.rejections += 1;
+                std::thread::yield_now();
+            }
+            Err(LogError::Closing) => return Err(invalid("logger closed during the run")),
+            Err(e) => return Err(format!("try_log: {e:?}").into()),
+        }
+    }
+}
+/// One large record as a zero-copy loan from `Writer::producer()`, filled in
+/// place like a sensor frame and submitted with the channel's metadata
+/// (API §18.3); both steps retried while `Capacity`.
+fn log_raw(
+    writer: &mut Writer,
+    channel: Channel<Seq>,
+    seq: u64,
+    len: usize,
+    out: &mut Produced,
+) -> Result<(), Error> {
+    let metadata = channel.metadata(writer.now_ns(), wall_ns());
+    let mut producer = writer.producer();
+    let mut loan = loop {
+        match producer.try_acquire(len, Importance::Normal) {
+            Ok(loan) => break loan,
+            Err(CaptureError::Capacity) => {
+                out.rejections += 1;
+                std::thread::yield_now();
+            }
+            Err(e) => return Err(format!("try_acquire: {e:?}").into()),
+        }
+    };
+    p1_payload(seq, loan.payload_mut()).ok_or(invalid("short raw payload"))?;
+    loop {
+        let t0 = now_ns();
+        let result = producer.try_record_raw(metadata, loan);
+        let spent = now_ns().saturating_sub(t0);
+        match result {
+            Ok(RawRecordOutcome::Accepted(_)) => {
+                out.raw_accepted.record(spent);
+                return Ok(());
+            }
+            Ok(RawRecordOutcome::Skipped(_)) => return Err(invalid("record skipped")),
+            Err(e)
+                if matches!(
+                    e.reason,
+                    CaptureError::Capacity | CaptureError::CompletionCapacity
+                ) =>
+            {
+                out.rejected.record(spent);
+                out.rejections += 1;
+                loan = e.loan;
+                std::thread::yield_now();
+            }
+            Err(e) => return Err(format!("try_record_raw: {:?}", e.reason).into()),
+        }
+    }
 }
 
 /// Run the workload through the facade into the exclusive `dir`. Every
@@ -153,10 +292,17 @@ pub fn write_logger(
     reserve_bytes: u64,
     gate: &Gate,
 ) -> Result<LoggerRun, Error> {
+    w.validate()?;
+    let streams = w.large.map_or(0, |l| l.streams);
+    // Raw streams need their own producers and slots; small records need a
+    // producer besides them unless every record is large.
+    let small_records = w.large.is_none_or(|l| l.every > 1);
     if w.record_payload_bytes < SEQUENCE_BYTES
-        || w.files == 0
+        || w.max_payload() < SEQUENCE_BYTES
         || !(1..=w.files).contains(&w.writers)
         || load.producers == 0
+        || load.producers < streams + usize::from(small_records)
+        || (streams > 0 && load.raw_slots == 0)
         || load.channels < w.files
         || load.channels % w.files != 0
         || load.slots == 0
@@ -169,13 +315,7 @@ pub fn write_logger(
     let cap = retention_bytes(&w)?;
     let total = cap.saturating_mul(w.files as u64);
     if available_bytes(dir)?
-        < reserve_bytes.saturating_add(
-            total.min(
-                w.records
-                    .saturating_mul(w.record_payload_bytes as u64)
-                    .saturating_mul(2),
-            ),
-        )
+        < reserve_bytes.saturating_add(total.min(w.total_payload_bytes().saturating_mul(2)))
     {
         return Err(invalid("not enough free space above the reserve"));
     }
@@ -199,7 +339,15 @@ pub fn write_logger(
             builder.channel_with::<Seq>(&topic(c), ChannelOptions::new().outputs(&[c % w.files]));
     }
     for p in 0..load.producers {
-        builder = builder.writer(&format!("p{p:03}"));
+        let name = format!("p{p:03}");
+        builder = match w.large {
+            Some(l) if p < l.streams => builder.writer_with(
+                &name,
+                WriterQuota::small(load.slots, w.record_payload_bytes)
+                    .with_raw(load.raw_slots, l.bytes),
+            ),
+            _ => builder.writer(&name),
+        };
     }
     let required_bytes = builder.plan()?.required_bytes;
     let logger = builder.start()?;
@@ -224,58 +372,28 @@ pub fn write_logger(
                 let channels = &channels;
                 let cpu = (!load.producer_cpus.is_empty())
                     .then(|| load.producer_cpus[p % load.producer_cpus.len()]);
-                let producers = load.producers as u64;
+                let producers = load.producers;
                 scope.spawn(move || -> Result<Produced, Error> {
                     let ((), start) = gate.after(|| match cpu {
                         Some(cpu) => pin(cpu),
                         None => Ok(()),
                     })?;
-                    let elapsed = || Duration::from_nanos(now_ns().saturating_sub(start));
-                    let share = w
-                        .offered_bytes_per_second
-                        .map(|rate| rate as f64 / producers as f64);
                     let mut out = Produced {
                         accepted: LatencyHistogram::default(),
+                        raw_accepted: LatencyHistogram::default(),
                         rejected: LatencyHistogram::default(),
                         rejections: 0,
                         accepted_ns: 0,
                     };
-                    let mut sent = 0_u64;
-                    let mut seq = p as u64;
-                    while seq < w.records {
-                        if let Some(share) = share {
-                            // Sleep only when more than 1 ms ahead of schedule.
-                            let due = Duration::from_secs_f64(sent as f64 / share);
-                            let ahead = due.saturating_sub(elapsed());
-                            if ahead > Duration::from_millis(1) {
-                                std::thread::sleep(ahead);
-                            }
+                    for seq in records_of(w, producers, p) {
+                        pace(&w, seq, start)?;
+                        let channel = channels[channel_of(&w, channels.len(), seq)];
+                        if w.stream_of(seq).is_some() {
+                            log_raw(&mut writer, channel, seq, w.payload_of(seq), &mut out)?;
+                        } else {
+                            log_small(&mut writer, channel, seq, &mut out)?;
                         }
-                        let channel = channels[(seq % channels.len() as u64) as usize];
-                        loop {
-                            let t0 = now_ns();
-                            let result = writer.try_log(channel, &Seq(seq));
-                            let spent = now_ns().saturating_sub(t0);
-                            match result {
-                                Ok(Logged::Accepted(_)) => {
-                                    out.accepted.record(spent);
-                                    break;
-                                }
-                                Ok(Logged::Skipped) => return Err(invalid("record skipped")),
-                                Err(e) if e.is_capacity() => {
-                                    out.rejected.record(spent);
-                                    out.rejections += 1;
-                                    std::thread::yield_now();
-                                }
-                                Err(LogError::Closing) => {
-                                    return Err(invalid("logger closed during the run"));
-                                }
-                                Err(e) => return Err(format!("try_log: {e:?}").into()),
-                            }
-                        }
-                        out.accepted_ns = u64::try_from(elapsed().as_nanos())?;
-                        sent += w.record_payload_bytes as u64;
-                        seq += producers;
+                        out.accepted_ns = now_ns().saturating_sub(start);
                     }
                     drop(writer);
                     Ok(out)
@@ -291,6 +409,7 @@ pub fn write_logger(
             .collect()
     });
     let mut accepted = LatencyHistogram::default();
+    let mut raw_accepted = LatencyHistogram::default();
     let mut rejected = LatencyHistogram::default();
     let mut rejections = 0;
     let mut accepted_ns = 0;
@@ -299,6 +418,7 @@ pub fn write_logger(
         match p {
             Ok(p) => {
                 accepted.merge(&p.accepted);
+                raw_accepted.merge(&p.raw_accepted);
                 rejected.merge(&p.rejected);
                 rejections += p.rejections;
                 accepted_ns = accepted_ns.max(p.accepted_ns);
@@ -324,7 +444,7 @@ pub fn write_logger(
         Err(e) => return Err(format!("shutdown failed: {e:?}").into()),
     };
     let (files_created, file_bytes, _) = closed_files(&directories)?;
-    let payload_bytes = w.records * w.record_payload_bytes as u64;
+    let payload_bytes = w.total_payload_bytes();
     Ok(LoggerRun {
         storage: StorageRun {
             tool: Tool::Logger,
@@ -341,6 +461,7 @@ pub fn write_logger(
         },
         load: load.clone(),
         accepted,
+        raw_accepted,
         rejected,
         rejections,
         required_bytes,
@@ -383,8 +504,9 @@ fn closed_files(directories: &[PathBuf]) -> Result<(u64, u64, Vec<Vec<PathBuf>>)
 /// channel, increasing per (producer, file), with the exact payload.
 pub fn verify_logger(run: &LoggerRun) -> Result<LoggerVerified, Error> {
     let w = run.storage.workload;
-    let channels = run.load.channels as u64;
-    let mut oracle = SequenceOracle::new(w.records, w.files, run.load.producers);
+    let channels = run.load.channels;
+    let producers = run.load.producers;
+    let mut oracle = SequenceOracle::new(w.records, w.files, producers);
     let (files, _, lists) = closed_files(&run.directories)?;
     let mut v = LoggerVerified {
         records: 0,
@@ -400,18 +522,19 @@ pub fn verify_logger(run: &LoggerRun) -> Result<LoggerVerified, Error> {
             let mut in_file = 0_u64;
             for message in mcap::MessageStream::new(&bytes)? {
                 let message = message?;
-                let stored = decode_record(&message.data, w.record_payload_bytes)
+                let stored = decode_record(&message.data, w.max_payload())
                     .map_err(|e| format!("decode: {e:?}"))?;
                 let payload = &stored.payload;
                 let seq = payload_sequence(payload).ok_or(invalid("short payload"))?;
-                let channel = u64::from(stored.record.metadata.channel_id);
-                if payload.len() != w.record_payload_bytes
+                let channel = stored.record.metadata.channel_id as usize;
+                if seq >= w.records
+                    || payload.len() != w.payload_of(seq)
                     || !check_p1_payload(seq, payload)
-                    || channel != seq % channels + 1
+                    || channel != channel_of(&w, channels, seq) + 1
                 {
                     return Err(invalid("record differs from the oracle"));
                 }
-                oracle.see(f, seq)?;
+                oracle.see_at(f, seq, w.file_of(seq), producer_of(&w, producers, seq))?;
                 in_file += 1;
                 if in_file > w.file_record_limit {
                     return Err(invalid("file holds more records than the limit"));
@@ -514,16 +637,7 @@ pub fn call_cost(dir: &Path, payload: usize, samples: u64) -> Result<CallCost, E
         n.map_err(|_| invalid("encode failed"))?;
         // Admission of the pre-encoded payload.
         loop {
-            let metadata = RecordMetadata {
-                channel_id: 1,
-                schema_id: Seq::SCHEMA.id(),
-                schema_version: Seq::SCHEMA.version(),
-                mono_ns: writer.now_ns(),
-                real_ns: 0,
-                source_time: None,
-                level: Level::Info,
-                importance: None,
-            };
+            let metadata = channel.metadata(writer.now_ns(), 0);
             let mut producer = writer.producer();
             let t0 = now_ns();
             let r = producer.try_record_small(metadata, &buf);

@@ -32,6 +32,7 @@ fn run(tool: Tool, durable_ns: Option<u64>) -> StorageRun {
             smallest: 16,
         }),
         periodic_syncs: Some(0),
+        start_ns: 0,
         accepted_ns: 1_000_000,
         durable_ns,
         stopped: None,
@@ -126,6 +127,7 @@ fn control(misses: u64, cpu: Option<usize>) -> ControlRun {
             work_iterations: 1000,
         },
         kernel: "7.0.0-42-generic".into(),
+        origin_ns: 0,
         releases: 100,
         completed: 100 - misses,
         misses,
@@ -191,7 +193,7 @@ fn histogram_keeps_exact_max_and_power_of_two_buckets() {
 fn p0_writer_rotates_syncs_and_matches_the_oracle() {
     let parent = std::env::temp_dir();
     let owned = RunDir::create(&parent).unwrap();
-    let r = write_p0(owned.path(), workload(), 0, &[]).unwrap();
+    let r = write_p0(owned.path(), workload(), 0, &[], &Gate::new(2, 0)).unwrap();
     assert_eq!(r.tool, Tool::P0SimpleFile);
     assert_eq!(r.payload_bytes, 3_000_000);
     assert_eq!(r.framing_bytes, 3000 * FRAME_HEADER as u64);
@@ -213,7 +215,7 @@ fn p0_writer_rotates_syncs_and_matches_the_oracle() {
 #[test]
 fn p0_writer_stops_admission_before_the_free_space_reserve() {
     let owned = RunDir::create(&std::env::temp_dir()).unwrap();
-    let r = write_p0(owned.path(), workload(), u64::MAX, &[]).unwrap();
+    let r = write_p0(owned.path(), workload(), u64::MAX, &[], &Gate::new(2, 0)).unwrap();
     assert_eq!(r.stopped, Some(Stop::Reserve));
     assert_eq!(throughput(&r), Err(Rejection::Incomplete));
     // What was admitted is still synced and verifiable.
@@ -227,7 +229,7 @@ fn paced_p0_writer_does_not_exceed_the_offered_rate() {
     let owned = RunDir::create(&std::env::temp_dir()).unwrap();
     let mut w = workload();
     w.offered_bytes_per_second = Some(10_000_000);
-    let r = write_p0(owned.path(), w, 0, &[]).unwrap();
+    let r = write_p0(owned.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
     // 3 MB at 10 MB/s cannot be accepted in under ~300 ms.
     assert!(r.accepted_ns >= 250_000_000, "{}", r.accepted_ns);
 }
@@ -240,7 +242,7 @@ fn control_loop_counts_every_release_on_the_monotonic_clock() {
         deadline: Duration::from_millis(2),
         work_iterations: calibrate(Duration::from_micros(50)),
     };
-    let r = run_control(cfg, 50).unwrap();
+    let r = run_control(cfg, 50, &Gate::new(0, 1)).unwrap();
     assert_eq!(r.releases, 50);
     assert_eq!(r.completed + r.misses, r.releases);
     assert!(r.skipped <= r.misses);
@@ -381,9 +383,9 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         worker_cpus: Vec::new(),
     };
     let p0_dir = RunDir::create(&parent).unwrap();
-    let p0 = write_p0(p0_dir.path(), w, 0, &[]).unwrap();
+    let p0 = write_p0(p0_dir.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
     let dir = RunDir::create(&parent).unwrap();
-    let run = write_logger(dir.path(), w, &load, 0).unwrap();
+    let run = write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).unwrap();
     assert_eq!(run.storage.tool, Tool::Logger);
     assert_eq!(run.storage.workload, w);
     assert_eq!(run.storage.payload_bytes, 20_000 * 64);
@@ -431,7 +433,7 @@ fn logger_load_must_route_whole_files() {
     };
     let dir = RunDir::create(&std::env::temp_dir()).unwrap();
     // Channel c goes to file c % files only when files divides channels.
-    assert!(write_logger(dir.path(), w, &load, 0).is_err());
+    assert!(write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).is_err());
     // A payload must fit the eight-byte sequence.
     let tiny = StorageWorkload {
         record_payload_bytes: 4,
@@ -441,7 +443,7 @@ fn logger_load_must_route_whole_files() {
         channels: 8,
         ..load
     };
-    assert!(write_logger(dir.path(), tiny, &fine, 0).is_err());
+    assert!(write_logger(dir.path(), tiny, &fine, 0, &Gate::new(fine.producers, 0)).is_err());
 }
 
 /// TASK-023 S2b / backlog T4: the call cost is split into `try_log` as a
@@ -479,7 +481,7 @@ fn p0_rotates_at_the_shared_record_limit_and_the_logger_requires_it() {
         ..workload()
     };
     let dir = RunDir::create(&parent).unwrap();
-    let r = write_p0(dir.path(), w, 0, &[]).unwrap();
+    let r = write_p0(dir.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
     // 50 frames of 1016 B stay below the 64 KiB byte limit (64 frames), so
     // the record count rotates first: 1000 records make 20 files.
     assert_eq!(r.files_created, 20);
@@ -500,6 +502,136 @@ fn p0_rotates_at_the_shared_record_limit_and_the_logger_requires_it() {
         file_limit_bytes: 8 << 20,
         ..w
     };
-    assert!(write_logger(logger_dir.path(), w, &load, 0).is_err());
+    assert!(
+        write_logger(
+            logger_dir.path(),
+            w,
+            &load,
+            0,
+            &Gate::new(load.producers, 0)
+        )
+        .is_err()
+    );
     assert_eq!(FACADE_SEGMENT_RECORDS, 16_384);
+}
+
+/// REV-052 RV-130: every party finishes its setup before one shared start,
+/// so a slow setup never shortens another party's measured interval.
+#[test]
+fn gate_starts_every_party_after_the_slowest_setup() {
+    let gate = Gate::new(2, 1);
+    let (ready, passed): (Vec<u64>, Vec<u64>) = std::thread::scope(|scope| {
+        let handles: Vec<_> = [0_u64, 0, 60]
+            .into_iter()
+            .map(|delay| {
+                let gate = &gate;
+                scope.spawn(move || {
+                    std::thread::sleep(Duration::from_millis(delay));
+                    let ready = monotonic_ns();
+                    let start = gate.pass().unwrap();
+                    assert!(monotonic_ns() >= start);
+                    (ready, start)
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).unzip()
+    });
+    assert!(passed.iter().all(|&s| s == passed[0]));
+    assert!(passed[0] > *ready.iter().max().unwrap());
+    assert_eq!(gate.started(), Some(passed[0]));
+}
+#[test]
+fn gate_releases_every_party_when_one_setup_fails() {
+    let gate = Gate::new(1, 1);
+    std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| gate.pass());
+        std::thread::sleep(Duration::from_millis(20));
+        gate.abort();
+        assert!(waiting.join().unwrap().is_err());
+    });
+    assert_eq!(gate.started(), None);
+    // A load whose party count differs from the gate never waits forever.
+    let owned = RunDir::create(&std::env::temp_dir()).unwrap();
+    assert!(write_p0(owned.path(), workload(), 0, &[], &Gate::new(3, 0)).is_err());
+}
+/// RV-130: a control result describes the load only when both counted from
+/// the same start and the load's admission covered the control window; the
+/// final durability tail is reported apart from the load interval.
+#[test]
+fn load_window_needs_a_shared_start_and_coverage_of_the_control_window() {
+    let ms = 1_000_000;
+    let mut c = control(0, None);
+    c.origin_ns = 5_000 * ms;
+    // 100 releases of 10 ms: a 1 s control window.
+    let mut r = run(Tool::P0SimpleFile, Some(1_200 * ms));
+    r.start_ns = 5_000 * ms;
+    r.accepted_ns = 1_000 * ms;
+    let w = load_window(&c, &r);
+    assert_eq!(w.control_ns, 1_000 * ms);
+    assert_eq!(w.load_ns, 1_000 * ms);
+    assert_eq!(w.covered_ns, 1_000 * ms);
+    assert_eq!(w.tail_ns, Some(200 * ms));
+    assert_eq!(w.judge(), Ok(()));
+    // Up to 1 % of the window may end early (the paced last record).
+    r.accepted_ns = 990 * ms;
+    assert_eq!(load_window(&c, &r).judge(), Ok(()));
+    r.accepted_ns = 989 * ms;
+    assert_eq!(load_window(&c, &r).judge(), Err(Rejection::NotConcurrent));
+    // Different starts are not one concurrent run, however long the load.
+    r.accepted_ns = 2_000 * ms;
+    r.start_ns = 5_001 * ms;
+    let w = load_window(&c, &r);
+    assert_eq!(w.skew_ns, ms);
+    assert_eq!(w.judge(), Err(Rejection::NotConcurrent));
+}
+/// RV-130: an artificial setup delay on the control side moves the shared
+/// start, not the load's or the control's measured intervals.
+#[test]
+fn a_slow_setup_shifts_neither_the_load_nor_the_control_window() {
+    let owned = RunDir::create(&std::env::temp_dir()).unwrap();
+    let mut w = workload();
+    w.offered_bytes_per_second = Some(10_000_000);
+    let gate = Gate::new(w.writers, 1);
+    let cfg = ControlConfig {
+        cpu: None,
+        period: Duration::from_millis(2),
+        deadline: Duration::from_millis(2),
+        work_iterations: calibrate(Duration::from_micros(20)),
+    };
+    let (c, r) = std::thread::scope(|scope| {
+        let c = scope.spawn(|| {
+            std::thread::sleep(Duration::from_millis(100));
+            run_control(cfg, 125, &gate)
+        });
+        let r = write_p0(owned.path(), w, 0, &[], &gate);
+        (c.join().unwrap().unwrap(), r.unwrap())
+    });
+    assert_eq!(c.origin_ns, r.start_ns);
+    assert_eq!(gate.started(), Some(r.start_ns));
+    // 3 MB at 10 MB/s: ~300 ms of load from the start, setup excluded.
+    assert!(r.accepted_ns >= 250_000_000, "{}", r.accepted_ns);
+    assert!(r.accepted_ns < 2_000_000_000, "{}", r.accepted_ns);
+    let window = load_window(&c, &r);
+    assert_eq!(window.control_ns, 250_000_000);
+    assert_eq!(window.judge(), Ok(()), "{window:?}");
+}
+#[test]
+fn a_load_that_ends_early_is_not_concurrent_with_the_control_window() {
+    let owned = RunDir::create(&std::env::temp_dir()).unwrap();
+    let w = workload();
+    let gate = Gate::new(w.writers, 1);
+    let cfg = ControlConfig {
+        cpu: None,
+        period: Duration::from_millis(10),
+        deadline: Duration::from_millis(10),
+        work_iterations: 1,
+    };
+    let (c, r) = std::thread::scope(|scope| {
+        let c = scope.spawn(|| run_control(cfg, 200, &gate));
+        let r = write_p0(owned.path(), w, 0, &[], &gate);
+        (c.join().unwrap().unwrap(), r.unwrap())
+    });
+    // Unpaced 3 MB is admitted long before the 2 s control window ends.
+    assert!(r.accepted_ns < 1_900_000_000, "{}", r.accepted_ns);
+    assert_eq!(load_window(&c, &r).judge(), Err(Rejection::NotConcurrent));
 }

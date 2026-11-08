@@ -8,8 +8,9 @@
 //! producer threads are a logger-side load (`LoggerLoad`) with record `s` sent
 //! by producer `s % producers`.
 use super::{
-    Error, LatencyHistogram, SEQUENCE_BYTES, SequenceOracle, Stop, StorageRun, StorageWorkload,
-    Tool, available_bytes, check_p1_payload, invalid, now_ns, p1_payload, payload_sequence, pin,
+    Error, Gate, LatencyHistogram, SEQUENCE_BYTES, SequenceOracle, Stop, StorageRun,
+    StorageWorkload, Tool, available_bytes, check_p1_payload, invalid, now_ns, p1_payload,
+    payload_sequence, pin,
 };
 use dot_logger::capture::{CaptureError, Level, RecordMetadata, RecordOutcome};
 use dot_logger::logger::{
@@ -21,7 +22,7 @@ use dot_logger::storage::decode_record;
 use std::{
     fs,
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 const MIB: u64 = 1024 * 1024;
@@ -142,11 +143,15 @@ struct Produced {
 
 /// Run the workload through the facade into the exclusive `dir`. Every
 /// rejected call is retried, so a completed run admitted every record.
+/// Each producer thread is one `gate` load party: planning, logger start,
+/// file creation, lookups, thread start and pinning are setup before the
+/// shared start, exactly as P0's writer threads open their files first.
 pub fn write_logger(
     dir: &Path,
     w: StorageWorkload,
     load: &LoggerLoad,
     reserve_bytes: u64,
+    gate: &Gate,
 ) -> Result<LoggerRun, Error> {
     if w.record_payload_bytes < SEQUENCE_BYTES
         || w.files == 0
@@ -157,6 +162,7 @@ pub fn write_logger(
         || load.slots == 0
         || w.offered_bytes_per_second == Some(0)
         || w.file_record_limit != FACADE_SEGMENT_RECORDS
+        || gate.load_parties() != load.producers
     {
         return Err(invalid("invalid logger workload"));
     }
@@ -210,9 +216,6 @@ pub fn write_logger(
                 .map_err(|e| format!("writer lookup: {e:?}"))?,
         );
     }
-    // The run starts with a running logger: preallocation and namespace
-    // creation are setup, as opening files is for P0.
-    let start = Instant::now();
     let produced: Vec<Result<Produced, Error>> = std::thread::scope(|scope| {
         let handles: Vec<_> = writers
             .into_iter()
@@ -223,9 +226,11 @@ pub fn write_logger(
                     .then(|| load.producer_cpus[p % load.producer_cpus.len()]);
                 let producers = load.producers as u64;
                 scope.spawn(move || -> Result<Produced, Error> {
-                    if let Some(cpu) = cpu {
-                        pin(cpu)?;
-                    }
+                    let ((), start) = gate.after(|| match cpu {
+                        Some(cpu) => pin(cpu),
+                        None => Ok(()),
+                    })?;
+                    let elapsed = || Duration::from_nanos(now_ns().saturating_sub(start));
                     let share = w
                         .offered_bytes_per_second
                         .map(|rate| rate as f64 / producers as f64);
@@ -241,7 +246,7 @@ pub fn write_logger(
                         if let Some(share) = share {
                             // Sleep only when more than 1 ms ahead of schedule.
                             let due = Duration::from_secs_f64(sent as f64 / share);
-                            let ahead = due.saturating_sub(start.elapsed());
+                            let ahead = due.saturating_sub(elapsed());
                             if ahead > Duration::from_millis(1) {
                                 std::thread::sleep(ahead);
                             }
@@ -268,7 +273,7 @@ pub fn write_logger(
                                 Err(e) => return Err(format!("try_log: {e:?}").into()),
                             }
                         }
-                        out.accepted_ns = u64::try_from(start.elapsed().as_nanos())?;
+                        out.accepted_ns = u64::try_from(elapsed().as_nanos())?;
                         sent += w.record_payload_bytes as u64;
                         seq += producers;
                     }
@@ -303,10 +308,14 @@ pub fn write_logger(
     }
     // Shutdown runs even after a producer failure, so nothing is left running.
     let shutdown = logger.shutdown(SHUTDOWN);
-    let durable_ns = u64::try_from(start.elapsed().as_nanos())?;
+    let done = now_ns();
     if let Some(e) = failure {
         return Err(e);
     }
+    let start = gate
+        .started()
+        .ok_or_else(|| invalid("producers never started"))?;
+    let durable_ns = done.saturating_sub(start);
     let report = match shutdown {
         Ok(Shutdown::Closed(report)) => report,
         Ok(Shutdown::Incomplete { report, .. }) => {
@@ -325,6 +334,7 @@ pub fn write_logger(
             files_created,
             writes: None,
             periodic_syncs: None,
+            start_ns: start,
             accepted_ns,
             durable_ns: Some(durable_ns),
             stopped: (!report.is_success()).then_some(Stop::Unsuccessful),

@@ -12,7 +12,10 @@ use std::{
     hint::black_box,
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::{
+        Condvar, Mutex, PoisonError,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 mod facade;
@@ -101,6 +104,9 @@ pub struct StorageRun {
     pub writes: Option<WriteCalls>,
     /// Periodic sync rounds over all writers; `None` when not observable.
     pub periodic_syncs: Option<u64>,
+    /// Shared start (CLOCK_MONOTONIC ns) from the run's `Gate`; every
+    /// other time is measured from it, setup excluded.
+    pub start_ns: u64,
     /// Last record handed to a writer in memory. Never a throughput denominator.
     pub accepted_ns: u64,
     /// Final file and directory sync completed; `None` if never reached.
@@ -131,6 +137,133 @@ pub enum Rejection {
     InsufficientRepetitions,
     /// Control runs differ in CPU, period, deadline, work, kernel or length.
     ConditionMismatch,
+    /// Control and load did not share a start, or the load's admission did
+    /// not cover the control window (REV-052 RV-130).
+    NotConcurrent,
+}
+/// Lead from the last party's arrival to the shared start, so every party is
+/// asleep on the absolute start before it arrives.
+pub const GATE_LEAD: Duration = Duration::from_millis(50);
+/// Common start of one measured run (REV-052 RV-130). Each party — P0 writer
+/// or logger producer threads (`load`), control and safety loops (`others`)
+/// — passes after its own setup; all then count from one absolute instant,
+/// so worker start, file creation and preallocation stay outside every
+/// measured interval. A party whose setup fails aborts, releasing the rest.
+pub struct Gate {
+    load: usize,
+    parties: usize,
+    state: Mutex<GateState>,
+    changed: Condvar,
+}
+#[derive(Default)]
+struct GateState {
+    arrived: usize,
+    start: Option<u64>,
+    aborted: bool,
+}
+impl Gate {
+    /// `load` load threads plus `others` concurrent loops.
+    pub fn new(load: usize, others: usize) -> Self {
+        Self {
+            load,
+            parties: load + others,
+            state: Mutex::new(GateState::default()),
+            changed: Condvar::new(),
+        }
+    }
+    /// Load threads this gate expects; a load must match it exactly.
+    pub fn load_parties(&self) -> usize {
+        self.load
+    }
+    /// Arrive after setup, then sleep until the shared start and return it
+    /// (CLOCK_MONOTONIC ns). Fails once any party aborted before the start.
+    pub fn pass(&self) -> Result<u64, Error> {
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        s.arrived += 1;
+        if s.arrived == self.parties && !s.aborted {
+            s.start = Some(now_ns() + u64::try_from(GATE_LEAD.as_nanos())?);
+            self.changed.notify_all();
+        }
+        while s.start.is_none() && !s.aborted {
+            s = self.changed.wait(s).unwrap_or_else(PoisonError::into_inner);
+        }
+        let Some(start) = s.start else {
+            return Err(invalid("another party failed before the start"));
+        };
+        drop(s);
+        sleep_until(start)?;
+        Ok(start)
+    }
+    /// Run a party's `setup`, then pass; a failed setup aborts the gate.
+    pub fn after<T>(&self, setup: impl FnOnce() -> Result<T, Error>) -> Result<(T, u64), Error> {
+        match setup() {
+            Ok(value) => Ok((value, self.pass()?)),
+            Err(e) => {
+                self.abort();
+                Err(e)
+            }
+        }
+    }
+    /// Release every waiting party without a start. No effect once started.
+    pub fn abort(&self) {
+        let mut s = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        if s.start.is_none() {
+            s.aborted = true;
+            self.changed.notify_all();
+        }
+    }
+    /// The shared start, once every party arrived.
+    pub fn started(&self) -> Option<u64> {
+        self.state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .start
+    }
+}
+/// Control window against the load interval of one concurrent run, all from
+/// the shared start. The final durability tail is kept apart: it follows the
+/// load and is not load the control loops ran under.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LoadWindow {
+    /// |control origin - load start|; zero for one shared `Gate`.
+    pub skew_ns: u64,
+    /// Nominal control window: releases × period.
+    pub control_ns: u64,
+    /// Load admission interval: start to the last accepted record.
+    pub load_ns: u64,
+    /// Last accepted record to the final file and directory sync.
+    pub tail_ns: Option<u64>,
+    /// Part of the control window inside the load interval.
+    pub covered_ns: u64,
+}
+impl LoadWindow {
+    /// Concurrent when both share the start and the load covered at least
+    /// 99 % of the control window (a paced load admits its last record
+    /// slightly before the window ends).
+    pub fn judge(&self) -> Result<(), Rejection> {
+        if self.skew_ns != 0 || u128::from(self.covered_ns) * 100 < u128::from(self.control_ns) * 99
+        {
+            return Err(Rejection::NotConcurrent);
+        }
+        Ok(())
+    }
+}
+/// Compare a control run with the load it ran beside.
+pub fn load_window(control: &ControlRun, load: &StorageRun) -> LoadWindow {
+    let period = u64::try_from(control.config.period.as_nanos()).unwrap_or(u64::MAX);
+    let control_ns = control.releases.saturating_mul(period);
+    let control_end = control.origin_ns.saturating_add(control_ns);
+    let load_end = load.start_ns.saturating_add(load.accepted_ns);
+    let covered_ns = control_end
+        .min(load_end)
+        .saturating_sub(control.origin_ns.max(load.start_ns));
+    LoadWindow {
+        skew_ns: control.origin_ns.abs_diff(load.start_ns),
+        control_ns,
+        load_ns: load.accepted_ns,
+        tail_ns: load.durable_ns.map(|d| d.saturating_sub(load.accepted_ns)),
+        covered_ns,
+    }
 }
 /// Payload bytes over the time to durability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -250,6 +383,8 @@ pub struct ControlRun {
     pub config: ControlConfig,
     /// Running kernel release.
     pub kernel: String,
+    /// First release (CLOCK_MONOTONIC ns), the run's shared `Gate` start.
+    pub origin_ns: u64,
     /// Nominal releases in the run.
     pub releases: u64,
     /// Releases completed by their deadline.
@@ -419,6 +554,10 @@ pub fn kernel() -> Result<String, Error> {
         .trim()
         .to_owned())
 }
+/// CLOCK_MONOTONIC in nanoseconds, the clock of `Gate` starts.
+pub fn monotonic_ns() -> u64 {
+    now_ns()
+}
 fn now_ns() -> u64 {
     let t = clock_gettime(ClockId::Monotonic);
     t.tv_sec as u64 * 1_000_000_000 + t.tv_nsec as u64
@@ -437,19 +576,24 @@ fn sleep_until(ns: u64) -> Result<(), Error> {
     }
 }
 /// Run `releases` absolute monotonic releases on the calling thread, pinning
-/// it first when configured. Skipped releases count as misses.
-pub fn run_control(config: ControlConfig, releases: u64) -> Result<ControlRun, Error> {
-    if let Some(cpu) = config.cpu {
-        pin(cpu)?;
-    }
-    let period = u64::try_from(config.period.as_nanos())?;
-    let deadline = u64::try_from(config.deadline.as_nanos())?;
-    if period == 0 || deadline == 0 {
-        return Err(invalid("zero period or deadline"));
-    }
+/// it first when configured; the first release is the `gate`'s shared start.
+/// Skipped releases count as misses.
+pub fn run_control(config: ControlConfig, releases: u64, gate: &Gate) -> Result<ControlRun, Error> {
+    let ((period, deadline, kernel), origin) = gate.after(|| {
+        if let Some(cpu) = config.cpu {
+            pin(cpu)?;
+        }
+        let period = u64::try_from(config.period.as_nanos())?;
+        let deadline = u64::try_from(config.deadline.as_nanos())?;
+        if period == 0 || deadline == 0 {
+            return Err(invalid("zero period or deadline"));
+        }
+        Ok((period, deadline, kernel()?))
+    })?;
     let mut r = ControlRun {
         config,
-        kernel: kernel()?,
+        kernel,
+        origin_ns: origin,
         releases,
         completed: 0,
         misses: 0,
@@ -458,7 +602,6 @@ pub fn run_control(config: ControlConfig, releases: u64) -> Result<ControlRun, E
         wake: Histogram::default(),
         response: Histogram::default(),
     };
-    let origin = now_ns() + period;
     let mut k = 0;
     while k < releases {
         let release = origin + k * period;
@@ -636,12 +779,15 @@ impl Output {
 }
 /// Run the P0 simple-file writer into the exclusive `dir`. Writers pin to
 /// `writer_cpus[w % len]` when given. Admission stops when free space would
-/// fall below `reserve_bytes`; admitted records are still synced.
+/// fall below `reserve_bytes`; admitted records are still synced. Each
+/// writer thread is one `gate` load party: thread start, pinning and file
+/// creation are setup before the shared start.
 pub fn write_p0(
     dir: &Path,
     workload: StorageWorkload,
     reserve_bytes: u64,
     writer_cpus: &[usize],
+    gate: &Gate,
 ) -> Result<StorageRun, Error> {
     let w = workload;
     let frame = (FRAME_HEADER + w.record_payload_bytes) as u64;
@@ -655,19 +801,16 @@ pub fn write_p0(
     {
         return Err(invalid("invalid P0 workload"));
     }
+    if gate.load_parties() != w.writers {
+        return Err(invalid("gate load parties differ from the P0 writers"));
+    }
     let stop = AtomicBool::new(false);
-    let start = Instant::now();
     let results: Vec<Result<WriterStats, Error>> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..w.writers)
             .map(|id| {
                 let stop = &stop;
                 let cpu = (!writer_cpus.is_empty()).then(|| writer_cpus[id % writer_cpus.len()]);
-                scope.spawn(move || {
-                    if let Some(cpu) = cpu {
-                        pin(cpu)?;
-                    }
-                    writer(dir, w, reserve_bytes, id, start, stop)
-                })
+                scope.spawn(move || writer(dir, w, reserve_bytes, id, cpu, gate, stop))
             })
             .collect();
         handles
@@ -675,6 +818,9 @@ pub fn write_p0(
             .map(|h| h.join().unwrap_or_else(|_| Err(invalid("writer panicked"))))
             .collect()
     });
+    let start = gate
+        .started()
+        .ok_or_else(|| invalid("P0 writers never started"))?;
     let mut run = StorageRun {
         tool: Tool::P0SimpleFile,
         workload: w,
@@ -683,6 +829,7 @@ pub fn write_p0(
         files_created: 0,
         writes: None,
         periodic_syncs: None,
+        start_ns: start,
         accepted_ns: 0,
         durable_ns: None,
         stopped: None,
@@ -708,7 +855,7 @@ pub fn write_p0(
     run.writes = Some(writes);
     // Every file was synced by its writer; the directory makes names durable.
     File::open(dir)?.sync_all()?;
-    run.durable_ns = Some(u64::try_from(start.elapsed().as_nanos())?);
+    run.durable_ns = Some(now_ns().saturating_sub(start));
     if stop.load(Ordering::Acquire) {
         run.stopped = Some(Stop::Reserve);
     }
@@ -719,23 +866,30 @@ fn writer(
     w: StorageWorkload,
     reserve_bytes: u64,
     id: usize,
-    start: Instant,
+    cpu: Option<usize>,
+    gate: &Gate,
     stop: &AtomicBool,
 ) -> Result<WriterStats, Error> {
     let mut stats = WriterStats::default();
-    let mut outputs = Vec::new();
-    for f in (id..w.files).step_by(w.writers) {
-        outputs.push(Output::open(dir, f, 0, w.block_bytes)?);
-        stats.files += 1;
-    }
+    let ((mut outputs, mut payload), start) = gate.after(|| {
+        if let Some(cpu) = cpu {
+            pin(cpu)?;
+        }
+        let mut outputs = Vec::new();
+        for f in (id..w.files).step_by(w.writers) {
+            outputs.push(Output::open(dir, f, 0, w.block_bytes)?);
+        }
+        if available_bytes(dir)? < reserve_bytes.saturating_add(w.file_limit_bytes) {
+            stop.store(true, Ordering::Release);
+        }
+        Ok((outputs, vec![0_u8; w.record_payload_bytes]))
+    })?;
+    stats.files = outputs.len() as u64;
+    let elapsed = || Duration::from_nanos(now_ns().saturating_sub(start));
     let share = w
         .offered_bytes_per_second
         .map(|rate| rate as f64 * outputs.len() as f64 / w.files as f64);
-    let mut payload = vec![0_u8; w.record_payload_bytes];
     let mut last_sync = Instant::now();
-    if available_bytes(dir)? < reserve_bytes.saturating_add(w.file_limit_bytes) {
-        stop.store(true, Ordering::Release);
-    }
     let mut seq = 0_u64;
     while seq < w.records && !stop.load(Ordering::Acquire) {
         let f = (seq % w.files as u64) as usize;
@@ -746,7 +900,7 @@ fn writer(
         if let Some(share) = share {
             // Sleep only when more than 1 ms ahead of the offered schedule.
             let due = Duration::from_secs_f64(stats.payload as f64 / share);
-            let ahead = due.saturating_sub(start.elapsed());
+            let ahead = due.saturating_sub(elapsed());
             if ahead > Duration::from_millis(1) {
                 std::thread::sleep(ahead);
             }
@@ -774,7 +928,7 @@ fn writer(
         out.records += 1;
         stats.payload += w.record_payload_bytes as u64;
         stats.records += 1;
-        stats.accepted_ns = u64::try_from(start.elapsed().as_nanos())?;
+        stats.accepted_ns = u64::try_from(elapsed().as_nanos())?;
         if last_sync.elapsed() >= w.sync_interval {
             for out in &mut outputs {
                 out.flush(&mut stats)?;

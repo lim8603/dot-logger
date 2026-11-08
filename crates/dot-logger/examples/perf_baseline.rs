@@ -78,10 +78,13 @@ mod linux {
                 )
             }
             ["--control", seconds, control, safety] => {
-                let ((c, ()), s) =
-                    loops(seconds.parse()?, control.parse()?, safety.parse()?, || {
-                        Ok(())
-                    })?;
+                let ((c, ()), s) = loops(
+                    seconds.parse()?,
+                    control.parse()?,
+                    safety.parse()?,
+                    0,
+                    |_| Ok(()),
+                )?;
                 line(&mut out, control_json("control", "off", &c))?;
                 line(&mut out, control_json("safety", "off", &s))
             }
@@ -107,11 +110,16 @@ mod linux {
                     Some(rate),
                 );
                 let dir = RunDir::create(Path::new(parent))?;
-                let ((c, run), s) = loops(seconds, control.parse()?, safety.parse()?, || {
-                    write_p0(dir.path(), w, RESERVE, &WORKER_CPUS)
-                })?;
+                let ((c, run), s) = loops(
+                    seconds,
+                    control.parse()?,
+                    safety.parse()?,
+                    w.writers,
+                    |gate| write_p0(dir.path(), w, RESERVE, &WORKER_CPUS, gate),
+                )?;
                 line(&mut out, control_json("control", "p0", &c))?;
                 line(&mut out, control_json("safety", "p0", &s))?;
+                line(&mut out, window_json("p0", &c, &s, &run))?;
                 line(&mut out, storage_json(dir.path(), &run)?)
             }
             ["--p0-max", parent, total, payload, files, writers] => {
@@ -124,7 +132,13 @@ mod linux {
                     None,
                 );
                 let dir = RunDir::create(Path::new(parent))?;
-                let run = write_p0(dir.path(), w, RESERVE, &WORKER_CPUS)?;
+                let run = write_p0(
+                    dir.path(),
+                    w,
+                    RESERVE,
+                    &WORKER_CPUS,
+                    &Gate::new(w.writers, 0),
+                )?;
                 line(&mut out, storage_json(dir.path(), &run)?)
             }
             [
@@ -154,11 +168,16 @@ mod linux {
                 );
                 let load = logger_load(producers, channels, slots, memory)?;
                 let dir = RunDir::create(Path::new(parent))?;
-                let ((c, run), s) = loops(seconds, control.parse()?, safety.parse()?, || {
-                    write_logger(dir.path(), w, &load, RESERVE)
-                })?;
+                let ((c, run), s) = loops(
+                    seconds,
+                    control.parse()?,
+                    safety.parse()?,
+                    load.producers,
+                    |gate| write_logger(dir.path(), w, &load, RESERVE, gate),
+                )?;
                 line(&mut out, control_json("control", "on", &c))?;
                 line(&mut out, control_json("safety", "on", &s))?;
+                line(&mut out, window_json("on", &c, &s, &run.storage))?;
                 line(&mut out, logger_json(&run)?)
             }
             [
@@ -183,7 +202,8 @@ mod linux {
                 );
                 let load = logger_load(producers, channels, slots, memory)?;
                 let dir = RunDir::create(Path::new(parent))?;
-                let run = write_logger(dir.path(), w, &load, RESERVE)?;
+                let gate = Gate::new(load.producers, 0);
+                let run = write_logger(dir.path(), w, &load, RESERVE, &gate)?;
                 line(&mut out, logger_json(&run)?)
             }
             ["--p1-cost", parent, payload, samples] => {
@@ -289,12 +309,15 @@ mod linux {
     }
     type Loops<T> = ((ControlRun, T), ControlRun);
     /// Control and safety loops on their CPUs for `seconds`, concurrently with
-    /// `load` on the calling thread.
+    /// `load` on the calling thread. All of them start together once the
+    /// loops and the load's `load_parties` threads finished their setup
+    /// (REV-052 RV-130); a load that fails first releases the loops.
     fn loops<T: Send>(
         seconds: u64,
         control: u64,
         safety: u64,
-        load: impl FnOnce() -> Result<T, Error>,
+        load_parties: usize,
+        load: impl FnOnce(&Gate) -> Result<T, Error>,
     ) -> Result<Loops<T>, Error> {
         let releases = seconds * 1_000_000_000 / PERIOD.as_nanos() as u64;
         let config = |cpu, work_iterations| ControlConfig {
@@ -303,13 +326,21 @@ mod linux {
             deadline: PERIOD,
             work_iterations,
         };
+        let gate = Gate::new(load_parties, 2);
         std::thread::scope(|scope| {
-            let c = scope.spawn(move || run_control(config(CONTROL_CPU, control), releases));
-            let s = scope.spawn(move || run_control(config(SAFETY_CPU, safety), releases));
-            let loaded = load();
-            let c = c.join().map_err(|_| "control panicked")??;
-            let s = s.join().map_err(|_| "safety panicked")??;
-            Ok(((c, loaded?), s))
+            let gate = &gate;
+            let c = scope.spawn(move || run_control(config(CONTROL_CPU, control), releases, gate));
+            let s = scope.spawn(move || run_control(config(SAFETY_CPU, safety), releases, gate));
+            let loaded = load(gate);
+            if loaded.is_err() {
+                gate.abort();
+            }
+            let c = c.join().map_err(|_| "control panicked")?;
+            let s = s.join().map_err(|_| "safety panicked")?;
+            // The load's own failure first: the loops then only report
+            // that the start was released.
+            let loaded = loaded?;
+            Ok(((c?, loaded), s?))
         })
     }
     /// Recorded, never changed: frequency scaling shapes the fixed work time.
@@ -328,6 +359,20 @@ mod linux {
             "work_iterations":r.config.work_iterations.to_string(),"releases":r.releases,
             "completed":r.completed,"misses":r.misses,"skipped":r.skipped,"off_cpu":r.off_cpu,
             "wake":histogram(&r.wake),"response":histogram(&r.response)})
+    }
+    /// Whether the loops observed the load: shared start, load admission over
+    /// the control window, and the durability tail reported apart.
+    fn window_json(logger: &str, c: &ControlRun, s: &ControlRun, run: &StorageRun) -> Value {
+        let judged = |r: &ControlRun| {
+            let w = load_window(r, run);
+            json!({"skew_ns":w.skew_ns.to_string(),"control_ns":w.control_ns.to_string(),
+                "covered_ns":w.covered_ns.to_string(),
+                "concurrent":w.judge().map_or_else(|e| json!({"rejected":format!("{e:?}")}), |()| json!(true))})
+        };
+        let w = load_window(c, run);
+        json!({"scope":"LoadWindow","logger":logger,"setup_excluded":true,
+            "lead_ns":GATE_LEAD.as_nanos().to_string(),"load_ns":w.load_ns.to_string(),
+            "tail_ns":w.tail_ns.map(|n| n.to_string()),"control":judged(c),"safety":judged(s)})
     }
     fn histogram(h: &Histogram) -> Value {
         json!({"count":h.count,"max_ns":h.max_ns.to_string(),"buckets_pow2_us":h.buckets})

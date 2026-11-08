@@ -98,6 +98,36 @@ impl<T: ?Sized> Channel<T> {
         self
     }
 }
+impl<T: Record + ?Sized> Channel<T> {
+    /// Metadata of one record in this channel at its level, for the advanced
+    /// path: `Producer::try_record_raw` with a loan from
+    /// [`Writer::producer`]. Reads no clock and allocates nothing.
+    ///
+    /// ```no_run
+    /// # use dot_logger::{capture::{CaptureError, Importance}, logger::{Channel, Writer}};
+    /// # fn frame(camera: Channel<[u8]>, writer: &mut Writer, image: &[u8])
+    /// #     -> Result<(), CaptureError> {
+    /// // camera = logger.channel::<[u8]>("camera")?
+    /// let metadata = camera.metadata(writer.now_ns(), 0);
+    /// let mut producer = writer.producer();
+    /// let mut loan = producer.try_acquire(image.len(), Importance::Normal)?;
+    /// loan.payload_mut().copy_from_slice(image);
+    /// producer.try_record_raw(metadata, loan).map_err(|e| e.reason)?;
+    /// # Ok(()) }
+    /// ```
+    pub fn metadata(&self, mono_ns: u64, real_ns: i64) -> RecordMetadata {
+        RecordMetadata {
+            channel_id: self.id,
+            schema_id: T::SCHEMA.id(),
+            schema_version: T::SCHEMA.version(),
+            mono_ns,
+            real_ns,
+            source_time: None,
+            level: self.level,
+            importance: None,
+        }
+    }
+}
 impl<T: ?Sized> Clone for Channel<T> {
     fn clone(&self) -> Self {
         *self
@@ -260,16 +290,7 @@ impl Writer {
             .encode(&mut owned.scratch)
             .map_err(|EncodeError| LogError::Encode)?;
         let payload = owned.scratch.get(..length).ok_or(LogError::Encode)?;
-        let metadata = RecordMetadata {
-            channel_id: channel.id,
-            schema_id: T::SCHEMA.id(),
-            schema_version: T::SCHEMA.version(),
-            mono_ns,
-            real_ns,
-            source_time: None,
-            level: channel.level,
-            importance: None,
-        };
+        let metadata = channel.metadata(mono_ns, real_ns);
         match owned
             .core
             .producer(self.id, &mut owned.write)

@@ -640,3 +640,62 @@ fn f18_small_record_segments_still_fill_the_configured_retention() {
     // More segments than the old byte-derived limit of 64 MiB / 8 MiB + 2.
     assert!(files.len() > 10, "{}", files.len());
 }
+
+/// TASK-023 S2c (Human 2026-11-08 「메타데이터 헬퍼」): a facade channel
+/// gives the metadata the advanced raw path needs, so a zero-copy loan from
+/// `Writer::producer()` lands in that channel's file like `try_log` does.
+#[test]
+fn f19_raw_loans_through_the_producer_view_use_the_channel_metadata() {
+    use dot_logger::capture::Importance;
+    use dot_logger::pool::RawRecordOutcome;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget().writer_quota(WriterQuota::small(64, 64).with_raw(2, MIB)))
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .channel::<[u8]>("camera")
+        .writer("w")
+        .start()
+        .unwrap();
+    let camera = logger.channel::<[u8]>("camera").unwrap();
+    let mut writer = logger.take_writer("w").unwrap();
+    let frames: Vec<Vec<u8>> = (0..3_u8).map(|i| vec![i + 1; MIB - 7]).collect();
+    for frame in &frames {
+        let metadata = camera.metadata(writer.now_ns(), 1_700_000_000_000_000_000);
+        assert_eq!(metadata.schema_id, <[u8] as Record>::SCHEMA.id());
+        let mut producer = writer.producer();
+        let mut loan = loop {
+            match producer.try_acquire(frame.len(), Importance::Normal) {
+                Ok(loan) => break loan,
+                Err(dot_logger::capture::CaptureError::Capacity) => {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err(e) => panic!("{e:?}"),
+            }
+        };
+        loan.payload_mut().copy_from_slice(frame);
+        match producer.try_record_raw(metadata, loan) {
+            Ok(RawRecordOutcome::Accepted(_)) => {}
+            Ok(RawRecordOutcome::Skipped(_)) => panic!("skipped"),
+            Err(e) => panic!("{:?}", e.reason),
+        }
+    }
+    drop(writer);
+    let directory = logger.directories()[0].clone();
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert!(report.is_success(), "{report:?}");
+    let (files, active) = closed_files(&directory);
+    assert_eq!(active, 0);
+    let mut stored = Vec::new();
+    for file in files {
+        let bytes = std::fs::read(file).unwrap();
+        for message in mcap::MessageStream::new(&bytes).unwrap() {
+            let record = decode_record(&message.unwrap().data, MIB).unwrap();
+            assert_eq!(record.record.metadata.channel_id, 2);
+            stored.push(record.payload.to_vec());
+        }
+    }
+    assert_eq!(stored, frames);
+}

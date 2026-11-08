@@ -1,0 +1,1 @@
+{"control":{"cpu":2,"result":{"iterations":1828750,"median_ns":503428,"rounds":3},"work_us":500},"governor":"powersave","kernel":"7.0.0-42-generic","logger":"off","releases_per_round":100,"safety":{"cpu":3,"result":{"iterations":558745,"median_ns":200008,"rounds":1},"work_us":200},"scope":"P0Calibration"}

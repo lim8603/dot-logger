@@ -998,6 +998,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96/1.85 경고 0·workspace 1.96/1.85 각 530 Pass(5 ignore 기존 DB)·CI Miri 묶음(`918ddfa` 기준, seed 0..8) cargo exit 0·실패 0(이번 변경은 facade 설정 1줄이라 Miri 묶음 범위 밖).
 - **미실행:** S3 정식 측정(예열 10초·120초×3·off/on, RAM 2배 이상 총량), P5 동시 조회, 계측 비용, RT, native(T3). 1.3초 종료 tail의 구성(종료 sync·finish) 분석.
 
+<a id="ev-059"></a>
+## EV-059 — TASK-023 S3 준비: 발견 ⑩ 조치, 장시간 운전 기준, 도구
+
+- **판정:** 발견 ⑩ 로컬 조치 Pass. S3 정식 측정 NotRun(두 번 중단). 발견 ⑪ Open.
+- **대상/환경:** 소스 `970e0f7`(예열·telemetry·스크립트)·`bf1be3b`(⑩)·`a5c61ed`(harness 오류 보고)·`2c4ad05` 이후 커밋(장시간 기준 도구). 2026-11-08 #001 AI, Ubuntu generic 7.0.0-42, RAM 55 GiB, Crucial T500 1TB(DRAM 탑재·동적 pSLC 캐시), `/home` ext4.
+- **발견 ⑩(조치):** `WriterBudget::reserve`가 공유 출력 장부 CAS를 1회만 시도해 경합 시 `Busy` → 고른 부하에서 여러 출력이 동시 회전할 때 `SegmentLog::open` 실패·출력 poisoned(120초 S3 1회차 logger 5건 중 4건 실패, 빈 `.active`). 실제 값으로 재판정하는 lock-free 재시도. 단위 시험 8스레드×2만 회 `Busy` 106,544 → 0, 70초 P1 8×4 재실행 700만 건 일치. 1.96/1.85 각 534 Pass, clippy 0.
+- **발견 ⑪(Open) — 장시간 대용량 logger 격차:** 2회차 S3에서 P3 logger 130초 분량을 290초에 수락(441 MB/s, 같은 회차 P0 996 MB/s). 진단: IO 스레드 대부분 D 상태 `jbd2_log_wait_commit`·`rq_qos_wait`, CPU 비포화. 회전 수(16,384→262,144건)·sync 간격(1→10초)·IO 스레드(8→16) 변경 효과 없음. raw만(P2) 60초 logger 413 MB/s vs 같은 시각 P0 654 MB/s. 장시간 기준 dry-run(4 GiB 무제한): P2 logger 377 vs P0 817 MB/s(46%), P3 393 vs 784(50%). **효율 목표 0.8 미달 — 다음 분석 대상.**
+- **장비 상태:** P0 P2가 같은 날 1,023 → 757 → 654 MB/s로 하락(동적 SLC 캐시 소진). 리뷰 자료: 2TB 모델은 캐시 뒤 약 500 MB/s(TechPowerUp), 1TB 캐시 300 GB 이상(ssd-tester).
+- **Human 결정(요구 §12.4 개정):** 장시간 운전 기준 S(캐시 소진 후 지속 쓰기, P0로 측정), 정상 부하 = min(1 GB/s, 0.6 × S)·sync 만료는 실패, 효율 = 무제한 logger ≥ 0.8 × 무제한 P0(손실 없으면 sync 만료는 보고). P4·P5 이월, P1 대표 3조합.
+- **기록:** 중단된 실행 결과 `perf_runs/s3-2026-11-08-aborted/`(⑩), `perf_runs/s3-2026-11-08/`(⑪ 발견 전 1회차 일부).
+- **미실행:** S3 정식 측정, ⑪ 원인 분석, RT, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

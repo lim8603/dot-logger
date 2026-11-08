@@ -857,14 +857,19 @@ pub(crate) struct Foreign {
 }
 impl Foreign {
     /// The parts of `from..=to` another file may hold unsynced: the owed
-    /// hull up to `base`, and whatever later files appended after it.
-    fn spans(self, from: u64, to: u64) -> impl Iterator<Item = (u64, u64)> {
+    /// hull up to `base`, and what later files appended after this file's
+    /// `last`. Between `base` and `last` this file was the only writer, so a
+    /// record there that it does not hold was never appended to the target.
+    fn spans(self, from: u64, to: u64, last: u64) -> impl Iterator<Item = (u64, u64)> {
         let earlier = if self.owed.0 == 0 {
             (1, 0)
         } else {
             (from.max(self.owed.0), to.min(self.owed.1).min(self.base))
         };
-        let later = (from.max(self.base.saturating_add(1)), to.min(self.appended));
+        let later = (
+            from.max(self.base.max(last).saturating_add(1)),
+            to.min(self.appended),
+        );
         [earlier, later].into_iter().filter(|(lo, hi)| lo <= hi)
     }
 }
@@ -942,7 +947,7 @@ impl SyncWork<'_, '_> {
                 // not routed here, or ended without a write. Details older
                 // than the window are gone, so such a span is unproven.
                 if !ended_is_synced {
-                    for (lo, hi) in foreign.spans(from, to) {
+                    for (lo, hi) in foreign.spans(from, to, last[p]) {
                         if hi - lo >= window {
                             return Ok(false);
                         }

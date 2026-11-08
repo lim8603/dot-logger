@@ -1042,6 +1042,73 @@ fn a_finished_segment_cannot_skip_a_later_files_expired_unsynced_records() {
     );
 }
 
+/// TASK-023 S2c finding (regression of RV-128 `97e2b12`): a record routed
+/// only to another target before this file's first record was never owed to
+/// any file of this target, even after its completion slot was reused. Only
+/// records after the file's last one can sit in a later file.
+#[test]
+fn an_unrouted_record_before_the_file_never_needs_a_proof() {
+    use dot_logger::completion::{Boundary, QueryOutcome, Update};
+    use dot_logger::control::{ControlConfig, ControlOwner};
+    use dot_logger::routing::Route;
+    use std::time::Instant;
+    let plan = support::plan();
+    let mut route = support::routing();
+    route.routes.push(Route {
+        channel_id: 8,
+        targets: vec![20],
+    });
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1), ChannelConfig::new(8, 99, 1)],
+        &route,
+        support::tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let now = Instant::now();
+        let control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 32,
+            },
+            now,
+        )
+        .unwrap();
+        let (mut producer, a) = scope.next().unwrap();
+        let (_, b) = scope.next().unwrap();
+        let mut router = Router::new(&plan, vec![a, b], route).unwrap();
+        let budget = router.writer_budget(10).unwrap();
+        let (_f, f) = Temp::new();
+        let mut file = SegmentWriter::new(budget, small(), channels(), f).unwrap();
+        router.scope(|mut dispatch, mut outputs| {
+            let mut other = support::meta();
+            other.channel_id = 8;
+            let elsewhere = support::accepted(producer.try_record_small(other, &[1]).unwrap());
+            dispatch.turn(now, &mut [None; 8]).unwrap();
+            let only = outputs[1].try_next(now).unwrap().unwrap();
+            only.report(Update::Confirmed(Boundary::Written)).unwrap();
+            drop(only);
+            for _ in 0..5 {
+                write_one(&mut producer, &mut dispatch, &mut outputs, &mut file, now);
+            }
+            // Its completion slot was reused by a later record.
+            assert_eq!(
+                c.poll(elsewhere, 10, Boundary::Synced).unwrap().outcome,
+                QueryOutcome::Expired
+            );
+            let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+            file.sync_work(work).map_err(|e| e.error).unwrap();
+            assert!(succeeded(&control, token, now));
+        });
+    });
+}
+
 // Independent uncompressed MCAP scanner: no mcap/prost parsing code is used for
 // record lengths, chunk CRC, message offsets or message-index validation.
 fn u32_at(b: &[u8], p: usize) -> Option<u32> {

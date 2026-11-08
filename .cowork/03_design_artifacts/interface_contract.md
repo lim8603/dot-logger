@@ -1027,3 +1027,9 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 - **부채 기록·해소:** 단독 `SegmentWriter`가 sync 안 된 기록을 가진 채 `finish`하거나 Drop되면, 또는 `SegmentLog`가 그런 상태로 Drop되면 부채가 남는다. `FinishedSegment::sync_work`(복구의 sync 포함) 성공이 그 파일의 부채를 해소한다. 해소 수단이 없는 파일(sync 없이 Drop)의 범위는 세션 끝까지 다른 파일로 대신 덮을 수 없다. 여러 파일에 걸친 barrier는 파일별 범위로 나눠 각 파일에서 처리한다(`FinishedSegment::sync_work` 문서의 "다른 segment는 별도 조정" 계약). facade `SegmentLog`는 회전 시 이전 파일을 sync하고 전체 범위를 가지므로 동작이 바뀌지 않는다.
 - **sync 발급 watermark(RV-129):** (target, 생산자) Written watermark는 그 바로 다음부터 연속으로 확인한 구간만 전진한다. 더 뒤에서 시작하는 부분 범위는 그 요청에서만 확인한다. 완료 window 생략·Expired 통과는 완료 기준이 Written/Synced인 target에만 쓰고, Enqueued 기준 target은 drained 조건을 쓴다.
 - **측정 구간(RV-130, harness):** P0·logger·control·safety는 각자 setup(스레드 시작·pin·파일 생성·logger 시작·조회)을 마친 뒤 공통 절대 시작 시각부터 계시한다. 처리량 분모·수락 시각·control 첫 release가 모두 이 시각 기준이다. 부하 수락 구간과 최종 내구화 tail을 나눠 보고하고, skew 0·control 구간의 99% 이상 중첩이 아니면 `NotConcurrent`로 판정해 off/on 비교에 쓰지 않는다.
+
+### 19.7 TASK-023 S2d 조치 반영 — 2026-11-08
+
+[EV-058](../05_verification/verification_evidence.md#ev-058). facade 내부 기본값 변경이며 공개 API는 같다.
+
+- **완료 장부 reconcile(발견 ⑨):** dispatcher turn과 종료 poll의 reconcile 상한은 writer 1개의 완료 window다(이전: window × writers). 버려진 delivery의 Unknown 확정은 writers turn 안에 이루어진다. 32생산자·16파일에서 소형 10만/s와 P3 혼합이 backlog 없이 처리된다(smoke).

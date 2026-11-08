@@ -983,6 +983,21 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96/1.85 경고 0·rustdoc 경고 0·Rust 1.96/MSRV 1.85 workspace 각 529 Pass(5 ignore 기존 DB)·`tc_012` 27(두 toolchain).
 - **미실행:** Miri(이번 변경분: control 정정·도구), feature matrix, 발견 ⑨ 분석, S3, RT, native(T3).
 
+<a id="ev-058"></a>
+## EV-058 — TASK-023 S2d 발견 ⑨ 조치(완료 장부 전체 sweep)와 짧은 시험
+
+- **판정:** 로컬 조치 Pass. 발견 ⑨ Closed(로컬). S2d smoke 기록(측정 아님). 정식 측정 NotRun(S3).
+- **대상/환경:** 소스 `a7fd4e1`, base `918ddfa`. 2026-11-08 #001 AI, Ubuntu generic 7.0.0-42(RT 아님), powersave, 16 CPU, `/home` NVMe ext4.
+- **원인 분석:** `/proc` 스레드 CPU 표본 — 소형 10만/s·32생산자·16파일 drain 중 `dot-logger-host` 100%, IO 8개 합 8%. 임시 계측(커밋 안 함): 부하 중 `turn` 1회 약 3.2 ms에 약 250건(약 7.7만 건/s), 종료 중 `poll_shutdown` 1회 약 70 ms(누적 29초). facade가 `reconcile_per_turn = window × writers`(32 × 8,192 = 262,144 slot)로 두어 turn·종료 poll마다 완료 장부 전체를 sweep했다. 실험: sweep = window만으로 수락 4.7→3.0초(일정대로)·내구화 17.8→5.0초·거절 2,149만→0·sync 성공. 종료 poll 10 ms 제한은 추가 효과 없음 → 미적용. `perf_event_paranoid=4`·`ptrace_scope=1`로 perf/gdb 표본은 쓰지 않았다.
+- **조치:** turn당 reconcile = writer 1개 window(장부 전체는 writers turn마다 1회). reconcile은 버려진 delivery를 Unknown으로 확정하는 용도뿐이라 결과 의미는 같고 확정 지연만 writers turn으로 늘어난다. `control.work_per_poll`은 유지.
+- **TDD:** `logger::tests::a_dispatcher_turn_reconciles_one_writer_window_not_the_whole_table` Red(262,144 ≠ 8,192) → Green.
+- **smoke(측정 아님, control/safety 동시, LoadWindow 모두 동시 판정 통과, miss 0):**
+  - 소형만 10만/s(32·16·128·IO 8) 3초: 수락 3.0초·내구화 4.6초·거절 0·sync 정상(이전 17.8초·실패).
+  - P3 3초: logger 성공 762 MB/s·tail 1.08초(이전 Unsuccessful). P2 3초: 966 MB/s·tail 0.13초.
+  - P3 20초: P0 1,023 MB/s·tail 0.18초·판독 2,002,400건. logger 성공 969 MB/s(P0 대비 약 95%)·tail 1.31초(3초 실행과 비슷, backlog 누적 없음)·판독 2,002,400건 일치·거절 0. `try_log` p50 639 ns·p99 3.3 µs·p99.9 12.3 µs, raw `try_record_raw` p50 1.5 µs·p99 5.1 µs. control 최대 응답 2.7 ms, safety 2.7 ms.
+- **검증:** fmt·clippy 1.96/1.85 경고 0·workspace 1.96/1.85 각 530 Pass(5 ignore 기존 DB)·CI Miri 묶음(`918ddfa` 기준, seed 0..8) cargo exit 0·실패 0(이번 변경은 facade 설정 1줄이라 Miri 묶음 범위 밖).
+- **미실행:** S3 정식 측정(예열 10초·120초×3·off/on, RAM 2배 이상 총량), P5 동시 조회, 계측 비용, RT, native(T3). 1.3초 종료 tail의 구성(종료 sync·finish) 분석.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

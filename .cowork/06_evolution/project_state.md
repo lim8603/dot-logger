@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-023 S2 — S2a·S2b·S2c 완료([EV-054](../05_verification/verification_evidence.md#ev-054)·[EV-055](../05_verification/verification_evidence.md#ev-055)·[EV-057](../05_verification/verification_evidence.md#ev-057)), REV-052 조치([EV-056](../05_verification/verification_evidence.md#ev-056)), 다음 S2d 발견 ⑨ 분석 |
-| 미처리 리뷰 | [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) **Resolved** — RV-128~130 조치 `97e2b12`·`f8f2859`, Human Close 승인 대기 |
-| 상태 | Yellow — 발견 ⑨(P3 구성 소형 소비 병목 → 주기 sync 만료) Open, 성능/RT/장기·운영/실앱·native 후속(REV-052 Close 승인 대기) |
+| 활성 Task | TASK-023 S2 — S2a·S2b·S2c 완료([EV-054](../05_verification/verification_evidence.md#ev-054)·[EV-055](../05_verification/verification_evidence.md#ev-055)·[EV-057](../05_verification/verification_evidence.md#ev-057)), REV-052 조치([EV-056](../05_verification/verification_evidence.md#ev-056)), S2d 완료(발견 ⑨ 조치 [EV-058](../05_verification/verification_evidence.md#ev-058)), 다음 S3 계획 |
+| 미처리 리뷰 | 없음 — [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Closed(2026-11-08 Human 「승인」) |
+| 상태 | Yellow — 정식 성능(S3)/RT/장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-08 / #001 / AI |
-| 세션 상태 | 진행 — 2026-11-08 #001. REV-052 조치(Close 승인 대기), Human 「다음 작업 진행」 → S2c 완료(Human 「메타데이터 헬퍼」), RV-128 정정 `b2899a3`. 다음 S2d 발견 ⑨ |
+| 세션 상태 | 진행 — 2026-11-08 #001. REV-052 조치, Human 「다음 작업 진행」 → S2c 완료(Human 「메타데이터 헬퍼」), RV-128 정정 `b2899a3`. REV-052 Closed(Human 「승인」). S2d 발견 ⑨ 조치 `a7fd4e1`(Human 「다음 작업 진행」). 다음 S3 계획 |
 | 최근 세션 | [2026-11-08 #001](../members/lim8603/workspace/session_logs/session_2026-11-08_001.md) — REV-052 조치(RV-128~130) |
 
 ## 현재 결정과 제약
@@ -72,7 +72,7 @@
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | AI | In Progress | 2026-11-01 | S1~S3 EV-037~039 로컬 수락; REV-038 Closed·통합/환경/native 후속 |
 | TASK-020 | tracing 어댑터와 통합 예제 | AI | In Progress | 2026-11-02 | S1~S3 EV-040~042 로컬 수락·REV-041 Closed; 통합 TASK-026/환경/native 대기 |
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
-| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-08 | S2a·S2b·S2c 완료(EV-054·055·057), REV-052 조치(EV-056) → S2d 발견 ⑨ 분석·짧은 시험 → S3 |
+| TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-08 | S2a~S2d 완료(EV-054·055·057·058), REV-052 조치(EV-056) → S3 정식 측정 계획 |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-07 | S3a [EV-048](../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../05_verification/verification_evidence.md#ev-051) 로컬 Pass(F1~F13) — S1~S3 로컬 완료, Human 리뷰 대기; 잔여 TASK-023 성능·TASK-029 계수·T3, S3d는 T4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
@@ -86,13 +86,13 @@
 | REV-029~041 | 간편 점검·DB·tracing/화면 예제 | Closed | EV-031~042 로컬 수락, 실앱/환경 후속은 각 Task 참조 |
 | REV-042~050 | UPS·운영 backend·facade S2~S3·preset 자가/독립 리뷰 | Closed | EV-043~052 로컬 조치·마감(독립 REV-043·045 포함). 원문 [상태 아카이브](state_archive.md) #024 |
 | [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | Closed | Conditional Pass 8건(P1 1·P2 5·P3 2) 전부 수용·조치 [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`, 2026-11-07 Human 「승인」 |
-| [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) | REV-051 조치·TASK-023 S2a/S2b 누적 독립 코드리뷰(`49df7d3..93db6e3`) | Resolved | Conditional, P1 2·P2 1(RV-128~130) 전부 수용·조치 [EV-056](../05_verification/verification_evidence.md#ev-056) `97e2b12`·`f8f2859`, 1.96/1.85 각 522 Pass. Human Close 승인 대기 |
+| [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) | REV-051 조치·TASK-023 S2a/S2b 누적 독립 코드리뷰(`49df7d3..93db6e3`) | Closed | Conditional, P1 2·P2 1(RV-128~130) 전부 수용·조치 [EV-056](../05_verification/verification_evidence.md#ev-056) `97e2b12`·`f8f2859`, 정정 `b2899a3`(EV-057). 2026-11-08 Human 「승인」 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **다음 TASK-023 S2d** — 발견 ⑨(32생산자·16파일 구성에서 소형 소비 약 2만 건/s, backlog > 5초면 주기 sync 만료 → Unsuccessful) 원인 분석·조치 후 짧은 시험 실행(S2a·S2b·S2c EV-054·055·057, REV-052 조치 EV-056 완료) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Close는 Human 승인 대기.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **다음 TASK-023 S3 계획**(S2a~S2d EV-054·055·057·058, REV-052 조치 EV-056 완료; S2d smoke P3 20초 logger 969 MB/s·P0 1,023 MB/s) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -138,6 +138,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-08 #001(계속): TASK-023 S2d 발견 ⑨ — facade가 turn마다 완료 장부 전체(window × writers)를 sweep → writer 1개 window로(`a7fd4e1`), P3 20초 smoke 성공 — [EV-058](../05_verification/verification_evidence.md#ev-058).
 - 2026-11-08 #001(계속): TASK-023 S2c — `Channel::metadata`(Human 「메타데이터 헬퍼」)·혼합 P2/P3 도구, RV-128 정정(`b2899a3`, 부분 라우팅 종료 sync 거절 회귀), smoke에서 발견 ⑨ — [EV-057](../05_verification/verification_evidence.md#ev-057).
 - 2026-11-08 #001: REV-052 RV-128(target별 파일 장부로 다른 파일의 미동기화 기록 증명 요구)·RV-129(연속 구간만 watermark 전진, Enqueued 기준 target 분리)·RV-130(공통 `Gate` 시작·`LoadWindow` 중첩 판정) TDD 조치, 1.96/1.85 각 522 Pass — [EV-056](../05_verification/verification_evidence.md#ev-056), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-08_001.md).
 - 2026-11-07 #004: REV-051 조치·TASK-023 S2a/S2b 누적 변경을 독립 리뷰하여 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional: P1 2·P2 1), 제품 무수정·공개 API 재현 2건 Red·1.96/1.85 각509 Pass — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_004.md).

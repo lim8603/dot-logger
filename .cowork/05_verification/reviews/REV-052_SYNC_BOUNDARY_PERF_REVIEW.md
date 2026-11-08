@@ -10,7 +10,7 @@
 | 주요 소스 | `60ea9bb`, `1602d5e`, `93e7241`, `c93a44a`, `a92aee6`, `97651f5`, `49f097d`, `eeec11f`, `d0c4851`, `a6938ca` |
 | 범위 | 29파일 중 Rust 21파일의 변경 및 관련 완료·저장소·제어 계약. 시작 작업 트리 clean |
 | 종합 판정 | **Conditional — P1 2건·P2 1건. 공개 L4 sync 경계 조치와 측정 구간 정렬 필요** |
-| 상태 | **Resolved** — 2026-11-08 #001 조치·검증([EV-056](../verification_evidence.md#ev-056)), Human Close 승인 대기 |
+| 상태 | **Closed** — 2026-11-08 #001 조치·검증([EV-056](../verification_evidence.md#ev-056), 정정 [EV-057](../verification_evidence.md#ev-057)), Human 「승인」 |
 
 채널별 출력 선택·예산 배정·RT Writer 반환·IO 종료 플래그 순서·완료 보고 재시도는 변경 코드와 기존 시험에서 확인했다. 새 `unsafe`는 없다. 기존 전체 회귀는 통과하지만, 부분 라우팅을 위해 완화한 공통 sync 판정이 **저장소 포함 범위 증명**과 **연속 Written watermark**를 깨뜨리는 조건을 발견했다. 두 건 모두 공개 API만 사용하는 저장소 밖 임시 시험에서 재현했다. 현재 facade의 `SegmentLog`·`capture_scope(first=1)` 경로만으로 공개 L4 `SegmentWriter`와 임의 `CompletionScope`의 안전성을 대체할 수 없다.
 
@@ -38,9 +38,9 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-128 | P1 | `control/mod.rs:883~922`, `SyncWork::covers_file`; `storage/writer.rs::check_sync` | Written 완료 이력의 Expired를 안전한 파일 범위 제외로 취급해, 이전 파일을 sync하지 않고 새 빈 파일만 sync한 요청이 성공함 | 완료 이력 만료와 파일 내구성 증명을 분리. `SegmentLog`와 단일 segment의 포함 범위 검증 구분 | 수용 | Resolved |
-| RV-129 | P1 | `routing/mod.rs:849~865`, `Dispatcher::ready_for_sync` | `[2,2]` 부분 범위가 watermark를 2로 올리면 미기록 `[1,1]`에도 SyncWork 발급 | 연속 prefix만 공유 watermark에 반영. 비연속 부분 범위는 요청별 확인 | 수용 | Resolved |
-| RV-130 | P2 | `examples/support/perf/facade.rs:213~215`, `perf/mod.rs:659`, `perf_baseline.rs:306~309` | P0는 파일 생성 전, logger는 start 완료 뒤부터 계시. 제어 루프는 logger 준비 중에도 측정하므로 부하와 같은 구간이라는 보장이 없음 | 양쪽 setup·예열 뒤 공통 시작 시각/장벽으로 부하와 제어 계시. 실제 중첩 구간 검증 | 수용 | Resolved |
+| RV-128 | P1 | `control/mod.rs:883~922`, `SyncWork::covers_file`; `storage/writer.rs::check_sync` | Written 완료 이력의 Expired를 안전한 파일 범위 제외로 취급해, 이전 파일을 sync하지 않고 새 빈 파일만 sync한 요청이 성공함 | 완료 이력 만료와 파일 내구성 증명을 분리. `SegmentLog`와 단일 segment의 포함 범위 검증 구분 | 수용 | Closed |
+| RV-129 | P1 | `routing/mod.rs:849~865`, `Dispatcher::ready_for_sync` | `[2,2]` 부분 범위가 watermark를 2로 올리면 미기록 `[1,1]`에도 SyncWork 발급 | 연속 prefix만 공유 watermark에 반영. 비연속 부분 범위는 요청별 확인 | 수용 | Closed |
+| RV-130 | P2 | `examples/support/perf/facade.rs:213~215`, `perf/mod.rs:659`, `perf_baseline.rs:306~309` | P0는 파일 생성 전, logger는 start 완료 뒤부터 계시. 제어 루프는 logger 준비 중에도 측정하므로 부하와 같은 구간이라는 보장이 없음 | 양쪽 setup·예열 뒤 공통 시작 시각/장벽으로 부하와 제어 계시. 실제 중첩 구간 검증 | 수용 | Closed |
 
 ### RV-128 — 만료된 Written 이력으로 다른 파일의 sync를 성공시킴 (P1)
 
@@ -134,4 +134,4 @@ next_sync(scope=[1,1], target=10).is_some() == true
 | 처리 | RV-128·129 수용·조치 `97e2b12`, RV-130 수용·조치 `f8f2859`. 세 건 모두 TDD Red 확인 후 Green |
 | 계약 반영 | [API §19.6](../../03_design_artifacts/interface_contract.md#196-rev-052-조치-반영--2026-11-08), §19.5 ①·④ 한정 문구 |
 | 검증 | [EV-056](../verification_evidence.md#ev-056) |
-| 상태 | Resolved. Close는 Human 승인 후 |
+| 상태 | Closed — 2026-11-08 Human 「승인」(RV-128 정정 `b2899a3` 포함) |

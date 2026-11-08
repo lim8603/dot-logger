@@ -83,6 +83,10 @@ pub struct StorageWorkload {
     pub offered_bytes_per_second: Option<u64>,
     /// Large records mixed in, or `None` for one record size.
     pub large: Option<LargeRecords>,
+    /// Leading part of a paced run left out of the results (TASK-023 S3):
+    /// records due before it are offered and stored, but throughput, call
+    /// latencies and the control window start at its end.
+    pub warmup: Duration,
 }
 impl StorageWorkload {
     /// Placement rules both tools rely on: large streams cover whole groups
@@ -90,6 +94,9 @@ impl StorageWorkload {
     pub fn validate(&self) -> Result<(), Error> {
         if self.files == 0 || self.record_payload_bytes == 0 {
             return Err(invalid("invalid workload"));
+        }
+        if !self.warmup.is_zero() && self.offered_bytes_per_second.is_none() {
+            return Err(invalid("a warm-up needs a paced workload"));
         }
         if let Some(l) = self.large {
             if l.bytes == 0
@@ -137,6 +144,29 @@ impl StorageWorkload {
         let large = self.large_before(s);
         let size = self.large.map_or(0, |l| l.bytes as u64);
         (s - large) * self.record_payload_bytes as u64 + large * size
+    }
+    /// Warm-up length in nanoseconds.
+    pub fn warmup_ns(&self) -> u64 {
+        u64::try_from(self.warmup.as_nanos()).unwrap_or(u64::MAX)
+    }
+    /// First record due at or after the warm-up: the measured records are
+    /// `first_measured()..records`.
+    pub fn first_measured(&self) -> u64 {
+        let warmup = self.warmup_ns();
+        if warmup == 0 {
+            return 0;
+        }
+        // due_ns is nondecreasing in s.
+        let (mut lo, mut hi) = (0, self.records);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if self.due_ns(mid).is_some_and(|due| due >= warmup) {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        lo
     }
     /// Payload of every offered record.
     pub fn total_payload_bytes(&self) -> u64 {
@@ -318,7 +348,8 @@ impl Gate {
 /// load and is not load the control loops ran under.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadWindow {
-    /// |control origin - load start|; zero for one shared `Gate`.
+    /// |control origin - (load start + warm-up)|; zero for one shared
+    /// `Gate` and the load's warm-up as the control delay.
     pub skew_ns: u64,
     /// Nominal control window: releases × period.
     pub control_ns: u64,
@@ -347,11 +378,13 @@ pub fn load_window(control: &ControlRun, load: &StorageRun) -> LoadWindow {
     let control_ns = control.releases.saturating_mul(period);
     let control_end = control.origin_ns.saturating_add(control_ns);
     let load_end = load.start_ns.saturating_add(load.accepted_ns);
+    // The control window opens when the load's warm-up ends.
+    let measured = load.start_ns.saturating_add(load.workload.warmup_ns());
     let covered_ns = control_end
         .min(load_end)
-        .saturating_sub(control.origin_ns.max(load.start_ns));
+        .saturating_sub(control.origin_ns.max(measured));
     LoadWindow {
-        skew_ns: control.origin_ns.abs_diff(load.start_ns),
+        skew_ns: control.origin_ns.abs_diff(measured),
         control_ns,
         load_ns: load.accepted_ns,
         tail_ns: load.durable_ns.map(|d| d.saturating_sub(load.accepted_ns)),
@@ -388,12 +421,21 @@ pub fn throughput(run: &StorageRun) -> Result<Throughput, Rejection> {
         Some(Stop::Reserve) => return Err(Rejection::Incomplete),
         None => {}
     }
-    let durable_ns = run.durable_ns.ok_or(Rejection::NoFinalSync)?;
+    // After a warm-up: the measured records' payload over warm-up end →
+    // final sync. A complete run admitted every record, so the warm-up's
+    // payload is exactly the workload's.
+    let w = run.workload;
+    let durable_ns = run
+        .durable_ns
+        .ok_or(Rejection::NoFinalSync)?
+        .saturating_sub(w.warmup_ns());
     if durable_ns == 0 {
         return Err(Rejection::ZeroDuration);
     }
     Ok(Throughput {
-        payload_bytes: run.payload_bytes,
+        payload_bytes: run
+            .payload_bytes
+            .saturating_sub(w.payload_before(w.first_measured())),
         durable_ns,
     })
 }
@@ -669,10 +711,16 @@ fn sleep_until(ns: u64) -> Result<(), Error> {
     }
 }
 /// Run `releases` absolute monotonic releases on the calling thread, pinning
-/// it first when configured; the first release is the `gate`'s shared start.
+/// it first when configured; the first release is `delay` after the `gate`'s
+/// shared start.
 /// Skipped releases count as misses.
-pub fn run_control(config: ControlConfig, releases: u64, gate: &Gate) -> Result<ControlRun, Error> {
-    let ((period, deadline, kernel), origin) = gate.after(|| {
+pub fn run_control(
+    config: ControlConfig,
+    releases: u64,
+    gate: &Gate,
+    delay: Duration,
+) -> Result<ControlRun, Error> {
+    let ((period, deadline, kernel), start) = gate.after(|| {
         if let Some(cpu) = config.cpu {
             pin(cpu)?;
         }
@@ -683,6 +731,8 @@ pub fn run_control(config: ControlConfig, releases: u64, gate: &Gate) -> Result<
         }
         Ok((period, deadline, kernel()?))
     })?;
+    // A load's warm-up stays outside the control window.
+    let origin = start.saturating_add(u64::try_from(delay.as_nanos())?);
     let mut r = ControlRun {
         config,
         kernel,

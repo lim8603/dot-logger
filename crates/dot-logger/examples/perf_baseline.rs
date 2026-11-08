@@ -42,13 +42,13 @@ mod linux {
     const RESERVE: u64 = 64 << 30;
     const USAGE: &str = "usage: perf_baseline --plan | --calibrate | \
         --control <seconds> <control_iters> <safety_iters> | \
-        --p0 <parent> <seconds> <payload> <bytes_per_second> <files> <writers> <control_iters> <safety_iters> | \
+        --p0 <parent> <seconds> <warmup_s> <payload> <bytes_per_second> <files> <writers> <control_iters> <safety_iters> | \
         --p0-max <parent> <total_bytes> <payload> <files> <writers> | \
-        --p1 <parent> <seconds> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <control_iters> <safety_iters> | \
+        --p1 <parent> <seconds> <warmup_s> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <telemetry> <control_iters> <safety_iters> | \
         --p1-max <parent> <total_bytes> <payload> <files> <writers> <producers> <channels> <slots> <memory_mib> | \
         --p1-cost <parent> <payload> <samples> | \
-        --p0-mix <parent> <seconds> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <control_iters> <safety_iters> | \
-        --p1-mix <parent> <seconds> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <control_iters> <safety_iters>";
+        --p0-mix <parent> <seconds> <warmup_s> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <control_iters> <safety_iters> | \
+        --p1-mix <parent> <seconds> <warmup_s> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <telemetry> <control_iters> <safety_iters>";
 
     pub fn execute() -> Result<(), Error> {
         let args: Vec<String> = std::env::args().skip(1).collect();
@@ -85,6 +85,7 @@ mod linux {
                     control.parse()?,
                     safety.parse()?,
                     0,
+                    Duration::ZERO,
                     |_| Ok(()),
                 )?;
                 line(&mut out, control_json("control", "off", &c))?;
@@ -94,6 +95,7 @@ mod linux {
                 "--p0",
                 parent,
                 seconds,
+                warmup,
                 payload,
                 rate,
                 files,
@@ -102,21 +104,14 @@ mod linux {
                 safety,
             ] => {
                 let seconds: u64 = seconds.parse()?;
-                let payload: usize = payload.parse()?;
-                let rate: u64 = rate.parse()?;
-                let w = workload(
-                    payload,
-                    records_for(rate.saturating_mul(seconds), payload)?,
-                    files.parse()?,
-                    writers.parse()?,
-                    Some(rate),
-                );
+                let w = paced(seconds, warmup, payload, rate, files, writers)?;
                 let dir = RunDir::create(Path::new(parent))?;
                 let ((c, run), s) = loops(
                     seconds,
                     control.parse()?,
                     safety.parse()?,
                     w.writers,
+                    w.warmup,
                     |gate| write_p0(dir.path(), w, RESERVE, &WORKER_CPUS, gate),
                 )?;
                 line(&mut out, control_json("control", "p0", &c))?;
@@ -147,6 +142,7 @@ mod linux {
                 "--p1",
                 parent,
                 seconds,
+                warmup,
                 payload,
                 rate,
                 files,
@@ -155,26 +151,21 @@ mod linux {
                 channels,
                 slots,
                 memory,
+                telemetry,
                 control,
                 safety,
             ] => {
                 let seconds: u64 = seconds.parse()?;
-                let payload: usize = payload.parse()?;
-                let rate: u64 = rate.parse()?;
-                let w = workload(
-                    payload,
-                    records_for(rate.saturating_mul(seconds), payload)?,
-                    files.parse()?,
-                    writers.parse()?,
-                    Some(rate),
-                );
-                let load = logger_load(producers, channels, slots, memory)?;
+                let w = paced(seconds, warmup, payload, rate, files, writers)?;
+                let mut load = logger_load(producers, channels, slots, memory)?;
+                load.telemetry = flag(telemetry)?;
                 let dir = RunDir::create(Path::new(parent))?;
                 let ((c, run), s) = loops(
                     seconds,
                     control.parse()?,
                     safety.parse()?,
                     load.producers,
+                    w.warmup,
                     |gate| write_logger(dir.path(), w, &load, RESERVE, gate),
                 )?;
                 line(&mut out, control_json("control", "on", &c))?;
@@ -214,6 +205,7 @@ mod linux {
                 "--p0-mix",
                 parent,
                 seconds,
+                warmup,
                 small,
                 small_rate,
                 large,
@@ -226,7 +218,7 @@ mod linux {
             ] => {
                 let seconds: u64 = seconds.parse()?;
                 let w = mixed_workload(
-                    seconds, small, small_rate, large, large_rate, streams, files, writers,
+                    seconds, warmup, small, small_rate, large, large_rate, streams, files, writers,
                 )?;
                 let dir = RunDir::create(Path::new(parent))?;
                 let ((c, run), s) = loops(
@@ -234,6 +226,7 @@ mod linux {
                     control.parse()?,
                     safety.parse()?,
                     w.writers,
+                    w.warmup,
                     |gate| write_p0(dir.path(), w, RESERVE, &WORKER_CPUS, gate),
                 )?;
                 line(&mut out, control_json("control", "p0", &c))?;
@@ -245,6 +238,7 @@ mod linux {
                 "--p1-mix",
                 parent,
                 seconds,
+                warmup,
                 small,
                 small_rate,
                 large,
@@ -257,21 +251,24 @@ mod linux {
                 slots,
                 raw_slots,
                 memory,
+                telemetry,
                 control,
                 safety,
             ] => {
                 let seconds: u64 = seconds.parse()?;
                 let w = mixed_workload(
-                    seconds, small, small_rate, large, large_rate, streams, files, writers,
+                    seconds, warmup, small, small_rate, large, large_rate, streams, files, writers,
                 )?;
                 let mut load = logger_load(producers, channels, slots, memory)?;
                 load.raw_slots = raw_slots.parse()?;
+                load.telemetry = flag(telemetry)?;
                 let dir = RunDir::create(Path::new(parent))?;
                 let ((c, run), s) = loops(
                     seconds,
                     control.parse()?,
                     safety.parse()?,
                     load.producers,
+                    w.warmup,
                     |gate| write_logger(dir.path(), w, &load, RESERVE, gate),
                 )?;
                 line(&mut out, control_json("control", "on", &c))?;
@@ -322,14 +319,47 @@ mod linux {
             sync_interval: SYNC,
             offered_bytes_per_second: rate,
             large: None,
+            warmup: Duration::ZERO,
         }
     }
-    /// `seconds` of `small_per_second` small and `large_per_second` large
+    /// `warmup` + `seconds` of `payload`-byte records at `rate` bytes/s; the
+    /// first `warmup` seconds are left out of the results.
+    fn paced(
+        seconds: u64,
+        warmup: &str,
+        payload: &str,
+        rate: &str,
+        files: &str,
+        writers: &str,
+    ) -> Result<StorageWorkload, Error> {
+        let warmup: u64 = warmup.parse()?;
+        let payload: usize = payload.parse()?;
+        let rate: u64 = rate.parse()?;
+        let mut w = workload(
+            payload,
+            records_for(rate.saturating_mul(seconds + warmup), payload)?,
+            files.parse()?,
+            writers.parse()?,
+            Some(rate),
+        );
+        w.warmup = Duration::from_secs(warmup);
+        w.validate()?;
+        Ok(w)
+    }
+    fn flag(value: &str) -> Result<bool, Error> {
+        match value {
+            "0" => Ok(false),
+            "1" => Ok(true),
+            _ => Err(USAGE.into()),
+        }
+    }
+    /// `warmup` + `seconds` of `small_per_second` small and `large_per_second` large
     /// records: every `round(total / large)`-th record is large, rotating over
     /// `streams`, and the offered rate is the run's payload over `seconds`.
     #[allow(clippy::too_many_arguments)]
     fn mixed_workload(
         seconds: u64,
+        warmup: &str,
         small: &str,
         small_rate: &str,
         large: &str,
@@ -338,6 +368,8 @@ mod linux {
         files: &str,
         writers: &str,
     ) -> Result<StorageWorkload, Error> {
+        let warmup: u64 = warmup.parse()?;
+        let total_seconds = seconds + warmup;
         let small_rate: u64 = small_rate.parse()?;
         let large_rate: u64 = large_rate.parse()?;
         let per_second = small_rate + large_rate;
@@ -346,7 +378,7 @@ mod linux {
         }
         let mut w = workload(
             small.parse()?,
-            per_second * seconds,
+            per_second * total_seconds,
             files.parse()?,
             writers.parse()?,
             None,
@@ -356,8 +388,9 @@ mod linux {
             every: (per_second + large_rate / 2) / large_rate,
             streams: streams.parse()?,
         });
+        w.offered_bytes_per_second = Some(w.total_payload_bytes() / total_seconds);
+        w.warmup = Duration::from_secs(warmup);
         w.validate()?;
-        w.offered_bytes_per_second = Some(w.total_payload_bytes() / seconds);
         Ok(w)
     }
     /// Producers unpinned; logger IO and host threads on the worker CPUs.
@@ -378,6 +411,7 @@ mod linux {
                 .ok_or("memory")?,
             producer_cpus: Vec::new(),
             worker_cpus: WORKER_CPUS.to_vec(),
+            telemetry: false,
         })
     }
     /// Quantiles are bucket upper bounds (≤ 1/8 above the true value); the
@@ -393,7 +427,8 @@ mod linux {
         value["scope"] = json!("LoggerStorage");
         value["load"] = json!({"producers":r.load.producers,"channels":r.load.channels,
             "slots":r.load.slots,"memory_bytes":r.load.memory_bytes.to_string(),
-            "producer_cpus":r.load.producer_cpus,"worker_cpus":r.load.worker_cpus});
+            "producer_cpus":r.load.producer_cpus,"worker_cpus":r.load.worker_cpus,
+            "telemetry":r.load.telemetry});
         value["required_bytes"] = json!(r.required_bytes.to_string());
         value["accepted_calls"] = latency(&r.accepted);
         value["raw_accepted_calls"] = latency(&r.raw_accepted);
@@ -422,7 +457,8 @@ mod linux {
     }
     type Loops<T> = ((ControlRun, T), ControlRun);
     /// Control and safety loops on their CPUs for `seconds`, concurrently with
-    /// `load` on the calling thread. All of them start together once the
+    /// `load` on the calling thread, from the end of its `warmup`. All of
+    /// them start together once the
     /// loops and the load's `load_parties` threads finished their setup
     /// (REV-052 RV-130); a load that fails first releases the loops.
     fn loops<T: Send>(
@@ -430,6 +466,7 @@ mod linux {
         control: u64,
         safety: u64,
         load_parties: usize,
+        warmup: Duration,
         load: impl FnOnce(&Gate) -> Result<T, Error>,
     ) -> Result<Loops<T>, Error> {
         let releases = seconds * 1_000_000_000 / PERIOD.as_nanos() as u64;
@@ -442,8 +479,11 @@ mod linux {
         let gate = Gate::new(load_parties, 2);
         std::thread::scope(|scope| {
             let gate = &gate;
-            let c = scope.spawn(move || run_control(config(CONTROL_CPU, control), releases, gate));
-            let s = scope.spawn(move || run_control(config(SAFETY_CPU, safety), releases, gate));
+            // The loops cover the measured window, after the load's warm-up.
+            let c = scope
+                .spawn(move || run_control(config(CONTROL_CPU, control), releases, gate, warmup));
+            let s = scope
+                .spawn(move || run_control(config(SAFETY_CPU, safety), releases, gate, warmup));
             let loaded = load(gate);
             if loaded.is_err() {
                 gate.abort();
@@ -509,6 +549,7 @@ mod linux {
             "files":w.files,"writers":w.writers,"file_limit_bytes":w.file_limit_bytes.to_string(),
             "block_bytes":w.block_bytes,"sync_interval_ms":w.sync_interval.as_millis() as u64,
             "offered_bytes_per_second":w.offered_bytes_per_second.map(|b| b.to_string()),
+            "warmup_ms":w.warmup.as_millis() as u64,"first_measured":w.first_measured().to_string(),
             "large":w.large.map(|l| json!({"bytes":l.bytes,"every":l.every.to_string(),"streams":l.streams}))},
         "payload_bytes":r.payload_bytes.to_string(),"framing_bytes":r.framing_bytes.to_string(),
         "files_created":r.files_created,

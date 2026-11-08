@@ -109,6 +109,9 @@ pub struct LoggerLoad {
     pub producer_cpus: Vec<usize>,
     /// `Budget::worker_cpus` (Optional) when not empty.
     pub worker_cpus: Vec<usize>,
+    /// Opt-in telemetry (`LoggerBuilder::telemetry`), for the instrumentation
+    /// cost comparison (TASK-023 S3, ≤ 5 %).
+    pub telemetry: bool,
 }
 
 /// Facts of one logger-on run.
@@ -196,6 +199,7 @@ fn retention_bytes(w: &StorageWorkload) -> Result<u64, Error> {
     }
 }
 
+#[derive(Default)]
 struct Produced {
     accepted: LatencyHistogram,
     raw_accepted: LatencyHistogram,
@@ -329,6 +333,9 @@ pub fn write_logger(
         budget = budget.worker_cpus(&load.worker_cpus, Requirement::Optional);
     }
     let mut builder = Logger::builder().budget(budget);
+    if load.telemetry {
+        builder = builder.telemetry();
+    }
     for f in 0..w.files {
         let out = dir.join(format!("out-{f:03}"));
         fs::create_dir(&out)?;
@@ -385,13 +392,17 @@ pub fn write_logger(
                         rejections: 0,
                         accepted_ns: 0,
                     };
+                    let first = w.first_measured();
+                    let mut ignored = Produced::default();
                     for seq in records_of(w, producers, p) {
                         pace(&w, seq, start)?;
                         let channel = channels[channel_of(&w, channels.len(), seq)];
+                        // Warm-up records are sent alike but not timed.
+                        let stats = if seq < first { &mut ignored } else { &mut out };
                         if w.stream_of(seq).is_some() {
-                            log_raw(&mut writer, channel, seq, w.payload_of(seq), &mut out)?;
+                            log_raw(&mut writer, channel, seq, w.payload_of(seq), stats)?;
                         } else {
-                            log_small(&mut writer, channel, seq, &mut out)?;
+                            log_small(&mut writer, channel, seq, stats)?;
                         }
                         out.accepted_ns = now_ns().saturating_sub(start);
                     }

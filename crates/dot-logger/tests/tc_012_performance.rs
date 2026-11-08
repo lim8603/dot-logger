@@ -18,6 +18,7 @@ fn workload() -> StorageWorkload {
         sync_interval: Duration::from_millis(1000),
         offered_bytes_per_second: None,
         large: None,
+        warmup: Duration::ZERO,
     }
 }
 fn run(tool: Tool, durable_ns: Option<u64>) -> StorageRun {
@@ -243,7 +244,7 @@ fn control_loop_counts_every_release_on_the_monotonic_clock() {
         deadline: Duration::from_millis(2),
         work_iterations: calibrate(Duration::from_micros(50)),
     };
-    let r = run_control(cfg, 50, &Gate::new(0, 1)).unwrap();
+    let r = run_control(cfg, 50, &Gate::new(0, 1), Duration::ZERO).unwrap();
     assert_eq!(r.releases, 50);
     assert_eq!(r.completed + r.misses, r.releases);
     assert!(r.skipped <= r.misses);
@@ -375,6 +376,7 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
         large: None,
+        warmup: Duration::ZERO,
     };
     let load = LoggerLoad {
         producers: 4,
@@ -384,6 +386,7 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         memory_bytes: 64 * MIB as usize,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
+        telemetry: false,
     };
     let p0_dir = RunDir::create(&parent).unwrap();
     let p0 = write_p0(p0_dir.path(), w, 0, &[], &Gate::new(w.writers, 0)).unwrap();
@@ -426,6 +429,7 @@ fn logger_load_must_route_whole_files() {
         sync_interval: Duration::from_millis(100),
         offered_bytes_per_second: None,
         large: None,
+        warmup: Duration::ZERO,
     };
     let load = LoggerLoad {
         producers: 1,
@@ -435,6 +439,7 @@ fn logger_load_must_route_whole_files() {
         memory_bytes: 64 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
+        telemetry: false,
     };
     let dir = RunDir::create(&std::env::temp_dir()).unwrap();
     // Channel c goes to file c % files only when files divides channels.
@@ -502,6 +507,7 @@ fn p0_rotates_at_the_shared_record_limit_and_the_logger_requires_it() {
         memory_bytes: 64 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
+        telemetry: false,
     };
     let w = StorageWorkload {
         record_payload_bytes: 64,
@@ -607,7 +613,7 @@ fn a_slow_setup_shifts_neither_the_load_nor_the_control_window() {
     let (c, r) = std::thread::scope(|scope| {
         let c = scope.spawn(|| {
             std::thread::sleep(Duration::from_millis(100));
-            run_control(cfg, 125, &gate)
+            run_control(cfg, 125, &gate, Duration::ZERO)
         });
         let r = write_p0(owned.path(), w, 0, &[], &gate);
         (c.join().unwrap().unwrap(), r.unwrap())
@@ -633,7 +639,7 @@ fn a_load_that_ends_early_is_not_concurrent_with_the_control_window() {
         work_iterations: 1,
     };
     let (c, r) = std::thread::scope(|scope| {
-        let c = scope.spawn(|| run_control(cfg, 200, &gate));
+        let c = scope.spawn(|| run_control(cfg, 200, &gate, Duration::ZERO));
         let r = write_p0(owned.path(), w, 0, &[], &gate);
         (c.join().unwrap().unwrap(), r.unwrap())
     });
@@ -697,6 +703,7 @@ fn mixed() -> StorageWorkload {
             every: 100,
             streams: 2,
         }),
+        warmup: Duration::ZERO,
     }
 }
 #[test]
@@ -719,6 +726,7 @@ fn mixed_load(producers: usize) -> LoggerLoad {
         memory_bytes: 64 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
+        telemetry: false,
     }
 }
 /// S2c P3: large records go through `Writer::producer()` raw loans on their
@@ -763,4 +771,70 @@ fn logger_all_large_run_uses_only_raw_producers() {
     let mut mixed_w = mixed();
     mixed_w.records = 10;
     assert!(write_logger(dir.path(), mixed_w, &mixed_load(2), 0, &Gate::new(2, 0)).is_err());
+}
+
+/// TASK-023 S3: a paced run starts with a warm-up the results leave out —
+/// its records are offered and stored, but throughput counts the payload
+/// after it over warm-up end → final sync.
+#[test]
+fn warmup_moves_the_measured_window_past_the_first_records() {
+    let mut w = workload();
+    w.records = 30;
+    w.record_payload_bytes = 100;
+    w.offered_bytes_per_second = Some(1_000_000);
+    w.warmup = Duration::from_millis(1);
+    // Record s is due at s × 100 µs: records 0..10 are the warm-up.
+    assert_eq!(w.first_measured(), 10);
+    w.validate().unwrap();
+    let mut r = run(Tool::P0SimpleFile, Some(5_000_000));
+    r.workload = w;
+    r.payload_bytes = 3_000;
+    let t = throughput(&r).unwrap();
+    assert_eq!(t.payload_bytes, 2_000);
+    assert_eq!(t.durable_ns, 4_000_000);
+    // A warm-up needs a paced schedule to end on.
+    w.offered_bytes_per_second = None;
+    assert!(w.validate().is_err());
+}
+/// S3: the control loops run only in the measured window, so their shared
+/// start is the load start plus the warm-up.
+#[test]
+fn control_loops_start_after_the_warmup_of_their_load() {
+    let ms = 1_000_000;
+    let mut c = control(0, None);
+    let mut r = run(Tool::P0SimpleFile, Some(1_300 * ms));
+    r.workload.offered_bytes_per_second = Some(1_000_000);
+    r.workload.warmup = Duration::from_millis(100);
+    r.start_ns = 5_000 * ms;
+    r.accepted_ns = 1_100 * ms;
+    c.origin_ns = 5_100 * ms;
+    assert_eq!(load_window(&c, &r).judge(), Ok(()));
+    c.origin_ns = 5_000 * ms;
+    assert_eq!(load_window(&c, &r).judge(), Err(Rejection::NotConcurrent));
+    // The loop itself waits the given delay past the gate's start.
+    let gate = Gate::new(0, 1);
+    let cfg = ControlConfig {
+        cpu: None,
+        period: Duration::from_millis(2),
+        deadline: Duration::from_millis(2),
+        work_iterations: 1,
+    };
+    let c = run_control(cfg, 5, &gate, Duration::from_millis(20)).unwrap();
+    assert_eq!(c.origin_ns, gate.started().unwrap() + 20 * ms);
+}
+/// S3: call latencies come from measured records only.
+#[test]
+fn logger_latencies_leave_out_the_warmup_records() {
+    let mut w = mixed();
+    w.large = None;
+    w.records = 2_000;
+    w.offered_bytes_per_second = Some(64 * 2_000 * 5);
+    w.warmup = Duration::from_millis(50);
+    assert_eq!(w.first_measured(), 500);
+    let load = mixed_load(4);
+    let dir = RunDir::create(&std::env::temp_dir()).unwrap();
+    let run = write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).unwrap();
+    assert!(run.storage.stopped.is_none(), "{}", run.report);
+    assert_eq!(run.accepted.count(), 1_500);
+    assert_eq!(verify_logger(&run).unwrap().records, 2_000);
 }

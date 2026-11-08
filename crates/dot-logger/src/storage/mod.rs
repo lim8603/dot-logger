@@ -43,19 +43,30 @@ impl WriterBudget {
     pub fn limit_bytes(&self) -> usize {
         self.ledger.storage_limit
     }
+    /// Management path. Writers of one router share the ledger and rotate
+    /// together, so a lost CAS race is retried against the new total: only
+    /// a real shortfall fails (TASK-023 S3 finding ⑩). Some contender always
+    /// succeeds, so the retry is lock-free and bounded by contention.
     pub(crate) fn reserve(&self, bytes: usize) -> Result<Lease, StorageError> {
-        let used = self.used_bytes();
-        let next = used.checked_add(bytes).ok_or(StorageError::InvalidConfig)?;
-        if next > self.limit_bytes() {
-            return Err(StorageError::Budget {
-                required: bytes,
-                available: self.limit_bytes().saturating_sub(used),
-            });
+        let mut used = self.used_bytes();
+        loop {
+            let next = used.checked_add(bytes).ok_or(StorageError::InvalidConfig)?;
+            if next > self.limit_bytes() {
+                return Err(StorageError::Budget {
+                    required: bytes,
+                    available: self.limit_bytes().saturating_sub(used),
+                });
+            }
+            match self.ledger.storage_used.compare_exchange_weak(
+                used,
+                next,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(actual) => used = actual,
+            }
         }
-        self.ledger
-            .storage_used
-            .compare_exchange(used, next, Ordering::AcqRel, Ordering::Relaxed)
-            .map_err(|_| StorageError::Busy)?;
         Ok(Lease {
             budget: self.clone(),
             bytes,
@@ -305,5 +316,51 @@ impl From<mcap::McapError> for StorageError {
             mcap::McapError::Io(e) => Self::Io(e),
             _ => Self::Container,
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod reserve_tests {
+    use super::*;
+    use crate::routing::{SharedLedger, TargetLedger};
+
+    /// TASK-023 S3 finding ⑩: outputs of one router rotate at the same moment
+    /// and reserve their next writer from one shared ledger. A lost CAS race
+    /// is not a lack of budget; it must never surface as `Busy`, which made
+    /// `SegmentLog::open` fail and poisoned the output.
+    #[test]
+    fn concurrent_reservations_within_the_limit_never_report_busy() {
+        let mut ledger = SharedLedger::default();
+        ledger.storage_limit = usize::MAX / 2;
+        let budget = WriterBudget {
+            ledger: Arc::new(ledger),
+            session: 1,
+            revision: 1,
+            target: 1,
+            producers: 1,
+            target_state: Arc::new(TargetLedger::default()),
+        };
+        let busy = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| {
+                    let budget = budget.clone();
+                    scope.spawn(move || {
+                        let mut busy = 0;
+                        for _ in 0..20_000 {
+                            match budget.reserve(1) {
+                                Ok(lease) => drop(lease),
+                                Err(StorageError::Busy) => busy += 1,
+                                Err(e) => panic!("{e:?}"),
+                            }
+                        }
+                        busy
+                    })
+                })
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).sum::<u32>()
+        });
+        assert_eq!(busy, 0);
+        assert_eq!(budget.used_bytes(), 0);
     }
 }

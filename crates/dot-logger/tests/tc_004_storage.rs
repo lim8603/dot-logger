@@ -803,6 +803,245 @@ fn a_new_segment_cannot_acknowledge_an_older_segments_unsynced_records() {
     });
 }
 
+/// One tracked session with a Written completion contract on both targets.
+fn file_session<R>(
+    window: usize,
+    retention: std::time::Duration,
+    run: impl for<'a> FnOnce(
+        dot_logger::completion::Completion<'a>,
+        dot_logger::capture::Producer<'a>,
+        Router<'a>,
+        dot_logger::control::ControlOwner<'a>,
+        std::time::Instant,
+    ) -> R,
+) -> R {
+    use dot_logger::control::{ControlConfig, ControlOwner};
+    let plan = support::plan();
+    let route = support::routing();
+    let mut tracking = support::tracking(window);
+    tracking.history_retention = retention;
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        tracking,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let completion = scope.completion().unwrap();
+        let now = std::time::Instant::now();
+        let control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 32,
+            },
+            now,
+        )
+        .unwrap();
+        let (producer, a) = scope.next().unwrap();
+        let (_, b) = scope.next().unwrap();
+        let router = Router::new(&plan, vec![a, b], route).unwrap();
+        run(completion, producer, router, control, now)
+    })
+}
+/// Small enough that an older finished file and a new writer fit together.
+fn small() -> WriterConfig {
+    WriterConfig {
+        max_payload_bytes: 64,
+        write_buffer_bytes: 1024,
+        chunk_target_bytes: 1024,
+        max_records: 8,
+        max_chunks: 8,
+        max_metadata_bytes: 2048,
+    }
+}
+/// Write one record to `file` on target 10 and report it Written on 20.
+fn write_one<'a>(
+    producer: &mut dot_logger::capture::Producer<'a>,
+    dispatch: &mut dot_logger::routing::Dispatcher<'_, 'a>,
+    outputs: &mut [dot_logger::routing::TargetConsumer<'_, 'a>],
+    file: &mut SegmentWriter<File>,
+    now: std::time::Instant,
+) -> CaptureReceipt {
+    use dot_logger::completion::{Boundary, Update};
+    let receipt = support::accepted(producer.try_record_small(support::meta(), &[3, 4]).unwrap());
+    dispatch.turn(now, &mut [None; 8]).unwrap();
+    let delivery = outputs[0].try_next(now).unwrap().unwrap();
+    file.write_delivery(&delivery).unwrap();
+    drop(delivery);
+    let optional = outputs[1].try_next(now).unwrap().unwrap();
+    optional
+        .report(Update::Confirmed(Boundary::Written))
+        .unwrap();
+    receipt
+}
+/// Freeze a barrier on target 10 over `ranges` (every producer when empty).
+fn file_barrier<'c, 'o>(
+    completion: dot_logger::completion::Completion<'o>,
+    control: &'c dot_logger::control::ControlOwner<'o>,
+    dispatch: &mut dot_logger::routing::Dispatcher<'_, 'o>,
+    ranges: &[dot_logger::completion::ProducerRange],
+    now: std::time::Instant,
+) -> (
+    dot_logger::control::SyncToken,
+    dot_logger::control::SyncWork<'c, 'o>,
+) {
+    use dot_logger::completion::ProducerRange;
+    let mut all = [ProducerRange::default(); 2];
+    let frozen = if ranges.is_empty() {
+        completion.capture_scope(&mut all).unwrap()
+    } else {
+        completion.scope(ranges).unwrap()
+    };
+    let token = control
+        .request_sync(frozen, &[10], now, now + std::time::Duration::from_secs(5))
+        .unwrap();
+    let work = control
+        .next_sync(token, 10, now, dispatch, &mut [ProducerRange::default(); 2])
+        .unwrap()
+        .unwrap();
+    (token, work)
+}
+fn succeeded(
+    control: &dot_logger::control::ControlOwner<'_>,
+    token: dot_logger::control::SyncToken,
+    now: std::time::Instant,
+) -> bool {
+    control.poll(now).unwrap();
+    let ok = control
+        .sync_snapshot(token, now)
+        .unwrap()
+        .barriers_succeeded();
+    control.release_sync(token).unwrap();
+    ok
+}
+
+/// REV-052 RV-128: with a Written completion contract an ended (and expired)
+/// record was only written, never synced. A new file cannot stand in for the
+/// older file that holds it.
+#[test]
+fn an_expired_written_record_cannot_let_a_new_segment_skip_its_unsynced_file() {
+    use dot_logger::completion::{Boundary, QueryOutcome};
+    use dot_logger::storage::StorageError;
+    use std::time::Duration;
+    file_session(
+        4,
+        Duration::from_millis(1),
+        |c, mut producer, mut router, control, now| {
+            let budget = router.writer_budget(10).unwrap();
+            let (_old, old) = Temp::new();
+            let (_new, new) = Temp::new();
+            let mut first = SegmentWriter::new(budget.clone(), small(), channels(), old).unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let receipt =
+                    write_one(&mut producer, &mut dispatch, &mut outputs, &mut first, now);
+                let mut older = first.finish().unwrap();
+                std::thread::sleep(Duration::from_millis(10));
+                assert_eq!(
+                    c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                    QueryOutcome::Expired
+                );
+                let mut second = SegmentWriter::new(budget, small(), channels(), new).unwrap();
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                let rejected = second.sync_work(work).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                // The file that holds the record takes the same barrier.
+                older.sync_work(rejected.work.unwrap()).unwrap();
+                assert!(succeeded(&control, token, now));
+                // With that file synced, the new one covers the old range again.
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                second.sync_work(work).unwrap();
+                assert!(succeeded(&control, token, now));
+            });
+        },
+    );
+}
+/// RV-128, window reuse: the older record's completion slot was reused by a
+/// later record instead of its detail aging out.
+#[test]
+fn a_reused_written_record_cannot_let_a_new_segment_skip_its_unsynced_file() {
+    use dot_logger::completion::{Boundary, QueryOutcome};
+    use dot_logger::storage::StorageError;
+    use std::time::Duration;
+    file_session(
+        4,
+        Duration::from_secs(60),
+        |c, mut producer, mut router, control, now| {
+            let budget = router.writer_budget(10).unwrap();
+            let (_old, old) = Temp::new();
+            let (_new, new) = Temp::new();
+            let mut first = SegmentWriter::new(budget.clone(), small(), channels(), old).unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let receipt =
+                    write_one(&mut producer, &mut dispatch, &mut outputs, &mut first, now);
+                let mut older = first.finish().unwrap();
+                let mut second = SegmentWriter::new(budget, small(), channels(), new).unwrap();
+                for _ in 0..5 {
+                    write_one(&mut producer, &mut dispatch, &mut outputs, &mut second, now);
+                }
+                assert_eq!(
+                    c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                    QueryOutcome::Expired
+                );
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                let rejected = second.sync_work(work).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                // Neither file alone holds the whole barrier.
+                let rejected = older.sync_work(rejected.work.unwrap()).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                drop(rejected);
+                assert!(!succeeded(&control, token, now));
+            });
+        },
+    );
+}
+/// RV-128, reverse direction: a finished file cannot stand in for a later
+/// file's written but unsynced records once their details expired.
+#[test]
+fn a_finished_segment_cannot_skip_a_later_files_expired_unsynced_records() {
+    use dot_logger::completion::ProducerRange;
+    use dot_logger::storage::StorageError;
+    use std::time::Duration;
+    file_session(
+        4,
+        Duration::from_millis(1),
+        |c, mut producer, mut router, control, now| {
+            let budget = router.writer_budget(10).unwrap();
+            let (_old, old) = Temp::new();
+            let (_new, new) = Temp::new();
+            let mut first = SegmentWriter::new(budget.clone(), small(), channels(), old).unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let one = write_one(&mut producer, &mut dispatch, &mut outputs, &mut first, now);
+                let mut older = first.finish().unwrap();
+                let mut second = SegmentWriter::new(budget, small(), channels(), new).unwrap();
+                write_one(&mut producer, &mut dispatch, &mut outputs, &mut second, now);
+                std::thread::sleep(Duration::from_millis(10));
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                let rejected = older.sync_work(work).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                drop(rejected);
+                assert!(!succeeded(&control, token, now));
+                // Coordinated: each file takes the barrier over its own records.
+                let mine = [ProducerRange {
+                    producer_id: 0,
+                    first: 1,
+                    last: one.accepted_seq,
+                }];
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &mine, now);
+                older.sync_work(work).unwrap();
+                assert!(succeeded(&control, token, now));
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                second.sync_work(work).unwrap();
+                assert!(succeeded(&control, token, now));
+            });
+        },
+    );
+}
+
 // Independent uncompressed MCAP scanner: no mcap/prost parsing code is used for
 // record lengths, chunk CRC, message offsets or message-index validation.
 fn u32_at(b: &[u8], p: usize) -> Option<u32> {

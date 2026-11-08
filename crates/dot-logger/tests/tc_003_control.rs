@@ -928,3 +928,147 @@ fn a_sync_token_from_another_session_cannot_alias_an_identical_slot_generation()
         );
     });
 }
+
+/// REV-052 RV-129: one producer's two records on target 10, the first still
+/// unwritten. A barrier over the later record alone must not move the shared
+/// Written watermark past the earlier one.
+fn gapped<R>(
+    run: impl for<'a> FnOnce(
+        dot_logger::completion::Completion<'a>,
+        &ControlOwner<'a>,
+        &mut dot_logger::routing::Dispatcher<'_, 'a>,
+        [dot_logger::capture::CaptureReceipt; 2],
+        Instant,
+    ) -> R,
+) -> R {
+    session(|c, mut producer, mut router, control, now| {
+        let first = accepted(producer.try_record_small(meta(), &[1]).unwrap());
+        let second = accepted(producer.try_record_small(meta(), &[2]).unwrap());
+        router.scope(|mut dispatcher, mut outputs| {
+            dispatcher.turn(now, &mut [None; 16]).unwrap();
+            let held = outputs[0].try_next(now).unwrap().unwrap();
+            let later = outputs[0].try_next(now).unwrap().unwrap();
+            assert_eq!(held.record().receipt, first);
+            later.report(Update::Confirmed(Boundary::Written)).unwrap();
+            drop(later);
+            while let Some(Ok(item)) = outputs[1].try_next(now) {
+                item.report(Update::Confirmed(Boundary::Written)).unwrap();
+            }
+            let result = run(c, &control, &mut dispatcher, [first, second], now);
+            assert_eq!(
+                c.poll(first, 10, Boundary::Written).unwrap().outcome,
+                QueryOutcome::Pending
+            );
+            drop(held);
+            result
+        })
+    })
+}
+fn barrier<'a>(
+    c: dot_logger::completion::Completion<'a>,
+    control: &ControlOwner<'a>,
+    dispatcher: &mut dot_logger::routing::Dispatcher<'_, 'a>,
+    ranges: &[ProducerRange],
+    now: Instant,
+) -> (dot_logger::control::SyncToken, bool) {
+    let frozen = c.scope(ranges).unwrap();
+    let token = control
+        .request_sync(frozen, &[10], now, now + Duration::from_secs(1))
+        .unwrap();
+    let mut cutoffs = [ProducerRange::default(); 2];
+    let work = control
+        .next_sync(token, 10, now, dispatcher, &mut cutoffs)
+        .unwrap();
+    let issued = work.is_some();
+    if let Some(work) = work {
+        work.complete(SyncResult::Synced);
+        control.poll(now).unwrap();
+    }
+    (token, issued)
+}
+fn only(first: u64, last: u64) -> [ProducerRange; 1] {
+    [ProducerRange {
+        producer_id: 0,
+        first,
+        last,
+    }]
+}
+#[test]
+fn a_partial_barrier_cannot_skip_an_earlier_unwritten_record() {
+    gapped(|c, control, dispatcher, _, now| {
+        let (later, issued) = barrier(c, control, dispatcher, &only(2, 2), now);
+        assert!(issued);
+        control.release_sync(later).unwrap();
+        let (_, issued) = barrier(c, control, dispatcher, &only(1, 1), now);
+        assert!(!issued, "seq 1 is not written on target 10 yet");
+    });
+}
+#[test]
+fn a_full_barrier_after_a_partial_one_still_waits_for_the_gap() {
+    gapped(|c, control, dispatcher, _, now| {
+        let (later, issued) = barrier(c, control, dispatcher, &only(2, 2), now);
+        assert!(issued);
+        control.release_sync(later).unwrap();
+        let (_, issued) = barrier(c, control, dispatcher, &only(1, 2), now);
+        assert!(!issued, "seq 1 is not written on target 10 yet");
+    });
+}
+#[test]
+fn overlapping_partial_barriers_wait_for_the_gap_in_either_order() {
+    gapped(|c, control, dispatcher, _, now| {
+        let (_, issued) = barrier(c, control, dispatcher, &only(1, 2), now);
+        assert!(!issued);
+        let (_, issued) = barrier(c, control, dispatcher, &only(2, 2), now);
+        assert!(issued, "seq 2 alone is written");
+    });
+}
+/// REV-052 RV-129 follow-up: with an Enqueued completion contract a record
+/// ends (and its detail can expire) before any write, so an ended record does
+/// not prove a Written barrier precondition.
+#[test]
+fn an_enqueued_completion_target_does_not_treat_an_expired_record_as_written() {
+    let plan = plan();
+    let route = routing();
+    let mut tracking = tracking(4);
+    tracking.history_retention = Duration::from_millis(1);
+    for target in &mut tracking.targets {
+        target.completion = Boundary::Enqueued;
+    }
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        tracking,
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let now = Instant::now();
+        let control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 16,
+            },
+            now,
+        )
+        .unwrap();
+        let (mut producer, a) = scope.next().unwrap();
+        let (_, b) = scope.next().unwrap();
+        let receipt = accepted(producer.try_record_small(meta(), &[1]).unwrap());
+        let mut router = Router::new(&plan, vec![a, b], route).unwrap();
+        router.scope(|mut dispatcher, _outputs| {
+            dispatcher.turn(now, &mut [None; 16]).unwrap();
+            std::thread::sleep(Duration::from_millis(10));
+            assert_eq!(
+                c.poll(receipt, 10, Boundary::Written).unwrap().outcome,
+                QueryOutcome::Expired
+            );
+            let (_, issued) = barrier(c, &control, &mut dispatcher, &only(1, 1), now);
+            assert!(!issued, "the record is still queued, never written");
+        });
+    });
+}

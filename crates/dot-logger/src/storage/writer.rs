@@ -87,16 +87,20 @@ impl<W: SyncSink> Seek for Sink<W> {
         Ok(self.signals.position.load(Ordering::Acquire))
     }
 }
+/// `base` is what the target's files had appended when this file started.
 pub(super) fn check_sync(
     budget: &WriterBudget,
     work: &SyncWork<'_, '_>,
     first: &[u64],
     last: &[u64],
+    base: &[u64],
 ) -> Result<(), StorageError> {
     if work.target_id() != budget.target || work.token().session_id != budget.session {
         return Err(StorageError::InvalidRecord);
     }
-    match work.covers_file(first, last) {
+    let files = &budget.target_state.files;
+    let foreign = |p: usize| files.foreign(p, base.get(p).copied().unwrap_or(0));
+    match work.covers_file(first, last, foreign) {
         Ok(true) => Ok(()),
         Err(
             crate::control::ControlError::Busy
@@ -218,6 +222,12 @@ pub struct SegmentWriter<W: SyncSink> {
     index: Vec<ChunkIndexEntry>,
     last: Box<[u64]>,
     first: Box<[u64]>,
+    /// The target's appended marks when this file started.
+    base: Box<[u64]>,
+    /// Appended records not covered by a successful sync of this file.
+    dirty: bool,
+    /// Owns its target claim; a SegmentLog accounts for its own files.
+    standalone: bool,
     encoder: Vec<u8>,
     records: usize,
     chunks: usize,
@@ -238,6 +248,9 @@ pub struct FinishedSegment<W: SyncSink> {
     safe: u64,
     first: Box<[u64]>,
     last: Box<[u64]>,
+    base: Box<[u64]>,
+    /// Counted in the target's owed files until synced.
+    owes: bool,
     _lease: Lease,
 }
 impl<W: SyncSink> FinishedSegment<W> {
@@ -245,7 +258,14 @@ impl<W: SyncSink> FinishedSegment<W> {
         self.sink
             .flush()
             .and_then(|()| self.sink.sync_all())
-            .map_err(StorageError::Io)
+            .map_err(StorageError::Io)?;
+        self.settle();
+        Ok(())
+    }
+    fn settle(&mut self) {
+        if std::mem::take(&mut self.owes) {
+            self._lease.budget.target_state.files.settle();
+        }
     }
     /// Retained auxiliary index.
     pub fn index(&self) -> &[ChunkIndexEntry] {
@@ -268,13 +288,22 @@ impl<W: SyncSink> FinishedSegment<W> {
         &mut self,
         work: SyncWork<'c, 'o>,
     ) -> Result<(), SyncWorkError<'c, 'o>> {
-        if let Err(error) = check_sync(&self._lease.budget, &work, &self.first, &self.last) {
+        if let Err(error) = check_sync(
+            &self._lease.budget,
+            &work,
+            &self.first,
+            &self.last,
+            &self.base,
+        ) {
             return Err(SyncWorkError {
                 error,
                 work: Some(work),
             });
         }
         let result = self.sink.flush().and_then(|()| self.sink.sync_all());
+        if result.is_ok() {
+            self.settle();
+        }
         work.complete(if result.is_ok() {
             SyncResult::Synced
         } else {
@@ -297,14 +326,17 @@ impl<W: SyncSink> SegmentWriter<W> {
     ) -> Result<Self, StorageError> {
         config.reservation(&channels, budget.producers)?;
         let target_lease = TargetLease::enter(&budget)?;
-        Self::with_target(budget, config, channels, sink, target_lease)
+        Self::with_target(budget, config, channels, sink, target_lease, true)
     }
+    /// `standalone` writers record their unsynced records in the target's
+    /// file ledger when released; a SegmentLog does that for its own files.
     pub(super) fn with_target(
         budget: WriterBudget,
         config: WriterConfig,
         channels: Vec<StorageChannel>,
         mut sink: W,
         target_lease: TargetLease,
+        standalone: bool,
     ) -> Result<Self, StorageError> {
         let bytes = config.reservation(&channels, budget.producers)?;
         let lease = budget.reserve(bytes)?;
@@ -396,6 +428,9 @@ impl<W: SyncSink> SegmentWriter<W> {
             index: Vec::with_capacity(config.index_entries(count)),
             last: vec![0; budget.producers].into_boxed_slice(),
             first: vec![0; budget.producers].into_boxed_slice(),
+            base: budget.target_state.files.base(),
+            dirty: false,
+            standalone,
             encoder: Vec::with_capacity(config.max_payload_bytes + codec::OVERHEAD),
             records: 0,
             chunks: 0,
@@ -481,6 +516,11 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.last[p] = record.receipt.accepted_seq;
         if self.first[p] == 0 {
             self.first[p] = record.receipt.accepted_seq;
+        }
+        self.dirty = true;
+        if let Some(lease) = &self.lease {
+            let files = &lease.budget.target_state.files;
+            files.appended(p, record.receipt.accepted_seq);
         }
         let entry = self.current[channel].get_or_insert(ChunkIndexEntry {
             channel_id: record.metadata.channel_id,
@@ -653,7 +693,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             .lease
             .as_ref()
             .ok_or(StorageError::Poisoned)
-            .and_then(|lease| check_sync(&lease.budget, &work, &self.first, &self.last))
+            .and_then(|lease| check_sync(&lease.budget, &work, &self.first, &self.last, &self.base))
             .and({
                 if self.poisoned {
                     Err(StorageError::Poisoned)
@@ -670,6 +710,9 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.signals.sync.store(true, Ordering::Release);
         let result = self.flush_chunk();
         self.signals.sync.store(false, Ordering::Release);
+        if result.is_ok() {
+            self.dirty = false;
+        }
         work.complete(if result.is_ok() {
             SyncResult::Synced
         } else {
@@ -690,13 +733,22 @@ impl<W: SyncSink> SegmentWriter<W> {
         let mut sink = writer.into_inner();
         sink.flush().map_err(StorageError::Io)?;
         let safe = self.signals.position.load(Ordering::Acquire);
+        let lease = self.lease.take().ok_or(StorageError::Poisoned)?;
+        // Releasing the target claim: a later file of this target must not
+        // stand in for these records until this file is synced.
+        let owes = self.standalone && std::mem::take(&mut self.dirty);
+        if owes {
+            lease.budget.target_state.files.owe(&self.first, &self.last);
+        }
         Ok(FinishedSegment {
             sink: sink.inner,
             index: std::mem::take(&mut self.index),
             safe,
             first: std::mem::take(&mut self.first),
             last: std::mem::take(&mut self.last),
-            _lease: self.lease.take().ok_or(StorageError::Poisoned)?,
+            base: std::mem::take(&mut self.base),
+            owes,
+            _lease: lease,
         })
     }
 }
@@ -706,6 +758,12 @@ impl<W: SyncSink> Drop for SegmentWriter<W> {
         // finish/sync methods produce completion observations.
         if let Some(writer) = self.writer.take() {
             drop(writer.into_inner());
+        }
+        // Unsynced records stay owed: no later file stands in for them.
+        if self.standalone && self.dirty {
+            if let Some(lease) = &self.lease {
+                lease.budget.target_state.files.owe(&self.first, &self.last);
+            }
         }
     }
 }

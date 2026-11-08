@@ -677,6 +677,114 @@ fn multi_segment_control_sync_preserves_rejected_work_and_reports_directory_fail
     }
 }
 
+/// REV-052 RV-128: a log dropped with written but unsynced records leaves
+/// them owed; a later log of the same target cannot take a barrier over them
+/// once their Written details expired, unless the dropped log synced first.
+#[test]
+fn a_dropped_unsynced_log_keeps_its_records_owed_to_a_later_log() {
+    use dot_logger::completion::{Boundary, ProducerRange, QueryOutcome, Update};
+    use dot_logger::control::{ControlConfig, ControlOwner};
+    use std::time::{Duration, Instant};
+    for synced in [false, true] {
+        let plan = support::plan();
+        let route = support::routing();
+        let mut tracking = support::tracking(4);
+        tracking.history_retention = Duration::from_millis(1);
+        let mut owner = CaptureOwner::new_tracked(
+            &plan,
+            42,
+            1,
+            &[ChannelConfig::new(7, 99, 1)],
+            &route,
+            tracking,
+        )
+        .unwrap();
+        owner.scope(|mut scope| {
+            let now = Instant::now();
+            let completion = scope.completion().unwrap();
+            let control = ControlOwner::new(
+                &plan,
+                scope.control(),
+                ControlConfig {
+                    sync_slots: 1,
+                    work_per_poll: 32,
+                },
+                now,
+            )
+            .unwrap();
+            let (mut producer, a) = scope.next().unwrap();
+            let (_, b) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![a, b], route).unwrap();
+            let budget = router.writer_budget(10).unwrap();
+            let log = |budget| {
+                let state = Rc::new(RefCell::new(State {
+                    free: u64::MAX,
+                    ..State::default()
+                }));
+                SegmentLog::new(
+                    budget,
+                    writer(),
+                    channels(),
+                    retention(RetentionMode::Continuous),
+                    Store(state),
+                    0,
+                )
+                .unwrap()
+            };
+            let mut first = log(budget.clone());
+            router.scope(|mut dispatch, mut outputs| {
+                let barrier =
+                    |target: &mut SegmentLog<Store>,
+                     dispatch: &mut dot_logger::routing::Dispatcher<'_, '_>| {
+                        let mut ranges = [ProducerRange::default(); 2];
+                        let frozen = completion.capture_scope(&mut ranges).unwrap();
+                        let token = control
+                            .request_sync(frozen, &[10], now, now + Duration::from_secs(5))
+                            .unwrap();
+                        let work = control
+                            .next_sync(token, 10, now, dispatch, &mut ranges)
+                            .unwrap()
+                            .unwrap();
+                        let result = target.sync_work(work).map_err(|e| e.error);
+                        control.poll(now).unwrap();
+                        control.release_sync(token).unwrap();
+                        result
+                    };
+                let receipt =
+                    support::accepted(producer.try_record_small(support::meta(), &[1]).unwrap());
+                dispatch.turn(now, &mut [None; 8]).unwrap();
+                let delivery = outputs[0].try_next(now).unwrap().unwrap();
+                first.write_batch(&[&delivery], 1).unwrap();
+                drop(delivery);
+                let optional = outputs[1].try_next(now).unwrap().unwrap();
+                optional
+                    .report(Update::Confirmed(Boundary::Written))
+                    .unwrap();
+                drop(optional);
+                if synced {
+                    barrier(&mut first, &mut dispatch).unwrap();
+                }
+                drop(first);
+                std::thread::sleep(Duration::from_millis(10));
+                assert_eq!(
+                    completion
+                        .poll(receipt, 10, Boundary::Written)
+                        .unwrap()
+                        .outcome,
+                    QueryOutcome::Expired
+                );
+                let mut second = log(budget);
+                let result = barrier(&mut second, &mut dispatch);
+                if synced {
+                    result.unwrap();
+                } else {
+                    assert!(matches!(result, Err(StorageError::InvalidRecord)));
+                }
+            });
+        });
+    }
+}
+
 #[cfg(all(unix, not(miri)))]
 #[test]
 fn filesystem_store_rotates_into_independently_readable_files_and_refuses_reuse() {

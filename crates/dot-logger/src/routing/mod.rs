@@ -37,6 +37,7 @@ pub(crate) struct TargetLedger {
     pending: AtomicUsize,
     cancelled: AtomicBool,
     pub(crate) writer_active: AtomicBool,
+    pub(crate) files: crate::storage::FileLedger,
 }
 impl TargetLedger {
     fn snapshot(&self) -> TargetSnapshot {
@@ -423,6 +424,10 @@ impl<'owner> Router<'owner> {
             add(&mut reserved, array_bytes(producers, size_of::<u64>())?)?;
             add(
                 &mut reserved,
+                array_bytes(producers, crate::storage::FileLedger::PRODUCER_BYTES)?,
+            )?;
+            add(
+                &mut reserved,
                 array_bytes(target.pending_slots, size_of::<Option<Pending<'_>>>())?,
             )?;
         }
@@ -596,7 +601,10 @@ impl<'owner> Router<'owner> {
                     write,
                     read,
                     pending,
-                    ledger: Arc::new(TargetLedger::default()),
+                    ledger: Arc::new(TargetLedger {
+                        files: crate::storage::FileLedger::new(producers),
+                        ..TargetLedger::default()
+                    }),
                     written: vec![0; producers].into_boxed_slice(),
                 }
             })
@@ -815,11 +823,17 @@ impl Dispatcher<'_, '_> {
         else {
             return Err(RoutingError::InputsMismatch);
         };
+        // An ended record proves Written only when this target's completion
+        // contract needs Written first; an Enqueued contract ends a record
+        // (and lets its detail expire) before any write (REV-052 RV-129).
         let written = completion
             .targets()
             .iter()
             .find(|contract| contract.id == target)
-            .is_some_and(|contract| contract.supported.contains(Boundary::Written));
+            .is_some_and(|contract| {
+                contract.supported.contains(Boundary::Written)
+                    && matches!(contract.completion, Boundary::Written | Boundary::Synced)
+            });
         if !written {
             return self.drained_for_sync(completion, target, ranges);
         }
@@ -846,9 +860,13 @@ impl Dispatcher<'_, '_> {
                 .ok_or(RoutingError::InputsMismatch)?;
             // A completion slot is reused only after its record ended on every
             // target, so only the newest `window` sequences can be pending.
-            let mut seq = (*mark + 1)
-                .max(range.last.saturating_sub(window.saturating_sub(1)))
-                .max(range.first);
+            // `mark` claims every sequence up to it, so it only follows a
+            // checked run that starts right after it: a range starting past
+            // that point is checked on its own and leaves `mark` alone
+            // (REV-052 RV-129).
+            let resume = (*mark + 1).max(range.last.saturating_sub(window.saturating_sub(1)));
+            let mut seq = resume.max(range.first);
+            let contiguous = seq == resume;
             while seq <= range.last {
                 let receipt = crate::capture::CaptureReceipt {
                     session_id: self.session_id,
@@ -862,7 +880,9 @@ impl Dispatcher<'_, '_> {
                             QueryOutcome::Pending | QueryOutcome::Busy
                         ) =>
                     {
-                        *mark = seq;
+                        if contiguous {
+                            *mark = seq;
+                        }
                         seq += 1;
                     }
                     Ok(_) | Err(CompletionError::Busy) => return Ok(false),

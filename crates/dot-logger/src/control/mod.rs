@@ -844,6 +844,30 @@ impl<'owner> ControlOwner<'owner> {
         })
     }
 }
+/// What other files of one target may hold of a producer without a proven
+/// sync, as seen by one file (REV-052 RV-128).
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Foreign {
+    /// Hull of released files still owing their sync, `(0, 0)` when none.
+    pub(crate) owed: (u64, u64),
+    /// Highest sequence the target's files appended before this file.
+    pub(crate) base: u64,
+    /// Highest sequence the target's files appended so far.
+    pub(crate) appended: u64,
+}
+impl Foreign {
+    /// The parts of `from..=to` another file may hold unsynced: the owed
+    /// hull up to `base`, and whatever later files appended after it.
+    fn spans(self, from: u64, to: u64) -> impl Iterator<Item = (u64, u64)> {
+        let earlier = if self.owed.0 == 0 {
+            (1, 0)
+        } else {
+            (from.max(self.owed.0), to.min(self.owed.1).min(self.base))
+        };
+        let later = (from.max(self.base.saturating_add(1)), to.min(self.appended));
+        [earlier, later].into_iter().filter(|(lo, hi)| lo <= hi)
+    }
+}
 /// Adapter-owned synchronization operation. Hold through actual IO completion or
 /// confirmed cancellation. Releasing without acknowledgment reports Unknown.
 ///
@@ -868,30 +892,37 @@ pub struct SyncWork<'control, 'owner> {
     armed: bool,
 }
 impl SyncWork<'_, '_> {
-    pub(crate) fn covers_file(&self, first: &[u64], last: &[u64]) -> Result<bool, ControlError> {
+    /// Whether this barrier may be acknowledged by syncing one file that
+    /// appended `first..=last` of each producer. A record outside that range
+    /// is owed to this file only while still pending; one that `foreign` says
+    /// another file may hold unsynced needs a positive proof instead.
+    pub(crate) fn covers_file(
+        &self,
+        first: &[u64],
+        last: &[u64],
+        foreign: impl Fn(usize) -> Foreign,
+    ) -> Result<bool, ControlError> {
         let completion = self.owner.completion;
         let slot = &self.owner.slots[self.token.slot];
         if first.len() != slot.ranges.len() || last.len() != slot.ranges.len() {
             return Ok(false);
         }
+        // Under a Synced contract a record ends only once Synced or failed,
+        // so an ended (expired, reused) record owes no file anything. Under
+        // Written it may have ended unsynced in another file (REV-052 RV-128).
+        let ended_is_synced = completion
+            .targets()
+            .iter()
+            .find(|contract| contract.id == self.target)
+            .is_some_and(|contract| contract.completion == Boundary::Synced);
+        let window = completion.registry.limits.window as u64;
         for (p, range) in slot.ranges.iter().enumerate() {
             let start = range.first.load(Ordering::Acquire);
             let end = range.last.load(Ordering::Acquire);
             if start == 0 || end < start {
                 continue;
             }
-            // A new segment cannot stand in for a previous segment's unsynced
-            // writes. Check only the portions outside this file's known range:
-            // `first`/`last` span every record this log ever appended, in
-            // per-producer order, so a record routed here and written lies
-            // inside. Outside it only a record that is not yet terminal could
-            // still be owed to this file. A completion slot is reused only
-            // after its record turned terminal on every target, so every
-            // sequence older than the newest `window` is terminal, and an
-            // Expired one is terminal too. Polling the newest `window` of each
-            // portion therefore decides it, however sparse this target's
-            // share of the producer is (TASK-023 S2b, routed outputs).
-            let window = completion.registry.limits.window as u64;
+            let foreign = foreign(p);
             let mut outside = [(1, 0); 2];
             if first[p] == 0 {
                 outside[0] = (start, end);
@@ -903,29 +934,56 @@ impl SyncWork<'_, '_> {
                     outside[1] = (start.max(last[p] + 1), end);
                 }
             }
-            for (seq, end) in outside {
-                if end < seq {
+            for (from, to) in outside {
+                if to < from {
                     continue;
                 }
-                let mut seq = seq.max(end.saturating_sub(window.saturating_sub(1)));
-                loop {
-                    let receipt = crate::capture::CaptureReceipt {
-                        session_id: self.token.session_id,
-                        producer_id: p as u32,
-                        accepted_seq: seq,
-                    };
-                    let status = completion.poll(receipt, self.target, Boundary::Synced)?;
-                    if status.outcome == QueryOutcome::Busy {
-                        return Err(ControlError::Busy);
+                // Another file's share: every record must be proven Synced,
+                // not routed here, or ended without a write. Details older
+                // than the window are gone, so such a span is unproven.
+                if !ended_is_synced {
+                    for (lo, hi) in foreign.spans(from, to) {
+                        if hi - lo >= window {
+                            return Ok(false);
+                        }
+                        if !self.settled(p, lo, hi, true)? {
+                            return Ok(false);
+                        }
                     }
-                    if status.outcome == QueryOutcome::Pending {
-                        return Ok(false);
-                    }
-                    if seq == end {
-                        break;
-                    }
-                    seq += 1;
                 }
+                // Never appended by any file: a completion slot is reused only
+                // after its record ended on every target, so only the newest
+                // `window` sequences can still be owed to this file.
+                if !self.settled(
+                    p,
+                    from.max(to.saturating_sub(window.saturating_sub(1))),
+                    to,
+                    false,
+                )? {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+    /// Poll `from..=to` of producer `p` at Synced: pending fails, and with
+    /// `strict` so does an expired detail.
+    fn settled(&self, p: usize, from: u64, to: u64, strict: bool) -> Result<bool, ControlError> {
+        let completion = self.owner.completion;
+        for seq in from..=to {
+            let receipt = crate::capture::CaptureReceipt {
+                session_id: self.token.session_id,
+                producer_id: p as u32,
+                accepted_seq: seq,
+            };
+            match completion
+                .poll(receipt, self.target, Boundary::Synced)?
+                .outcome
+            {
+                QueryOutcome::Busy => return Err(ControlError::Busy),
+                QueryOutcome::Pending => return Ok(false),
+                QueryOutcome::Expired if strict => return Ok(false),
+                _ => {}
             }
         }
         Ok(true)

@@ -210,6 +210,10 @@ pub struct SegmentLog<S: SegmentStore> {
     channels: Vec<StorageChannel>,
     first: Box<[u64]>,
     last: Box<[u64]>,
+    /// The target's appended marks when this log started.
+    base: Box<[u64]>,
+    /// Appended records not yet covered by a sync of their file.
+    dirty: bool,
     scratch: Vec<u8>,
     now: u64,
     next: u64,
@@ -219,6 +223,15 @@ pub struct SegmentLog<S: SegmentStore> {
     target: TargetLease,
     // Last: retained logger allocations are released before their reservation.
     catalog: Catalog,
+}
+impl<S: SegmentStore> Drop for SegmentLog<S> {
+    fn drop(&mut self) {
+        // Unsynced records stay owed: no later file of this target stands in
+        // for them (REV-052 RV-128).
+        if self.dirty {
+            self.budget.target_state.files.owe(&self.first, &self.last);
+        }
+    }
 }
 fn catalog_extra(
     config: WriterConfig,
@@ -319,6 +332,8 @@ impl<S: SegmentStore> SegmentLog<S> {
             channels,
             first: vec![0; producers].into_boxed_slice(),
             last: vec![0; producers].into_boxed_slice(),
+            base: budget.target_state.files.base(),
+            dirty: false,
             scratch: Vec::with_capacity(config.max_payload_bytes + codec::OVERHEAD),
             now,
             next: 0,
@@ -441,6 +456,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             self.channels.clone(),
             sink,
             self.target.clone(),
+            false,
         )?;
         self.writer = Some(writer);
         self.active = Some(Active {
@@ -561,6 +577,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             self.first[p] = record.receipt.accepted_seq;
         }
         self.last[p] = record.receipt.accepted_seq;
+        self.dirty = true;
         Ok(AppendReport {
             segment: a.sequence,
             rotated,
@@ -605,6 +622,8 @@ impl<S: SegmentStore> SegmentLog<S> {
             mono_range: a.range,
         });
         self.active = None;
+        // Earlier files were synced at their own publication.
+        self.dirty = false;
         self.poisoned = false;
         Ok(())
     }
@@ -756,7 +775,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         let check = if self.poisoned {
             Err(StorageError::Poisoned)
         } else {
-            super::writer::check_sync(&self.budget, &work, &self.first, &self.last)
+            super::writer::check_sync(&self.budget, &work, &self.first, &self.last, &self.base)
         };
         if let Err(error) = check {
             return Err(SyncWorkError {
@@ -773,6 +792,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             self.poisoned = true;
         }
         if result.is_ok() {
+            self.dirty = false;
             if let Some(a) = self.active.as_mut() {
                 a.visible = a.range;
             }

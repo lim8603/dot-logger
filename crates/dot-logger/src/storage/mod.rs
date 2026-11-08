@@ -66,6 +66,96 @@ pub(crate) struct Lease {
     budget: WriterBudget,
     bytes: usize,
 }
+/// Files one target wrote, kept across its successive writers. Under a Written
+/// completion contract an ended or expired record was only written, so the
+/// completion history cannot show which file still owes its sync; a barrier
+/// on one file asks this ledger instead (REV-052 RV-128). Management path only.
+#[derive(Default)]
+pub(crate) struct FileLedger {
+    /// Per producer: highest sequence any file of this target appended.
+    appended: Box<[std::sync::atomic::AtomicU64]>,
+    owed: std::sync::Mutex<Owed>,
+}
+#[derive(Default)]
+struct Owed {
+    /// Released files whose appended records were never proven synced.
+    files: usize,
+    /// Per producer: hull of those files' ranges, `(0, 0)` when none.
+    ranges: Box<[(u64, u64)]>,
+}
+impl FileLedger {
+    pub(crate) fn new(producers: usize) -> Self {
+        Self {
+            appended: (0..producers).map(|_| Default::default()).collect(),
+            owed: std::sync::Mutex::new(Owed {
+                files: 0,
+                ranges: vec![(0, 0); producers].into_boxed_slice(),
+            }),
+        }
+    }
+    /// Bytes `new` allocates per producer beyond the struct itself.
+    pub(crate) const PRODUCER_BYTES: usize =
+        size_of::<std::sync::atomic::AtomicU64>() + size_of::<(u64, u64)>();
+    fn owed(&self) -> std::sync::MutexGuard<'_, Owed> {
+        // Owed is updated in place without panicking paths; a poisoned
+        // guard still holds consistent counts.
+        self.owed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+    pub(crate) fn appended(&self, producer: usize, seq: u64) {
+        if let Some(mark) = self.appended.get(producer) {
+            mark.fetch_max(seq, Ordering::AcqRel);
+        }
+    }
+    /// What this target's files appended so far, as a new file's baseline.
+    pub(crate) fn base(&self) -> Box<[u64]> {
+        self.appended
+            .iter()
+            .map(|mark| mark.load(Ordering::Acquire))
+            .collect()
+    }
+    /// A file released its writer while holding unsynced records.
+    pub(crate) fn owe(&self, first: &[u64], last: &[u64]) {
+        let mut owed = self.owed();
+        owed.files += 1;
+        for (range, (&first, &last)) in owed.ranges.iter_mut().zip(first.iter().zip(last)) {
+            if first == 0 {
+                continue;
+            }
+            *range = if range.0 == 0 {
+                (first, last)
+            } else {
+                (range.0.min(first), range.1.max(last))
+            };
+        }
+    }
+    /// A released file that owed its records was synced.
+    pub(crate) fn settle(&self) {
+        let mut owed = self.owed();
+        owed.files = owed.files.saturating_sub(1);
+        if owed.files == 0 {
+            owed.ranges.fill((0, 0));
+        }
+    }
+    /// The records of `producer` another file may hold unsynced, as seen by a
+    /// file created when this ledger's appended marks were `base`.
+    pub(crate) fn foreign(&self, producer: usize, base: u64) -> crate::control::Foreign {
+        let owed = self.owed();
+        crate::control::Foreign {
+            owed: if owed.files == 0 {
+                (0, 0)
+            } else {
+                owed.ranges.get(producer).copied().unwrap_or((0, 0))
+            },
+            base,
+            appended: self
+                .appended
+                .get(producer)
+                .map_or(0, |mark| mark.load(Ordering::Acquire)),
+        }
+    }
+}
 #[derive(Clone)]
 struct TargetLease {
     _claim: Arc<TargetClaim>,

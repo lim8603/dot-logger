@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) RV-128~130 조치·검증 후 S2c — P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합, 32생산자·16파일·128채널) |
+| 다음 액션 | S2c — P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합, 32생산자·16파일·128채널). [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) RV-128~130 조치 완료([EV-056](../../05_verification/verification_evidence.md#ev-056)), Close는 Human 승인 대기 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -72,3 +72,5 @@ S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../cra
 - **환경:** `/data/build` 여유 부족(68.3GB)은 Human 결정으로 build cache를 정리해 472.9GB로 회복했다. 측정 run 전에 다시 cap+reserve를 검사한다.
 
 2026-11-07 독립 리뷰: [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional, P1 2·P2 1). 공개 L4 sync coverage·부분 scope watermark와 P0/logger 측정 구간을 후속 개발 세션에서 조치·검증한 뒤 S2c/S3로 진행한다. EV-054·055의 로컬 구현·과거 실행 결과와 정식 측정 NotRun은 유지한다.
+
+2026-11-08 #001 조치: RV-128·129(공개 L4 sync 경계) `97e2b12`, RV-130(측정 구간) `f8f2859` — [EV-056](../../05_verification/verification_evidence.md#ev-056). **판정 규칙 추가:** 부하와 control/safety는 공통 `Gate` 시작 시각부터 계시하고(setup 제외), `LoadWindow`가 skew 0·control 구간 99% 이상 중첩일 때만 off/on 비교에 쓴다(아니면 `NotConcurrent`). 최종 내구화 tail은 부하 구간과 분리해 보고한다. S3의 예열 10초 분리는 S3 구현에서 이 공통 시작 기준으로 둔다(아직 미구현).

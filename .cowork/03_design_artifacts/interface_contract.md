@@ -1012,8 +1012,17 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 [EV-054](../05_verification/verification_evidence.md#ev-054). Human 결정(2026-11-07, 권고안 3건)을 따른다.
 
 - **IO batch 상한(③):** 실제 batch = min(`Budget::batching` 값, target별 기록 예산/2). 기록 예산은 모든 writer slot 합이다. `Plan::batch_records`로 보이고, facade batch 버퍼 예산(§19.4)도 이 값으로 계산한다.
-- **주기 sync 발급(④):** Written 경계가 있는 target은 "cutoff까지의 기록이 각 생산자 ingress를 떠났고, 그중 이 target으로 라우팅된 기록이 모두 Written 이상(또는 종료)"일 때 barrier를 발급한다. 연속 부하에서도 1초 주기 sync가 일어난다. 확인은 최신 완료 window만 조회하고 (target, 생산자)별 단조 watermark로 비용을 나눈다. 다른 target은 기존 조건(진행 중 호출 0·feedback 비어 있음·target 장부 0)을 유지한다.
-- **부분 라우팅 sync coverage(①):** 파일이 받은 범위 밖 구간은 최신 window만 조회하고 Expired는 종료로 본다.
+- **주기 sync 발급(④):** Written 경계가 있는 target은 "cutoff까지의 기록이 각 생산자 ingress를 떠났고, 그중 이 target으로 라우팅된 기록이 모두 Written 이상(또는 종료)"일 때 barrier를 발급한다. 연속 부하에서도 1초 주기 sync가 일어난다. 확인은 최신 완료 window만 조회하고 (target, 생산자)별 단조 watermark로 비용을 나눈다. 다른 target은 기존 조건(진행 중 호출 0·feedback 비어 있음·target 장부 0)을 유지한다. **§19.6에서 한정:** watermark는 연속 구간만 전진하고, 이 경로는 완료 기준이 Written/Synced인 target에만 쓴다.
+- **부분 라우팅 sync coverage(①):** 파일이 받은 범위 밖 구간은 최신 window만 조회하고 Expired는 종료로 본다. **§19.6에서 한정:** 이 생략은 어떤 파일도 append하지 않은 구간에만 적용한다.
 - **폐기 없음(②):** 필수 target 입구 `Capacity` 폐기가 drop 순서 경쟁으로 일어나지 않는다. 과부하는 RT `Capacity` 거절로만 보인다.
 - **회전(⑤·⑥):** facade segment는 바이트 상한(§19.3), 기록당 상한 추정(payload + 2,560B)의 누적, 16,384건 중 먼저 닿는 것으로 회전한다. 보존 segment 개수 상한은 이 회전이 만들 수 있는 가장 작은 segment(min(segment × 31/2,560, 16,384 × 31B), storage 공용 공식) 기준으로 계산해 설정 보존 바이트가 실제 한도가 되게 한다(Human 2026-11-07 「권고대로」). 시간 회전(60초)·종료로 닫히는 더 작은 segment는 이 계산 밖이다.
 - **IO 스레드 견고성(⑦·⑧):** Busy 완료 보고는 최대 1초 재시도한다. IO 루프는 `stop`을 `finish`보다 먼저 읽어, Closed 뒤 `.active` segment가 남지 않는다. [EV-055](../05_verification/verification_evidence.md#ev-055).
+
+### 19.6 REV-052 조치 반영 — 2026-11-08
+
+[REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md), [EV-056](../05_verification/verification_evidence.md#ev-056). 기존 승인 범위의 결함 조치이며 새 공개 API는 없다.
+
+- **파일 sync coverage(RV-128):** 완료 기준이 Written인 target에서 종료·Expired는 "어느 파일에 쓰였다"는 과거 사실일 뿐 Synced가 아니다. target마다 writer 교체 뒤에도 남는 파일 장부가 producer별로 ① 이 target의 파일이 append한 최고 seq, ② sync 없이 놓인 파일들의 범위를 기록한다. 한 파일의 `sync_work`에서 그 파일 범위 밖이면서 **다른 파일이 가질 수 있는 기록**(파일 시작 전 sync 없이 놓인 범위, 파일 시작 뒤 다른 파일이 append한 범위)은 Synced·NotRouted·실패 종료로 증명되어야 한다. 증명 구간이 완료 window보다 길거나 Expired면 `InvalidRecord`로 거절하고 work를 돌려준다. 어떤 파일도 append하지 않은 구간만 최신 window의 Pending 여부로 판정한다(§19.5 ①). 완료 기준이 Synced인 target은 종료가 Synced 또는 실패라 증명을 생략한다.
+- **부채 기록·해소:** 단독 `SegmentWriter`가 sync 안 된 기록을 가진 채 `finish`하거나 Drop되면, 또는 `SegmentLog`가 그런 상태로 Drop되면 부채가 남는다. `FinishedSegment::sync_work`(복구의 sync 포함) 성공이 그 파일의 부채를 해소한다. 해소 수단이 없는 파일(sync 없이 Drop)의 범위는 세션 끝까지 다른 파일로 대신 덮을 수 없다. 여러 파일에 걸친 barrier는 파일별 범위로 나눠 각 파일에서 처리한다(`FinishedSegment::sync_work` 문서의 "다른 segment는 별도 조정" 계약). facade `SegmentLog`는 회전 시 이전 파일을 sync하고 전체 범위를 가지므로 동작이 바뀌지 않는다.
+- **sync 발급 watermark(RV-129):** (target, 생산자) Written watermark는 그 바로 다음부터 연속으로 확인한 구간만 전진한다. 더 뒤에서 시작하는 부분 범위는 그 요청에서만 확인한다. 완료 window 생략·Expired 통과는 완료 기준이 Written/Synced인 target에만 쓰고, Enqueued 기준 target은 drained 조건을 쓴다.
+- **측정 구간(RV-130, harness):** P0·logger·control·safety는 각자 setup(스레드 시작·pin·파일 생성·logger 시작·조회)을 마친 뒤 공통 절대 시작 시각부터 계시한다. 처리량 분모·수락 시각·control 첫 release가 모두 이 시각 기준이다. 부하 수락 구간과 최종 내구화 tail을 나눠 보고하고, skew 0·control 구간의 99% 이상 중첩이 아니면 `NotConcurrent`로 판정해 off/on 비교에 쓰지 않는다.

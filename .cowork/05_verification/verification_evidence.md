@@ -957,6 +957,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96/1.85 exit0·rustdoc exit0·workspace 1.96/1.85 각 509 Pass(5 ignore)·feature matrix 1.96 exit0, 1.85는 4회 중 1회 실패(로그 미보존, 원인 미상)·3회 exit0·Miri CI 묶음 lib 27(2 ignore)·tc_002/003/005/006·fault_storage Pass.
 - **미실행:** S2c(P2 raw·P3 혼합), S3 정식 측정·병목 분석, RT, native(T3). 1.85 matrix 1회 실패 원인.
 
+<a id="ev-056"></a>
+## EV-056 — REV-052 조치(RV-128~130)
+
+- **판정:** 로컬 조치 Pass. REV-052 Resolved(Close는 Human 승인 대기). 정식 성능 측정·RT·native(T3)는 NotRun.
+- **대상/환경:** 소스 `97e2b12`(RV-128·129)·`f8f2859`(RV-130), base `ef15c06`. 2026-11-08 #001 AI, Ubuntu generic 7.0.0-42(RT 아님), powersave, `/data/build` NVMe ext4. Cargo.lock 변경 없음. [REV-052](reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md), [API §19.6](../03_design_artifacts/interface_contract.md#196-rev-052-조치-반영--2026-11-08).
+- **TDD:** RV-129 `tc_003_control` 부분 범위 2건·Enqueued 완료 기준 1건 Red → Green(겹침·역순 보호 1건). RV-128 `tc_004_storage` 시간 만료·window 재사용·역방향(finished 파일이 이후 파일 기록을 대신) 3건 Red(잘못된 `Ok`) → Green. `tc_005_retention` Drop 부채 시험은 Drop 기록을 끈 돌연변이에서 Red 확인. RV-130 `tc_012_performance` 5건 컴파일 Red → Green.
+- **확인한 계약:** Written 기준 target에서 다른 파일의 미동기화 기록(만료·재사용 포함)을 새 파일이나 이전 finished 파일이 대신 sync해도 barrier가 성공하지 않고 work가 반환된다. 해당 파일이 sync하면 부채가 해소되고 다른 파일이 다시 그 범위를 덮을 수 있다. sync 없이 Drop된 log의 범위는 계속 거절된다. 부분 범위 barrier가 앞쪽 미기록 공백을 건너뛰지 않고, Enqueued 기준 target은 쓰기 전 만료로 발급되지 않는다. F16 부분 라우팅·F6 연속 부하 주기 sync·facade 회귀 유지. 측정에서는 control 쪽 setup을 100 ms 지연해도 control origin = 부하 start이고 paced 부하 수락 구간이 유지되며, 일찍 끝난 부하는 `NotConcurrent`로 판정된다.
+- **smoke(측정 아님):** `--p0` 3초 10 MB/s·4KiB·4파일: skew 0, 중첩 2,999.18/3,000 ms, tail 11.5 ms, 판독 7,324건 일치. `--p1` 같은 조건·생산자 4: skew 0, 중첩 2,998.33/3,000 ms, tail 24.7 ms, 완료 7,324건.
+- **검증:** fmt·clippy 1.96 `-D warnings` 경고 0·Rust 1.96/MSRV 1.85 workspace 각 522 Pass(5 ignore, 기존 DB; 신규 13)·CI Miri 묶음(nightly-2026-10-26, strict provenance, seed 0..8: lib 27(2 ignore)·tc_002_pool·tc_003_routing/completion/control(22)·tc_005_retention(19, 파일 기반 1건 기존 Miri 제외)·fault_storage·tc_006_query/replay) cargo exit 0·실패 0.
+- **미실행:** rustdoc 전용·feature matrix 스크립트, 정식 S3 측정(예열 분리 포함), RT, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

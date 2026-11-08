@@ -454,7 +454,9 @@ pub fn write_logger(
         }
         Err(e) => return Err(format!("shutdown failed: {e:?}").into()),
     };
-    let (files_created, file_bytes, _) = closed_files(&directories)?;
+    // A leftover active segment means a failed output: keep the report.
+    let (files_created, file_bytes, _) =
+        closed_files(&directories).map_err(|e| format!("{e}; report {report:?}"))?;
     let payload_bytes = w.total_payload_bytes();
     Ok(LoggerRun {
         storage: StorageRun {
@@ -496,7 +498,9 @@ fn closed_files(directories: &[PathBuf]) -> Result<(u64, u64, Vec<Vec<PathBuf>>)
                     bytes += fs::metadata(&path)?.len();
                     files.push(path);
                 }
-                Some("active") => return Err(invalid("active segment after Closed")),
+                Some("active") => {
+                    return Err(format!("active segment after Closed: {}", path.display()).into());
+                }
                 _ => {}
             }
         }

@@ -968,6 +968,21 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96 `-D warnings` 경고 0·Rust 1.96/MSRV 1.85 workspace 각 522 Pass(5 ignore, 기존 DB; 신규 13)·CI Miri 묶음(nightly-2026-10-26, strict provenance, seed 0..8: lib 27(2 ignore)·tc_002_pool·tc_003_routing/completion/control(22)·tc_005_retention(19, 파일 기반 1건 기존 Miri 제외)·fault_storage·tc_006_query/replay) cargo exit 0·실패 0.
 - **미실행:** rustdoc 전용·feature matrix 스크립트, 정식 S3 측정(예열 분리 포함), RT, native(T3).
 
+<a id="ev-057"></a>
+## EV-057 — TASK-023 S2c 혼합 workload 도구·raw facade 경로와 RV-128 정정
+
+- **판정:** 로컬 구현 Pass(S2c 도구, `Channel::metadata`, RV-128 정정). 정식 측정 NotRun(S3). 발견 ⑨(32생산자·16파일 소형 소비 병목 → 주기 sync 만료)은 Open.
+- **대상/환경:** 소스 `b2899a3`(RV-128 정정)·`e5a005a`(`Channel::metadata`)·`145dc4a`(도구), base `fddd8e4`. 2026-11-08 #001 AI, Ubuntu generic 7.0.0-42(RT 아님), powersave, 16 CPU, 측정 디렉터리 `/home`(NVMe ext4, 여유 835 GB). Human 결정 「메타데이터 헬퍼」. [API §18.3·§19.6](../03_design_artifacts/interface_contract.md#196-rev-052-조치-반영--2026-11-08).
+- **TDD:** F19(`tc_013_facade`, raw loan → 채널 파일 판독) 컴파일 Red → `Channel::metadata` → Green. RV-128 정정 `an_unrouted_record_before_the_file_never_needs_a_proof` Red(`InvalidRecord`) → Green. 도구 `tc_012` 4건(혼합 배치·일정 규칙, P0 혼합 판독, logger 혼합/raw·P0 비율, P2 전부 대용량) 컴파일 Red → Green.
+- **도구:** `LargeRecords{bytes, every, streams}` — 기록 s는 `s % every == 0`이면 대용량, stream `(s/every) % streams`, 파일 `stream × files / streams`. `payload_of`·`file_of`·`due_ns`(전역 일정: 이전 기록 payload / 제시 속도)를 P0·logger·두 oracle이 함께 쓴다. logger는 stream j를 전용 raw 생산자 j(`writer_with` + `with_raw`)·채널 `file_of`에서 `producer()` loan으로, 소형은 나머지 생산자에서 `try_log`로 보낸다. raw 수락 호출 지연은 별도 히스토그램. CLI `--p0-mix`/`--p1-mix`(P2: 소형 0/s).
+- **smoke(측정 아님, 3초, control/safety 동시, 모두 LoadWindow skew 0·중첩 ≥99.8%):**
+  - P2 4×8 MiB×30/s(4파일·IO 4): P0 975 MB/s·tail 0.10초·판독 360건 일치. logger 성공, raw 360건 수락 p50 1.7·p99 7.2 µs, tail 0.14초, 거절 0.
+  - P3 P2 + 256B×10만/s(32생산자·16파일·128채널·IO 8): P0 988 MB/s·tail 0.14초·판독 300,360건 일치·miss 0. logger는 판독 300,360건·payload 일치·폐기 0이나 **tail 15.9초·`sync_failed` → Unsuccessful**, Capacity 거절 1,080만 회. `plan` 요구량 1,571,105,168 B(1 GiB 예산은 start 전 거절).
+  - 소형만 10만/s(같은 32·16·128·IO 8): 거절 0인데 tail 11.8초(소비 약 2만 건/s), `sync_failed`.
+- **발견 ⑨(Open):** 32생산자·16파일 구성에서 소형 기록 소비가 약 2만 건/s(S2b 8생산자·4파일은 약 29만 건/s)로, backlog가 주기 sync 기한(4×주기+1초 = 5초)보다 길어지면 sync가 발급 전에 만료되어 `sync_failed`가 된다. 이분 확인: 변경 전 `ef15c06`·`97e2b12` 빌드도 내구화 13~17초로 같은 속도(2회씩). `sync_failed`는 `f8f2859` 이후 빌드에서만 나타났는데, 제품 코드는 같고 부하 시작 시점만 다르다(공통 Gate). 원인 분석·조치는 S2d.
+- **검증:** fmt·clippy 1.96/1.85 경고 0·rustdoc 경고 0·Rust 1.96/MSRV 1.85 workspace 각 529 Pass(5 ignore 기존 DB)·`tc_012` 27(두 toolchain).
+- **미실행:** Miri(이번 변경분: control 정정·도구), feature matrix, 발견 ⑨ 분석, S3, RT, native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

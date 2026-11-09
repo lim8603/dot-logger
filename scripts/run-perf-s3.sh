@@ -26,12 +26,15 @@ mkdir "$out"
 log="$out/runs.jsonl"
 # S3_RAM_BYTES / S3_DRY only shorten a dry run; a real run uses neither.
 ram=${S3_RAM_BYTES:-$(($(awk '/MemTotal/{print $2}' /proc/meminfo) * 1024))}
+# The device that holds <parent>, not a fixed name: partition -> its disk.
+part=$(basename "$(findmnt -no SOURCE --target "$parent")")
+if [ -e "/sys/block/$part" ]; then disk=$part; else disk=$(basename "$(readlink -f "/sys/class/block/$part/..")"); fi
 printf '{"scope":"S3Run","started":"%s","git":"%s","dirty":%s,"dry":%s,"seconds":%s,"warmup_s":%s,"reps":%s,"kernel":"%s","rustc":"%s","ram_bytes":%s,"device":"%s"}\n' \
   "$(date -Iseconds)" "$(git rev-parse HEAD)" \
   "$([ -z "$(git status --porcelain -- crates scripts)" ] && echo false || echo true)" \
   "$([ -n "${S3_DRY:-}" ] && echo true || echo false)" \
   "$seconds" "$warmup" "$reps" "$(uname -r)" "$(rustc --version)" "$ram" \
-  "$(cat /sys/block/nvme0n1/device/model 2>/dev/null | xargs)" >>"$log"
+  "$disk $(cat "/sys/block/$disk/device/model" 2>/dev/null | xargs)" >>"$log"
 
 run() {
   local label=$1 rep=$2

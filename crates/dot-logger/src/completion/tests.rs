@@ -531,3 +531,76 @@ fn routed_db_busy_publication_keeps_the_same_attempt_and_output_permit() {
     });
     assert_eq!(budget.used_bytes(), 0);
 }
+
+fn accept(p: &mut crate::capture::Producer<'_>, byte: u8) -> CaptureReceipt {
+    let crate::capture::RecordOutcome::Accepted(receipt) =
+        p.try_record_small(metadata(), &[byte]).unwrap()
+    else {
+        panic!()
+    };
+    receipt
+}
+
+#[test]
+fn reconcile_sweeps_the_window_only_after_an_abandoned_delivery() {
+    // TASK-023 S3 finding 11: a sweep on every turn cost ~37 % of the host
+    // thread although only an abandoned delivery needs it.
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        c.report(first, 10, Update::Confirmed(Boundary::Written))
+            .unwrap();
+        // A settled slot left ACTIVE is what a sweep would terminalize.
+        let slot = &c.registry.producers[0].slots[(first.accepted_seq % 2) as usize];
+        slot.phase.store(ACTIVE, Ordering::Release);
+        assert_eq!(c.reconcile(2), 0, "no abandonment, no sweep");
+        let second = accept(&mut p, 2);
+        reader.try_read(&mut [0; 16]).unwrap();
+        drop(c.marker(second, 10).unwrap());
+        assert_eq!(c.reconcile(2), 2);
+        assert_eq!(c.totals(false).unknown, 1);
+    });
+}
+
+#[test]
+fn an_abandoned_slot_skipped_while_updating_is_reconciled_later() {
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        drop(c.marker(first, 10).unwrap());
+        let slot = &c.registry.producers[0].slots[(first.accepted_seq % 2) as usize];
+        slot.phase.store(UPDATING, Ordering::Release);
+        c.reconcile(2);
+        assert_eq!(c.totals(false).unknown, 0);
+        slot.phase.store(ACTIVE, Ordering::Release);
+        c.reconcile(2);
+        assert_eq!(c.totals(false).unknown, 1);
+    });
+}
+
+#[test]
+fn an_abandonment_after_a_finished_sweep_starts_another_sweep() {
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        drop(c.marker(first, 10).unwrap());
+        c.reconcile(2);
+        assert_eq!(c.totals(false).unknown, 1);
+        assert_eq!(c.reconcile(2), 0);
+        let second = accept(&mut p, 2);
+        reader.try_read(&mut [0; 16]).unwrap();
+        drop(c.marker(second, 10).unwrap());
+        c.reconcile(1);
+        c.reconcile(1);
+        assert_eq!(c.totals(false).unknown, 2);
+    });
+}

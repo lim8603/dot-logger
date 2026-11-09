@@ -539,7 +539,12 @@ impl<'owner> ControlOwner<'owner> {
                 {
                     let cursor = target.cursor.load(Ordering::Relaxed);
                     out.examined += 1;
-                    if let Some(receipt) = self.completion.receipt_at(cursor) {
+                    let receipt = self
+                        .completion
+                        .awaits_sync(cursor, index)
+                        .then(|| self.completion.receipt_at(cursor))
+                        .flatten();
+                    if let Some(receipt) = receipt {
                         let range = ProducerRange {
                             producer_id: receipt.producer_id,
                             first: receipt.accepted_seq,

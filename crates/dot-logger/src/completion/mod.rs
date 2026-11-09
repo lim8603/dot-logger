@@ -71,6 +71,14 @@ pub(crate) struct Registry {
     pub(crate) limits: Limits,
     readers: AtomicUsize,
     cursor: AtomicUsize,
+    /// Abandoned deliveries so far: the only state no update terminalizes.
+    abandons: AtomicU64,
+    /// `abandons` when the current sweep started.
+    swept: AtomicU64,
+    /// Slots the current sweep has still to visit.
+    sweep_left: AtomicUsize,
+    /// The sweep skipped an abandoned slot that was being updated.
+    sweep_missed: AtomicBool,
     reserved: usize,
     origin: Instant,
     retention: u64,
@@ -251,6 +259,10 @@ impl Registry {
             },
             readers: AtomicUsize::new(0),
             cursor: AtomicUsize::new(0),
+            abandons: AtomicU64::new(0),
+            swept: AtomicU64::new(0),
+            sweep_left: AtomicUsize::new(0),
+            sweep_missed: AtomicBool::new(false),
             reserved,
             origin: Instant::now(),
             retention,
@@ -485,18 +497,41 @@ impl<'owner> Completion<'owner> {
     }
     /// Reconcile at most `limit` physical slots after unreported output release.
     /// This never scans an unbounded sequence history or releases payload memory.
+    ///
+    /// Updates terminalize their own slot; only an abandoned delivery needs a
+    /// sweep. So each abandonment starts one sweep over the whole window, and
+    /// without one this does no work (TASK-023 S3 finding ⑪: sweeping on
+    /// every turn took ~37 % of the host thread). A sweep that skipped an
+    /// abandoned slot under update runs once more.
     pub fn reconcile(self, limit: usize) -> usize {
-        let total = self.registry.producers.len() * self.registry.limits.window;
+        let registry = self.registry;
+        let total = registry.producers.len() * registry.limits.window;
+        let generation = registry.abandons.load(Ordering::Acquire);
+        if registry.swept.swap(generation, Ordering::AcqRel) != generation {
+            registry.sweep_missed.store(false, Ordering::Relaxed);
+            registry.sweep_left.store(total, Ordering::Release);
+        }
+        let left = registry.sweep_left.load(Ordering::Acquire);
+        let count = limit.min(left);
         let mut terminalized = 0;
-        for _ in 0..limit.min(total) {
-            let index = self.registry.cursor.fetch_add(1, Ordering::Relaxed) % total;
-            let slot = &self.registry.producers[index / self.registry.limits.window].slots
-                [index % self.registry.limits.window];
-            if slot
-                .phase
-                .compare_exchange(ACTIVE, UPDATING, Ordering::AcqRel, Ordering::Relaxed)
-                .is_err()
+        for _ in 0..count {
+            let index = registry.cursor.fetch_add(1, Ordering::Relaxed) % total;
+            let slot = &registry.producers[index / registry.limits.window].slots
+                [index % registry.limits.window];
+            if let Err(phase) =
+                slot.phase
+                    .compare_exchange(ACTIVE, UPDATING, Ordering::AcqRel, Ordering::Relaxed)
             {
+                if phase == UPDATING {
+                    let sequence = slot.sequence.load(Ordering::Acquire);
+                    if slot
+                        .cells
+                        .iter()
+                        .any(|c| c.abandoned.load(Ordering::Acquire) == sequence)
+                    {
+                        registry.sweep_missed.store(true, Ordering::Relaxed);
+                    }
+                }
                 continue;
             }
             let sequence = slot.sequence.load(Ordering::Acquire);
@@ -514,6 +549,11 @@ impl<'owner> Completion<'owner> {
                 self.registry.stamp(slot);
             }
             slot.phase.store(phase, Ordering::Release);
+        }
+        let rest = left - count;
+        registry.sweep_left.store(rest, Ordering::Release);
+        if rest == 0 && registry.sweep_missed.swap(false, Ordering::AcqRel) {
+            registry.sweep_left.store(total, Ordering::Release);
         }
         terminalized
     }
@@ -614,6 +654,27 @@ impl<'owner> Completion<'owner> {
         }
         out
     }
+    /// Whether the record in physical slot `index` can still take a Synced
+    /// update for target position `target`: routed there, Written, and
+    /// neither Synced nor terminal. `false` is exactly what `poll` would
+    /// skip at this moment, read from one cell word without the receipt
+    /// lookup; most cells belong to other targets (TASK-023 S3 finding ⑪).
+    pub(crate) fn awaits_sync(self, index: usize, target: usize) -> bool {
+        let window = self.registry.limits.window;
+        let Some(cell) = self
+            .registry
+            .producers
+            .get(index / window)
+            .and_then(|p| p.slots[index % window].cells.get(target))
+        else {
+            return false;
+        };
+        let word = cell.word.load(Ordering::Acquire);
+        let confirmed = Boundaries(word & 31);
+        word & (NOT_ROUTED | TERM_MASK) == 0
+            && confirmed.contains(Boundary::Written)
+            && !confirmed.contains(Boundary::Synced)
+    }
     pub(crate) fn receipt_at(self, index: usize) -> Option<CaptureReceipt> {
         let producer = self
             .registry
@@ -713,6 +774,7 @@ impl<'owner> Completion<'owner> {
         let index = self.registry.target(target).ok()?;
         Some(AbandonMarker {
             cell: &slot.cells[index].abandoned,
+            abandons: &self.registry.abandons,
             sequence: receipt.accepted_seq,
             armed: true,
         })
@@ -838,6 +900,7 @@ impl Drop for Reservation<'_> {
 }
 pub(crate) struct AbandonMarker<'a> {
     cell: &'a AtomicU64,
+    abandons: &'a AtomicU64,
     sequence: u64,
     armed: bool,
 }
@@ -850,6 +913,8 @@ impl Drop for AbandonMarker<'_> {
     fn drop(&mut self) {
         if self.armed {
             self.cell.fetch_max(self.sequence, Ordering::Release);
+            // After the cell: a sweep started for this count sees it.
+            self.abandons.fetch_add(1, Ordering::Release);
         }
     }
 }

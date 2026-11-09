@@ -604,3 +604,23 @@ fn an_abandonment_after_a_finished_sweep_starts_another_sweep() {
         assert_eq!(c.totals(false).unknown, 2);
     });
 }
+
+#[test]
+fn dropping_a_reported_delivery_does_not_start_a_sweep() {
+    // Every IO guard drops its marker armed after reporting; only an
+    // unreported one is an abandonment that needs a sweep.
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        let marker = c.marker(first, 10).unwrap();
+        c.report(first, 10, Update::Confirmed(Boundary::Written))
+            .unwrap();
+        drop(marker);
+        let slot = &c.registry.producers[0].slots[(first.accepted_seq % 2) as usize];
+        slot.phase.store(ACTIVE, Ordering::Release);
+        assert_eq!(c.reconcile(2), 0, "a reported delivery is no abandonment");
+    });
+}

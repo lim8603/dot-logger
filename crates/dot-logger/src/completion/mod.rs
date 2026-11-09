@@ -140,6 +140,8 @@ impl Registry {
             || config.updates_per_turn == 0
             || config.reconcile_per_turn == 0
             || config.targets.is_empty()
+            // An abandon marker names its target in 16 bits.
+            || config.targets.len() > usize::from(u16::MAX)
             || config.targets.len() != routing.targets.len()
             || routing.routes.len() != channels.len()
         {
@@ -770,12 +772,13 @@ impl<'owner> Completion<'owner> {
         receipt: CaptureReceipt,
         target: u32,
     ) -> Option<AbandonMarker<'owner>> {
-        let slot = self.registry.locate(receipt).ok()?;
+        self.registry.locate(receipt).ok()?;
         let index = self.registry.target(target).ok()?;
         Some(AbandonMarker {
-            cell: &slot.cells[index].abandoned,
-            abandons: &self.registry.abandons,
+            registry: self.registry,
             sequence: receipt.accepted_seq,
+            producer: receipt.producer_id,
+            target: u16::try_from(index).ok()?,
             armed: true,
         })
     }
@@ -898,10 +901,13 @@ impl Drop for Reservation<'_> {
         }
     }
 }
+/// Kept as small as the cell reference it replaced: every `Delivery`
+/// carries one.
 pub(crate) struct AbandonMarker<'a> {
-    cell: &'a AtomicU64,
-    abandons: &'a AtomicU64,
+    registry: &'a Registry,
     sequence: u64,
+    producer: u32,
+    target: u16,
     armed: bool,
 }
 impl AbandonMarker<'_> {
@@ -912,9 +918,19 @@ impl AbandonMarker<'_> {
 impl Drop for AbandonMarker<'_> {
     fn drop(&mut self) {
         if self.armed {
-            self.cell.fetch_max(self.sequence, Ordering::Release);
-            // After the cell: a sweep started for this count sees it.
-            self.abandons.fetch_add(1, Ordering::Release);
+            let registry = self.registry;
+            let slot = &registry.producers[self.producer as usize].slots
+                [(self.sequence % registry.limits.window as u64) as usize];
+            let cell = &slot.cells[usize::from(self.target)];
+            cell.abandoned.fetch_max(self.sequence, Ordering::Release);
+            // Every guard drops armed after its report; only a record still
+            // unconfirmed here is abandoned and needs a sweep (`effective`).
+            // Counted after the cell, so a sweep started for it sees the mark.
+            if slot.sequence.load(Ordering::Acquire) == self.sequence
+                && cell.word.load(Ordering::Acquire) & (NOT_ROUTED | TERM_MASK | 0b11110) == 0
+            {
+                registry.abandons.fetch_add(1, Ordering::Release);
+            }
         }
     }
 }

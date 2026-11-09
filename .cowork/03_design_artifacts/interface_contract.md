@@ -1033,3 +1033,4 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 [EV-058](../05_verification/verification_evidence.md#ev-058). facade 내부 기본값 변경이며 공개 API는 같다.
 
 - **완료 장부 reconcile(발견 ⑨):** dispatcher turn과 종료 poll의 reconcile 상한은 writer 1개의 완료 window다(이전: window × writers). 버려진 delivery의 Unknown 확정은 writers turn 안에 이루어진다. 32생산자·16파일에서 소형 10만/s와 P3 혼합이 backlog 없이 처리된다(smoke).
+- **완료 장부 reconcile·sync 적용(발견 ⑪, 2026-11-09):** 갱신은 자기 slot을 종결하므로 reconcile이 필요한 것은 버려진 delivery뿐이다. `AbandonMarker`가 발동할 때마다 세대를 올리고, reconcile은 세대가 바뀌었을 때만 window 전체를 한 바퀴(turn당 상한은 그대로) 훑는다. 갱신 중이라 건너뛴 slot에 버려진 기록이 있으면 한 바퀴 더 훑는다. Unknown 확정 상한은 버려진 뒤 writers turn(재훑기 시 그 두 배)으로 유지된다. sync 확인 적용(`control.poll`)은 cell word로 이 target에 라우팅·Written·미Synced·비종결인 칸만 receipt 조회·poll을 거친다(의미 동일). P3 무제한에서 host 시간의 약 65%를 차지하던 두 훑기를 없앴다([EV-062](../05_verification/verification_evidence.md#ev-062)).

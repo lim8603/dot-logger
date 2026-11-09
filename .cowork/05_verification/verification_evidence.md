@@ -1031,6 +1031,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **EV-059 재해석:** P3 441 MB/s는 ①이 주원인으로 보인다. P2 격차는 메모리 상한 조건에서 재현되지 않았고, P0를 먼저 실행한 단일 쌍의 장치 상태 표류 가능성이 크다(EV-060).
 - **쓰기량:** 2차 분석(dry-run 약 25 GB 포함) 약 125 GB(T500). 11-09 누적 약 495 GB로, 1차 분석 때 알린 400~450 GB를 넘었다.
 
+## EV-062 — TASK-023 S3 발견 ⑪ 3차: host 장부 훑기 제거, 남은 한계는 파이프라인 대기
+
+- **판정:** host 장부 훑기 제거 로컬 Pass. P3 무제한 처리량 개선은 측정 잡음(±30%) 안이라 미확인. ⑪ Open — 남은 한계는 host CPU가 아니라 파이프라인 대기·용량.
+- **대상/환경:** 작업 트리(`0b9299d` + 아래 변경), 2026-11-09 AI, T500 `/home`, `MemoryMax=8G`, P3 무제한 4~8 GiB.
+- **host 시간 분해(진단 계측 빌드, 4 GiB·41.3만 건):** 완료 장부 `reconcile` 624~631 ms(약 37%), `control.poll` sync 적용 훑기 459~488 ms(약 28%), 실제 분배 412~420 ms(기록당 약 1.0 µs). turn당 이벤트 256 → 4096은 효과 없음(1.70~1.79 vs 1.80~1.83 GB/s).
+- **조치(TDD):** ① reconcile을 `AbandonMarker` 발동 세대로 게이트 — 세대가 바뀌었을 때만 window 한 바퀴, 갱신 중이라 놓친 버려진 slot이 있으면 한 바퀴 더. 새 시험 3(Red 1: 「버려진 delivery 없이는 훑지 않는다」). ② `control.poll`이 cell word로 적용 대상 칸만 receipt 조회·poll(`awaits_sync`, 의미 동일). API §19.5 갱신.
+- **검증:** fmt·clippy 1.96/1.85 `-D warnings` 0, workspace 1.96/1.85 각 540 Pass(신규 3), Miri(nightly-2026-10-26, strict provenance) completion lib 8·control lib 4·tc_003_completion 15·tc_003_control 22 Pass.
+- **효과:** host 상태 R 99% → 52~66%(나머지는 할 일 없는 1 ms sleep). P3 무제한 처리량 변경 전 1,196/1,968 vs 후 1,454/1,755 MB/s(같은 조건 P0 2,921) — 잡음 범위.
+- **남은 한계(Open):** 생산자 거부 약 27.5만 회(소형 20.3만·raw 획득 7.2만)인데 host·IO 스레드는 약 45% sleep. IO 배치 대기 기본값(256건·10 ms)과 유휴 대기 1 ms 때문에 기록이 slot을 오래 점유하는 것으로 보인다. 진단 1회: `idle_wait` 100 µs에서 1,834 MB/s(기본 1,376), `batching` 1 ms만으로는 변화 없음. 4 GiB 실행은 잡음이 커 판정에 반복·장시간 실행이 필요하다.
+- **쓰기량:** 3차 약 90 GB(T500). 11-09 누적 약 585 GB.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

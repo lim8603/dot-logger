@@ -92,7 +92,7 @@
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **다음 TASK-023 S3 — host 상한 처리 판단 후 축소 S3 정식 실행.** ⑪은 P2 격차 없음(EV-060), P3는 생산자 바쁜 대기(도구 `RETRY_BACKOFF` 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(P3 혼합 약 1.75 GB/s, 빠른 장치 P0의 55~60%, 요구 P3는 충족) — EV-061. **S3 축소(2026-11-09 Human 「1」·「구간 60초」):** cgroup M 8 GiB로 RAM 2배 대체·무거운 행 1회·효율 ABBA·구간 60초, 약 0.7 TB(T500)·약 40분, 실행 전 쓰기량 고지. 요구 §12.4 장시간 기준 개정(2026-11-08 Human) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **다음 TASK-023 S3 — host 상한 처리 판단 후 축소 S3 정식 실행.** ⑪은 P2 격차 없음(EV-060), P3는 생산자 바쁜 대기(도구 `RETRY_BACKOFF` 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(P3 혼합 약 1.75 GB/s, 빠른 장치 P0의 55~60%, 요구 P3는 충족) — EV-061. host 장부 훑기 제거(EV-062) 뒤 남은 한계는 IO 배치·유휴 대기로 보이며 반복 측정이 필요하다. **S3 축소(2026-11-09 Human 「1」·「구간 60초」):** cgroup M 8 GiB로 RAM 2배 대체·무거운 행 1회·효율 ABBA·구간 60초, 약 0.7 TB(T500)·약 40분, 실행 전 쓰기량 고지. 요구 §12.4 장시간 기준 개정(2026-11-08 Human) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -138,6 +138,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-09 #001(계속): ⑪ 3차 — host 장부 훑기(reconcile·sync 적용) 제거 TDD, host R 99% → 52~66%, 처리량 개선은 잡음 안, 남은 한계는 파이프라인 대기(IO 배치 10 ms·유휴 1 ms) — [EV-062](../05_verification/verification_evidence.md#ev-062). 11-09 쓰기 누적 약 585 GB.
 - 2026-11-09 #001(계속): ⑪ 2차 — P3 격차 원인(생산자 `yield_now` 바쁜 대기 → host 스레드 CPU 박탈, 도구 backoff 조치)·단일 host 분배 상한 Open — [EV-061](../05_verification/verification_evidence.md#ev-061). 요구 §12.4 축소 기준 개정·`run-perf-s3.sh` 반영(dry-run 통과). 11-09 쓰기 누적 약 495 GB.
 - 2026-11-09 #001: TASK-023 S3 발견 ⑪ 1차 분석 — 회전 sync 가설 기각, 소진 후 MemoryMax 4G A/B logger ≈ P0, 장치 상태 표류 2배 관측, 쓰기 약 370 GB(Human 승인) — [EV-060](../05_verification/verification_evidence.md#ev-060). `run-perf-s3.sh` 장치 기록을 측정 경로의 디스크로 정정.
 - 2026-11-08 #001(계속): TASK-023 S3 — 범위(P4·P5 이월, P1 3조합)·장시간 기준(S·0.6×S·효율 0.8·sync 판정) Human 결정, 발견 ⑩(출력 예산 CAS `Busy`) 조치 `bf1be3b`, 발견 ⑪ Open — [EV-059](../05_verification/verification_evidence.md#ev-059).

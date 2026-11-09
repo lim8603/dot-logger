@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-08 |
-| 다음 액션 | S3 — 발견 ⑪(장시간 대용량 logger 효율 약 50%, IO 스레드 fsync·writeback 대기) 분석·조치 후 `scripts/run-perf-s3.sh`(장시간 기준) 정식 실행. [EV-059](../../05_verification/verification_evidence.md#ev-059). P4·P5 이월 |
+| 다음 액션 | S3 — 발견 ⑪ 원인 규명(EV-060·[EV-061](../../05_verification/verification_evidence.md#ev-061)): P2 격차 없음, P3는 생산자 바쁜 대기(도구 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(Open). host 상한 처리 Human 판단 후 축소 S3(2026-11-09 결정: M 8 GiB·60초·무거운 행 1회·효율 ABBA, 약 0.7 TB) 정식 실행. P4·P5 이월 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -60,7 +60,7 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 | S2b | facade 경로 logger on 측정 도구: P1 `try_log`, 같은 workload의 `StorageRun{tool: Logger}`, MCAP 판독 무결성 oracle, 호출 지연 ns 분포(p99/p99.9), encode·복사 비용 분리(T4 입력). P0 회전 256 MiB·16,384건 | 완료 — [EV-054](../../05_verification/verification_evidence.md#ev-054)·[EV-055](../../05_verification/verification_evidence.md#ev-055). 제품 발견 ①~⑧ 조치(⑥ Human 「권고대로」). smoke: P1 무제한 logger 73.7 MB/s·판독 일치, P0 대비 7.7% |
 | S2c | P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합 확장, 32생산자·16파일·128채널) | 완료 — [EV-057](../../05_verification/verification_evidence.md#ev-057). `Channel::metadata`(Human 「메타데이터 헬퍼」) `e5a005a`, 도구 `145dc4a`, RV-128 정정 `b2899a3`. smoke: P2 logger 성공, P3 logger Unsuccessful(발견 ⑨ Open) |
 | S2d | 짧은 시험 실행(측정 아님)·EV 기록. 정식 측정은 S3 | 완료 — [EV-058](../../05_verification/verification_evidence.md#ev-058). 발견 ⑨(완료 장부 전체 sweep) 조치 `a7fd4e1`. smoke P3 20초 logger 969 MB/s(P0 1,023 MB/s), 판독 일치 |
-| S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·계측 비용≤5%. 2026-11-08 Human: 장시간 기준(S·0.6×S 정상 부하·무제한 효율 ≥0.8), P4·P5 이월, P1 대표 3조합 | 진행 — 도구 완료, 발견 ⑩ 조치, ⑪ Open([EV-059](../../05_verification/verification_evidence.md#ev-059)) |
+| S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·계측 비용≤5%. 2026-11-08 Human: 장시간 기준(S·0.6×S 정상 부하·무제한 효율 ≥0.8), P4·P5 이월, P1 대표 3조합 | 진행 — 도구 완료(2026-11-09 축소 기준 반영), 발견 ⑩ 조치, ⑪ 원인 규명·host 상한 Open([EV-059](../../05_verification/verification_evidence.md#ev-059)·[EV-060](../../05_verification/verification_evidence.md#ev-060)·[EV-061](../../05_verification/verification_evidence.md#ev-061)) |
 | RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
 
 S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../crates/dot-logger/examples/support/perf/mod.rs)·[perf_baseline](../../../crates/dot-logger/examples/perf_baseline.rs)·[TC-012 시험](../../../crates/dot-logger/tests/tc_012_performance.rs). 제품 코드 변경은 없다.

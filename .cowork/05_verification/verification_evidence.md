@@ -1033,6 +1033,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ## EV-062 — TASK-023 S3 발견 ⑪ 3차: host 장부 훑기 제거, 남은 한계는 파이프라인 대기
 
+- **정정(EV-063):** 아래 ① 게이트는 실제 흐름에서 효과가 없었다 — 보고를 마친 IO guard도 marker를 해제하지 않고 drop해 세대가 기록마다 올랐다. 「host R 99% → 52~66%」는 SSD 잡음 범위의 관측이다.
 - **판정:** host 장부 훑기 제거 로컬 Pass. P3 무제한 처리량 개선은 측정 잡음(±30%) 안이라 미확인. ⑪ Open — 남은 한계는 host CPU가 아니라 파이프라인 대기·용량.
 - **대상/환경:** 작업 트리(`0b9299d` + 아래 변경), 2026-11-09 AI, T500 `/home`, `MemoryMax=8G`, P3 무제한 4~8 GiB.
 - **host 시간 분해(진단 계측 빌드, 4 GiB·41.3만 건):** 완료 장부 `reconcile` 624~631 ms(약 37%), `control.poll` sync 적용 훑기 459~488 ms(약 28%), 실제 분배 412~420 ms(기록당 약 1.0 µs). turn당 이벤트 256 → 4096은 효과 없음(1.70~1.79 vs 1.80~1.83 GB/s).
@@ -1041,6 +1042,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **효과:** host 상태 R 99% → 52~66%(나머지는 할 일 없는 1 ms sleep). P3 무제한 처리량 변경 전 1,196/1,968 vs 후 1,454/1,755 MB/s(같은 조건 P0 2,921) — 잡음 범위.
 - **남은 한계(Open):** 생산자 거부 약 27.5만 회(소형 20.3만·raw 획득 7.2만)인데 host·IO 스레드는 약 45% sleep. IO 배치 대기 기본값(256건·10 ms)과 유휴 대기 1 ms 때문에 기록이 slot을 오래 점유하는 것으로 보인다. 진단 1회: `idle_wait` 100 µs에서 1,834 MB/s(기본 1,376), `batching` 1 ms만으로는 변화 없음. 4 GiB 실행은 잡음이 커 판정에 반복·장시간 실행이 필요하다.
 - **쓰기량:** 3차 약 90 GB(T500). 11-09 누적 약 585 GB.
+
+## EV-063 — TASK-023 S3 발견 ⑪ 4차: 게이트 정정, tmpfs 측정, 남은 상한
+
+- **판정:** reconcile 게이트 정정 로컬 Pass. ⑪ 정리 — 남은 logger 상한은 장치 지속 속도와 요구 처리량보다 높다. 정식 판정은 축소 S3.
+- **대상/환경:** `c41843b` + 아래 변경, 2026-11-09 AI. 측정은 tmpfs(`/dev/shm`, SSD 쓰기 0, 진단 빌드의 예약 0). P3 무제한 8 GiB.
+- **결함:** EV-062 게이트는 `AbandonMarker` drop마다 세대를 올렸는데, IO guard는 Written 보고 뒤에도 marker를 해제하지 않고 drop하므로 세대가 기록마다 올라 훑기가 계속됐다. 계측: turn 2.39 s 중 visit 1.05 s, finish 약 0.16 s, 나머지 약 1.16 s가 reconcile.
+- **조치(TDD):** drop 시 그 칸이 같은 기록이고 경계 미확인일 때만 세대 증가. 새 시험 1(Red: 「보고된 delivery drop은 훑기를 시작하지 않는다」). marker를 `&Registry`·기록 번호·생산자(u32)·target(u16)으로 압축해 크기를 유지(그대로 두면 `Delivery`가 커져 clippy `result_large_err`). 완료 장부 target 수 상한 65,535 검증 추가.
+- **검증:** fmt·clippy 1.96/1.85 `-D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96/1.85 각 541 Pass(신규 1), Miri(nightly-2026-10-26, strict provenance) completion lib 9·control lib 4·tc_003_completion 15·tc_003_control 22·tc_003_routing 19 Pass.
+- **효과(tmpfs, 3회 교차):** P3 logger 2,495~2,508 → 2,598~2,599 MB/s(+4%), 생산자 거부 약 67만 → 34만 회. host R 60%·IO R 50%로 둘 다 포화되지 않음.
+- **대기 설정 영향 작음(tmpfs, 각 3회):** 기본(배치 256건·10 ms, 유휴 1 ms) 2,578~2,587, 유휴 100 µs 2,597~2,605, 배치 1 ms 2,641~2,693, 유휴 100 µs+배치 1 ms 2,658~2,683, 유휴 20 µs+배치 200 µs 2,658~2,676 MB/s — 최대 약 3%. 기본값은 바꾸지 않는다. EV-062의 SSD 1회 관측(유휴 100 µs +33%)은 잡음이었다.
+- **남은 상한:** tmpfs에서 logger P3 약 2.6 GB/s(P0 4.07, 64%), P2 3.72 GB/s(P0 7.26, 51%). 원인 미규명(host·IO 비포화). 이 PC의 SSD 지속 속도 S ≈ 1.67 GB/s와 요구 P3(1 GB/s + 10만/s)보다 높으므로, 소진 상태의 SSD 효율 판정에는 장치가 먼저 한계가 된다. SLC 여유 상태의 무제한 효율은 0.8 경계일 수 있다.
+- **쓰기량:** 4차 SSD 0(tmpfs). 11-09 누적 약 585 GB.
 
 ## Open Evidence Gaps
 

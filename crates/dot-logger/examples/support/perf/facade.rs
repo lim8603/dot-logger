@@ -35,6 +35,11 @@ const SEGMENT_CEILING: u64 = 256 * MIB;
 /// budget): the facade rotates at this count whatever the byte limit, so a
 /// comparable P0 workload rotates at it too (TASK-023 S2b ⑤).
 pub const FACADE_SEGMENT_RECORDS: u64 = 16_384;
+/// Pause of a load producer after a Capacity rejection before it retries.
+/// A bare `yield_now` let 32 rejected producers spin on 16 cores and starve
+/// the logger's host thread, so unpaced runs measured the scheduler rather
+/// than the logger (EV-061).
+const RETRY_BACKOFF: Duration = Duration::from_micros(50);
 /// Shutdown is given ample time; the durable time is measured, not bounded.
 const SHUTDOWN: Duration = Duration::from_secs(600);
 const DROP_DEADLINE: Duration = Duration::from_secs(30);
@@ -228,7 +233,7 @@ fn log_small(
             Err(e) if e.is_capacity() => {
                 out.rejected.record(spent);
                 out.rejections += 1;
-                std::thread::yield_now();
+                std::thread::sleep(RETRY_BACKOFF);
             }
             Err(LogError::Closing) => return Err(invalid("logger closed during the run")),
             Err(e) => return Err(format!("try_log: {e:?}").into()),
@@ -252,7 +257,7 @@ fn log_raw(
             Ok(loan) => break loan,
             Err(CaptureError::Capacity) => {
                 out.rejections += 1;
-                std::thread::yield_now();
+                std::thread::sleep(RETRY_BACKOFF);
             }
             Err(e) => return Err(format!("try_acquire: {e:?}").into()),
         }
@@ -277,7 +282,7 @@ fn log_raw(
                 out.rejected.record(spent);
                 out.rejections += 1;
                 loan = e.loan;
-                std::thread::yield_now();
+                std::thread::sleep(RETRY_BACKOFF);
             }
             Err(e) => return Err(format!("try_record_raw: {:?}", e.reason).into()),
         }

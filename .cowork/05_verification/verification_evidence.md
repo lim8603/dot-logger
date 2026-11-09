@@ -1010,6 +1010,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **기록:** 중단된 실행 결과 `perf_runs/s3-2026-11-08-aborted/`(⑩), `perf_runs/s3-2026-11-08/`(⑪ 발견 전 1회차 일부).
 - **미실행:** S3 정식 측정, ⑪ 원인 분석, RT, native(T3).
 
+## EV-060 — TASK-023 S3 발견 ⑪ 분석 1차: 회전 sync 가설 기각
+
+- **판정:** 진단 실험(제품 무수정). 가설 「256 MiB 회전마다의 파일·디렉터리 fsync가 원인」 기각. ⑪ Open 유지 — 재현 조건 미확정.
+- **대상/환경:** 소스 `c13797d` + 진단 변형 2종(로컬 빌드만, 소스 원복): `nosync`(segment 게시 시 파일 fsync·디렉터리 fsync 생략), `1gib`(segment 상한 256 MiB → 1 GiB, P0 파일 한도 동일). 2026-11-09 AI, generic 7.0.0-43, `/home` = nvme1n1 Crucial T500 1TB. P2 무제한(8 MiB raw, 4 stream/4 file/4 writer), `systemd-run --user -p MemoryMax=…`로 페이지 캐시 흡수를 제한.
+- **쓰기 증폭 없음:** 4 GiB 쌍의 장치 기록 바이트 P0 4.302 GB, logger 4.305 GB.
+- **빠른 장치(SLC 여유)에서 logger ≈ P0:** MemoryMax 4G, 8 GiB — logger 2.94 GB/s, P0 3.10 GB/s(95%). MemoryMax 2G의 60%는 logger 버퍼 1 GiB가 같은 cgroup의 페이지 캐시와 경쟁한 측정 왜곡.
+- **fsync 호출:** 대상당 2 GiB에 logger 26회(회전 9 × 2 + 주기·종료) 대 P0 10회.
+- **소진 후 A/B(MemoryMax 4G, 12 GiB × 8, 두 바퀴):** 소진 188 GB, 19초(약 100 GB)에서 급락, 안정 구간 S ≈ 1.67 GB/s(EV-059의 650 MB/s 상태보다 얕음). 결과 MB/s — P0 1,443 / 2,828, logger 기본 2,762 / 2,700, nosync 1,752 / 2,088, 1gib 2,004 / 2,203. 회전 sync를 없애거나 줄여도 개선이 없고, 대기는 `balance_dirty_pages`로 옮겨갈 뿐(장치 한계). 같은 조건 P0가 수 분 사이 2배 차이 — 장치 상태 표류가 크다.
+- **남은 후보:** EV-059와 다른 조건은 ① 페이지 캐시 무제한(RAM 55 GiB, dirty 한도 약 11 GB) ② 수 TB 기록 뒤의 더 깊은 소진(약 650 MB/s) ③ 순서 표류 — EV-059의 비교는 모두 P0를 먼저 실행한 단일 쌍이었다.
+- **쓰기량:** 이 분석 전체 약 370 GB(T500, Human 승인 범위 400~450 GB 안). 원자료 `perf_runs/f11-2026-11-09/`.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

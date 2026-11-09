@@ -1,0 +1,11 @@
+[22:07:17] deplete
+[22:08:37] deplete done dev_bytes=188404842496 {"stable":true,"drop_at_s":19,"peak":5320,"S":1670,"total":188}
+[22:08:37] start p0-1
+[22:08:52] start default-1
+[22:09:19] start nosync-1
+[22:09:49] start 1gib-1
+[22:10:11] start p0-2
+[22:10:21] start default-2
+[22:10:49] start nosync-2
+[22:11:17] start 1gib-2
+[22:11:38] done total_dev_since_deplete=291672854528

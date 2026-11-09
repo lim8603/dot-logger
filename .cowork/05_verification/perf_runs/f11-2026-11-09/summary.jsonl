@@ -1,0 +1,8 @@
+{"label":"p0-1","rc":0,"mbps":1443,"payload":"12884901888","dev_bytes":12909936640,"wall":15.613528523,"files":52}
+{"label":"default-1","rc":0,"mbps":2762,"payload":"12884901888","dev_bytes":12911009792,"wall":26.913635066,"files":52}
+{"label":"nosync-1","rc":0,"mbps":1752,"payload":"12884901888","dev_bytes":12910956544,"wall":29.584019283,"files":52}
+{"label":"1gib-1","rc":0,"mbps":2004,"payload":"12884901888","dev_bytes":12901527552,"wall":21.697493846,"files":16}
+{"label":"p0-2","rc":0,"mbps":2828,"payload":"12884901888","dev_bytes":12899909632,"wall":10.793902881,"files":52}
+{"label":"default-2","rc":0,"mbps":2700,"payload":"12884901888","dev_bytes":12913262592,"wall":27.410657622,"files":52}
+{"label":"nosync-2","rc":0,"mbps":2088,"payload":"12884901888","dev_bytes":12907249664,"wall":28.400088921,"files":52}
+{"label":"1gib-2","rc":0,"mbps":2203,"payload":"12884901888","dev_bytes":12897509376,"wall":20.807723493,"files":16}

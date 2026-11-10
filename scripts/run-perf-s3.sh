@@ -95,29 +95,35 @@ mib8=8388608
 rate=$(python3 -c "print(min(10**9, int(0.6 * $s)))")
 large=$(python3 -c "print(max(1, $rate // $mib8))")
 heavy=$(python3 -c "import math; print(max($seconds, math.ceil($total / ($large * $mib8))))")
-printf '{"scope":"S3Plan","sustained_bytes_per_second":%s,"normal_bytes_per_second":%s,"large_per_second":%s,"heavy_seconds":%s,"max_total_bytes":%s}\n' \
-  "$s" "$rate" "$large" "$heavy" "$total" >>"$log"
+# Raw slots per stream as `Preset::sensor` sizes them: ⌈hz × 1 s × 1.25⌉
+# (API §19.1). Eight slots (≈ 0.29 s here) ran dry in this SSD's IO stalls
+# (EV-065); the memory budget grows by the extra slots.
+raw=$(python3 -c "import math; print(math.ceil(math.ceil($large / 4) * 5 / 4))")
+p2_mem=$((1024 + 4 * (raw - 8) * 8))
+p3_mem=$((2048 + 4 * (raw - 8) * 8))
+printf '{"scope":"S3Plan","sustained_bytes_per_second":%s,"normal_bytes_per_second":%s,"large_per_second":%s,"heavy_seconds":%s,"max_total_bytes":%s,"raw_slots":%s}\n' \
+  "$s" "$rate" "$large" "$heavy" "$total" "$raw" >>"$log"
 
 # 2. Heavy rows once, right after the device left its cache.
 pair 1 p2-normal-p0 p2-normal-logger \
   --p0-mix "$parent" "$heavy" "$warmup" 256 0 "$mib8" "$large" 4 4 4 "${loops[@]}" -- \
-  --p1-mix "$parent" "$heavy" "$warmup" 256 0 "$mib8" "$large" 4 4 4 4 4 1024 8 1024 0 "${loops[@]}"
+  --p1-mix "$parent" "$heavy" "$warmup" 256 0 "$mib8" "$large" 4 4 4 4 4 1024 "$raw" "$p2_mem" 0 "${loops[@]}"
 pair 2 p3-normal-p0 p3-normal-logger \
   --p0-mix "$parent" "$heavy" "$warmup" 256 100000 "$mib8" "$large" 4 16 8 "${loops[@]}" -- \
   --p1-mix "$parent" "$heavy" "$warmup" 256 100000 "$mib8" "$large" 4 16 8 \
-  32 128 4096 8 2048 0 "${loops[@]}"
+  32 128 4096 "$raw" "$p3_mem" 0 "${loops[@]}"
 # Efficiency, unpaced, 2 × M payload: ABBA over repetitions 1 and 2.
 for rep in 1 2; do
   pair "$rep" p2-max-p0 p2-max-logger \
     --p0-mix-max "$parent" "$total" 256 0 "$mib8" 120 4 4 4 -- \
-    --p1-mix-max "$parent" "$total" 256 0 "$mib8" 120 4 4 4 4 4 1024 8 1024 0
+    --p1-mix-max "$parent" "$total" 256 0 "$mib8" 120 4 4 4 4 4 1024 "$raw" "$p2_mem" 0
   pair "$rep" p3-max-p0 p3-max-logger \
     --p0-mix-max "$parent" "$total" 256 100000 "$mib8" 120 4 16 8 -- \
-    --p1-mix-max "$parent" "$total" 256 100000 "$mib8" 120 4 16 8 32 128 4096 8 2048 0
+    --p1-mix-max "$parent" "$total" 256 100000 "$mib8" 120 4 16 8 32 128 4096 "$raw" "$p3_mem" 0
 done
 # Instrumentation cost against p3-max-logger of repetition 2.
 run p3-max-logger-telemetry 2 --p1-mix-max "$parent" "$total" 256 100000 "$mib8" 120 4 16 8 \
-  32 128 4096 8 2048 1
+  32 128 4096 "$raw" "$p3_mem" 1
 
 # 3. Light rows, `reps` times.
 small_rate=$((256 * 100000))

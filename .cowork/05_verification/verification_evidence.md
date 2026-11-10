@@ -1086,7 +1086,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **① P3 무제한 16 GiB, SSD(P0 → raw8 → raw35 → raw35 → raw8 → P0):** P0 1,835 → 1,002 MB/s(2.5분 사이 45% 하락), logger raw8 1,415·1,509, raw35 1,579·1,330. logger 평균 1,458 / P0 평균 1,418 = **103%**. raw 깊이 효과는 잡음 안(tmpfs에서도 +5%). EV-064 행까지 합친 P3 평균은 logger 1,278 / P0 1,431 = 89%. 한 쌍 17 GB 실행의 비율은 이 SSD에서 0.54~1.4로 흔들린다 — 효율 0.8 판정에는 반복 ABBA가 필요하다.
 - **② 정상 P2(926 MB/s, 20초 + 예열 5초, ① 직후 소진 상태):** raw 8칸 — `try_acquire` Capacity 47,337회, raw 35칸(`Preset::sensor(28 Hz, 8 MiB)`: ⌈28 × 1 s × 1.25⌉) — **0회**. 두 경우 모두 처리량 920·921 MB/s, 제어·안전 miss 0. 이 SSD의 IO 정체가 290 ms(8칸 분량)를 넘는 일이 잦고, preset의 흡수 1초가 이를 덮는다. 제품 결함이 아니라 harness가 preset보다 작은 풀을 쓴 것이다.
 - **쓰기량:** SSD 149 GB(T500). 11-10 누적 약 733 GB.
-- **후속:** S3 정상 행을 preset 크기 raw 풀로 다시 판정할지, P3 효율 판정 방법(반복 수)은 Human 판단.
+- **Human 결정(2026-11-10 「a」) — S3 마감:** 추가 SSD 쓰기 없이 판정한다. P3 효율은 EV-064·065 P3 10회 합산 89% Pass(장치 표류 큼 주석), 정상 부하 raw 획득 거절은 harness 사이징 문제(P3에도 같은 원인으로 판단). `run-perf-s3.sh` raw 풀을 `Preset::sensor` 크기(⌈hz × 1.25⌉, 메모리 예산 증액)로 수정, tmpfs dry-run 13조건 Pass(raw 38칸, 거절 0). T5는 Human이 조사 필요 의견(10GbE 병목 우려) — 범위 확인 중.
 
 ## Open Evidence Gaps
 

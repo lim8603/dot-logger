@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-08 |
-| 다음 액션 | S3 완료(2026-11-10 Human 「a」, [EV-064](../../05_verification/verification_evidence.md#ev-064)·[EV-065](../../05_verification/verification_evidence.md#ev-065)) — P1·제어·정상 부하·효율(P2 95%·P3 합산 89%)·계측 비용 2.5% Pass, 도구 raw 풀 preset 크기로 수정. 다음 RT 요청(TASK-022 규칙). P4·P5 이월. T5 조사 범위 Human 확인 중 |
+| 다음 액션 | S3 완료(2026-11-10 Human 「a」, [EV-064](../../05_verification/verification_evidence.md#ev-064)·[EV-065](../../05_verification/verification_evidence.md#ev-065)) — P1·제어·정상 부하·효율(P2 95%·P3 합산 89%)·계측 비용 2.5% Pass, 도구 raw 풀 preset 크기로 수정. 다음 RT 요청(TASK-022 규칙). P4·P5 이월. T5 조사는 다음 세션(Human 결정) |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 

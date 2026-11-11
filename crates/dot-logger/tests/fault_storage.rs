@@ -873,3 +873,24 @@ fn exhausted_output_capacity_returns_the_last_complete_prefix_without_claiming_s
         assert_eq!(budget.used_bytes(), 0);
     });
 }
+// T5 (EV-068): the vendored MCAP writer hashes an uncompressed chunk once and
+// reuses that CRC for the data section; both must stay exact, since recovery
+// requires the chunk CRC and checks a nonzero data section CRC.
+#[test]
+fn uncompressed_chunks_keep_exact_chunk_and_data_section_crcs() {
+    with_budget(|budget| {
+        let bytes = fixture(budget, true);
+        let ch = chunks(&bytes);
+        assert_eq!(ch.len(), 3);
+        for (start, end) in ch {
+            let header = start + 9;
+            let stored = u32::from_le_bytes(bytes[header + 24..header + 28].try_into().unwrap());
+            assert_ne!(stored, 0);
+            assert_eq!(stored, crc32(&bytes[header + 40..end]));
+        }
+        let data_end = records(&bytes).into_iter().find(|r| r.0 == 0x0f).unwrap();
+        let stored = u32::from_le_bytes(bytes[data_end.1 + 9..data_end.1 + 13].try_into().unwrap());
+        assert_ne!(stored, 0);
+        assert_eq!(stored, crc32(&bytes[..data_end.1]));
+    });
+}

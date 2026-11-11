@@ -1,6 +1,7 @@
 [workspace]
 members = ["crates/dot-logger", "crates/dot-logger-client", "crates/dot-logger-cli", "tests/api-consumer", "tests/rt-allocation"]
 default-members = ["crates/dot-logger"]
+exclude = ["vendor"]
 resolver = "3"
 
 [workspace.package]
@@ -38,3 +39,10 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "warn"
 expect_used = "warn"
+
+# ADR-010 amendment (2026-11-11, EV-068): MCAP 0.26.0 with one patch — an
+# uncompressed chunk is hashed once and that CRC serves the data section too
+# (upstream hashes the same bytes twice). File bytes are unchanged. See
+# vendor/mcap-0.26.0/VENDORED.md.
+[patch.crates-io]
+mcap = { path = "vendor/mcap-0.26.0" }

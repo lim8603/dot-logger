@@ -1100,6 +1100,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **조치 후보(미착수, Human 판단):** ⑫ 종료 집계를 drain이 끝났을 때·기한 경과 때만 수행(TDD, 판정 의미 유지, 효과 4 스트림 +3%·raw 스트림이 많을 때 큰 폭). 중복 CRC 제거(+9~10%, 압축 없음일 때 chunk CRC 한 번 — mcap 옵션/형식 영향 검토 필요). Envelope 복사 제거(형식·mcap 쓰기 API 변경 필요, 효과 미측정). 상한 수치(이 PC 약 3 GB/s)는 요구 P3(1 GB/s + 10만/s)와 10GbE 1줄(1.25 GB/s)보다 높다.
 - **쓰기량:** SSD 0(tmpfs). 진단 빌드 산출물만 `/data/build`(HP EX950).
 
+## EV-067 — ⑫ 종료 drain 장부 훑기 조치, 중복 CRC·Envelope 복사 효과 측정
+
+- **판정:** ⑫ 조치 로컬 **Pass**(`234ea62`). 중복 CRC 1회화 효과 +4~9%, Envelope 복사 1회 비용 −21~24%(제거 효과 추정 상한 +37~45%) — 둘 다 미적용, Human 판단.
+- **Human 결정(2026-11-11):** ① ⑫ 「진행」 ② 중복 CRC 「아직 배포된 게 아니니 제거」 ③ Envelope 복사 「효과 측정」.
+- **⑫ 조치(TDD):** host가 drain 중 매 turn `poll_shutdown`을 불러 매번 완료 장부 전체를 2회 집계했다. crate 내부 `ControlOwner::poll_shutdown_when_due(now, dispatcher, incomplete_due)` 추가 — 종료 가능(drain 비어 있음·생산자 호출 0)·이미 Closed·(`incomplete_due`이고 기한 경과)일 때만 집계, 아니면 `None`(Closing). 닫힘 판정은 집계한 poll에서만 한다. 공개 `poll_shutdown`은 매 호출 집계를 유지(공통 본문 `drive_shutdown`), 비용 안내를 문서화. facade host는 Incomplete를 보낸 뒤에는 `incomplete_due = false`. 긴급 경로는 보고서를 밖으로 내보내므로 바꾸지 않았다. 새 시험 2(Red 1: 「drain 중 집계하지 않는다」 — 기존 동작은 매번 집계), 집계 횟수는 crate 내부 시험 전용 thread-local 카운터. API §13.2 문구 갱신.
+- **검증:** fmt·clippy 1.96.0/1.85.0 `--all-targets --all-features -D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96.0/1.85.0 각 543 Pass(신규 2), Miri(nightly-2026-10-26, strict provenance) control·completion lib 15·tc_003_completion 15·tc_003_control 22 Pass.
+- **효과(tmpfs, P3 무제한 12 GiB, 수정 후 소스 진단 빌드):** raw 8 스트림 0.92 → 3.00·3.01 GB/s, 4 스트림 2.70·2.70 GB/s(EV-066 기준선 2.72~2.86과 잡음 범위).
+- **중복 CRC:** dot-logger 복구는 chunk CRC를 필수로 쓴다(`recovery.rs` — 0·불일치 거절). mcap 0.26 옵션으로는 chunk CRC를 켠 채 1회로 줄일 수 없다(uncompressed·compressed `CountingCrcWriter` 2겹, `write.rs:1669·1710`). 압축 없음일 때 compressed CRC 계층을 빼고 uncompressed CRC를 재사용하는 mcap 패치(파일 바이트·CRC 값 동일) 진단: 4 스트림 2.94·2.80(+4~9%), 8 스트림 3.11·3.14(+4%). 적용하려면 mcap 포크(vendor + `[patch.crates-io]`) 또는 upstream 반영이 필요하다.
+- **Envelope 복사:** `encode_record`에 payload 복사 1회를 더한 진단: 4 스트림 2.13·2.13(−21%), 8 스트림 2.29·2.29(−24%). 복사 1회 ≈ 0.1 s/GB 합산. 같은 비용을 빼는 선형 외삽은 4 스트림 3.7·8 스트림 4.3 GB/s(+37~45%)로 상한 추정이며, 메모리 경합이 비선형이라 실제 효과는 더 작을 수 있다. 제거에는 Envelope 헤더와 payload를 나눠 쓰는 mcap 쓰기 경로(형식 또는 API 변경)가 필요하다.
+- **원자료:** `perf_runs/t5-2026-11-11/`(`runs-ev067.jsonl`). 쓰기량 SSD 0.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

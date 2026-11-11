@@ -1,0 +1,8 @@
+{"run":"w-target-diag5-4-1","bps":2616136058.254493,"accepted_ns":"4392103285","durable_ns":"4889209394","rejections":"596286","streams":4}
+{"run":"w-target-diag5-4-2","bps":2674887839.045037,"accepted_ns":"4277259039","durable_ns":"4781821804","rejections":"589658","streams":4}
+{"run":"w-target-diag5-8-1","bps":2976822549.1914196,"accepted_ns":"3762995647","durable_ns":"4296808688","rejections":"1041096","streams":8}
+{"run":"w-target-diag5-8-2","bps":2972861766.1721463,"accepted_ns":"3761420666","durable_ns":"4302533383","rejections":"1052790","streams":8}
+{"run":"w-target-diag8-4-1","bps":2763325613.6288843,"accepted_ns":"4166046063","durable_ns":"4628783857","rejections":"600777","streams":4}
+{"run":"w-target-diag8-4-2","bps":2778982676.84939,"accepted_ns":"4142545205","durable_ns":"4602704831","rejections":"591147","streams":4}
+{"run":"w-target-diag8-8-1","bps":3133534611.140276,"accepted_ns":"3569893524","durable_ns":"4081919806","rejections":"983758","streams":8}
+{"run":"w-target-diag8-8-2","bps":3144881002.2937,"accepted_ns":"3556598076","durable_ns":"4067192680","rejections":"986356","streams":8}

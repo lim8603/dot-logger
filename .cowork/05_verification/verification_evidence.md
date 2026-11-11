@@ -1111,6 +1111,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Envelope 복사:** `encode_record`에 payload 복사 1회를 더한 진단: 4 스트림 2.13·2.13(−21%), 8 스트림 2.29·2.29(−24%). 복사 1회 ≈ 0.1 s/GB 합산. 같은 비용을 빼는 선형 외삽은 4 스트림 3.7·8 스트림 4.3 GB/s(+37~45%)로 상한 추정이며, 메모리 경합이 비선형이라 실제 효과는 더 작을 수 있다. 제거에는 Envelope 헤더와 payload를 나눠 쓰는 mcap 쓰기 경로(형식 또는 API 변경)가 필요하다.
 - **원자료:** `perf_runs/t5-2026-11-11/`(`runs-ev067.jsonl`). 쓰기량 SSD 0.
 
+## EV-068 — 무압축 MCAP chunk CRC 1회 계산(vendor mcap 0.26.0)
+
+- **판정:** 로컬 **Pass**(`942eecf`). 파일 바이트와 CRC 값은 그대로이고 처리량은 +4~6%다. Envelope 복사는 이월 T6로 등록했다.
+- **Human 결정(2026-11-11 「권고대로」):** ② 중복 CRC — mcap 패치를 vendor하고 ADR-010을 개정한다. ③ Envelope 복사 — 형식·API 변경이 필요하므로 착수하지 않고 측정값과 함께 이월 백로그에 둔다.
+- **변경:** `vendor/mcap-0.26.0`(crates.io 원본 `src/`·README, manifest는 예제·시험·벤치 대상과 dev-dependencies만 제거), `single-crc.patch`(write.rs 2곳), `VENDORED.md`(출처·MIT·패치·보안 확인 방식). workspace `exclude = ["vendor"]`, `[patch.crates-io] mcap`. `Cargo.lock`은 mcap의 출처·checksum 두 줄만 바뀌었다. ADR-010 개정 1, 기술 스택 갱신.
+- **시험:** `fault_storage::uncompressed_chunks_keep_exact_chunk_and_data_section_crcs`(완성 파일 chunk 3개 CRC와 data section CRC를 독립 CRC로 대조) — 출력이 같은 성능 변경이라 Red가 성립하지 않으며, 패치 전후 모두 Pass. 상류 시험(패치본 vs 원본, 1.96.0): 결과 동일 — lib 130 Pass, 패키지에 없는 fixture 때문에 통합 시험 7개는 양쪽 모두 실패.
+- **검증:** fmt·clippy 1.96.0/1.85.0 `--all-targets --all-features -D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96.0/1.85.0 각 544 Pass(신규 1).
+- **효과(tmpfs, P3 무제한 12 GiB, ⑫ 수정만 있는 빌드와 교차 2회):** raw 4 스트림 2.62·2.68 → 2.76·2.78 GB/s(+4~6%), 8 스트림 2.98·2.97 → 3.13·3.15 GB/s(+5%).
+- **별건 — 보안 검사:** `cargo audit --deny unsound`가 **RUSTSEC-2026-0486**(rustix 1.1.4, xattr 함수 unsound, 2026-10-27 공지)로 실패한다. HEAD(`0023de1`, 변경 전)에서도 같으므로 이번 변경과 무관하다. dot-logger는 xattr 함수를 쓰지 않는다(statvfs·affinity만). workspace 고정이 `=1.1.4`이고 1.1.6이 있다 — 고정 갱신은 Human 판단. `paste` 유지보수 경고(GAP-005)는 그대로다.
+- **원자료:** `perf_runs/t5-2026-11-11/runs-ev068.jsonl`. SSD 쓰기 0.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

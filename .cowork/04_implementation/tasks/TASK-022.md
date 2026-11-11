@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-02 |
-| 다음 액션 | RT 요청(2026-11-11) 승인 — 1단계 generic FIFO 완료(`perf_runs/rt-generic-2026-11-11/`). 다음: Human `sudo scripts/rt-boot.sh once` → RT 부팅 확인(`perf_runs/rt-boot/boot.log`) → `RT_EXPECT=realtime scripts/run-perf-rt.sh` → Human `sudo scripts/rt-boot.sh back`. 절차는 아래 「RT 준비·재시작 요청 — 2026-11-11」 |
+| 마지막 갱신일 | 2026-11-11 |
+| 다음 액션 | RT 요청(2026-11-11) 1~3단계 완료 — generic·RT FIFO 행 모두 miss 0([EV-070](../../05_verification/verification_evidence.md#ev-070)). 남은 것: Human `sudo scripts/rt-boot.sh back`(generic 복귀). 실앱·장기 RT는 TASK-026·024 뒤 |
 | 의존 | TASK-001 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -117,9 +117,9 @@ examples/telemetry_overhead.rs의 enabled/disabled·순서 반전 fixture를 실
 
 현재 PC는 Ubuntu 일반 커널로 실행 중이며 RT 커널을 올려 실행한 상태가 아니다. 이번 읽기 전용 `uname -r` 확인도 `7.0.0-42-generic`이다. 이전 설치 기록을 현재 RT 실행/설치 완료의 증거로 사용하지 않는다.
 
-RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/예상 시간·현재 설치 상태를 확인하고, 필요한 RT 커널 설치/부팅 선택·재시작과 작업 재개 절차를 구체적으로 정리해 Human에게 요청한다. Human 승인 전에 커널 설치/부트 설정 변경/재시작을 실행하지 않는다. 재시작 후에는 실행 커널·CONFIG_PREEMPT_RT·sysfs/capability를 실제 확인하고 동일 조건의 generic/RT 결과를 분리한다. 현재까지 EV-043 UPS 시뮬레이션을 포함한 PC 실행 결과는 일반 커널 결과이며 RT 시험은 Not Run이다.
+RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/예상 시간·현재 설치 상태를 확인하고, 필요한 RT 커널 설치/부팅 선택·재시작과 작업 재개 절차를 구체적으로 정리해 Human에게 요청한다. Human 승인 전에 커널 설치/부트 설정 변경/재시작을 실행하지 않는다. 재시작 후에는 실행 커널·CONFIG_PREEMPT_RT·sysfs/capability를 실제 확인하고 동일 조건의 generic/RT 결과를 분리한다. EV-043 UPS 시뮬레이션을 포함한 이전 PC 실행 결과는 일반 커널 결과다. RT 합성 control 행은 2026-11-11 실행했다(EV-070); 실앱·장기 RT는 Not Run이다.
 
-### RT 준비·재시작 요청 — 2026-11-11 (Human 승인 대기)
+### RT 준비·재시작 요청 — 2026-11-11 (Human 승인, 1~3단계 완료 — [EV-070](../../05_verification/verification_evidence.md#ev-070))
 
 위 규칙에 따라 AI가 준비 상태를 확인하고 요청한다. 커널 설치·부트 설정 변경·재시작은 하지 않았다.
 
@@ -142,3 +142,5 @@ RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/�
 4. (Human) `sudo scripts/rt-boot.sh back` — 남은 `next_entry`가 있으면 지우고 기록한 뒤, 물어보고 재부팅해 generic으로 돌아간다.
 
 **합계:** SSD 약 135 GB, 실행 약 20분 + 재부팅 2회. RT 결과는 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.
+
+**결과(2026-11-11):** 1단계 generic 20:12~20:20, 3단계 RT(`7.0.0-38-realtime`, realtime=1) 20:42~20:50 — 두 커널 모두 모든 행 miss 0, RT는 부하 중 wake 꼬리 감소(P1 최대 108 → 25 µs). 유휴 wake 약 1 ms는 두 커널 공통(C-state 추정). 실제 SSD 약 141 GB, RT 부팅은 데스크톱 inhibitor 거절과 Human의 첫 RT 세션 재시작으로 예약 2회. [EV-070](../../05_verification/verification_evidence.md#ev-070). 남은 단계: 4(Human `sudo scripts/rt-boot.sh back`).

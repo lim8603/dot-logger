@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-08 |
-| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행: 1단계 generic FIFO 완료(control·safety miss 0, P1·P3 정상 부하, `perf_runs/rt-generic-2026-11-11/`), 2단계 RT 부팅 후 같은 스크립트 — [TASK-022 RT 요청](TASK-022.md). 그 뒤 TASK-028 S2. P4·P5 이월 |
+| 마지막 갱신일 | 2026-11-11 |
+| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행 완료 — generic·PREEMPT_RT FIFO 모두 control·safety miss 0, P1·P3 정상 부하([EV-070](../../05_verification/verification_evidence.md#ev-070)). Human generic 복귀 뒤 TASK-028 S2. P4·P5 이월 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 

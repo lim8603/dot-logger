@@ -1129,6 +1129,26 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **변경:** `Cargo.toml` `rustix = "=1.1.6"`, `Cargo.lock`은 rustix 버전·checksum만 바뀌었다(다른 패키지 변동 없음). dot-logger는 문제의 xattr 함수를 쓰지 않는다(statvfs·affinity만).
 - **검증:** fmt·clippy 1.96.0/1.85.0 `--all-targets --all-features -D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96.0/1.85.0 각 544 Pass, `scripts/check-feature-matrix.py` 1.96.0/1.85.0 각 17조합 Pass, `cargo audit --deny unsound`(cargo-audit 0.22.2) 취약점·unsound 0 — `paste` 유지보수 경고 1(GAP-005)만 남음.
 
+## EV-070 — TASK-023 RT 행: generic FIFO / PREEMPT_RT FIFO 제어 대조
+
+- **판정:** 로컬 **Pass** — 두 커널 모두 control(FIFO 70, 10 ms 주기·500 µs 작업)·safety(FIFO 80, 200 µs 작업) deadline miss 0·skipped 0·다른 CPU 실행 0, off 3회와 P1·P3 logger on 모두. 요구 「추가 miss 0(off 대비)」 충족. 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.
+- **조건:** 같은 바이너리(`/data/build/.../perf_baseline`, 20:12 빌드, 이후 소스 변경 없음)·같은 스크립트 `scripts/run-perf-rt.sh` 기본값(60초·예열 10초·off 3회), 경로 `/home/lim8603/s3-data`(T500 `nvme1n1`), S = 1.544 GB/s, cgroup memory.max 8 GiB, governor powersave(변경 안 함), mlockall. generic `7.0.0-43-generic`(20:12~20:20, git `3444127` 이전 HEAD) / RT `7.0.0-38-realtime`(`/sys/kernel/realtime`=1·`CONFIG_PREEMPT_RT=y`, 20:42~20:50, git `517f888` clean). RT 커널 패치 수준이 generic보다 낮다(38 vs 43).
+- **RT 부팅:** `rt-boot.sh once` → 데스크톱 inhibitor가 `reboot`를 거절(로그 기록) → 데스크톱 메뉴로 재시작. 첫 RT 부팅(20:30)은 Human이 모르고 GNOME에서 재시작해 측정 없이 generic으로 돌아갔고(커널 이상 없음, journal 확인), 두 번째 예약(20:38)으로 RT 부팅 후 부하가 load 1.0 아래로 내려간 뒤 측정. 전 과정 `perf_runs/rt-boot/boot.log`.
+
+| 행 | 루프 | generic wake p50 / p99 / max | RT wake p50 / p99 / max | generic response p99 / max | RT response p99 / max |
+|---|---|---|---|---|---|
+| control off ×3 | control | <512 / <1024 µs / 0.99~1.37 ms | <512 / <1024 µs / 1.00~1.35 ms | <2048 µs / 2.27~2.33 ms | <2048 µs / 1.87~2.26 ms |
+| control off ×3 | safety | <512 / <1024 µs / 0.89~1.37 ms | <512 / <1024 µs / 1.00~1.35 ms | <1024 µs / 1.19~1.68 ms | <2048 µs / 1.47~1.80 ms |
+| P1 32×16 on | control | <16 / <64 µs / 108 µs | <8 / <32 µs / 25 µs | <2048 µs / 2.01 ms | <1024 µs / 1.20 ms |
+| P1 32×16 on | safety | <16 / <64 µs / 132 µs | <8 / <16 µs / 19 µs | <512 µs / 760 µs | <512 µs / 321 µs |
+| P3 정상 on | control | <64 / <256 µs / 732 µs | <64 / <128 µs / 576 µs | <2048 µs / 2.11 ms | <2048 µs / 1.68 ms |
+| P3 정상 on | safety | <64 / <256 µs / 732 µs | <64 / <128 µs / 575 µs | <1024 µs / 1.01 ms | <1024 µs / 1.19 ms |
+
+- **부하:** P1 25.41 / 25.39 MB/s, P3 940.7 / 941.6 MB/s(요구 926 MB/s + 소형 10만/s), 둘 다 거절 0·sync 기한 초과 없음(generic / RT).
+- **유휴 cyclictest(진단, 1 ms 간격, P80, control·safety CPU):** generic 평균 4·5 µs / 최대 619·776 µs, RT 평균 4·4 µs / 최대 228·148 µs.
+- **해석:** RT는 부하 중 꼬리를 줄였다(P1 wake 최대 108·132 → 25·19 µs, P3 732 → 576 µs). 유휴 off 행 wake는 두 커널 모두 256~511 µs 중앙·최대 약 1~1.4 ms로 같다 — 커널 선점이 아니라 10 ms 주기 유휴 사이 깊은 CPU idle 상태 복귀로 추정(부하 중에는 오히려 짧다, `/dev/cpu_dma_latency` 쓰기 권한 없음, powersave). 10 ms deadline 대비 response 최대 2.33 ms로 여유가 크다. 주기 응답을 더 줄여야 하면 C-state 제한·governor가 커널보다 먼저다(Human 판단, 미착수).
+- **원자료:** `perf_runs/rt-generic-2026-11-11/`·`perf_runs/rt-rt-2026-11-11/`(`runs.jsonl`·`cyclictest.txt`·`calibration.json`·`progress.txt`·`device-writes.txt`). SSD 쓰기 T500 generic 70.4 GB + RT 약 70.5 GB(RT는 부팅 뒤 장치 누적, 상한).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

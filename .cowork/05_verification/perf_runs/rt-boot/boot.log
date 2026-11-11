@@ -12,3 +12,20 @@
 2026-11-11T20:28:56+09:00 kernel=7.0.0-38-realtime target=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3
 2026-11-11T20:28:56+09:00 OK: next boot only -> gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 (default unchanged)
 2026-11-11T20:28:58+09:00 reboot requested
+2026-11-11T20:34:45+09:00 === status
+2026-11-11T20:34:45+09:00 user=lim8603 kernel=7.0.0-43-generic realtime=absent boot_id=2393b5c5-a7f7-40a9-979c-8b7346ac8614
+2026-11-11T20:34:45+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-43-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T20:34:45+09:00 grubenv: next_entry= 
+2026-11-11T20:38:00+09:00 === once
+2026-11-11T20:38:00+09:00 user=lim8603 kernel=7.0.0-43-generic realtime=absent boot_id=2393b5c5-a7f7-40a9-979c-8b7346ac8614
+2026-11-11T20:38:00+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-43-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T20:38:00+09:00 grubenv: next_entry= 
+2026-11-11T20:38:00+09:00 kernel=7.0.0-38-realtime target=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3
+2026-11-11T20:38:00+09:00 OK: next boot only -> gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 (default unchanged)
+2026-11-11T20:38:02+09:00 reboot requested
+Call to Reboot failed: Operation denied due to active block inhibitor
+2026-11-11T20:38:02+09:00 reboot refused (see above); the boot choice stays — restart from the desktop menu or run: sudo systemctl reboot -i
+2026-11-11T20:39:31+09:00 === status
+2026-11-11T20:39:31+09:00 user=lim8603 kernel=7.0.0-38-realtime realtime=1 boot_id=a09ebccc-6f33-4db2-a5f8-1c2091fc9fcb
+2026-11-11T20:39:31+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-38-realtime root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T20:39:31+09:00 grubenv: next_entry= 

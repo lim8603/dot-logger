@@ -1034,3 +1034,43 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 
 - **완료 장부 reconcile(발견 ⑨):** dispatcher turn과 종료 poll의 reconcile 상한은 writer 1개의 완료 window다(이전: window × writers). 버려진 delivery의 Unknown 확정은 writers turn 안에 이루어진다. 32생산자·16파일에서 소형 10만/s와 P3 혼합이 backlog 없이 처리된다(smoke).
 - **완료 장부 reconcile·sync 적용(발견 ⑪, 2026-11-09):** 갱신은 자기 slot을 종결하므로 reconcile이 필요한 것은 버려진 delivery뿐이다. `AbandonMarker`가 발동할 때마다 세대를 올리고, reconcile은 세대가 바뀌었을 때만 window 전체를 한 바퀴(turn당 상한은 그대로) 훑는다. 갱신 중이라 건너뛴 slot에 버려진 기록이 있으면 한 바퀴 더 훑는다. Unknown 확정 상한은 버려진 뒤 writers turn(재훑기 시 그 두 배)으로 유지된다. sync 확인 적용(`control.poll`)은 cell word로 이 target에 라우팅·Written·미Synced·비종결인 칸만 receipt 조회·poll을 거친다(의미 동일). P3 무제한에서 host 시간의 약 65%를 차지하던 두 훑기를 없앴다([EV-062](../05_verification/verification_evidence.md#ev-062)). 세대는 marker가 drop될 때 그 칸이 같은 기록이고 아무 경계도 확인되지 않았을 때만 올린다 — IO guard는 보고 뒤에도 marker를 해제하지 않고 drop하므로, 이 조건 없이는 모든 기록이 훑기를 다시 시작한다([EV-063](../05_verification/verification_evidence.md#ev-063)). marker가 target을 16비트로 담으므로 완료 장부의 target 수 상한은 65,535다.
+
+### 19.8 TASK-028 S2 auto preset 계약 — 2026-11-11
+
+상태: **Human 결정(2026-11-11, 착수 시 질문 3건 모두 권고안)**, 구현 중 구체화는 §19.9로 덧붙인다. §19.1~19.7은 바뀌지 않는다.
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | 지속 처리량·수락 오차 | 기본 calibrate는 짧다(쓰기 ≤ 4 GiB 또는 ≤ 15초 중 먼저). 순간 쓰기+fdatasync 처리량과 sync·쓰기 호출 지연은 Observed, 지속 처리량은 Estimated(순간 × 0.5, 가정 문자열 명시 — SSD 캐시·page cache 때문에 짧은 측정은 지속값을 과대평가한다). 수락: 같은 PC의 TASK-023 S3 정식 S(1.544 GB/s, EV-064)를 20% 넘게 과대평가하지 않는다(추정 ≤ 1.2 × S). 장기 모드는 두지 않는다 |
+| 2 | 프로필 형식 | JSON(`serde_json`, 새 의존성 없음), 형식 이름·버전 필드. core는 선택 feature `calibrate`로만 포함 |
+| 3 | preset 반영 범위 | 흡수 시간 = max(Sizing 흡수, ⌈관측 최대 IO 정체 × 2⌉) — 사용자가 `.absorb(..)`로 정한 값은 바꾸지 않는다. 메모리 예산이 관측 가용 메모리(MemAvailable·cgroup 한도 중 작은 값)를 넘으면 경고, 선언 부하(writer 수 × Σ기록률×크기)가 추정 지속 × 0.6을 넘으면 경고. CPU(online·isolated)·governor·커널·PREEMPT_RT·파일시스템은 기록만 |
+
+**계약 초안:**
+
+```rust
+// feature "calibrate" — 설치·커미셔닝 때 명시 실행. 자동 적용 없음.
+let profile = dot_logger::calibrate::Calibration::new("/data/logs")  // 측정 대상 파일시스템의 기존 디렉터리
+    .run(&cancel)?;              // 전용 하위 디렉터리에 쓰고 fdatasync, 끝나면 지운다
+profile.save("machine.json")?;   // 새 파일만 만든다(덮어쓰기 거절)
+let profile = Profile::load("machine.json")?;
+
+let builder = Logger::builder()
+    .preset(Preset::control(1000).profile(&profile))   // 사용자 opt-in
+    /* outputs, channels, writers */;
+let plan = builder.plan()?;      // plan.warnings: 메모리·부하 경고(시작은 막지 않는다)
+```
+
+- **한도:** `write_limit`(기본 4 GiB)·`time_limit`(기본 15초)·`disk_reserve`(기본 1 GiB, 남은 공간이 reserve + 쓰기 한도보다 작으면 한도를 줄이고, 블록 하나도 못 쓰면 거절)·취소 flag(블록마다 확인). 측정 파일은 성공·실패·취소 모두 지운다.
+- **측정:** 8 MiB 블록 순차 쓰기, 1초마다와 끝에 fdatasync. 처리량 = 쓴 바이트 / (마지막 fdatasync까지 경과). IO 정체 = 쓰기 호출·fdatasync 한 번의 최대 시간. 정지 사유를 기록한다.
+- **host 사실:** Linux에서 커널 release, `/sys/kernel/realtime`, online·isolated CPU, CPU0 governor, `/proc/meminfo` MemTotal·MemAvailable, 자기 cgroup `memory.max`, 파일시스템 종류·여유. 읽지 못한 값은 Unavailable(사유)이며 0이나 성공으로 바꾸지 않는다. 다른 OS는 모두 Unavailable.
+- **한계 표시:** 프로필은 측정 시점 snapshot이며 보장이 아니다(page cache·온도·governor·장치 상태 변동). 프로필의 측정 디렉터리와 다른 장치에 쓰는 출력에는 맞지 않는다.
+
+### 19.9 S2 구현 반영 — 2026-11-11
+
+[EV-071](../05_verification/verification_evidence.md#ev-071). §19.8 결정과 다른 점은 없다.
+
+- **이름:** `Preset::from_profile` 대신 `Sizing::profile(&Profile)` — 부하(hz·bytes)는 사용자 입력이라 어느 preset·Sizing에도 이어 붙인다. 사용자의 `.absorb(..)`는 호출 순서와 관계없이 유지되고, preset 고유 흡수(`black_box` 2초)는 프로필이 늘릴 수만 있다.
+- **공개 표면:** facade 추가는 `PlanWarning`(+1)과 `Plan::warnings` 필드. `calibrate` 모듈(feature 조건, 고급 경로) 타입 9개: `Calibration`·`Profile`·`Host`·`Fact`·`WriteMeasurement`·`Stop`·`Estimate`·`CalibrateError`·`ProfileError`.
+- **형식 v1:** `format`·`version`·`measured_unix_s`·`directory`·`host`(각 값 `{"observed": v}` 또는 `{"unavailable": 사유}`, cgroup 무제한은 `{"observed": null}`)·`write`(바이트·`elapsed_ns`·sync 수·`sync_max_ns`·`write_call_max_ns`·`stopped_by`)·`derived`(읽는 사람용, 읽을 때 무시하고 재계산). 저장은 새 파일만.
+- **측정:** 블록 하나는 항상 쓴 뒤 시간 한도를 본다. reserve는 시작 시 여유 snapshot으로 한도를 줄이며(실행 중 재확인 없음) 그때 정지 사유는 `DiskReserve`. 다른 OS는 여유 확인이 `Unsupported` I/O 오류다.
+- **CLI:** `dot-logger calibrate --directory D --output P` — `P`가 있으면 측정 전 Conflict(exit 3), 사용자가 `--timeout-ms`를 주지 않으면 제한 시간 = `--time-limit-ms` + 120초.

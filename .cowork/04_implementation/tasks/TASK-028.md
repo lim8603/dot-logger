@@ -9,8 +9,8 @@
 | ADR | ADR-004·005·011 Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S1 로컬 완료. 다음은 TASK-023 S2(facade·preset 경로 logger on 측정, 이월 T4 판정 입력). S2 auto preset은 TASK-023 S3 정식 결과 뒤 |
+| 마지막 갱신일 | 2026-11-11 |
+| 다음 액션 | S2 로컬 완료([EV-071](../../05_verification/verification_evidence.md#ev-071)) — T500 정확도 3회 Pass(추정 지속 최대 1.467 ≤ 1.853 GB/s). Human 리뷰 대기. 다음 TASK-029 |
 | 의존 | TASK-027(S1 계약)·TASK-017·TASK-023(S2의 정확도 oracle) |
 | 예상 소요 | S1 1~2 + S2 2~3 인일, 측정/리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 결정적 사이징·preset | `Sizing` 입력→설정·계산 근거, preset 3~4종(제어 경량·센서 원본·블랙박스 순환·혼합; 수치 근거는 TASK-022 local-pc-v1), 부족 항목·부족량 설명 오류 | Done(로컬) — 2026-11-07 Human 결정 3건, [API §19](../../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07), [EV-052](../../05_verification/verification_evidence.md#ev-052) |
-| S2 | 장비 측정 auto preset | 아래 설계로 측정 프로필 파일 생성→`Preset::from_profile` 적용, TASK-023 정식 결과 대비 오차 기록 | Planned |
+| S2 | 장비 측정 auto preset | 아래 설계로 측정 프로필 파일 생성→`Sizing::profile` 적용, TASK-023 정식 결과 대비 오차 기록 | Done(로컬) — 2026-11-11 Human 결정 [API §19.8·19.9](../../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../../05_verification/verification_evidence.md#ev-071) |
 
 ## S1 Human 결정과 계획 — 2026-11-07
 
@@ -33,6 +33,19 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 |---|---|---|
 | S1a | core 예약 공식을 생성자와 공유하는 순수 함수로 추출하고 facade `derive`를 정확 요구량 배정으로 교체(RV-097) | 로컬 Pass — 소스 `21cc198`, F14 |
 | S1b | `Sizing`·`Preset` 3종·builder `.preset`·`plan()`과 근거, 사용자 값 우선, 부족 항목·부족량 | 로컬 Pass — 소스 `4465be3`, F15, [EV-052](../../05_verification/verification_evidence.md#ev-052), [REV-050](../../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) Closed, API §19.3 |
+
+## S2 Human 결정과 계획 — 2026-11-11
+
+착수 시 질문 3건을 Human이 모두 권고안으로 정했다(「짧은 측정 + 보수 추정」·「JSON」·「흡수 시간·메모리·부하 경고」). 상세 [API §19.8](../../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11).
+
+- **수락 오차:** 추정 지속 처리량 ≤ 1.2 × TASK-023 S3 S(1.544 GB/s → ≤ 1.853 GB/s). 짧은 측정은 SSD 캐시 때문에 지속값을 과대평가하므로(이 T500 순간 약 2.65 GB/s) 지속값은 순간 × 0.5인 Estimated로만 둔다. 장기 모드는 없다.
+- **이름 정정:** 설계의 `Preset::from_profile`은 부하(hz·bytes)가 사용자 입력이므로 `Sizing::profile(&Profile)`(어느 preset에도 이어 붙임)로 구체화한다.
+
+| 하위 | 범위 | 상태 |
+|---|---|---|
+| S2a | feature `calibrate`: `Calibration` 한도·취소·정리, host 사실(Observed/Unavailable), `Profile` JSON 저장/읽기 — F19 | 로컬 Pass — EV-071 |
+| S2b | `Sizing::profile` 흡수 반영(사용자 값 유지), `Plan::warnings` 메모리·부하 경고 — F20 | 로컬 Pass — EV-071 |
+| S2c | CLI `dot-logger calibrate`, T500(`/home/lim8603/s3-data`) 3회 정확도 확인(쓰기 약 12 GB) | 로컬 Pass — CLI 시험, 추정 지속 0.78·1.47·1.42 GB/s(≤ 1.853), SSD 12.89 GB, EV-071 |
 
 ## S2 auto preset 설계 — 2026-11-04 Human 요청
 
@@ -56,7 +69,7 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 ## Human 확인 필요 사항
 
 - preset 종류·이름과 안전 여유 계수 기본값.
-- auto preset 수락 오차와 프로필 파일 형식(TOML/JSON) — S2 착수 시.
+- ~~auto preset 수락 오차와 프로필 파일 형식(TOML/JSON) — S2 착수 시.~~ 2026-11-11 결정(위 S2 절).
 - FR-015의 질문 프리셋 부분은 [TASK-018](TASK-018.md)에 남는다(제안 유지).
 
 ## 완료 기준
@@ -66,4 +79,4 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 - [ ] 실패/포화·취소/종료·예산 경계(측정 중 취소·디스크 reserve 포함)를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 제품 코드·테스트 실행 결과: 없음.
+테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S1 [EV-052](../../05_verification/verification_evidence.md#ev-052), S2 [EV-071](../../05_verification/verification_evidence.md#ev-071).

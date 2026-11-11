@@ -1,0 +1,77 @@
+{
+  "derived": {
+    "absorb_ns": 1500369348,
+    "burst_bytes_per_second": 2848995809,
+    "load_limit_bytes_per_second": 854698742,
+    "note": "recomputed on load; a snapshot, not a guarantee",
+    "stall_ns": 750184674,
+    "sustained_bytes_per_second": {
+      "assumption": "half the burst rate of a short run; an SSD write cache and the page cache make a short run overstate the sustained rate",
+      "estimated": 1424497904
+    }
+  },
+  "directory": "/home/lim8603/s3-data",
+  "format": "dot-logger-calibration",
+  "host": {
+    "cgroup_memory_current_bytes": {
+      "observed": 39743307776
+    },
+    "cgroup_memory_max_bytes": {
+      "observed": null
+    },
+    "cpus_isolated": {
+      "observed": []
+    },
+    "cpus_online": {
+      "observed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    "filesystem": {
+      "observed": "ext4"
+    },
+    "free_bytes": {
+      "observed": 894842245120
+    },
+    "governor": {
+      "observed": "powersave"
+    },
+    "kernel": {
+      "observed": "7.0.0-43-generic"
+    },
+    "memory_available_bytes": {
+      "observed": 55951044608
+    },
+    "memory_total_bytes": {
+      "observed": 59750256640
+    },
+    "preempt_rt": {
+      "observed": false
+    }
+  },
+  "measured_unix_s": 1794402416,
+  "version": 1,
+  "write": {
+    "bytes": 4294967296,
+    "elapsed_ns": 1507537246,
+    "stopped_by": "WriteLimit",
+    "sync_max_ns": 750184674,
+    "syncs": 1,
+    "write_call_max_ns": 2792745
+  }
+}

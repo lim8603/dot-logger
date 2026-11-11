@@ -1149,6 +1149,27 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **해석:** RT는 부하 중 꼬리를 줄였다(P1 wake 최대 108·132 → 25·19 µs, P3 732 → 576 µs). 유휴 off 행 wake는 두 커널 모두 256~511 µs 중앙·최대 약 1~1.4 ms로 같다 — 커널 선점이 아니라 10 ms 주기 유휴 사이 깊은 CPU idle 상태 복귀로 추정(부하 중에는 오히려 짧다, `/dev/cpu_dma_latency` 쓰기 권한 없음, powersave). 10 ms deadline 대비 response 최대 2.33 ms로 여유가 크다. 주기 응답을 더 줄여야 하면 C-state 제한·governor가 커널보다 먼저다(Human 판단, 미착수).
 - **원자료:** `perf_runs/rt-generic-2026-11-11/`·`perf_runs/rt-rt-2026-11-11/`(`runs.jsonl`·`cyclictest.txt`·`calibration.json`·`progress.txt`·`device-writes.txt`). SSD 쓰기 T500 generic 70.4 GB + RT 약 70.5 GB(RT는 부팅 뒤 장치 누적, 상한).
 
+
+## EV-071 — TASK-028 S2 auto preset: calibrate·프로필·preset 반영·CLI, T500 정확도
+
+- **판정:** 로컬 **Pass**. 정확도 수락(추정 지속 ≤ 1.2 × S3 S = 1.853 GB/s) 3회 모두 충족 — 최대 1.467 GB/s(S의 95%), 과대평가 없음.
+- **Human 결정(2026-11-11):** 착수 질문 3건 모두 권고안 — 짧은 측정 + 보수 추정(순간 × 0.5, 수락 ≤ 1.2 × S), JSON, 흡수 시간·메모리·부하 경고([API §19.8](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11)).
+- **변경(TDD):** core 선택 feature `calibrate`(`dep:serde_json`, 새 의존성 없음) — `calibrate::{Calibration, Profile, Host, Fact, WriteMeasurement, Stop, Estimate, CalibrateError, ProfileError}`. `Sizing::profile(&Profile)`(feature 조건), facade `PlanWarning`·`Plan::warnings`. CLI `dot-logger calibrate --directory --output [--write-limit --time-limit-ms --disk-reserve]`(기존 파일이면 측정 전 Conflict, 기본 제한 시간 = 측정 시간 + 120초). `scripts/check-feature-matrix.py`에 calibrate 단독·전체 조합 추가.
+- **Red:** `tc_013_calibrate` 컴파일 실패 9건(모듈·`PlanWarning`·`Sizing::profile`·`Plan::warnings` 없음), CLI 시험 exit 2(`calibrate` 미지원).
+- **시험:** F19·F20 10개(`tc_013_calibrate`), host 단위 2개(빈 root → Unavailable·RT 파일 없음 = false, CPU 목록 파싱), CLI 1개.
+- **검증:** fmt, clippy 1.96.0/1.85.0 workspace `--all-targets --all-features`·core `--no-default-features` `-D warnings` 0, rustdoc `-D warnings` 0(기존 `output filename collision` 경고만, HEAD에서도 동일), workspace 1.96.0/1.85.0 각 559 Pass(HEAD 546 + 신규 13), `check-feature-matrix.py` 1.96.0/1.85.0 Pass(16조합 + calibrate 2조합). unsafe·동시성 변경 없음 → Miri 미실행.
+- **T500 정확도(release CLI, 기본 4 GiB·15초·reserve 1 GiB, `/home/lim8603/s3-data` = `nvme1n1` ext4, generic 7.0.0-43, 2026-11-11 22:06:49~22:06:56):**
+
+  | 회 | 4 GiB 시간 | 순간(Observed) | 추정 지속(Estimated) | S3 S 대비 | sync 최대 | 쓰기 호출 최대 | 흡수 |
+  |---|---|---|---|---|---|---|---|
+  | 1 | 2.76 s | 1.558 GB/s | 0.779 GB/s | 50% | 431 ms | 9.9 ms | 0.86 s(→ preset 1 s 유지) |
+  | 2 | 1.46 s | 2.934 GB/s | 1.467 GB/s | 95% | 703 ms | 4.6 ms | 1.41 s |
+  | 3 | 1.51 s | 2.849 GB/s | 1.424 GB/s | 92% | 750 ms | 2.8 ms | 1.50 s |
+
+  세 회 모두 쓰기 한도로 정지, 측정 파일 없음. 1회차만 순간값이 절반 — 장치 상태 표류(EV-060·065와 같은 현상). 짧은 측정의 순간값은 최대 2.93 GB/s로 S의 1.9배라 지속값을 그대로 쓰면 90% 과대평가였다. 흡수는 sync 최대(1초분 dirty page flush)가 지배해 1.4~1.5 s로 preset 1 s보다 길어진다 — EV-065의 「290 ms 넘는 정체가 잦음」과 같은 방향.
+- **한계:** 측정 시점 snapshot이며 보장이 아니다. ×0.5는 이 PC 1대의 S3 결과로만 확인했다(다른 장치는 미확인). 부하 경고는 preset을 쓰는 writer의 선언 부하만 본다(writer별 quota writer 제외).
+- **원자료:** `perf_runs/calibrate-2026-11-11/`(`run{1,2,3}.json` 프로필, `.stdout.jsonl`, `device-writes.txt`). SSD 쓰기 T500 12.89 GB.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

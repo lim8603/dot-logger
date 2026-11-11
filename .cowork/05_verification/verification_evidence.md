@@ -1088,6 +1088,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **쓰기량:** SSD 149 GB(T500). 11-10 누적 약 733 GB.
 - **Human 결정(2026-11-10 「a」) — S3 마감:** 추가 SSD 쓰기 없이 판정한다. P3 효율은 EV-064·065 P3 10회 합산 89% Pass(장치 표류 큼 주석), 정상 부하 raw 획득 거절은 harness 사이징 문제(P3에도 같은 원인으로 판단). `run-perf-s3.sh` raw 풀을 `Preset::sensor` 크기(⌈hz × 1.25⌉, 메모리 예산 증액)로 수정, tmpfs dry-run 13조건 Pass(raw 38칸, 거절 0). T5는 Human 결정으로 조사(다음 세션, tmpfs·SSD 쓰기 0).
 
+## EV-066 — T5 조사: ⑪ 상한은 IO 경로의 바이트당 비용과 공유 자원 경합, 새 발견 ⑫ 종료 drain 장부 훑기
+
+- **판정:** ⑪ 원인 규명(조사 범위). 단일 결함이 아니다. ① logger IO 스레드가 payload 바이트당 P0 writer의 약 2.5~3배 CPU를 쓴다(encode 복사·CRC 2회·커널 쓰기 비용 증가·같은 스레드의 소형 기록). ② hot IO 스레드를 늘려도 바이트당 비용이 함께 올라 합계가 약 3 GB/s에서 멈춘다 — 메모리 대역폭·SMT 같은 공유 자원 경합(하드웨어 카운터 없이 자원은 미확정). host·CPU 배치·raw 깊이는 원인이 아니다. **새 발견 ⑫(제품 결함, Open):** 종료 중 host turn마다 `poll_shutdown`이 완료 장부 전체를 두 번 집계해 drain을 굶긴다.
+- **대상/환경:** 제품 `96465af`, 2026-11-11 18:02~18:23 AI(Human 시간 상한 45분). tmpfs `/dev/shm`만 사용, SSD 쓰기 0. 진단 빌드 `/data/build/target-diag{,2,3,4}`(예약 0, 변경은 빌드 직후 원복). `perf_event_paranoid=4`라 perf 대신 `/proc` 스레드 표본(0.2 s)과 gdb 스택 사용. 원자료 `perf_runs/t5-2026-11-11/`.
+- **재현:** P3 무제한 12 GiB(raw 4 스트림) logger 2.72~2.86 GB/s, P0 4.08~4.15 GB/s(66~67%) — EV-063과 같다.
+- **기각:** CPU 배치(worker 4코어 고정/생산자 분리/고정 없음/worker 16개) 2.72~2.85 GB/s로 차이 없음. raw 8 → 32칸: hot IO 84% → 96% 포화, 처리량 +3~7%. host는 부하 중 40~72%로 비포화.
+- **스레드 분해(4 스트림):** raw 파일 4개를 맡은 IO 스레드 4개가 부하 중 83~87%, 나머지 4개 15~18%. hot IO 비용 user 0.60 + sys 0.60 s/GiB. P0는 raw 파일이 writer 2개에 몰리며 그 2개가 약 98%로 user 0.07 + sys 0.42 s/GiB. CRC off 진단: hot IO user 0.61 → 0.50 s/GiB, 처리량 +9%(2.71 → 2.96). 경로 확인: mcap 0.26 seek 모드는 chunk 버퍼 복사가 없고(`ChunkMode::Direct`), 압축 없음에서도 uncompressed·compressed CRC 계층이 같은 바이트를 두 번 훑는다. Sink는 64 KiB 이상 쓰기를 직접 보낸다. `encode_record`는 payload를 Envelope 버퍼로 1회 복사한다.
+- **확장(raw 8 스트림):** P0 6.88~6.89 GB/s(hot writer 4개)로 오르지만 logger는 0.92 GB/s(13%). accepted 3.69 s·durable 13.9 s — 입력 뒤 10초 drain 동안 host 100%, IO 약 5%. gdb 표본 4회 모두 host가 `ControlOwner::poll_shutdown` → `Completion::selected_totals`(생산자 × window × target `observe`, 이 조건 약 200만 회 × 2). drain 중 집계를 건너뛴 진단 빌드: 8 스트림 3.04~3.07 GB/s, 4 스트림 2.79~2.86 GB/s(+3%, drain 0.45 → 0.3 s). 같은 빌드에서 hot IO 8개 모두 80~87%인데 합계는 +8%뿐이고, IO 비용이 1.56 → 2.04 s/GiB(+31%)로 오른다(P0는 0.52 → 0.57). 여기에 CRC off를 더하면 3.05 → 3.35 GB/s(+10%).
+- **해석:** logger는 바이트당 메모리를 약 2배 더 지나간다(fill·encode 복사·CRC 2회·커널 복사 vs fill·커널 복사). 이 PC의 8 MiB memcpy 대역폭은 스레드 수와 무관하게 18~23 GB/s에서 포화한다. 이 때문에 동시 IO가 늘수록 바이트당 비용이 오른다. 다만 CRC 제거 효과(+10%)가 순수 대역폭 모델 예측보다 작아 SMT 공유 등이 섞였다고 본다.
+- **조치 후보(미착수, Human 판단):** ⑫ 종료 집계를 drain이 끝났을 때·기한 경과 때만 수행(TDD, 판정 의미 유지, 효과 4 스트림 +3%·raw 스트림이 많을 때 큰 폭). 중복 CRC 제거(+9~10%, 압축 없음일 때 chunk CRC 한 번 — mcap 옵션/형식 영향 검토 필요). Envelope 복사 제거(형식·mcap 쓰기 API 변경 필요, 효과 미측정). 상한 수치(이 PC 약 3 GB/s)는 요구 P3(1 GB/s + 10만/s)와 10GbE 1줄(1.25 GB/s)보다 높다.
+- **쓰기량:** SSD 0(tmpfs). 진단 빌드 산출물만 `/data/build`(HP EX950).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

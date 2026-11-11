@@ -1,0 +1,58 @@
+----
+Thread 2 "dot-logger-host" received signal SIGINT, Interrupt.
+[Switching to Thread 0x7fffd3ca16c0 (LWP 24490)]
+0x00005555556622e2 in dot_logger::completion::Completion::selected_totals ()
+
+----
+Thread 2 (Thread 0x7fffd3ca16c0 (LWP 24490) "dot-logger-host"):
+#0  0x00005555556622e2 in dot_logger::completion::Completion::selected_totals ()
+#1  0x0000555555640857 in dot_logger::control::ControlOwner::poll_shutdown ()
+#2  0x0000555555653e03 in std::thread::scoped::scope ()
+#3  0x000055555565d2d4 in dot_logger::routing::Router::scope ()
+#4  0x000055555560331a in std::sys::backtrace::__rust_begin_short_backtrace ()
+#5  0x000055555560575a in core::ops::function::FnOnce::call_once{{vtable.shim}} ()
+#6  0x00005555556c060f in <std::sys::thread::unix::Thread>::new::thread_start ()
+#7  0x00007ffff7ca3dfa in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:454
+#8  0x00007ffff7d375cc in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+----
+Thread 2 (Thread 0x7fffd3ca16c0 (LWP 24490) "dot-logger-host"):
+#0  0x00005555556621a4 in dot_logger::completion::Completion::selected_totals ()
+#1  0x0000555555640857 in dot_logger::control::ControlOwner::poll_shutdown ()
+#2  0x0000555555653e03 in std::thread::scoped::scope ()
+#3  0x000055555565d2d4 in dot_logger::routing::Router::scope ()
+#4  0x000055555560331a in std::sys::backtrace::__rust_begin_short_backtrace ()
+#5  0x000055555560575a in core::ops::function::FnOnce::call_once{{vtable.shim}} ()
+#6  0x00005555556c060f in <std::sys::thread::unix::Thread>::new::thread_start ()
+#7  0x00007ffff7ca3dfa in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:454
+#8  0x00007ffff7d375cc in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+----
+Thread 2 (Thread 0x7fffd3ca16c0 (LWP 24490) "dot-logger-host"):
+#0  0x0000555555662169 in dot_logger::completion::Completion::selected_totals ()
+#1  0x000055555564083f in dot_logger::control::ControlOwner::poll_shutdown ()
+#2  0x0000555555653e03 in std::thread::scoped::scope ()
+#3  0x000055555565d2d4 in dot_logger::routing::Router::scope ()
+#4  0x000055555560331a in std::sys::backtrace::__rust_begin_short_backtrace ()
+#5  0x000055555560575a in core::ops::function::FnOnce::call_once{{vtable.shim}} ()
+#6  0x00005555556c060f in <std::sys::thread::unix::Thread>::new::thread_start ()
+#7  0x00007ffff7ca3dfa in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:454
+#8  0x00007ffff7d375cc in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+----
+Thread 2 "dot-logger-host" received signal SIGINT, Interrupt.
+[Switching to Thread 0x7fffd3ca16c0 (LWP 24490)]
+0x0000555555662169 in dot_logger::completion::Completion::selected_totals ()
+
+----
+Thread 2 (Thread 0x7fffd3ca16c0 (LWP 24490) "dot-logger-host"):
+#0  0x0000555555662169 in dot_logger::completion::Completion::selected_totals ()
+#1  0x000055555564083f in dot_logger::control::ControlOwner::poll_shutdown ()
+#2  0x0000555555653e03 in std::thread::scoped::scope ()
+#3  0x000055555565d2d4 in dot_logger::routing::Router::scope ()
+#4  0x000055555560331a in std::sys::backtrace::__rust_begin_short_backtrace ()
+#5  0x000055555560575a in core::ops::function::FnOnce::call_once{{vtable.shim}} ()
+#6  0x00005555556c060f in <std::sys::thread::unix::Thread>::new::thread_start ()
+#7  0x00007ffff7ca3dfa in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:454
+#8  0x00007ffff7d375cc in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+

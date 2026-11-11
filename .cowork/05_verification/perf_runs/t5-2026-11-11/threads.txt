@@ -1,0 +1,38 @@
+== e-base-1
+e-base-1.samples             dot-logger-io    x4 user/GiB 0.60 sys/GiB 0.60
+e-base-1.samples             dot-logger-host  x1 user/GiB 0.19 sys/GiB 0.02
+e-base-1.samples active 4.3s mid-window busy: io:83% io:83% io:83% io:83% host:41% io:15% io:15% io:15% io:14%
+== c-target-diag-1
+c-target-diag-1.samples      dot-logger-io    x4 user/GiB 0.62 sys/GiB 0.59
+c-target-diag-1.samples      dot-logger-host  x1 user/GiB 0.20 sys/GiB 0.02
+c-target-diag-1.samples active 4.3s mid-window busy: io:85% io:84% io:82% io:82% host:40% io:16% io:16% io:16% io:15%
+== c-target-diag2-1
+c-target-diag2-1.samples     dot-logger-io    x4 user/GiB 0.50 sys/GiB 0.61
+c-target-diag2-1.samples     dot-logger-host  x1 user/GiB 0.19 sys/GiB 0.02
+c-target-diag2-1.samples active 4.0s mid-window busy: io:85% io:84% io:83% io:83% host:45% io:15% io:15% io:15% io:15%
+== s-32-1
+s-32-1.samples               dot-logger-io    x4 user/GiB 0.63 sys/GiB 0.59
+s-32-1.samples               dot-logger-host  x1 user/GiB 0.22 sys/GiB 0.03
+s-32-1.samples active 3.9s mid-window busy: io:96% io:95% io:95% io:95% host:61% io:21% io:21% io:21% io:20%
+== k-lg-4-1
+k-lg-4-1.samples             dot-logger-io    x4 user/GiB 0.61 sys/GiB 0.60
+k-lg-4-1.samples             dot-logger-host  x1 user/GiB 0.20 sys/GiB 0.02
+k-lg-4-1.samples active 4.3s mid-window busy: io:84% io:84% io:83% io:82% host:37% io:14% io:14% io:14% io:14%
+== k-lg-8-1
+k-lg-8-1.samples             dot-logger-io    x4 user/GiB 0.57 sys/GiB 0.46
+k-lg-8-1.samples             dot-logger-host  x1 user/GiB 1.06 sys/GiB 0.03
+k-lg-8-1.samples active 13.4s mid-window busy: host:99% io:6% io:6% io:5% io:5% io:5% io:5% io:5% io:5%
+== q-4-1
+q-4-1.samples                dot-logger-io    x4 user/GiB 0.62 sys/GiB 0.61
+q-4-1.samples                dot-logger-host  x1 user/GiB 0.19 sys/GiB 0.02
+q-4-1.samples active 4.1s mid-window busy: io:87% io:87% io:86% io:85% host:48% io:18% io:17% io:17% io:17%
+== q-8-1
+q-8-1.samples                dot-logger-io    x4 user/GiB 0.58 sys/GiB 0.45
+q-8-1.samples                dot-logger-host  x1 user/GiB 0.22 sys/GiB 0.02
+q-8-1.samples active 3.5s mid-window busy: io:87% io:87% io:86% io:85% io:83% io:80% io:79% io:75% host:71%
+== k-p0-4-1
+k-p0-4-1.samples             dot-logger-io    x0 user/GiB 0.00 sys/GiB 0.00
+k-p0-4-1.samples             dot-logger-host  x0 user/GiB 0.00 sys/GiB 0.00
+== k-p0-8-1
+k-p0-8-1.samples             dot-logger-io    x0 user/GiB 0.00 sys/GiB 0.00
+k-p0-8-1.samples             dot-logger-host  x0 user/GiB 0.00 sys/GiB 0.00

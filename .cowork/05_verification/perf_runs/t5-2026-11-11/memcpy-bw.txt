@@ -1,0 +1,5 @@
+threads  1 memcpy 17.6 GB/s (copied bytes)
+threads  2 memcpy 22.6 GB/s (copied bytes)
+threads  4 memcpy 21.0 GB/s (copied bytes)
+threads  8 memcpy 18.2 GB/s (copied bytes)
+threads 16 memcpy 17.9 GB/s (copied bytes)

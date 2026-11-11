@@ -16,31 +16,13 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-11 / #002 / AI |
-| 세션 상태 | 진행 — 2026-11-11 #002. RT 행(EV-070)·빌드 정리·generic 복귀, TASK-028 S2 구현·Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)). 다음: TASK-029 |
+| 세션 상태 | 종료 — 2026-11-11 #002. RT 행(EV-070)·generic 복귀·빌드 정리, TASK-028 S2 구현·Human 승인(EV-071), 상태 문서 R1/R2(#026). 다음: TASK-029 착수(계수 규칙·API 감지 도구 결정부터) |
 | 최근 세션 | [2026-11-11 #002](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md) — RT 행·TASK-028 S2 |
 
 ## 현재 결정과 제약
 
-- **2026-11-11 Human 결정 — TASK-028 S2 승인(「승인」):** 구현과 리뷰 포인트 4건 수락. 측정 도중 취소 시험은 미실시로 기록.
-- **2026-11-11 Human 결정 — TASK-028 S2 착수(질문 3건 모두 권고안):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5 Estimated, 수락 추정 ≤ 1.2 × S3 S), 프로필 JSON(feature `calibrate`), 반영 범위 = 흡수 시간·메모리·부하 경고(사용자 값 불변, CPU·RT는 기록만). [API §19.8](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).
-
-- **2026-11-11 Human 결정 — 「올려올려」:** rustix 고정을 1.1.4 → 1.1.6(RUSTSEC-2026-0486, 같은 계열 수정판). [EV-069](../05_verification/verification_evidence.md#ev-069).
-
-- **2026-11-11 Human 결정 — 「권고대로」:** ② 중복 CRC는 mcap 0.26.0을 `vendor/`에 두고 `[patch.crates-io]`로 무압축 chunk CRC를 1회 계산(ADR-010 개정 1, 파일 바이트 동일, +4~6%, `942eecf`). `cargo audit`은 path 패키지를 검사하지 않으므로 mcap 공지는 수동 확인. ③ Envelope 복사 제거는 착수하지 않고 이월 T6. [EV-068](../05_verification/verification_evidence.md#ev-068).
-
-- **2026-11-11 Human 결정 — T5 후속(「1. 진행 2. 아직 배포된게 아니니 제거 3. 효과 측정」):** ① ⑫ 조치 → `234ea62` Pass ② 중복 CRC 제거 — 복구가 chunk CRC를 필수로 쓰고 mcap 0.26 옵션으로는 1회화가 안 되어 mcap 포크가 필요(파일 바이트 동일, +4~9%), 진행 방식 확인 대기 ③ Envelope 복사 — 측정 완료(1회 −21~24%, 제거 상한 추정 +37~45%). [EV-067](../05_verification/verification_evidence.md#ev-067).
-
-- **2026-11-10 Human 결정 — TASK-023 S3 마감(「a」):** 추가 쓰기 없이 EV-064·065로 판정(P3 효율 합산 89% Pass·장치 표류 주석, raw 획득 거절은 harness 사이징 → 스크립트 preset 크기 수정). T5는 Human 「그래도 한번 조사는 하고 넘어가자」로 조사 결정(다음 세션, tmpfs·SSD 쓰기 0, 시작 시 시간 상한 합의). 10GbE 1줄 ≈ 1.25 GB/s < 상한 2.6 GB/s, 원격 전송(P4)은 미측정. [EV-065](../05_verification/verification_evidence.md#ev-065).
-
-- **2026-11-10 Human 결정 — 발견 ⑪ 비차단(「1」):** host 분배 상한(tmpfs logger P3 약 2.6 GB/s, 원인 미규명)은 「알려진 상한·비차단」. 선조치 없이 축소 S3 실행, 재개 조건은 T5. [EV-063](../05_verification/verification_evidence.md#ev-063).
-
-- **2026-11-07 Human 결정 — TASK-023 S2(4건, 모두 권고안):** S2a 채널별 출력 선택(`ChannelOptions::outputs`, 선언 순서), S2b ③ batch = min(값, 기록 예산/2) ④ 주기 sync 발급 = cutoff까지 이 target 기록이 Written ⑤ P0를 facade 16,384건 회전에 맞춤 ⑥ 보존 segment 개수를 가장 작은 회전 segment 기준으로 계산(시간 회전·종료 segment는 밖). [API §18.12·§19.5](../03_design_artifacts/interface_contract.md#195-task-023-s2b-조치-반영--2026-11-07), [EV-054](../05_verification/verification_evidence.md#ev-054)·[EV-055](../05_verification/verification_evidence.md#ev-055).
-
-- **2026-11-07 Human 결정 — TASK-028 S1 preset/사이징:** preset 3종(`control`·`sensor`·`black_box`) + `Sizing`, 흡수 1초 × slot 1.25·메모리 +10%(`black_box` 흡수 2초), start 시 계산 + `plan()`. preset은 빈 손실 값만 채우고 사용자 값을 덮어쓰지 않는다. [API §19](../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07).
-
-- **2026-11-07 Human 결정 — TASK-027 S3c remote 연결:** ① 구독 기록은 관측용 사본(완료 대상 아님, 포화는 그 구독의 Gap/Disconnect) ② 원격 관리는 상태 조회만(나머지 Unsupported, 이력 조회·재생은 MS-009 TASK-031) ③ 한도는 writer quota 기반 기본값 + `remote_with` 명시. 상세 [API §18.11](../03_design_artifacts/interface_contract.md#1811-s3c-remote-선택-연결--2026-11-07).
-
-- **2026-11-07 Human 결정 — TASK-027 S3d 제외:** 「승인」으로 slot 직접 encode를 S3에서 빼고 scratch encode + byte ring 복사 경로를 유지한다(byte ring 감김·rtrb 0 채우기·unsafe/형식 변경 필요). TASK-023 S2 P1(256B)에서 encode·복사 비용이 의미 있게 나오면 별도 설계한다 — Human 요청으로 이월 백로그 T4에 기록. API §18.3 문구 정정.
+- **2026-11-11 Human 결정 — TASK-028 S2(착수 3건 권고안·「승인」):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5, 수락 ≤ 1.2 × S3 S), JSON 프로필(feature `calibrate`), 흡수·메모리·부하 경고. 측정 도중 취소 시험 미실시. [API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).
+- **완료된 Human 결정(11-07~11-11: TASK-023 S2·S3 마감·⑪·T5·CRC vendor·rustix·TASK-027 S3c/S3d·TASK-028 S1):** 원문은 [상태 아카이브](state_archive.md) #026, 계약은 API §18~19·ADR-010 개정 1·EV-054~069. T4·T6 이월은 아래 백로그.
 
 - **2026-11-05 Human 결정 — TASK-027 S1 facade 계약:** ADR-012 Accepted(공유 `CaptureCore`·소유 `Writer`·빌림 `Producer<'_>`, Writer Drop은 반납함 이동만), 손실 값 필수·성능 값 기본값, `Logger::drop` 기한 종료, NFR-008 수치(L1 ≤20줄·≤6개념 등), `writer.try_log(channel, &msg)`. [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05).
 
@@ -59,7 +41,7 @@
 - Gate 1·2 Pass, ADR-003~006 기준선 유지. 1 GB/s 원본+10만 소형/s·32생산자/16파일/128채널·R1 2 GiB 및 512 MiB/4 GiB 비교는 조건부 목표이며 제품 기본값·달성 결과가 아니다.
 - **ADR-007 Accepted:** dot-probe 내장형 Ports and Adapters + 제한된 생산자/소비자 파이프라인. 별도 데몬은 첫 범위에 넣지 않는다. 프로세스 장애까지 격리하지 않음.
 - **클라이언트 형태 확정:** Rust API + CLI, dot-probe 기존 화면 연동. 명령/통신 상세도 ADR-009 기준선 채택 완료.
-- **실제 장치 대체 환경 확정 — ADR-011 Accepted / 2026-10-31:** Human이 현재 Ubuntu PC 실측을 실제 장치 시험으로 대체 수락하고 실물 UPS 없이 시뮬레이션 결과로 판정하도록 승인했다. native는 GitHub 공개 완료 후 진행한다. **2026-11-02 Human 재확인: 현재는 일반 Ubuntu이며 RT 커널로 실행 중이 아니다**(uname:7.0.0-42-generic). 2026-10-31 RT 패키지 설치 관측은 과거 이력이며 현재 설치/부팅 가능 상태를 보장하지 않는다. RT 검증이 필요해지면 AI가 준비 상태·필요 설치/부팅 전환·재시작·시험 계획을 먼저 정리해 Human에게 요청하고 승인 후 진행한다. 부팅 뒤 실행 커널/CONFIG_PREEMPT_RT/capability를 확인해야 RT 행을 실행한다. 상세 [TASK-022](../04_implementation/tasks/TASK-022.md)·[ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md).
+- **실제 장치 대체 환경 확정 — ADR-011 Accepted / 2026-10-31:** Human이 현재 Ubuntu PC 실측을 실제 장치 시험으로 대체 수락하고 실물 UPS 없이 시뮬레이션 결과로 판정하도록 승인했다. native는 GitHub 공개 완료 후 진행한다. 기본 부팅은 generic(7.0.0-43). RT 행이 필요하면 AI가 요청서를 내고 Human 승인 뒤 `scripts/rt-boot.sh once`(1회 RT 부팅)·확인·`back` 절차로 진행한다(2026-11-11 실행, EV-070). 상세 [TASK-022](../04_implementation/tasks/TASK-022.md)·[ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md).
 - RT 무대기·별도 중요도·중요 우선 기본값, 보존 모드 옵션과 처리/저장 예산 분리 유지. FR-018은 선택 옵션·기본 off, 전체 약3초는 신호 발생→차단 예산.
 - 플랫폼 Tier 1/2 유지. affinity는 간섭 감소이며 완전 격리/보편적 성능 보장 아님. Tier 2 고급 기능 미지원은 capability로 표시한다.
 - FR-015는 장비 측정 auto preset만 2026-11-04 TASK-028 S2로 부분 채택(선택·기본 off). 질문 프리셋 TASK-018은 별도 범위 승인 전 착수하지 않고 Must 완료에 몰래 넣지 않는다.
@@ -105,7 +87,7 @@
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **TASK-023 S3 완료(2026-11-10 Human 「a」). T5 조사 완료(2026-11-11, [EV-066](../05_verification/verification_evidence.md#ev-066)): ⑪ = IO 경로 바이트당 비용(encode 복사·CRC 2회) + 공유 자원 경합. ⑫(종료 drain 장부 훑기) 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067), 8 스트림 0.92 → 3.00 GB/s). 무압축 chunk CRC 1회 `942eecf`([EV-068](../05_verification/verification_evidence.md#ev-068), vendor mcap·ADR-010 개정 1), Envelope 복사는 T6, rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). **RT 행 완료(2026-11-11, [EV-070](../05_verification/verification_evidence.md#ev-070)): generic·PREEMPT_RT FIFO 모두 control·safety miss 0, RT는 부하 중 wake 꼬리 감소, 유휴 wake 약 1 ms는 C-state 추정. 21:39 generic 복귀 완료.** **TASK-028 S2 Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) → 다음 TASK-029.** ⑪은 P2 격차 없음(EV-060), P3는 생산자 바쁜 대기(도구 `RETRY_BACKOFF` 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(P3 혼합 약 1.75 GB/s, 빠른 장치 P0의 55~60%, 요구 P3는 충족) — EV-061. host 장부 훑기 제거·게이트 정정(EV-062·063) 뒤 tmpfs logger P3 약 2.6 GB/s — 장치 S(약 1.67 GB/s)·요구보다 높아 다음은 축소 S3 정식 실행. **S3 축소(2026-11-09 Human 「1」·「구간 60초」):** cgroup M 8 GiB로 RAM 2배 대체·무거운 행 1회·효율 ABBA·구간 60초, 약 0.7 TB(T500)·약 40분, 실행 전 쓰기량 고지. 요구 §12.4 장시간 기준 개정(2026-11-08 Human) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
+1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. **다음 TASK-029**(레시피·quickstart·NFR-008 회귀 가드 — 착수 시 계수 규칙·API 변경 감지 도구 결정) → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -152,21 +134,8 @@
 
 ## 최근 작업·이력
 
-- 2026-11-11 #002(계속): TASK-028 S2 — 결정 3건 권고안, calibrate·프로필·`Sizing::profile`·plan 경고·CLI(TDD, 신규 시험 13), 1.96.0/1.85.0 각 559 Pass, T500 정확도 3회 Pass·SSD 12.89 GB — [EV-071](../05_verification/verification_evidence.md#ev-071).
-- 2026-11-11 #002: RT 행 — RT 부팅 확인(첫 RT 세션은 Human 재시작으로 무측정, 재예약), `run-perf-rt.sh` RT 실행 miss 0, generic/RT 대조 [EV-070](../05_verification/verification_evidence.md#ev-070), SSD 약 70.5 GB — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).
-- 2026-11-11 #001: T5 해소 — ⑪ 원인 규명([EV-066](../05_verification/verification_evidence.md#ev-066)), ⑫ 종료 drain 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067)), vendor mcap 무압축 chunk CRC 1회 `942eecf`·ADR-010 개정 1·T6([EV-068](../05_verification/verification_evidence.md#ev-068)), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). RT 요청 승인·도구 FIFO 모드·부팅 스크립트(`37c71ad`·`94b6fa1`), 1단계 generic FIFO 행 miss 0(SSD 70.4 GB) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
-- 2026-11-10: ⑪ 비차단·T5 등록(Human 「1」), 축소 S3 1회차 실행(584 GB, 40분) — P3 효율 미달로 T5 도래 [EV-064](../05_verification/verification_evidence.md#ev-064). 후속 진단 149 GB: P3 미달 재현 안 됨·raw 거절은 풀 사이징·계측 비용 2.5% [EV-065](../05_verification/verification_evidence.md#ev-065).
-- 2026-11-09 #001(계속): ⑪ 4차 — reconcile 게이트 정정(실제 abandon만 세대 증가, EV-062 정정), tmpfs 측정 +4%·거부 절반, 대기 설정 영향 ≤3%, 남은 logger 상한 tmpfs P3 2.6 GB/s(장치 S·요구보다 높음) — [EV-063](../05_verification/verification_evidence.md#ev-063).
-- 2026-11-09 #001(계속): ⑪ 3차 — host 장부 훑기(reconcile·sync 적용) 제거 TDD, host R 99% → 52~66%, 처리량 개선은 잡음 안, 남은 한계는 파이프라인 대기(IO 배치 10 ms·유휴 1 ms) — [EV-062](../05_verification/verification_evidence.md#ev-062). 11-09 쓰기 누적 약 585 GB.
-- 2026-11-09 #001(계속): ⑪ 2차 — P3 격차 원인(생산자 `yield_now` 바쁜 대기 → host 스레드 CPU 박탈, 도구 backoff 조치)·단일 host 분배 상한 Open — [EV-061](../05_verification/verification_evidence.md#ev-061). 요구 §12.4 축소 기준 개정·`run-perf-s3.sh` 반영(dry-run 통과). 11-09 쓰기 누적 약 495 GB.
-- 2026-11-09 #001: TASK-023 S3 발견 ⑪ 1차 분석 — 회전 sync 가설 기각, 소진 후 MemoryMax 4G A/B logger ≈ P0, 장치 상태 표류 2배 관측, 쓰기 약 370 GB(Human 승인) — [EV-060](../05_verification/verification_evidence.md#ev-060). `run-perf-s3.sh` 장치 기록을 측정 경로의 디스크로 정정.
-- 2026-11-08 #001(계속): TASK-023 S3 — 범위(P4·P5 이월, P1 3조합)·장시간 기준(S·0.6×S·효율 0.8·sync 판정) Human 결정, 발견 ⑩(출력 예산 CAS `Busy`) 조치 `bf1be3b`, 발견 ⑪ Open — [EV-059](../05_verification/verification_evidence.md#ev-059).
-- 2026-11-08 #001(계속): TASK-023 S2d 발견 ⑨ — facade가 turn마다 완료 장부 전체(window × writers)를 sweep → writer 1개 window로(`a7fd4e1`), P3 20초 smoke 성공 — [EV-058](../05_verification/verification_evidence.md#ev-058).
-- 2026-11-08 #001(계속): TASK-023 S2c — `Channel::metadata`(Human 「메타데이터 헬퍼」)·혼합 P2/P3 도구, RV-128 정정(`b2899a3`, 부분 라우팅 종료 sync 거절 회귀), smoke에서 발견 ⑨ — [EV-057](../05_verification/verification_evidence.md#ev-057).
-- 2026-11-08 #001: REV-052 RV-128(target별 파일 장부로 다른 파일의 미동기화 기록 증명 요구)·RV-129(연속 구간만 watermark 전진, Enqueued 기준 target 분리)·RV-130(공통 `Gate` 시작·`LoadWindow` 중첩 판정) TDD 조치, 1.96/1.85 각 522 Pass — [EV-056](../05_verification/verification_evidence.md#ev-056), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-08_001.md).
-- 2026-11-07 #004: REV-051 조치·TASK-023 S2a/S2b 누적 변경을 독립 리뷰하여 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional: P1 2·P2 1), 제품 무수정·공개 API 재현 2건 Red·1.96/1.85 각509 Pass — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_004.md).
+- 2026-11-11 #002: RT 행 실행·generic 복귀([EV-070](../05_verification/verification_evidence.md#ev-070)), 빌드 산출물 정리(약 265 GB), TASK-028 S2 구현·Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).
+- 2026-11-11 #001: T5 해소(EV-066~068)·rustix 1.1.6(EV-069)·RT 요청 1단계 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
+- 2026-11-10: 축소 S3 1회차·후속 진단([EV-064](../05_verification/verification_evidence.md#ev-064)·[EV-065](../05_verification/verification_evidence.md#ev-065)).
 
-- 2026-11-07 #003: REV-051 RV-120~127 조치·Closed(EV-053), TASK-023 S2a 채널별 출력 선택·S2b facade 측정 도구와 측정 중 제품 결함 ①~⑧ 조치(EV-054·055) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
-- 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`77013e7..49df7d3`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
-
-2026-11-05 이전 이력과 상세 원문은 [상태 아카이브](state_archive.md) #025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.
+이전 이력과 상세 원문은 [상태 아카이브](state_archive.md) #026·#025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.

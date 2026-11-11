@@ -575,6 +575,8 @@ impl<'owner> Completion<'owner> {
             .then(|| self.selected_totals(false, Some(id)))
     }
     fn selected_totals(self, required_only: bool, target_id: Option<u32>) -> CompletionTotals {
+        #[cfg(test)]
+        TOTALS_SCANS.with(|n| n.set(n.get() + 1));
         let mut out = CompletionTotals::default();
         for (pid, producer) in self.registry.producers.iter().enumerate() {
             accumulate(
@@ -1020,3 +1022,13 @@ fn accumulate(target: &mut u64, value: u64, overflow: &mut bool) {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+thread_local! {
+    static TOTALS_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+/// Full ledger counts started on this thread (test-only probe, T5 ⑫).
+#[cfg(test)]
+pub(crate) fn totals_scans() -> usize {
+    TOTALS_SCANS.with(std::cell::Cell::get)
+}

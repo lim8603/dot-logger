@@ -307,3 +307,118 @@ fn admitted_sync_submission_keeps_timeout_incomplete_until_it_is_published() {
 fn rejected_sync_submission_releases_shutdown_without_starting_io() {
     overlapping_submission(false, 99);
 }
+
+fn small_metadata() -> crate::capture::RecordMetadata {
+    crate::capture::RecordMetadata {
+        channel_id: 7,
+        schema_id: 99,
+        schema_version: 1,
+        mono_ns: 1,
+        real_ns: 2,
+        source_time: None,
+        level: crate::capture::Level::Info,
+        importance: None,
+    }
+}
+
+// T5 ⑫ (EV-066): the facade host polls shutdown every turn while it drains.
+// A full completion-ledger count (producers × window × targets) on each of
+// those polls starved dispatch, so the host's poll counts only when the
+// result can matter: closure is possible, or an Incomplete report is due.
+#[test]
+fn host_shutdown_poll_counts_the_ledger_only_when_closure_or_a_report_is_due() {
+    let (mut owner, plan, route) = setup();
+    owner.scope(|mut scope| {
+        let now = Instant::now();
+        let end = now + Duration::from_secs(1);
+        let control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 8,
+            },
+            now,
+        )
+        .unwrap();
+        let (mut producer, reader) = scope.next().unwrap();
+        let mut router = Router::new(&plan, vec![reader], route).unwrap();
+        router.scope(|mut d, _| {
+            producer.try_record_small(small_metadata(), &[1]).unwrap();
+            assert!(matches!(
+                control
+                    .begin_shutdown(ShutdownPlan { sync_files: false }, now, end, &mut d)
+                    .unwrap(),
+                ShutdownPoll::Closing(_)
+            ));
+            let scans = crate::completion::totals_scans();
+            assert!(
+                control
+                    .poll_shutdown_when_due(now, &mut d, true)
+                    .unwrap()
+                    .is_none(),
+                "an undrained record keeps shutdown closing",
+            );
+            assert_eq!(
+                crate::completion::totals_scans(),
+                scans,
+                "no count while draining"
+            );
+            // The first report after the deadline still carries fresh totals.
+            assert!(matches!(
+                control.poll_shutdown_when_due(end, &mut d, true).unwrap(),
+                Some(ShutdownPoll::Incomplete(report)) if report.totals.records == 1,
+            ));
+            let scans = crate::completion::totals_scans();
+            assert!(
+                control
+                    .poll_shutdown_when_due(end, &mut d, false)
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(
+                crate::completion::totals_scans(),
+                scans,
+                "report already sent"
+            );
+            // The public poll keeps counting on every call.
+            assert!(matches!(
+                control.poll_shutdown(end, &mut d).unwrap(),
+                ShutdownPoll::Incomplete(report) if report.totals.records == 1,
+            ));
+            assert!(crate::completion::totals_scans() > scans);
+        });
+    });
+}
+
+#[test]
+fn host_shutdown_poll_still_closes_with_counted_totals() {
+    let (mut owner, plan, route) = setup();
+    owner.scope(|scope| {
+        let now = Instant::now();
+        let end = now + Duration::from_secs(1);
+        let control = ControlOwner::new(
+            &plan,
+            scope.control(),
+            ControlConfig {
+                sync_slots: 1,
+                work_per_poll: 8,
+            },
+            now,
+        )
+        .unwrap();
+        let inputs = scope.map(|(_, reader)| reader).collect();
+        let mut router = Router::new(&plan, inputs, route).unwrap();
+        router.scope(|mut d, _| {
+            control
+                .begin_shutdown(ShutdownPlan { sync_files: false }, now, end, &mut d)
+                .unwrap();
+            let scans = crate::completion::totals_scans();
+            assert!(matches!(
+                control.poll_shutdown_when_due(now, &mut d, true).unwrap(),
+                Some(ShutdownPoll::Closed(report)) if report.is_success(),
+            ));
+            assert!(crate::completion::totals_scans() > scans);
+        });
+    });
+}

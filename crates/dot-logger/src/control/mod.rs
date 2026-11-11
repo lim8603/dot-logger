@@ -685,15 +685,44 @@ impl<'owner> ControlOwner<'owner> {
         let _publication = slot.claim(token.generation)?;
         slot.copy_ranges(buffer)
     }
+    /// Host-turn variant of [`Self::poll_shutdown`]: it drives shutdown the
+    /// same way but counts the completion ledger (producers × window ×
+    /// targets) only when the result can matter — closure is possible (no
+    /// drain or producer call left) or, with `incomplete_due`, the deadline
+    /// has passed and the caller still owes an Incomplete report. Otherwise
+    /// it returns `None` (still Closing). Closure is decided only on a counted
+    /// poll, so the outcome matches `poll_shutdown` (T5 ⑫, EV-066).
+    pub(crate) fn poll_shutdown_when_due(
+        &self,
+        now: Instant,
+        dispatcher: &mut Dispatcher<'_, '_>,
+        incomplete_due: bool,
+    ) -> Result<Option<ShutdownPoll>, ControlError> {
+        self.drive_shutdown(now, dispatcher, Some(incomplete_due))
+    }
     /// Poll safe cleanup on the same owner after any timeout. This does not perform
     /// writer IO or forcibly cancel IO guards. Drive dispatcher/readers/writers too.
     /// Keep polling after Closing or Incomplete until Closed; inspect its report
     /// for failure, since Closed alone does not mean synchronization succeeded.
+    /// Every call counts the completion ledger (producers × window × targets)
+    /// for its report; a host that drains between polls should poll at a
+    /// bounded rate rather than once per dispatch turn.
     pub fn poll_shutdown(
         &self,
         now: Instant,
         dispatcher: &mut Dispatcher<'_, '_>,
     ) -> Result<ShutdownPoll, ControlError> {
+        self.drive_shutdown(now, dispatcher, None)?
+            .ok_or(ControlError::Busy)
+    }
+    /// `when_due: None` counts on every poll (public contract); `Some(due)`
+    /// counts only as described on [`Self::poll_shutdown_when_due`].
+    fn drive_shutdown(
+        &self,
+        now: Instant,
+        dispatcher: &mut Dispatcher<'_, '_>,
+        when_due: Option<bool>,
+    ) -> Result<Option<ShutdownPoll>, ControlError> {
         let tick = self.now(now)?;
         self.tighten_emergency_deadline();
         if !dispatcher
@@ -751,8 +780,21 @@ impl<'owner> ControlOwner<'owner> {
         self.completion
             .reconcile(self.completion.registry.limits.reconcile);
         let drain = dispatcher.drain_state();
-        let totals = self.completion.totals(false);
-        let required = self.completion.totals(true);
+        // A cheap pre-read; closure below rereads producer calls and also
+        // requires this poll to have counted.
+        let counted = match when_due {
+            None => true,
+            Some(incomplete_due) => {
+                (drain.is_empty() && self.completion.active_calls() == 0)
+                    || self.shutdown.load(Ordering::Acquire) == 3
+                    || (incomplete_due && tick >= self.shutdown_deadline.load(Ordering::Acquire))
+            }
+        };
+        let (totals, required) = if counted {
+            (self.completion.totals(false), self.completion.totals(true))
+        } else {
+            Default::default()
+        };
         let mut sync_in_flight = 0;
         let mut sync_pending = 0;
         let mut sync_failed = false;
@@ -799,7 +841,8 @@ impl<'owner> ControlOwner<'owner> {
             // The cursor makes this cleanup bounded and schedules it exactly once.
             sync_pending += self.settle_expired_shutdown()?;
         }
-        if self.shutdown.load(Ordering::Acquire) >= 2
+        if counted
+            && self.shutdown.load(Ordering::Acquire) >= 2
             && producer_calls == 0
             && drain.is_empty()
             && sync_in_flight == 0
@@ -817,6 +860,9 @@ impl<'owner> ControlOwner<'owner> {
         } else {
             ShutdownPhase::Closing
         };
+        if !counted {
+            return Ok(None);
+        }
         let observed = if phase == ShutdownPhase::Closed {
             self.shutdown_finished_at.load(Ordering::Acquire)
         } else {
@@ -840,13 +886,13 @@ impl<'owner> ControlOwner<'owner> {
             sync_in_flight,
             sync_failed,
         };
-        Ok(if phase == ShutdownPhase::Closed {
+        Ok(Some(if phase == ShutdownPhase::Closed {
             ShutdownPoll::Closed(report)
         } else if report.deadline_elapsed {
             ShutdownPoll::Incomplete(report)
         } else {
             ShutdownPoll::Closing(report)
-        })
+        }))
     }
 }
 /// What other files of one target may hold of a producer without a proven

@@ -482,9 +482,12 @@ fn run(
                     if let Some(token) = state.token {
                         host.hand(token, &mut state.pending, &mut dispatcher, now, &send);
                     }
-                    match control.poll_shutdown(now, &mut dispatcher)? {
-                        ShutdownPoll::Closing(_) => {}
-                        ShutdownPoll::Incomplete(report) => {
+                    // Counting the ledger on every draining turn starved
+                    // dispatch (T5 ⑫, EV-066); count only when it can matter.
+                    let due = !state.incomplete_sent;
+                    match control.poll_shutdown_when_due(now, &mut dispatcher, due)? {
+                        None | Some(ShutdownPoll::Closing(_)) => {}
+                        Some(ShutdownPoll::Incomplete(report)) => {
                             if !state.incomplete_sent {
                                 state.incomplete_sent = true;
                                 let report = facade_report(report, &control, mailboxes, config);
@@ -493,7 +496,7 @@ fn run(
                                 }
                             }
                         }
-                        ShutdownPoll::Closed(report) => {
+                        Some(ShutdownPoll::Closed(report)) => {
                             let unconfirmed = unconfirmed(&report, &control, producers);
                             break (report, unconfirmed, state.reply.take());
                         }

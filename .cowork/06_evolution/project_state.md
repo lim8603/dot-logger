@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-029 착수 전 — 직전 TASK-028 S2 Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) |
-| 미처리 리뷰 | 없음 — [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Closed(2026-11-08 Human 「승인」) |
-| 상태 | Yellow — TASK-028 S1·S2 Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)), TASK-023 RT 행 Pass(EV-070). 다음 TASK-029. 장기·운영/실앱·native 후속 |
+| 활성 Task | REV-053 후속 조치 대기 → TASK-029 착수. 직전 TASK-028 S2 Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) 유지 |
+| 미처리 리뷰 | [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Open — Conditional, P1 1·P2 1·P3 1(RV-131~133) |
+| 상태 | Yellow — REV-053 Open 조치 필요. TASK-028 S1·S2 Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071))·TASK-023 RT 행 Pass(EV-070) 유지. 리뷰 조치 후 TASK-029. 장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-11 / #002 / AI |
-| 세션 상태 | 종료 — 2026-11-11 #002. RT 행(EV-070)·generic 복귀·빌드 정리, TASK-028 S2 구현·Human 승인(EV-071), 상태 문서 R1/R2(#026). 다음: TASK-029 착수(계수 규칙·API 감지 도구 결정부터) |
-| 최근 세션 | [2026-11-11 #002](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md) — RT 행·TASK-028 S2 |
+| 갱신 | 2026-11-11 / REV-053 / AI |
+| 세션 상태 | 리뷰 전용 세션 종료 — REV-053 Open 등록, 제품 코드 미수정. 다음 개발: RV-131~133 조치·검증 → TASK-029 착수(계수 규칙·API 감지 도구 결정부터) |
+| 최근 세션 | [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) — 완료 이력 정리·장비 측정 누적 리뷰. 직전 개발: [2026-11-11 #002](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md) |
 
 ## 현재 결정과 제약
 
@@ -82,11 +82,13 @@
 | REV-042~050 | UPS·운영 backend·facade S2~S3·preset 자가/독립 리뷰 | Closed | EV-043~052 로컬 조치·마감(독립 REV-043·045 포함). 원문 [상태 아카이브](state_archive.md) #024 |
 | [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | Closed | Conditional Pass 8건(P1 1·P2 5·P3 2) 전부 수용·조치 [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`, 2026-11-07 Human 「승인」 |
 | [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) | REV-051 조치·TASK-023 S2a/S2b 누적 독립 코드리뷰(`49df7d3..93db6e3`) | Closed | Conditional, P1 2·P2 1(RV-128~130) 전부 수용·조치 [EV-056](../05_verification/verification_evidence.md#ev-056) `97e2b12`·`f8f2859`, 정정 `b2899a3`(EV-057). 2026-11-08 Human 「승인」 |
+| [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) | REV-052 조치·TASK-023 S2/S3·T5·RT harness·TASK-028 S2 누적 리뷰(`93db6e3..8dbd999`) | Open | Conditional, P1 1·P2 1·P3 1(RV-131~133). 동시 reconcile 작업 유실 재현, 비 Linux calibration 타입 오류, 기본 feature rustdoc 링크 오류. 제품 코드 미수정 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
 
 ## 다음 시작점
 
+0. **리뷰 후속 개발:** [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) RV-131~133 판정·TDD 조치·검증부터 진행한다. RV-131은 동시 완료 이력 정리 중 새 작업이 유실되어 CompletionCapacity가 지속되는 P1이다. RV-132 비 Linux 타입 오류와 RV-133 core-only rustdoc 링크를 정렬한 뒤 아래 기존 순서를 이어간다. TASK-028 S2의 기존 Human 수락과 native T3 이월은 유지한다.
 1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. **다음 TASK-029**(레시피·quickstart·NFR-008 회귀 가드 — 착수 시 계수 규칙·API 변경 감지 도구 결정) → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
@@ -134,6 +136,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-11 리뷰 전용: [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Open — RV-131~133, Conditional(P1 1·P2 1·P3 1). 1.96.0/MSRV 전체 회귀 각각 559 passed·5 ignored, 동시 정리 실패 재현·비 Linux 타입 오류·core-only rustdoc 실패 확인. 제품 코드 미수정.
 - 2026-11-11 #002: RT 행 실행·generic 복귀([EV-070](../05_verification/verification_evidence.md#ev-070)), 빌드 산출물 정리(약 265 GB), TASK-028 S2 구현·Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).
 - 2026-11-11 #001: T5 해소(EV-066~068)·rustix 1.1.6(EV-069)·RT 요청 1단계 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
 - 2026-11-10: 축소 S3 1회차·후속 진단([EV-064](../05_verification/verification_evidence.md#ev-064)·[EV-065](../05_verification/verification_evidence.md#ev-065)).

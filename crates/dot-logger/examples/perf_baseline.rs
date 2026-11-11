@@ -34,6 +34,20 @@ mod linux {
     const CONTROL_WORK: Duration = Duration::from_micros(500);
     const SAFETY_WORK: Duration = Duration::from_micros(200);
     const WORKER_CPUS: [usize; 8] = [4, 5, 6, 7, 12, 13, 14, 15];
+    /// local-pc-v1 RT rows: SCHED_FIFO control 70 / safety 80 with all
+    /// memory locked, selected by `DOT_LOGGER_PERF_RT=fifo` (TASK-022).
+    const CONTROL_FIFO: u8 = 70;
+    const SAFETY_FIFO: u8 = 80;
+    fn rt_mode() -> Result<bool, Error> {
+        match std::env::var("DOT_LOGGER_PERF_RT") {
+            Err(std::env::VarError::NotPresent) => Ok(false),
+            Ok(v) if v == "fifo" => Ok(true),
+            _ => Err("DOT_LOGGER_PERF_RT must be unset or \"fifo\"".into()),
+        }
+    }
+    fn fifo(priority: u8) -> Result<Option<u8>, Error> {
+        Ok(rt_mode()?.then_some(priority))
+    }
     /// Rotation of both tools: the facade segment ceiling (API §19), so P0
     /// and logger runs share the same file limit (TASK-023 S2b).
     const FILE_LIMIT: u64 = 256 << 20;
@@ -57,6 +71,9 @@ mod linux {
         let args: Vec<String> = std::env::args().skip(1).collect();
         let a: Vec<&str> = args.iter().map(String::as_str).collect();
         let mut out = io::stdout().lock();
+        if rt_mode()? {
+            perf::lock_memory()?;
+        }
         match a.as_slice() {
             ["--plan"] => line(
                 &mut out,
@@ -64,12 +81,15 @@ mod linux {
                     "control":{"cpu":CONTROL_CPU,"work_us":500},"safety":{"cpu":SAFETY_CPU,"work_us":200},
                     "worker_cpus":WORKER_CPUS,"file_limit_bytes":FILE_LIMIT,"block_bytes":BLOCK,
                     "sync_interval_ms":1000,"final_file_and_directory_sync":true,"reserve_bytes":RESERVE,
-                    "policy":"SCHED_OTHER","throughput_denominator":"final file and directory sync",
+                    "policy":if rt_mode()? {"SCHED_FIFO"} else {"SCHED_OTHER"},
+                    "fifo_priority":{"control":fifo(CONTROL_FIFO)?,"safety":fifo(SAFETY_FIFO)?},
+                    "memory_locked":rt_mode()?,"kernel":kernel()?,"realtime":perf::realtime_kernel(),
+                    "throughput_denominator":"final file and directory sync",
                     "ratio_requires":"P0 run of the identical workload","repetitions":REPETITIONS}),
             ),
             ["--calibrate"] => {
-                let control = calibrated(CONTROL_CPU, CONTROL_WORK)?;
-                let safety = calibrated(SAFETY_CPU, SAFETY_WORK)?;
+                let control = calibrated(CONTROL_CPU, CONTROL_WORK, fifo(CONTROL_FIFO)?)?;
+                let safety = calibrated(SAFETY_CPU, SAFETY_WORK, fifo(SAFETY_FIFO)?)?;
                 let c = |cal: Calibration| {
                     json!({"iterations":cal.iterations,
                     "median_ns":cal.median_ns,"rounds":cal.rounds})
@@ -77,6 +97,7 @@ mod linux {
                 line(
                     &mut out,
                     json!({"scope":"P0Calibration","kernel":kernel()?,"logger":"off",
+                        "realtime":perf::realtime_kernel(),"rt_mode":rt_mode()?,
                         "governor":governor(CONTROL_CPU),"releases_per_round":100,
                         "control":{"cpu":CONTROL_CPU,"work_us":500,"result":c(control)},
                         "safety":{"cpu":SAFETY_CPU,"work_us":200,"result":c(safety)}}),
@@ -553,9 +574,16 @@ mod linux {
         }
         Ok(value)
     }
-    fn calibrated(cpu: usize, target: Duration) -> Result<Calibration, Error> {
+    fn calibrated(
+        cpu: usize,
+        target: Duration,
+        fifo_priority: Option<u8>,
+    ) -> Result<Calibration, Error> {
         std::thread::spawn(move || {
             perf::pin(cpu)?;
+            if let Some(priority) = fifo_priority {
+                perf::set_fifo(priority)?;
+            }
             calibrate_periodic(target, PERIOD, 100)
         })
         .join()
@@ -576,20 +604,34 @@ mod linux {
         load: impl FnOnce(&Gate) -> Result<T, Error>,
     ) -> Result<Loops<T>, Error> {
         let releases = seconds * 1_000_000_000 / PERIOD.as_nanos() as u64;
-        let config = |cpu, work_iterations| ControlConfig {
+        let (control_fifo, safety_fifo) = (fifo(CONTROL_FIFO)?, fifo(SAFETY_FIFO)?);
+        let config = |cpu, work_iterations, fifo_priority| ControlConfig {
             cpu: Some(cpu),
             period: PERIOD,
             deadline: PERIOD,
             work_iterations,
+            fifo_priority,
         };
         let gate = Gate::new(load_parties, 2);
         std::thread::scope(|scope| {
             let gate = &gate;
             // The loops cover the measured window, after the load's warm-up.
-            let c = scope
-                .spawn(move || run_control(config(CONTROL_CPU, control), releases, gate, warmup));
-            let s = scope
-                .spawn(move || run_control(config(SAFETY_CPU, safety), releases, gate, warmup));
+            let c = scope.spawn(move || {
+                run_control(
+                    config(CONTROL_CPU, control, control_fifo),
+                    releases,
+                    gate,
+                    warmup,
+                )
+            });
+            let s = scope.spawn(move || {
+                run_control(
+                    config(SAFETY_CPU, safety, safety_fifo),
+                    releases,
+                    gate,
+                    warmup,
+                )
+            });
             let loaded = load(gate);
             if loaded.is_err() {
                 gate.abort();
@@ -612,6 +654,7 @@ mod linux {
     }
     fn control_json(name: &str, logger: &str, r: &ControlRun) -> Value {
         json!({"scope":"P0Control","loop":name,"logger":logger,"kernel":r.kernel,
+            "realtime":perf::realtime_kernel(),"policy":r.policy.policy,"priority":r.policy.priority,
             "governor":r.config.cpu.and_then(governor),
             "cpu":r.config.cpu,"period_ns":r.config.period.as_nanos().to_string(),
             "deadline_ns":r.config.deadline.as_nanos().to_string(),

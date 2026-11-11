@@ -128,8 +128,10 @@ fn control(misses: u64, cpu: Option<usize>) -> ControlRun {
             period: Duration::from_millis(10),
             deadline: Duration::from_millis(10),
             work_iterations: 1000,
+            fifo_priority: None,
         },
         kernel: "7.0.0-42-generic".into(),
+        policy: ThreadPolicy::default(),
         origin_ns: 0,
         releases: 100,
         completed: 100 - misses,
@@ -244,6 +246,7 @@ fn control_loop_counts_every_release_on_the_monotonic_clock() {
         period: Duration::from_millis(2),
         deadline: Duration::from_millis(2),
         work_iterations: calibrate(Duration::from_micros(50)),
+        fifo_priority: None,
     };
     let r = run_control(cfg, 50, &Gate::new(0, 1), Duration::ZERO).unwrap();
     assert_eq!(r.releases, 50);
@@ -610,6 +613,7 @@ fn a_slow_setup_shifts_neither_the_load_nor_the_control_window() {
         period: Duration::from_millis(2),
         deadline: Duration::from_millis(2),
         work_iterations: calibrate(Duration::from_micros(20)),
+        fifo_priority: None,
     };
     let (c, r) = std::thread::scope(|scope| {
         let c = scope.spawn(|| {
@@ -638,6 +642,7 @@ fn a_load_that_ends_early_is_not_concurrent_with_the_control_window() {
         period: Duration::from_millis(10),
         deadline: Duration::from_millis(10),
         work_iterations: 1,
+        fifo_priority: None,
     };
     let (c, r) = std::thread::scope(|scope| {
         let c = scope.spawn(|| run_control(cfg, 200, &gate, Duration::ZERO));
@@ -819,6 +824,7 @@ fn control_loops_start_after_the_warmup_of_their_load() {
         period: Duration::from_millis(2),
         deadline: Duration::from_millis(2),
         work_iterations: 1,
+        fifo_priority: None,
     };
     let c = run_control(cfg, 5, &gate, Duration::from_millis(20)).unwrap();
     assert_eq!(c.origin_ns, gate.started().unwrap() + 20 * ms);
@@ -880,4 +886,63 @@ fn sustained_write_samples_every_second_and_cleans_up() {
     assert!(!run.series.is_empty());
     assert_eq!(run.series.iter().sum::<u64>(), run.total_bytes);
     assert_eq!(std::fs::read_dir(owned.path()).unwrap().count(), 0);
+}
+
+// RT request (TASK-022 rule, 2026-11-11): RT rows run the loops as
+// SCHED_FIFO (control 70 / safety 80). The applied policy is read back from
+// /proc, never assumed, and a refused priority is an error, not a fallback.
+#[test]
+fn proc_stat_policy_reads_rt_priority_and_policy_after_the_command_name() {
+    let mut fields: Vec<String> = (3..=52).map(|n| n.to_string()).collect();
+    fields[40 - 3] = "70".into();
+    fields[41 - 3] = "1".into();
+    let stat = format!("1234 (a) b (c)) {}", fields.join(" "));
+    assert_eq!(
+        thread_policy(&stat),
+        Some(ThreadPolicy {
+            policy: SCHED_FIFO,
+            priority: 70
+        })
+    );
+    assert_eq!(thread_policy("1234 (truncated"), None);
+}
+
+#[test]
+fn fifo_control_loop_applies_and_reports_its_policy() {
+    let limit = rtprio_limit().unwrap();
+    if limit == 0 {
+        eprintln!("RLIMIT_RTPRIO is 0: SCHED_FIFO is not permitted here; skipped");
+        return;
+    }
+    let work_iterations = calibrate(Duration::from_micros(50));
+    // A fresh thread per run: a policy stays on the thread that took it.
+    let run = move |fifo_priority| {
+        std::thread::spawn(move || {
+            let cfg = ControlConfig {
+                cpu: None,
+                period: Duration::from_millis(2),
+                deadline: Duration::from_millis(2),
+                work_iterations,
+                fifo_priority,
+            };
+            run_control(cfg, 5, &Gate::new(0, 1), Duration::ZERO)
+        })
+        .join()
+        .unwrap()
+    };
+    let fifo = run(Some(1)).unwrap();
+    assert_eq!(
+        fifo.policy,
+        ThreadPolicy {
+            policy: SCHED_FIFO,
+            priority: 1
+        }
+    );
+    assert_eq!(run(None).unwrap().policy.policy, 0);
+    if limit < 99 {
+        assert!(
+            run(Some(99)).is_err(),
+            "a refused priority must not fall back"
+        );
+    }
 }

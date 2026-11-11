@@ -652,6 +652,80 @@ pub struct ControlConfig {
     pub deadline: Duration,
     /// Fixed work per release, calibrated once with the logger off.
     pub work_iterations: u64,
+    /// SCHED_FIFO priority applied in setup (RT rows), or the inherited
+    /// policy. A refused priority fails the run; it never falls back.
+    pub fifo_priority: Option<u8>,
+}
+/// `policy` (SCHED_OTHER 0, SCHED_FIFO 1, …) and `rt_priority` of a thread,
+/// as /proc reports them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ThreadPolicy {
+    /// Scheduling policy number.
+    pub policy: u32,
+    /// Real-time priority; 0 for the normal policies.
+    pub priority: u32,
+}
+/// Linux `SCHED_FIFO`.
+pub const SCHED_FIFO: u32 = 1;
+/// Fields 40 (`rt_priority`) and 41 (`policy`) of a /proc `stat` line; the
+/// command name may hold spaces and parentheses, so fields count from its
+/// last `") "`.
+pub fn thread_policy(stat: &str) -> Option<ThreadPolicy> {
+    let mut fields = stat.rsplit_once(") ")?.1.split_whitespace().skip(40 - 3);
+    let priority = fields.next()?.parse().ok()?;
+    let policy = fields.next()?.parse().ok()?;
+    Some(ThreadPolicy { policy, priority })
+}
+/// Policy of the calling thread.
+pub fn current_policy() -> Result<ThreadPolicy, Error> {
+    thread_policy(&fs::read_to_string("/proc/thread-self/stat")?)
+        .ok_or_else(|| invalid("unreadable /proc/thread-self/stat"))
+}
+/// Make the calling thread SCHED_FIFO `priority` with util-linux `chrt`
+/// (the workspace forbids unsafe, and rustix has no sched_setscheduler),
+/// then read it back.
+pub fn set_fifo(priority: u8) -> Result<ThreadPolicy, Error> {
+    let tid = rustix::thread::gettid().as_raw_nonzero().get();
+    let status = std::process::Command::new("chrt")
+        .args(["-f", "-p", &priority.to_string(), &tid.to_string()])
+        .stderr(std::process::Stdio::null())
+        .status()?;
+    let applied = current_policy()?;
+    let wanted = ThreadPolicy {
+        policy: SCHED_FIFO,
+        priority: u32::from(priority),
+    };
+    if !status.success() || applied != wanted {
+        return Err(format!("SCHED_FIFO {priority} refused: {applied:?}").into());
+    }
+    Ok(applied)
+}
+/// Soft RLIMIT_RTPRIO of this process ("Max realtime priority").
+pub fn rtprio_limit() -> Result<u64, Error> {
+    let limits = fs::read_to_string("/proc/self/limits")?;
+    let line = limits
+        .lines()
+        .find(|l| l.starts_with("Max realtime priority"))
+        .ok_or_else(|| invalid("no realtime priority limit"))?;
+    let soft = line["Max realtime priority".len()..]
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| invalid("no realtime priority limit"))?;
+    Ok(if soft == "unlimited" {
+        u64::MAX
+    } else {
+        soft.parse()?
+    })
+}
+/// Lock current and future pages (RT rows), so the loops never page-fault.
+pub fn lock_memory() -> Result<(), Error> {
+    use rustix::mm::{MlockAllFlags, mlockall};
+    mlockall(MlockAllFlags::CURRENT | MlockAllFlags::FUTURE)?;
+    Ok(())
+}
+/// `/sys/kernel/realtime`: "1" on a PREEMPT_RT kernel, absent otherwise.
+pub fn realtime_kernel() -> bool {
+    fs::read_to_string("/sys/kernel/realtime").is_ok_and(|s| s.trim() == "1")
 }
 /// Exact maximum plus power-of-two microsecond buckets: bucket 0 holds
 /// < 1 µs and bucket k holds [2^(k-1), 2^k) µs; the last bucket is open.
@@ -685,6 +759,8 @@ pub struct ControlRun {
     pub config: ControlConfig,
     /// Running kernel release.
     pub kernel: String,
+    /// Policy read back after setup.
+    pub policy: ThreadPolicy,
     /// First release (CLOCK_MONOTONIC ns), the run's shared `Gate` start.
     pub origin_ns: u64,
     /// Nominal releases in the run.
@@ -887,22 +963,27 @@ pub fn run_control(
     gate: &Gate,
     delay: Duration,
 ) -> Result<ControlRun, Error> {
-    let ((period, deadline, kernel), start) = gate.after(|| {
+    let ((period, deadline, kernel, policy), start) = gate.after(|| {
         if let Some(cpu) = config.cpu {
             pin(cpu)?;
         }
+        let policy = match config.fifo_priority {
+            Some(priority) => set_fifo(priority)?,
+            None => current_policy()?,
+        };
         let period = u64::try_from(config.period.as_nanos())?;
         let deadline = u64::try_from(config.deadline.as_nanos())?;
         if period == 0 || deadline == 0 {
             return Err(invalid("zero period or deadline"));
         }
-        Ok((period, deadline, kernel()?))
+        Ok((period, deadline, kernel()?, policy))
     })?;
     // A load's warm-up stays outside the control window.
     let origin = start.saturating_add(u64::try_from(delay.as_nanos())?);
     let mut r = ControlRun {
         config,
         kernel,
+        policy,
         origin_ns: origin,
         releases,
         completed: 0,

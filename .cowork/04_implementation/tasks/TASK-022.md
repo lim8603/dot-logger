@@ -135,17 +135,10 @@ RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/�
 
 **측정 행(커널마다 같은 스크립트, 예상 약 9분·SSD 약 67 GB, 경로 `/home/lim8603/s3-data` = T500, S = 1.544 GB/s(EV-064)):** FIFO 보정, 유휴 cyclictest 60초(진단), control off 60초 × 3, control on — P1 32생산자×16파일 60초 + 예열 10초, P3 정상 부하(926 MB/s + 소형 10만/s) 60초 + 예열 10초. 판정은 요구 그대로 추가 deadline miss 0(off 대비)이며 wake·response 분포를 generic·RT로 나눠 보고한다. generic SCHED_OTHER 기준선은 EV-064를 쓴다.
 
-**절차:**
-1. (재부팅 전, AI) generic에서 FIFO 행 실행 — 출력 `perf_runs/rt-generic-2026-11-11/`.
-2. (Human) RT로 한 번만 부팅 — 기본값은 바꾸지 않는다.
-   ```
-   sudo grep -E "^\s*(menuentry|submenu) '" /boot/grub/grub.cfg | cut -d"'" -f2   # 항목 이름 확인
-   sudo grub-reboot "Advanced options for Ubuntu>Ubuntu, with Linux 7.0.0-38-realtime"
-   sudo grub-editenv list   # next_entry=… 확인
-   sudo reboot
-   ```
-   다음 부팅 한 번만 RT로 뜬다. RT 부팅이 실패하면 전원을 다시 켜면 generic으로 돌아온다.
-3. (재부팅 후, Human이 세션 재개 → AI) `uname -r`=`7.0.0-38-realtime`, `/sys/kernel/realtime`=1, `CONFIG_PREEMPT_RT=y`, `ulimit -r`/`-l`, `/home` 장치 이름(재부팅으로 바뀔 수 있음)을 확인한 뒤 같은 스크립트 실행 — 출력 `perf_runs/rt-rt-2026-11-11/`. 하나라도 다르면 실행하지 않고 보고한다.
-4. (Human) `sudo reboot` — generic으로 복귀(설정 변경 없음).
+**절차(2026-11-11 Human 제안으로 Human 단계를 스크립트화, 모든 단계가 `perf_runs/rt-boot/boot.log`에 남는다):**
+1. (재부팅 전, AI) `RT_EXPECT=generic scripts/run-perf-rt.sh /home/lim8603/s3-data .cowork/05_verification/perf_runs/rt-generic-2026-11-11`.
+2. (Human) `sudo scripts/rt-boot.sh once` — 설치된 최신 `*-realtime` 커널의 `CONFIG_PREEMPT_RT=y`, grub.cfg의 `next_entry` 처리, GRUB 항목 ID(번역된 제목이 아니라 ID)를 확인하고 `grub-reboot`로 다음 한 번만 RT를 예약한 뒤 `next_entry`를 되읽는다. 재부팅은 물어본 뒤 한다. 기본 부팅 항목과 `/etc/default/grub`은 바꾸지 않는다. RT 부팅이 실패하면 전원을 다시 켜면 generic이다.
+3. (재부팅 후, Human이 세션 재개 → AI) `scripts/rt-boot.sh status`와 로그로 부팅 결과를 확인하고, `/home` 장치 이름을 확인한 뒤 `RT_EXPECT=realtime scripts/run-perf-rt.sh /home/lim8603/s3-data .cowork/05_verification/perf_runs/rt-rt-2026-11-11`. 스크립트가 커널(`/sys/kernel/realtime`=1·`CONFIG_PREEMPT_RT=y`)과 권한(rtprio ≥ 80·memlock unlimited)이 다르면 측정 전에 멈춘다.
+4. (Human) `sudo scripts/rt-boot.sh back` — 남은 `next_entry`가 있으면 지우고 기록한 뒤, 물어보고 재부팅해 generic으로 돌아간다.
 
 **합계:** SSD 약 135 GB, 실행 약 20분 + 재부팅 2회. RT 결과는 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.

@@ -15,7 +15,7 @@
 # with memory.max = 8 GiB; each run's data under <parent> is removed when it
 # ends. One JSON line per fact goes to <out>/runs.jsonl.
 #
-# usage: scripts/run-perf-rt.sh <parent> <out> [seconds] [warmup_s] [reps]
+# usage: RT_EXPECT=realtime|generic scripts/run-perf-rt.sh <parent> <out> [seconds] [warmup_s] [reps]
 set -euo pipefail
 
 parent=${1:?parent}
@@ -27,12 +27,23 @@ bin=${PERF_BASELINE:-/data/build/target/release/examples/perf_baseline}
 s=${S_BYTES:-1543573777}
 mem=${RT_MEM:-8G}
 export DOT_LOGGER_PERF_RT=fifo
+# The kernel this run is meant for; a mismatch stops before any measurement.
+expect=${RT_EXPECT:?RT_EXPECT=realtime or RT_EXPECT=generic}
+config="/boot/config-$(uname -r)"
+is_rt=$([ "$(cat /sys/kernel/realtime 2>/dev/null)" = 1 ] && grep -q '^CONFIG_PREEMPT_RT=y' "$config" && echo realtime || echo generic)
+if [ "$is_rt" != "$expect" ]; then
+  echo "running kernel $(uname -r) is $is_rt, expected $expect" >&2
+  exit 1
+fi
+if [ "$(ulimit -r)" -lt 80 ] || [ "$(ulimit -l)" != unlimited ]; then
+  echo "rtprio $(ulimit -r) / memlock $(ulimit -l): FIFO 80 and mlockall need rtprio >= 80, memlock unlimited" >&2
+  exit 1
+fi
 
 mkdir "$out"
 log="$out/runs.jsonl"
 part=$(basename "$(findmnt -no SOURCE --target "$parent")")
 if [ -e "/sys/block/$part" ]; then disk=$part; else disk=$(basename "$(readlink -f "/sys/class/block/$part/..")"); fi
-config="/boot/config-$(uname -r)"
 jq -cn --arg started "$(date -Iseconds)" --arg git "$(git rev-parse HEAD)" \
   --argjson dirty "$([ -z "$(git status --porcelain -- crates scripts)" ] && echo false || echo true)" \
   --arg kernel "$(uname -r)" --arg cmdline "$(cat /proc/cmdline)" \
@@ -41,7 +52,8 @@ jq -cn --arg started "$(date -Iseconds)" --arg git "$(git rev-parse HEAD)" \
   --arg rtprio "$(ulimit -r)" --arg memlock "$(ulimit -l)" \
   --arg rustc "$(rustc --version)" --arg device "$disk $(cat "/sys/block/$disk/device/model" 2>/dev/null | xargs)" \
   --argjson seconds "$seconds" --argjson warmup "$warmup" --argjson reps "$reps" --argjson s "$s" \
-  '{scope:"RTRun",started:$started,git:$git,dirty:$dirty,kernel:$kernel,cmdline:$cmdline,
+  --arg expect "$expect" \
+  '{scope:"RTRun",expect:$expect,started:$started,git:$git,dirty:$dirty,kernel:$kernel,cmdline:$cmdline,
     realtime:$realtime,preempt_rt:$preempt_rt,rtprio_limit:$rtprio,memlock_limit:$memlock,
     rustc:$rustc,device:$device,seconds:$seconds,warmup_s:$warmup,reps:$reps,
     sustained_bytes_per_second:$s,policy:"SCHED_FIFO control 70 / safety 80, mlockall"}' >>"$log"

@@ -1,0 +1,14 @@
+2026-11-11T20:28:34+09:00 === once
+2026-11-11T20:28:34+09:00 user=lim8603 kernel=7.0.0-43-generic realtime=absent boot_id=e9699576-8613-462b-8d08-37e1c3c22b32
+2026-11-11T20:28:34+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-43-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T20:28:34+09:00 grubenv: 
+2026-11-11T20:28:34+09:00 kernel=7.0.0-38-realtime target=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3
+2026-11-11T20:28:35+09:00 OK: next boot only -> gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 (default unchanged)
+2026-11-11T20:28:36+09:00 reboot requested
+2026-11-11T20:28:56+09:00 === once
+2026-11-11T20:28:56+09:00 user=lim8603 kernel=7.0.0-43-generic realtime=absent boot_id=e9699576-8613-462b-8d08-37e1c3c22b32
+2026-11-11T20:28:56+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-43-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T20:28:56+09:00 grubenv: next_entry=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 
+2026-11-11T20:28:56+09:00 kernel=7.0.0-38-realtime target=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3
+2026-11-11T20:28:56+09:00 OK: next boot only -> gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-38-realtime-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 (default unchanged)
+2026-11-11T20:28:58+09:00 reboot requested

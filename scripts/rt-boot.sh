@@ -54,7 +54,11 @@ ask_reboot() {
     say "reboot requested"
     own_log
     sync
-    reboot
+    # A desktop session can inhibit it; the boot choice above stays set.
+    if ! reboot 2>>"$log"; then
+      say "reboot refused (see above); the boot choice stays — restart from the desktop menu or run: sudo systemctl reboot -i"
+      exit 1
+    fi
   else
     say "reboot postponed by the user (run: sudo reboot)"
   fi

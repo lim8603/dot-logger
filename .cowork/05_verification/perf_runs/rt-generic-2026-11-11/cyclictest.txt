@@ -1,0 +1,3 @@
+WARN: open /dev/cpu_dma_latency: Permission denied
+T: 0 (336905) P:80 I:1000 C:  60000 Min:      2 Act:    5 Avg:    4 Max:     619
+T: 1 (336906) P:80 I:1000 C:  60000 Min:      2 Act:    4 Avg:    5 Max:     776

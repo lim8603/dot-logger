@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-11 / #001 / AI |
-| 세션 상태 | 진행 — 2026-11-11 #001. T5 조사·후속(EV-066~068), rustix 1.1.6(EV-069). RT 요청 제출([RT 요청](../04_implementation/tasks/TASK-022.md#rt-준비재시작-요청--2026-11-11-human-승인-대기), 도구 `37c71ad`) — Human 승인 대기 |
+| 세션 상태 | 진행 — 2026-11-11 #001. T5 조사·후속(EV-066~068), rustix 1.1.6(EV-069). RT 요청 승인(Human 「시작」) — 1단계 generic FIFO 행 완료(miss 0, SSD 70.4 GB, `perf_runs/rt-generic-2026-11-11/`). 다음: Human `sudo scripts/rt-boot.sh once` → 재부팅 후 세션 재개 시 `scripts/rt-boot.sh status`·`perf_runs/rt-boot/boot.log` 확인 → `RT_EXPECT=realtime scripts/run-perf-rt.sh /home/lim8603/s3-data .cowork/05_verification/perf_runs/rt-rt-2026-11-11` → Human `sudo scripts/rt-boot.sh back` |
 | 최근 세션 | [2026-11-11 #001](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md) — T5 조사·⑫ 발견 |
 
 ## 현재 결정과 제약

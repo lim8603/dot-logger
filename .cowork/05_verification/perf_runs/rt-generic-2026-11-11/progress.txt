@@ -1,0 +1,7 @@
+[20:12:46] cyclictest
+[20:13:46] rep 1 control-off
+[20:14:47] rep 2 control-off
+[20:15:47] rep 3 control-off
+[20:16:47] rep 1 p1-32x16-logger
+[20:18:01] rep 1 p3-normal-logger
+[20:20:32] done

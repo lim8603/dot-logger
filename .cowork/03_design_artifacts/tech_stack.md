@@ -25,7 +25,7 @@
 
 TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-version = "1.85"`로 MSRV를 고정했다. Ubuntu 26.04.1 x86_64에서 Rust 1.85.0/1.96.0의 16가지 feature 조합·독립 consumer·clippy·개발 rustdoc/fmt를 확인했다([EV-001](../05_verification/verification_evidence.md)). `Cargo.lock`으로 patch/간접 의존성도 고정한다. 전역 rustup default는 변경하지 않고 프로젝트 toolchain으로 실행한다.
 
-MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 [목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
+MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. rustix는 RUSTSEC-2026-0486(xattr unsound, dot-logger 미사용 함수) 때문에 같은 계열 1.1.6으로 고정했다(2026-11-11 Human 「올려올려」, [EV-069](../05_verification/verification_evidence.md#ev-069)). 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 [목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
 
 CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 [Pass](https://github.com/lim8603/dot-logger/actions/runs/40504484501)했다(2026-10-27, EV-001, GAP-004 Closed). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
 

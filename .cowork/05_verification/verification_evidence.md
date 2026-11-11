@@ -1122,6 +1122,13 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **별건 — 보안 검사:** `cargo audit --deny unsound`가 **RUSTSEC-2026-0486**(rustix 1.1.4, xattr 함수 unsound, 2026-10-27 공지)로 실패한다. HEAD(`0023de1`, 변경 전)에서도 같으므로 이번 변경과 무관하다. dot-logger는 xattr 함수를 쓰지 않는다(statvfs·affinity만). workspace 고정이 `=1.1.4`이고 1.1.6이 있다 — 고정 갱신은 Human 판단. `paste` 유지보수 경고(GAP-005)는 그대로다.
 - **원자료:** `perf_runs/t5-2026-11-11/runs-ev068.jsonl`. SSD 쓰기 0.
 
+## EV-069 — rustix 1.1.4 → 1.1.6(RUSTSEC-2026-0486)
+
+- **판정:** 로컬 **Pass**. `cargo audit --deny unsound` 실패 해소.
+- **Human 결정(2026-11-11 「올려올려」):** workspace 고정을 같은 계열 수정판으로 올린다.
+- **변경:** `Cargo.toml` `rustix = "=1.1.6"`, `Cargo.lock`은 rustix 버전·checksum만 바뀌었다(다른 패키지 변동 없음). dot-logger는 문제의 xattr 함수를 쓰지 않는다(statvfs·affinity만).
+- **검증:** fmt·clippy 1.96.0/1.85.0 `--all-targets --all-features -D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96.0/1.85.0 각 544 Pass, `scripts/check-feature-matrix.py` 1.96.0/1.85.0 각 17조합 Pass, `cargo audit --deny unsound`(cargo-audit 0.22.2) 취약점·unsound 0 — `paste` 유지보수 경고 1(GAP-005)만 남음.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

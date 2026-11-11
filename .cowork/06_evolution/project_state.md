@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-11 / #001 / AI |
-| 세션 상태 | 진행 — 2026-11-11 #001. T5 조사(EV-066) → ⑫ 조치(EV-067) → mcap vendor CRC 1회·ADR-010 개정 1·T6(EV-068) → rustix 1.1.6(EV-069, Human 「올려올려」). 다음: RT 요청 |
+| 세션 상태 | 진행 — 2026-11-11 #001. T5 조사·후속(EV-066~068), rustix 1.1.6(EV-069). RT 요청 제출([RT 요청](../04_implementation/tasks/TASK-022.md#rt-준비재시작-요청--2026-11-11-human-승인-대기), 도구 `37c71ad`) — Human 승인 대기 |
 | 최근 세션 | [2026-11-11 #001](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md) — T5 조사·⑫ 발견 |
 
 ## 현재 결정과 제약
@@ -102,7 +102,7 @@
 
 ## 다음 시작점
 
-1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **TASK-023 S3 완료(2026-11-10 Human 「a」). T5 조사 완료(2026-11-11, [EV-066](../05_verification/verification_evidence.md#ev-066)): ⑪ = IO 경로 바이트당 비용(encode 복사·CRC 2회) + 공유 자원 경합. ⑫(종료 drain 장부 훑기) 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067), 8 스트림 0.92 → 3.00 GB/s). 무압축 chunk CRC 1회 `942eecf`([EV-068](../05_verification/verification_evidence.md#ev-068), vendor mcap·ADR-010 개정 1), Envelope 복사는 T6, rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). 다음: RT 요청.** ⑪은 P2 격차 없음(EV-060), P3는 생산자 바쁜 대기(도구 `RETRY_BACKOFF` 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(P3 혼합 약 1.75 GB/s, 빠른 장치 P0의 55~60%, 요구 P3는 충족) — EV-061. host 장부 훑기 제거·게이트 정정(EV-062·063) 뒤 tmpfs logger P3 약 2.6 GB/s — 장치 S(약 1.67 GB/s)·요구보다 높아 다음은 축소 S3 정식 실행. **S3 축소(2026-11-09 Human 「1」·「구간 60초」):** cgroup M 8 GiB로 RAM 2배 대체·무거운 행 1회·효율 ABBA·구간 60초, 약 0.7 TB(T500)·약 40분, 실행 전 쓰기량 고지. 요구 §12.4 장시간 기준 개정(2026-11-08 Human) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
+1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** 완료 사슬(운영 backend~TASK-028 S1~REV-051, EV-044~053)은 아카이브 #025. **TASK-023 S3 완료(2026-11-10 Human 「a」). T5 조사 완료(2026-11-11, [EV-066](../05_verification/verification_evidence.md#ev-066)): ⑪ = IO 경로 바이트당 비용(encode 복사·CRC 2회) + 공유 자원 경합. ⑫(종료 drain 장부 훑기) 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067), 8 스트림 0.92 → 3.00 GB/s). 무압축 chunk CRC 1회 `942eecf`([EV-068](../05_verification/verification_evidence.md#ev-068), vendor mcap·ADR-010 개정 1), Envelope 복사는 T6, rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). **RT 요청 제출([RT 요청](../04_implementation/tasks/TASK-022.md#rt-준비재시작-요청--2026-11-11-human-승인-대기)): generic FIFO 행 → Human 1회 RT 부팅(`grub-reboot`) → 커널·PREEMPT_RT·권한·장치 확인 후 RT 행 → generic 복귀. 승인 대기.** ⑪은 P2 격차 없음(EV-060), P3는 생산자 바쁜 대기(도구 `RETRY_BACKOFF` 조치)와 단일 host 스레드 분배 상한 약 17.5만 기록/s(P3 혼합 약 1.75 GB/s, 빠른 장치 P0의 55~60%, 요구 P3는 충족) — EV-061. host 장부 훑기 제거·게이트 정정(EV-062·063) 뒤 tmpfs logger P3 약 2.6 GB/s — 장치 S(약 1.67 GB/s)·요구보다 높아 다음은 축소 S3 정식 실행. **S3 축소(2026-11-09 Human 「1」·「구간 60초」):** cgroup M 8 GiB로 RAM 2배 대체·무거운 행 1회·효율 ABBA·구간 60초, 약 0.7 TB(T500)·약 40분, 실행 전 쓰기량 고지. 요구 §12.4 장시간 기준 개정(2026-11-08 Human) → S3(120초×3·P5·계측 비용, P4 배정 확인, T4 판정; 공통 `Gate` 시작·`LoadWindow` 중첩 판정 사용) → RT 요청/승인 후 RT 행 → TASK-028 S2 → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지. REV-052 Closed.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -150,6 +150,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-11 #001(계속): RT 준비 — RT 커널 7.0.0-38-realtime 설치·PREEMPT_RT 확인, 권한 충분(realtime 그룹 rtprio 95·memlock unlimited), 도구 FIFO 모드·`run-perf-rt.sh` `37c71ad`(tmpfs dry-run 통과). TASK-022에 요청 기록.
 - 2026-11-11 #001(계속): rustix 1.1.6 — 1.96.0/1.85.0 각 544 Pass·feature 17조합·audit 취약점/unsound 0 — [EV-069](../05_verification/verification_evidence.md#ev-069).
 - 2026-11-11 #001(계속): vendor mcap 무압축 chunk CRC 1회 `942eecf`(1.96.0/1.85.0 각 544 Pass, 상류 시험 원본과 동일), ADR-010 개정 1, T6 등록. 별건: `cargo audit` rustix RUSTSEC-2026-0486(기존 의존성) — [EV-068](../05_verification/verification_evidence.md#ev-068).
 - 2026-11-11 #001(계속): ⑫ 조치 `234ea62`(host `poll_shutdown_when_due`, 1.96.0/1.85.0 각 543 Pass·Miri Pass), 중복 CRC 1회화 패치 진단 +4~9%, Envelope 복사 1회 −21~24% — [EV-067](../05_verification/verification_evidence.md#ev-067). 실수로 자동 설치된 rustup `1.96`·`1.85` 채널은 제거(기존 `1.96.0`·`1.85.0` 유지).

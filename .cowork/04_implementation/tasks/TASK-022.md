@@ -118,3 +118,34 @@ examples/telemetry_overhead.rs의 enabled/disabled·순서 반전 fixture를 실
 현재 PC는 Ubuntu 일반 커널로 실행 중이며 RT 커널을 올려 실행한 상태가 아니다. 이번 읽기 전용 `uname -r` 확인도 `7.0.0-42-generic`이다. 이전 설치 기록을 현재 RT 실행/설치 완료의 증거로 사용하지 않는다.
 
 RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/예상 시간·현재 설치 상태를 확인하고, 필요한 RT 커널 설치/부팅 선택·재시작과 작업 재개 절차를 구체적으로 정리해 Human에게 요청한다. Human 승인 전에 커널 설치/부트 설정 변경/재시작을 실행하지 않는다. 재시작 후에는 실행 커널·CONFIG_PREEMPT_RT·sysfs/capability를 실제 확인하고 동일 조건의 generic/RT 결과를 분리한다. 현재까지 EV-043 UPS 시뮬레이션을 포함한 PC 실행 결과는 일반 커널 결과이며 RT 시험은 Not Run이다.
+
+### RT 준비·재시작 요청 — 2026-11-11 (Human 승인 대기)
+
+위 규칙에 따라 AI가 준비 상태를 확인하고 요청한다. 커널 설치·부트 설정 변경·재시작은 하지 않았다.
+
+**준비 상태(읽기 전용 관측, 2026-11-11):**
+
+| 항목 | 관측 |
+|---|---|
+| 실행 커널 | `7.0.0-43-generic`(PREEMPT_DYNAMIC) |
+| RT 커널 | `linux-image-7.0.0-38-realtime`·`linux-modules-7.0.0-38-realtime` 설치, vmlinuz·initrd 있음, `CONFIG_PREEMPT_RT=y`·`CONFIG_HZ=1000`·`CONFIG_NO_HZ_FULL=y`, amdgpu 모듈 있음. generic보다 패치 수준이 낮다(38 vs 43) — 결과에 함께 기록 |
+| 부트 | `GRUB_DEFAULT=0`·메뉴 숨김(timeout 0) → 기본은 최신 generic. Secure Boot off |
+| 권한 | 사용자 `realtime` 그룹, `ulimit -r` 95·`ulimit -l` unlimited → FIFO 80·mlockall 가능(root 불필요) |
+| 도구 | `37c71ad` — `DOT_LOGGER_PERF_RT=fifo`(control FIFO 70·safety 80·mlockall, 정책 되읽기, 거절 시 실패), `scripts/run-perf-rt.sh`. generic tmpfs dry-run 통과(정책 1/70·1/80, miss 0, 판독 일치). `cyclictest` 설치됨 |
+
+**측정 행(커널마다 같은 스크립트, 예상 약 9분·SSD 약 67 GB, 경로 `/home/lim8603/s3-data` = T500, S = 1.544 GB/s(EV-064)):** FIFO 보정, 유휴 cyclictest 60초(진단), control off 60초 × 3, control on — P1 32생산자×16파일 60초 + 예열 10초, P3 정상 부하(926 MB/s + 소형 10만/s) 60초 + 예열 10초. 판정은 요구 그대로 추가 deadline miss 0(off 대비)이며 wake·response 분포를 generic·RT로 나눠 보고한다. generic SCHED_OTHER 기준선은 EV-064를 쓴다.
+
+**절차:**
+1. (재부팅 전, AI) generic에서 FIFO 행 실행 — 출력 `perf_runs/rt-generic-2026-11-11/`.
+2. (Human) RT로 한 번만 부팅 — 기본값은 바꾸지 않는다.
+   ```
+   sudo grep -E "^\s*(menuentry|submenu) '" /boot/grub/grub.cfg | cut -d"'" -f2   # 항목 이름 확인
+   sudo grub-reboot "Advanced options for Ubuntu>Ubuntu, with Linux 7.0.0-38-realtime"
+   sudo grub-editenv list   # next_entry=… 확인
+   sudo reboot
+   ```
+   다음 부팅 한 번만 RT로 뜬다. RT 부팅이 실패하면 전원을 다시 켜면 generic으로 돌아온다.
+3. (재부팅 후, Human이 세션 재개 → AI) `uname -r`=`7.0.0-38-realtime`, `/sys/kernel/realtime`=1, `CONFIG_PREEMPT_RT=y`, `ulimit -r`/`-l`, `/home` 장치 이름(재부팅으로 바뀔 수 있음)을 확인한 뒤 같은 스크립트 실행 — 출력 `perf_runs/rt-rt-2026-11-11/`. 하나라도 다르면 실행하지 않고 보고한다.
+4. (Human) `sudo reboot` — generic으로 복귀(설정 변경 없음).
+
+**합계:** SSD 약 135 GB, 실행 약 20분 + 재부팅 2회. RT 결과는 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.

@@ -22,6 +22,12 @@ def main():
         if features:
             command += ["--features", ",".join(features)]
         subprocess.run(command, check=True)
+    # `calibrate` (TASK-028 S2) only adds a module and `Sizing::profile`; it is
+    # independent of the others, so check it alone and with all of them.
+    for features in [["calibrate"], [*FEATURES, "calibrate"]]:
+        print(f"TC-001: {args.toolchain}: {','.join(features)}", flush=True)
+        subprocess.run(cargo + ["test", "-p", "dot-logger", "--locked", "--no-default-features",
+                                "--features", ",".join(features)], check=True)
 
     # Resolve the consumer alone: optional network/runtime and compression crates
     # must not become mandatory dependencies through feature unification.
@@ -42,7 +48,7 @@ def main():
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger", "--example", "scoped_capture"], check=True)
     subprocess.run(cargo + ["run", "--locked", "-p", "dot-logger-api-consumer", "--features", "remote"], check=True)
     subprocess.run(cargo + ["test", "--locked", "-p", "dot-logger-rt-allocation", "--features", "remote"], check=True)
-    print("TC-001: all 16 feature combinations and independent core consumer passed", flush=True)
+    print("TC-001: all 16 feature combinations, calibrate alone and with all, and independent core consumer passed", flush=True)
 
 
 if __name__ == "__main__":

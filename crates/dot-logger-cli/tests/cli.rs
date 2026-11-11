@@ -930,3 +930,67 @@ fn non_unicode_credential_environment_is_not_downgraded_to_anonymous() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
 }
+/// TASK-028 S2 (API §19.8): `calibrate` measures once, saves a new profile and
+/// leaves no probe file; an existing profile is kept and nothing is measured.
+#[test]
+fn calibrate_saves_a_new_profile_and_never_overwrites() {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "dot-logger-cli-calibrate-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&dir).unwrap();
+    let profile = dir.join("machine.json");
+    let run = || {
+        command()
+            .args(["calibrate", "--json", "--directory"])
+            .arg(&dir)
+            .arg("--output")
+            .arg(&profile)
+            .args(["--write-limit", "2097152", "--disk-reserve", "0"])
+            .output()
+            .unwrap()
+    };
+    let output = run();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = lines(&output.stdout);
+    assert_eq!(rows[0]["kind"], "calibration");
+    assert_eq!(rows[0]["data"]["write"]["bytes"], 2_097_152);
+    assert!(rows[0]["data"]["derived"]["sustained_bytes_per_second"]["assumption"].is_string());
+    assert_eq!(rows.last().unwrap()["kind"], "summary");
+    let saved: Value = serde_json::from_slice(&std::fs::read(&profile).unwrap()).unwrap();
+    assert_eq!(saved["format"], "dot-logger-calibration");
+    let names: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("machine.json")]);
+
+    let before = std::fs::read(&profile).unwrap();
+    let output = run();
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "existing profile is a conflict"
+    );
+    assert!(
+        !lines(&output.stdout)
+            .iter()
+            .any(|r| r["kind"] == "calibration")
+    );
+    assert_eq!(std::fs::read(&profile).unwrap(), before);
+
+    let output = command()
+        .args(["calibrate", "--json", "--output"])
+        .arg(dir.join("other.json"))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2), "--directory is required");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

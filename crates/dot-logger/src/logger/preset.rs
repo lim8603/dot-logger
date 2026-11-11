@@ -30,8 +30,22 @@ pub struct Sizing {
     small: Option<Stream>,
     raw: Option<Stream>,
     absorb: Duration,
+    /// The user chose `absorb`; a profile never changes it.
+    absorb_set: bool,
+    machine: Option<Machine>,
     pub(crate) sync_every: Duration,
     pub(crate) drop_deadline: Duration,
+}
+
+/// What a calibration profile contributes (API §19.8).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Machine {
+    /// Twice the longest observed IO stall.
+    pub(crate) absorb: Duration,
+    /// 0.6 × the sustained write estimate.
+    pub(crate) load_limit: u64,
+    /// Memory the logger can count on, when it was read.
+    pub(crate) available_memory: Option<u64>,
 }
 
 impl Sizing {
@@ -41,6 +55,8 @@ impl Sizing {
             small: None,
             raw: None,
             absorb: DEFAULT_ABSORB,
+            absorb_set: false,
+            machine: None,
             sync_every,
             drop_deadline,
         }
@@ -55,10 +71,55 @@ impl Sizing {
         self.raw = Some(Stream { hz, bytes });
         self
     }
-    /// File IO stall a writer absorbs before RT admission rejects.
+    /// File IO stall a writer absorbs before RT admission rejects. A value
+    /// set here is kept even with a [`profile`](Self::profile).
     pub fn absorb(mut self, absorb: Duration) -> Self {
         self.absorb = absorb;
+        self.absorb_set = true;
         self
+    }
+    /// Opt in to a machine calibration (API §19.8): unless the absorb was set
+    /// with [`absorb`](Self::absorb), it becomes at least twice the longest IO
+    /// stall the profile observed. [`plan`](super::LoggerBuilder::plan) then
+    /// warns when the memory budget exceeds the memory the profile saw
+    /// available, or the declared load exceeds 0.6 × its sustained estimate.
+    #[cfg(feature = "calibrate")]
+    pub fn profile(mut self, profile: &crate::calibrate::Profile) -> Self {
+        self.machine = Some(Machine {
+            absorb: profile.absorb(),
+            load_limit: profile.load_limit_bytes_per_second(),
+            available_memory: profile.available_memory_bytes(),
+        });
+        self
+    }
+
+    pub(crate) fn machine(&self) -> Option<Machine> {
+        self.machine
+    }
+
+    /// Absorb in effect: the user's, else the larger of the preset's and the
+    /// profile's.
+    fn effective_absorb(&self) -> Duration {
+        match self.machine {
+            Some(m) if !self.absorb_set => self.absorb.max(m.absorb),
+            _ => self.absorb,
+        }
+    }
+
+    /// Bytes per second one writer with this load offers, metadata included.
+    pub(crate) fn offered_bytes_per_second(&self) -> u64 {
+        [self.small_or_metadata(), self.raw]
+            .into_iter()
+            .flatten()
+            .map(|s| u64::from(s.hz).saturating_mul(s.bytes as u64))
+            .fold(0, u64::saturating_add)
+    }
+
+    fn small_or_metadata(&self) -> Option<Stream> {
+        self.small.or(self.raw.map(|raw| Stream {
+            hz: raw.hz,
+            bytes: SMALL_BYTES,
+        }))
     }
     /// Replace the ordinary sync period (loss window on power failure).
     pub fn sync_every(mut self, period: Duration) -> Self {
@@ -75,7 +136,7 @@ impl Sizing {
         // Saturates; an unrepresentable count becomes `usize::MAX` and the
         // budget check rejects it (RV-123).
         let wanted = u128::from(stream.hz)
-            .saturating_mul(self.absorb.as_nanos())
+            .saturating_mul(self.effective_absorb().as_nanos())
             .saturating_mul(SLOT_MARGIN_NUM);
         let slots = wanted.div_ceil(1_000_000_000 * SLOT_MARGIN_DEN).max(1);
         usize::try_from(slots).unwrap_or(usize::MAX)
@@ -84,10 +145,7 @@ impl Sizing {
     /// Writer quota for this load. A writer always needs small slots; with
     /// only raw streams the small pool mirrors the raw rate for metadata.
     pub(crate) fn quota(&self) -> WriterQuota {
-        let small = self.small.or(self.raw.map(|raw| Stream {
-            hz: raw.hz,
-            bytes: SMALL_BYTES,
-        }));
+        let small = self.small_or_metadata();
         let mut quota = small.map_or(WriterQuota::small(0, 0), |s| {
             WriterQuota::small(self.slots(s), s.bytes)
         });
@@ -117,8 +175,10 @@ impl Preset {
     /// Black box: small 256-byte records with durability first — 100 ms sync
     /// and a 2 s absorb. Pair it with `Retention::ring`.
     pub fn black_box(hz: u32) -> Sizing {
-        Sizing::new(Duration::from_millis(100), Duration::from_secs(3))
-            .small(hz, SMALL_BYTES)
-            .absorb(Duration::from_secs(2))
+        let mut sizing =
+            Sizing::new(Duration::from_millis(100), Duration::from_secs(3)).small(hz, SMALL_BYTES);
+        // The preset's own absorb, not the user's: a profile may lengthen it.
+        sizing.absorb = Duration::from_secs(2);
+        sizing
     }
 }

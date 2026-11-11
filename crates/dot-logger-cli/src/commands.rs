@@ -108,6 +108,14 @@ impl Context {
             ("recover", _) if !remote => {
                 self.text("output")?;
             }
+            ("calibrate", _) if !remote => {
+                self.text("directory")?;
+                self.text("output")?;
+                self.number::<u64>("write-limit")?;
+                self.number::<u64>("time-limit-ms")?;
+                self.number::<u64>("disk-reserve")?;
+                return Ok(());
+            }
             _ => return Err(Failure::Unsupported),
         }
         if !(remote || name == "config" && sub == Some("diff")) {
@@ -233,6 +241,9 @@ fn emit_record(
 pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     ctx.check()?;
     let (command, sub) = ctx.command()?;
+    if command == "calibrate" {
+        return calibrate(ctx, out);
+    }
     if command == "config" && sub == Some("diff") {
         let before: Value = serde_json::from_slice(&model::read(Path::new(ctx.text("before")?))?)?;
         let after: Value = serde_json::from_slice(&model::read(Path::new(ctx.text("after")?))?)?;
@@ -844,4 +855,34 @@ fn tail_plan(external: usize) -> Result<dot_logger::config::ValidatedConfig, Fai
     })
     .validate(&PlatformCapabilities::default())
     .map_err(|_| Failure::Input)
+}
+
+/// TASK-028 S2 (API §19.8): one bounded measurement saved as a new profile.
+/// An existing profile is reported before anything is written.
+fn calibrate(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
+    use dot_logger::calibrate::{CalibrateError, Calibration};
+    let output = Path::new(ctx.text("output")?);
+    if output.exists() {
+        return Err(Failure::Conflict);
+    }
+    let profile = Calibration::new(ctx.text("directory")?)
+        .write_limit(ctx.number("write-limit")?)
+        .time_limit(Duration::from_millis(ctx.number("time-limit-ms")?))
+        .disk_reserve(ctx.number("disk-reserve")?)
+        .run(ctx.cancel.as_atomic())
+        .map_err(|e| match e {
+            CalibrateError::InvalidInput => Failure::Input,
+            CalibrateError::NoSpace { .. } => Failure::Limit,
+            CalibrateError::Cancelled => Failure::Cancelled,
+            CalibrateError::Io(_) => Failure::Io,
+        })?;
+    out.emit("calibration", serde_json::from_str(&profile.to_json())?)?;
+    profile.save(output).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            Failure::Conflict
+        } else {
+            Failure::Io
+        }
+    })?;
+    Ok(json!({"profile": output.to_string_lossy()}))
 }

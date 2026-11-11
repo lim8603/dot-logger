@@ -10,7 +10,7 @@ name = "dot-logger"
 path = "src/main.rs"
 
 [dependencies]
-dot-logger = { path = "../dot-logger", default-features = false, features = ["remote"] }
+dot-logger = { path = "../dot-logger", default-features = false, features = ["remote", "calibrate"] }
 dot-logger-client = { path = "../dot-logger-client", features = ["remote"] }
 clap.workspace = true
 serde.workspace = true

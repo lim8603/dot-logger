@@ -4,6 +4,7 @@ mod commands;
 mod model;
 mod output;
 use clap::error::ErrorKind;
+use clap::parser::ValueSource;
 use commands::Context;
 use dot_logger_client::Cancellation;
 use output::{Failure, Output};
@@ -14,6 +15,8 @@ use std::{
     },
     time::{Duration, Instant},
 };
+/// Time allowed after a calibration's time limit for the final sync and cleanup.
+const CALIBRATE_SLACK_MS: u64 = 120_000;
 fn run() -> i32 {
     let args: Vec<_> = std::env::args_os().collect();
     let json = args.iter().any(|a| a == "--json");
@@ -35,6 +38,19 @@ fn run() -> i32 {
         .get_one::<String>("timeout-ms")
         .and_then(|s| s.parse::<u64>().ok())
         .filter(|n| (1..=3_600_000).contains(n));
+    // `calibrate` runs for its own time limit plus the final sync and cleanup;
+    // the general 5 s default would cancel it. An explicit value still wins.
+    let timeout = if command == "calibrate"
+        && matches.value_source("timeout-ms") == Some(ValueSource::DefaultValue)
+    {
+        matches
+            .get_one::<String>("time-limit-ms")
+            .and_then(|s| s.parse::<u64>().ok())
+            .filter(|n| (1..=3_600_000).contains(n))
+            .map(|n| n + CALIBRATE_SLACK_MS)
+    } else {
+        timeout
+    };
     let cap = matches
         .get_one::<String>("max-output-bytes")
         .and_then(|s| s.parse::<usize>().ok())

@@ -386,6 +386,7 @@ struct Resolved {
     plan: ValidatedConfig,
     filled: Vec<Missing>,
     default_quota: Option<WriterQuota>,
+    warnings: Vec<PlanWarning>,
     #[cfg(feature = "tracing-adapter")]
     tracing: Option<::tracing::Level>,
     #[cfg(feature = "remote")]
@@ -410,6 +411,29 @@ pub struct Plan {
     /// IO batch actually used: the budget's batch size capped at half of a
     /// target's record budget.
     pub batch_records: usize,
+    /// What a calibration profile on the preset flags; never blocks start.
+    pub warnings: Vec<PlanWarning>,
+}
+
+/// A plan exceeds what a calibration profile observed (API §19.8). The
+/// profile is a snapshot, so these are warnings, not start errors.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PlanWarning {
+    /// The memory budget is larger than the memory available when measured.
+    Memory {
+        /// Total memory budget of the plan.
+        budget_bytes: usize,
+        /// Available memory in the profile (cgroup headroom when lower).
+        available_bytes: u64,
+    },
+    /// The declared load of writers using the preset exceeds 0.6 × the
+    /// profile's sustained write estimate.
+    Load {
+        /// Declared bytes per second of those writers, metadata included.
+        offered_bytes_per_second: u64,
+        /// 0.6 × the sustained estimate.
+        limit_bytes_per_second: u64,
+    },
 }
 
 /// Collects declarations; allocates nothing until [`start`](Self::start).
@@ -629,6 +653,9 @@ impl LoggerBuilder {
         }
         let derived = budget::derive(&budget, &quotas, &storage, &routes, &retention, extra)?;
         let plan = SessionBuilder::new(derived.session.clone()).validate(&derived.platform)?;
+        let warnings = self.preset.as_ref().map_or_else(Vec::new, |sizing| {
+            warnings(sizing, plan.config().memory.total_bytes, &quotas)
+        });
         Ok(Resolved {
             channels,
             writers: writers.into_iter().map(|(name, _)| name).collect(),
@@ -637,6 +664,7 @@ impl LoggerBuilder {
             plan,
             filled,
             default_quota: budget.default_quota(),
+            warnings,
             #[cfg(feature = "tracing-adapter")]
             tracing,
             #[cfg(feature = "remote")]
@@ -659,6 +687,7 @@ impl LoggerBuilder {
             writer_quota: resolved.default_quota,
             preset_filled: resolved.filled,
             batch_records: resolved.derived.tuning.batch_records,
+            warnings: resolved.warnings,
         })
     }
 
@@ -981,4 +1010,34 @@ impl fmt::Debug for Logger {
             .field("directories", &self.directories)
             .finish_non_exhaustive()
     }
+}
+
+/// Profile warnings for a plan (API §19.8). Writers with their own quota are
+/// outside the preset's declared load.
+fn warnings(
+    sizing: &Sizing,
+    budget_bytes: usize,
+    quotas: &[Option<WriterQuota>],
+) -> Vec<PlanWarning> {
+    let Some(machine) = sizing.machine() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    if let Some(available) = machine.available_memory {
+        if budget_bytes as u64 > available {
+            out.push(PlanWarning::Memory {
+                budget_bytes,
+                available_bytes: available,
+            });
+        }
+    }
+    let writers = quotas.iter().filter(|q| q.is_none()).count() as u64;
+    let offered = sizing.offered_bytes_per_second().saturating_mul(writers);
+    if offered > machine.load_limit {
+        out.push(PlanWarning::Load {
+            offered_bytes_per_second: offered,
+            limit_bytes_per_second: machine.load_limit,
+        });
+    }
+    out
 }

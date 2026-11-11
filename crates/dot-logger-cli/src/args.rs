@@ -77,6 +77,10 @@ pub fn command() -> Command {
         ("before", None),
         ("after", None),
         ("output", None),
+        ("directory", None),
+        ("write-limit", Some("4294967296")),
+        ("time-limit-ms", Some("15000")),
+        ("disk-reserve", Some("1073741824")),
     ] {
         let arg = value(name, default);
         c = c.arg(if matches!(name, "from" | "to") {
@@ -102,6 +106,10 @@ pub fn command() -> Command {
         (
             "recover",
             "Recover an immutable source into an independent new file",
+        ),
+        (
+            "calibrate",
+            "Measure an output filesystem once (writes up to --write-limit) and save a new preset profile",
         ),
     ] {
         c = c.subcommand(Command::new(name).about(help));

@@ -11,6 +11,8 @@ remote = ["dep:tonic", "dep:tokio", "dep:subtle", "dep:serde_json", "tonic/tls-r
 influxdb = ["dep:reqwest", "dep:tokio", "dep:bytes", "dep:serde_json"]
 tracing-adapter = ["dep:tracing", "dep:log"]
 compression-zstd = ["mcap/zstd"]
+# TASK-028 S2 (API §19.8): explicit machine calibration and JSON profiles.
+calibrate = ["dep:serde_json"]
 
 [dependencies]
 rtrb.workspace = true

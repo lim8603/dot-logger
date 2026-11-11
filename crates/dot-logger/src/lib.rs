@@ -39,6 +39,10 @@ pub mod diagnostics;
 /// Default execution layer: builder, default worker and owned writers (ADR-012).
 pub mod logger;
 
+/// Explicit machine calibration and JSON profiles for presets (TASK-028 S2).
+#[cfg(feature = "calibrate")]
+pub mod calibrate;
+
 /// Facade types for the common integration path.
 pub mod prelude {
     pub use crate::logger::{

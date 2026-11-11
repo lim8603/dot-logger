@@ -29,3 +29,13 @@ Call to Reboot failed: Operation denied due to active block inhibitor
 2026-11-11T20:39:31+09:00 user=lim8603 kernel=7.0.0-38-realtime realtime=1 boot_id=a09ebccc-6f33-4db2-a5f8-1c2091fc9fcb
 2026-11-11T20:39:31+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-38-realtime root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
 2026-11-11T20:39:31+09:00 grubenv: next_entry= 
+2026-11-11T21:36:45+09:00 === back
+2026-11-11T21:36:45+09:00 user=lim8603 kernel=7.0.0-38-realtime realtime=1 boot_id=a09ebccc-6f33-4db2-a5f8-1c2091fc9fcb
+2026-11-11T21:36:45+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-38-realtime root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T21:36:45+09:00 grubenv: next_entry= 
+2026-11-11T21:36:45+09:00 OK: next boot uses the default entry
+2026-11-11T21:36:47+09:00 reboot requested
+2026-11-11T21:39:06+09:00 === status
+2026-11-11T21:39:06+09:00 user=lim8603 kernel=7.0.0-43-generic realtime=absent boot_id=d01634fd-2174-4c6a-9959-5dbe758ba393
+2026-11-11T21:39:06+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-43-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-11T21:39:06+09:00 grubenv: next_entry= 

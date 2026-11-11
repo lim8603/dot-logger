@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-11 |
-| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행 완료 — generic·PREEMPT_RT FIFO 모두 control·safety miss 0, P1·P3 정상 부하([EV-070](../../05_verification/verification_evidence.md#ev-070)). Human generic 복귀 뒤 TASK-028 S2. P4·P5 이월 |
+| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행 완료 — generic·PREEMPT_RT FIFO 모두 control·safety miss 0, P1·P3 정상 부하([EV-070](../../05_verification/verification_evidence.md#ev-070)). generic 복귀 완료, 다음 TASK-028 S2. P4·P5 이월 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 

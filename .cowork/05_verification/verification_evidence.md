@@ -1169,6 +1169,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   세 회 모두 쓰기 한도로 정지, 측정 파일 없음. 1회차만 순간값이 절반 — 장치 상태 표류(EV-060·065와 같은 현상). 짧은 측정의 순간값은 최대 2.93 GB/s로 S의 1.9배라 지속값을 그대로 쓰면 90% 과대평가였다. 흡수는 sync 최대(1초분 dirty page flush)가 지배해 1.4~1.5 s로 preset 1 s보다 길어진다 — EV-065의 「290 ms 넘는 정체가 잦음」과 같은 방향.
 - **한계:** 측정 시점 snapshot이며 보장이 아니다. ×0.5는 이 PC 1대의 S3 결과로만 확인했다(다른 장치는 미확인). 부하 경고는 preset을 쓰는 writer의 선언 부하만 본다(writer별 quota writer 제외).
 - **원자료:** `perf_runs/calibrate-2026-11-11/`(`run{1,2,3}.json` 프로필, `.stdout.jsonl`, `device-writes.txt`). SSD 쓰기 T500 12.89 GB.
+- **미시험:** 취소는 시작 전 취소만 시험했다. 측정 도중 취소(블록마다 확인, 정리 경로는 같은 `Probe` Drop)는 자동 시험이 없다.
+- **Human 승인(2026-11-11 「승인」):** S2 구현·리뷰 포인트 4건(×0.5 근거 1대, 흡수가 sync 최대로 1.4~1.5배, 부하 경고는 preset writer만, CLI 기본 제한 시간)을 수락.
 
 ## Open Evidence Gaps
 

@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-11 |
-| 다음 액션 | S2 로컬 완료([EV-071](../../05_verification/verification_evidence.md#ev-071)) — T500 정확도 3회 Pass(추정 지속 최대 1.467 ≤ 1.853 GB/s). Human 리뷰 대기. 다음 TASK-029 |
+| 다음 액션 | S1·S2 로컬 완료·Human 승인(S2 2026-11-11 「승인」, [EV-071](../../05_verification/verification_evidence.md#ev-071)). 잔여: 측정 도중 취소 시험(사전 취소만 시험), NFR-008 계수는 TASK-029, native T3. 다음 TASK-029 |
 | 의존 | TASK-027(S1 계약)·TASK-017·TASK-023(S2의 정확도 oracle) |
 | 예상 소요 | S1 1~2 + S2 2~3 인일, 측정/리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 결정적 사이징·preset | `Sizing` 입력→설정·계산 근거, preset 3~4종(제어 경량·센서 원본·블랙박스 순환·혼합; 수치 근거는 TASK-022 local-pc-v1), 부족 항목·부족량 설명 오류 | Done(로컬) — 2026-11-07 Human 결정 3건, [API §19](../../03_design_artifacts/interface_contract.md#19-예산-preset사이징-계약--2026-11-07), [EV-052](../../05_verification/verification_evidence.md#ev-052) |
-| S2 | 장비 측정 auto preset | 아래 설계로 측정 프로필 파일 생성→`Sizing::profile` 적용, TASK-023 정식 결과 대비 오차 기록 | Done(로컬) — 2026-11-11 Human 결정 [API §19.8·19.9](../../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../../05_verification/verification_evidence.md#ev-071) |
+| S2 | 장비 측정 auto preset | 아래 설계로 측정 프로필 파일 생성→`Sizing::profile` 적용, TASK-023 정식 결과 대비 오차 기록 | Done(로컬)·Human 승인 2026-11-11 — [API §19.8·19.9](../../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../../05_verification/verification_evidence.md#ev-071) |
 
 ## S1 Human 결정과 계획 — 2026-11-07
 

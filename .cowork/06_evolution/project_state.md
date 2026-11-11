@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-023 S3 완료([EV-064](../05_verification/verification_evidence.md#ev-064)·[EV-065](../05_verification/verification_evidence.md#ev-065)), T5 조사·후속 완료 — ⑫ 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067)), 무압축 chunk CRC 1회 `942eecf`([EV-068](../05_verification/verification_evidence.md#ev-068)), Envelope 복사는 T6. 다음 RT 요청 |
+| 활성 Task | TASK-023 RT 행 — 요청 승인, 1단계 generic FIFO 완료(miss 0), 2단계 RT 부팅 대기. 직전: S3 완료(EV-064·065), T5 해소([EV-066](../05_verification/verification_evidence.md#ev-066)~[EV-068](../05_verification/verification_evidence.md#ev-068)), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)) |
 | 미처리 리뷰 | 없음 — [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Closed(2026-11-08 Human 「승인」) |
 | 상태 | Yellow — TASK-023 S3 완료(EV-064·065), T5 조사·후속 완료(EV-066~068), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069), audit 취약점·unsound 0). 다음 RT 요청, 장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-11 / #001 / AI |
-| 세션 상태 | 진행 — 2026-11-11 #001. T5 조사·후속(EV-066~068), rustix 1.1.6(EV-069). RT 요청 승인(Human 「시작」) — 1단계 generic FIFO 행 완료(miss 0, SSD 70.4 GB, `perf_runs/rt-generic-2026-11-11/`). 다음: Human `sudo scripts/rt-boot.sh once` → 재부팅 후 세션 재개 시 `scripts/rt-boot.sh status`·`perf_runs/rt-boot/boot.log` 확인 → `RT_EXPECT=realtime scripts/run-perf-rt.sh /home/lim8603/s3-data .cowork/05_verification/perf_runs/rt-rt-2026-11-11` → Human `sudo scripts/rt-boot.sh back` |
-| 최근 세션 | [2026-11-11 #001](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md) — T5 조사·⑫ 발견 |
+| 세션 상태 | 종료 — 2026-11-11 #001. T5 해소(⑫ 조치·CRC 1회·T6 등록), rustix 1.1.6, RT 요청 승인·1단계 generic FIFO 완료. 다음: Human `sudo scripts/rt-boot.sh once` → 재부팅 뒤 「RT 측정 재개」 |
+| 최근 세션 | [2026-11-11 #001](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md) — T5 해소·RT 1단계 |
 
 ## 현재 결정과 제약
 
@@ -128,11 +128,10 @@
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
 | T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1) | 공개 전환 또는 첫 외부 배포를 요청할 때 | INT-001 / 공개 준비 | 2026-10-28 Human 논의 |
 | T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
-| T5 | 발견 ⑪ host 분배 상한(tmpfs logger P3 약 2.6 GB/s·P0 대비 64%) — 원인 규명(EV-066), ⑫ 조치(EV-067), 중복 CRC(+4~9%)·Envelope 복사(상한 +37~45%) Human 판단 | S3 효율 행이 장치가 아닌 logger 원인으로 0.8 미달일 때, 또는 대상 장치의 지속 쓰기가 약 3.2 GB/s를 넘을 때 | NFR-001 / 요구 §12.4 / TASK-023 S3 / EV-061~067 | 2026-11-10 Human 「1」 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 | T6 | Envelope payload 복사 제거 설계(헤더·payload 분리 쓰기 — 형식 또는 vendor mcap 쓰기 API 변경). 측정: 복사 1회 −21~24%, 제거 상한 추정 +37~45% | 처리량 요구가 이 PC 기준 약 3 GB/s(logger tmpfs 상한)에 가까워질 때, 또는 Human 요청 시 | NFR-001 / [EV-067](../05_verification/verification_evidence.md#ev-067) / ADR-010 개정 1 | 2026-11-11 Human 「권고대로」 |
 
-범위 밖 백로그 B: 없음. **T5 — 완료(EV-066~068): 원인 규명, ⑫ 조치 `234ea62`, 무압축 chunk CRC 1회 `942eecf`. 남은 개선(Envelope 복사)은 T6.** T6 미도래. 트리거 ①은 EV-065에서 재현되지 않음. T1~T4는 미도래(T4: 복사 p50 21 ns = 시계 오버헤드). T4 입력: S2b smoke(측정 아님)에서 256B `try_log` p50 143 ns 중 복사 p50 21 ns(시계 오버헤드와 같은 수준) — 정식 판정은 TASK-023 S3. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
+범위 밖 백로그 B: 없음. **T5 → 해소(2026-11-11, EV-066~068): 원인 규명, ⑫ 조치 `234ea62`, 무압축 chunk CRC 1회 `942eecf`, 잔여 개선은 T6.** T6 미도래. 트리거 ①은 EV-065에서 재현되지 않음. T1~T4는 미도래(T4: 복사 p50 21 ns = 시계 오버헤드). T4 입력: S2b smoke(측정 아님)에서 256B `try_log` p50 143 ns 중 복사 p50 21 ns(시계 오버헤드와 같은 수준) — 정식 판정은 TASK-023 S3. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -150,11 +149,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-11 #001(계속): RT 준비 — RT 커널 7.0.0-38-realtime 설치·PREEMPT_RT 확인, 권한 충분(realtime 그룹 rtprio 95·memlock unlimited), 도구 FIFO 모드·`run-perf-rt.sh` `37c71ad`(tmpfs dry-run 통과). TASK-022에 요청 기록.
-- 2026-11-11 #001(계속): rustix 1.1.6 — 1.96.0/1.85.0 각 544 Pass·feature 17조합·audit 취약점/unsound 0 — [EV-069](../05_verification/verification_evidence.md#ev-069).
-- 2026-11-11 #001(계속): vendor mcap 무압축 chunk CRC 1회 `942eecf`(1.96.0/1.85.0 각 544 Pass, 상류 시험 원본과 동일), ADR-010 개정 1, T6 등록. 별건: `cargo audit` rustix RUSTSEC-2026-0486(기존 의존성) — [EV-068](../05_verification/verification_evidence.md#ev-068).
-- 2026-11-11 #001(계속): ⑫ 조치 `234ea62`(host `poll_shutdown_when_due`, 1.96.0/1.85.0 각 543 Pass·Miri Pass), 중복 CRC 1회화 패치 진단 +4~9%, Envelope 복사 1회 −21~24% — [EV-067](../05_verification/verification_evidence.md#ev-067). 실수로 자동 설치된 rustup `1.96`·`1.85` 채널은 제거(기존 `1.96.0`·`1.85.0` 유지).
-- 2026-11-11 #001: T5 조사(tmpfs, SSD 0, 21분) — ⑪ 원인: raw 파일 담당 IO 스레드의 바이트당 비용이 P0 writer의 약 2.5~3배(encode 복사·CRC 2회), 스레드를 늘리면 공유 자원 경합으로 합계 약 3 GB/s. CPU 배치·raw 깊이·host는 기각. 새 발견 ⑫ 종료 drain 장부 훑기(8 스트림 0.92 → 진단 3.05 GB/s) — [EV-066](../05_verification/verification_evidence.md#ev-066).
+- 2026-11-11 #001: T5 해소 — ⑪ 원인 규명([EV-066](../05_verification/verification_evidence.md#ev-066)), ⑫ 종료 drain 조치 `234ea62`([EV-067](../05_verification/verification_evidence.md#ev-067)), vendor mcap 무압축 chunk CRC 1회 `942eecf`·ADR-010 개정 1·T6([EV-068](../05_verification/verification_evidence.md#ev-068)), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). RT 요청 승인·도구 FIFO 모드·부팅 스크립트(`37c71ad`·`94b6fa1`), 1단계 generic FIFO 행 miss 0(SSD 70.4 GB) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
 - 2026-11-10: ⑪ 비차단·T5 등록(Human 「1」), 축소 S3 1회차 실행(584 GB, 40분) — P3 효율 미달로 T5 도래 [EV-064](../05_verification/verification_evidence.md#ev-064). 후속 진단 149 GB: P3 미달 재현 안 됨·raw 거절은 풀 사이징·계측 비용 2.5% [EV-065](../05_verification/verification_evidence.md#ev-065).
 - 2026-11-09 #001(계속): ⑪ 4차 — reconcile 게이트 정정(실제 abandon만 세대 증가, EV-062 정정), tmpfs 측정 +4%·거부 절반, 대기 설정 영향 ≤3%, 남은 logger 상한 tmpfs P3 2.6 GB/s(장치 S·요구보다 높음) — [EV-063](../05_verification/verification_evidence.md#ev-063).
 - 2026-11-09 #001(계속): ⑪ 3차 — host 장부 훑기(reconcile·sync 적용) 제거 TDD, host R 99% → 52~66%, 처리량 개선은 잡음 안, 남은 한계는 파이프라인 대기(IO 배치 10 ms·유휴 1 ms) — [EV-062](../05_verification/verification_evidence.md#ev-062). 11-09 쓰기 누적 약 585 GB.

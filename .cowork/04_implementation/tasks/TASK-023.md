@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-08 |
-| 다음 액션 | S3 완료(2026-11-10 Human 「a」, [EV-064](../../05_verification/verification_evidence.md#ev-064)·[EV-065](../../05_verification/verification_evidence.md#ev-065)) — P1·제어·정상 부하·효율(P2 95%·P3 합산 89%)·계측 비용 2.5% Pass, 도구 raw 풀 preset 크기로 수정. 다음 RT 요청(TASK-022 규칙). P4·P5 이월. T5 조사 완료([EV-066](../../05_verification/verification_evidence.md#ev-066)) — 새 발견 ⑫ 종료 drain 장부 훑기 Open, 조치 여부 Human 판단 |
+| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행: 1단계 generic FIFO 완료(control·safety miss 0, P1·P3 정상 부하, `perf_runs/rt-generic-2026-11-11/`), 2단계 RT 부팅 후 같은 스크립트 — [TASK-022 RT 요청](TASK-022.md). 그 뒤 TASK-028 S2. P4·P5 이월 |
 | 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 

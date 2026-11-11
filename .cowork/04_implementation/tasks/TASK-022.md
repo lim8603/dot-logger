@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-02 |
-| 다음 액션 | 선행 시험 harness 준비. RT 필요 시 설치 상태/실행 계획 확인→Human에게 설치·전환/재시작 요청→승인·RT 부팅 확인 후 시험 |
+| 다음 액션 | RT 요청(2026-11-11) 승인 — 1단계 generic FIFO 완료(`perf_runs/rt-generic-2026-11-11/`). 다음: Human `sudo scripts/rt-boot.sh once` → RT 부팅 확인(`perf_runs/rt-boot/boot.log`) → `RT_EXPECT=realtime scripts/run-perf-rt.sh` → Human `sudo scripts/rt-boot.sh back`. 절차는 아래 「RT 준비·재시작 요청 — 2026-11-11」 |
 | 의존 | TASK-001 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 

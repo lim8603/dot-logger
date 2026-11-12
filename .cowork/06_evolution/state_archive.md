@@ -632,3 +632,14 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-07 #004: REV-051 조치·TASK-023 S2a/S2b 누적 변경을 독립 리뷰하여 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional: P1 2·P2 1), 제품 무수정·공개 API 재현 2건 Red·1.96/1.85 각509 Pass — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_004.md).
 - 2026-11-07 #003: REV-051 RV-120~127 조치·Closed(EV-053), TASK-023 S2a 채널별 출력 선택·S2b facade 측정 도구와 측정 중 제품 결함 ①~⑧ 조치(EV-054·055) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
 - 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`77013e7..49df7d3`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
+
+## #027 — 2026-11-12 #001 세션 종료 최근 이력 하베스트(최대 3세션 유지)
+
+`project_state.md` 최근 작업·이력을 3세션으로 줄이며 옮긴 원문이다.
+
+- 2026-11-12: TASK-029 S4 [EV-075](../05_verification/verification_evidence.md#ev-075) `cd53f37` — `dot_probe_facade`(facade만, support 0, 68줄 vs pipeline 37 + support 889, 범위 차이 기록). S3 Human 승인.
+- 2026-11-12: TASK-029 S3 [EV-074](../05_verification/verification_evidence.md#ev-074) `0622982` — README 250→136줄(quickstart·레시피 중심), 계약 상세 11개 모듈 rustdoc 이동, crate quickstart doctest·README 동기화 가드. S1·S2 Human 승인.
+- 2026-11-12: TASK-029 S1·S2 [EV-073](../05_verification/verification_evidence.md#ev-073) `79d376e` — 표면 가드(이름 있는 항목 30/60·snapshot), 레시피 L1 20줄·6개념/L2 40·7/L3 +3·+5, `Shutdown::is_success()`.
+- 2026-11-12: REV-053 RV-131~133 조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04` — reconcile 진입 claim(Red `CompletionCapacity` → Green), 비 Linux calibrate 타입 오류(nightly build-std 교차 검사 E0308 8 → 0), core-only rustdoc CI 단계.
+- 2026-11-11 #001: T5 해소(EV-066~068)·rustix 1.1.6(EV-069)·RT 요청 1단계 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
+- 2026-11-10: 축소 S3 1회차·후속 진단([EV-064](../05_verification/verification_evidence.md#ev-064)·[EV-065](../05_verification/verification_evidence.md#ev-065)).

@@ -72,7 +72,8 @@ impl Sizing {
         self
     }
     /// File IO stall a writer absorbs before RT admission rejects. A value
-    /// set here is kept even with a [`profile`](Self::profile).
+    /// set here is kept even with a calibration `profile` (feature
+    /// `calibrate`).
     pub fn absorb(mut self, absorb: Duration) -> Self {
         self.absorb = absorb;
         self.absorb_set = true;

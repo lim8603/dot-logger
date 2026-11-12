@@ -659,7 +659,9 @@ mod host {
         #[cfg(not(target_os = "linux"))]
         {
             let _ = (root, directory, free);
-            let none = || Fact::Unavailable("unsupported platform".into());
+            fn none<T>() -> Fact<T> {
+                Fact::Unavailable("unsupported platform".into())
+            }
             Host {
                 kernel: none(),
                 preempt_rt: none(),
@@ -757,6 +759,7 @@ mod host {
     }
 
     /// "0-3,8,10-11" → [0, 1, 2, 3, 8, 10, 11]; empty → [].
+    #[cfg(target_os = "linux")]
     pub(super) fn parse_cpus(s: &str) -> Option<Vec<usize>> {
         let mut cpus = Vec::new();
         for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {

@@ -624,3 +624,58 @@ fn dropping_a_reported_delivery_does_not_start_a_sweep() {
         assert_eq!(c.reconcile(2), 0, "a reported delivery is no abandonment");
     });
 }
+
+#[test]
+fn a_stale_sweep_cannot_erase_a_new_abandonment() {
+    // REV-053 RV-131: reconciler A paused before storing its remainder while
+    // B started the sweep of a newer abandonment; A then stored the old
+    // remainder, the newer sweep never finished and its slot stayed ACTIVE.
+    use std::sync::{Arc, Barrier};
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1); // slot 1
+        reader.try_read(&mut [0; 16]).unwrap();
+        drop(c.marker(first, 10).unwrap());
+        let second = accept(&mut p, 2); // slot 0
+        reader.try_read(&mut [0; 16]).unwrap();
+        c.report(second, 10, Update::Confirmed(Boundary::Written))
+            .unwrap();
+        c.reconcile(1); // starts the sweep, visits slot 0 only
+        let paused = Arc::new(Barrier::new(2));
+        let resume = Arc::new(Barrier::new(2));
+        std::thread::scope(|threads| {
+            let (hold, wake) = (paused.clone(), resume.clone());
+            let a = threads.spawn(move || {
+                BEFORE_SWEEP_STORE.with(|hook| {
+                    *hook.borrow_mut() = Some(Box::new(move || {
+                        hold.wait();
+                        wake.wait();
+                    }));
+                });
+                c.reconcile(1) // terminalizes the first record in slot 1
+            });
+            paused.wait();
+            let third = accept(&mut p, 3); // reuses slot 1
+            reader.try_read(&mut [0; 16]).unwrap();
+            drop(c.marker(third, 10).unwrap());
+            c.reconcile(1); // B
+            resume.wait();
+            assert_eq!(a.join().unwrap(), 1);
+        });
+        for _ in 0..4 {
+            c.reconcile(2);
+        }
+        let fourth = accept(&mut p, 4); // slot 0
+        reader.try_read(&mut [0; 16]).unwrap();
+        c.report(fourth, 10, Update::Confirmed(Boundary::Written))
+            .unwrap();
+        let fifth = p.try_record_small(metadata(), &[5]);
+        assert!(
+            matches!(fifth, Ok(crate::capture::RecordOutcome::Accepted(_))),
+            "an abandoned slot must be reusable after reconciliation, got {fifth:?}"
+        );
+        assert_eq!(c.totals(false).unknown, 2);
+    });
+}

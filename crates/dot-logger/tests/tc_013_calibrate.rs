@@ -5,7 +5,9 @@
 #![cfg(feature = "calibrate")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use dot_logger::calibrate::{CalibrateError, Calibration, Fact, Profile, ProfileError, Stop};
+#[cfg(target_os = "linux")]
+use dot_logger::calibrate::Stop;
+use dot_logger::calibrate::{CalibrateError, Calibration, Fact, Profile, ProfileError};
 use dot_logger::logger::{
     EncodeError, Logger, LoggerBuilder, PlanWarning, Preset, Record, Retention, Schema, Shutdown,
 };
@@ -45,6 +47,8 @@ fn go() -> AtomicBool {
     AtomicBool::new(false)
 }
 
+// Measuring needs the free-space check, which only Linux has (API §19.9).
+#[cfg(target_os = "linux")]
 #[test]
 fn f19_write_limit_stops_the_run_and_leaves_no_file() {
     let temp = Temp::new();
@@ -70,6 +74,8 @@ fn f19_write_limit_stops_the_run_and_leaves_no_file() {
     assert_eq!(profile.directory(), temp.0.as_path());
 }
 
+// Measuring needs the free-space check, which only Linux has (API §19.9).
+#[cfg(target_os = "linux")]
 #[test]
 fn f19_time_limit_stops_after_the_first_block() {
     let temp = Temp::new();
@@ -84,6 +90,8 @@ fn f19_time_limit_stops_after_the_first_block() {
     assert_eq!(temp.entries(), 0);
 }
 
+// Measuring needs the free-space check, which only Linux has (API §19.9).
+#[cfg(target_os = "linux")]
 #[test]
 fn f19_reserve_without_room_for_one_block_is_rejected_without_files() {
     let temp = Temp::new();
@@ -104,6 +112,8 @@ fn f19_reserve_without_room_for_one_block_is_rejected_without_files() {
     assert_eq!(temp.entries(), 0);
 }
 
+// Measuring needs the free-space check, which only Linux has (API §19.9).
+#[cfg(target_os = "linux")]
 #[test]
 fn f19_reserve_shrinks_the_write_limit() {
     let temp = Temp::new();
@@ -138,8 +148,30 @@ fn f19_cancellation_and_invalid_input_leave_no_file() {
     let err = Calibration::new(temp.0.join("missing"))
         .run(&go())
         .unwrap_err();
+    let kind = if cfg!(target_os = "linux") {
+        std::io::ErrorKind::NotFound
+    } else {
+        std::io::ErrorKind::Unsupported
+    };
     assert!(
-        matches!(&err, CalibrateError::Io(e) if e.kind() == std::io::ErrorKind::NotFound),
+        matches!(&err, CalibrateError::Io(e) if e.kind() == kind),
+        "{err:?}"
+    );
+    assert_eq!(temp.entries(), 0);
+}
+
+/// REV-053 RV-132: elsewhere the free-space check is `Unsupported` (API
+/// §19.9), so a run fails before writing anything.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn f19_other_platforms_fail_unsupported_without_files() {
+    let temp = Temp::new();
+    let err = Calibration::new(&temp.0)
+        .disk_reserve(0)
+        .run(&go())
+        .unwrap_err();
+    assert!(
+        matches!(&err, CalibrateError::Io(e) if e.kind() == std::io::ErrorKind::Unsupported),
         "{err:?}"
     );
     assert_eq!(temp.entries(), 0);

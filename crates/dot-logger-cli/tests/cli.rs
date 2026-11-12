@@ -932,6 +932,8 @@ fn non_unicode_credential_environment_is_not_downgraded_to_anonymous() {
 }
 /// TASK-028 S2 (API §19.8): `calibrate` measures once, saves a new profile and
 /// leaves no probe file; an existing profile is kept and nothing is measured.
+/// Measuring needs the Linux free-space check (API §19.9).
+#[cfg(target_os = "linux")]
 #[test]
 fn calibrate_saves_a_new_profile_and_never_overwrites() {
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -992,5 +994,52 @@ fn calibrate_saves_a_new_profile_and_never_overwrites() {
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(2), "--directory is required");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// REV-053 RV-132: elsewhere the free-space check is `Unsupported` (API
+/// §19.9); `calibrate` fails as IO, writes nothing and still keeps an
+/// existing profile.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn calibrate_on_other_platforms_fails_without_writing() {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "dot-logger-cli-calibrate-other-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&dir).unwrap();
+    let profile = dir.join("machine.json");
+    let run = || {
+        command()
+            .args(["calibrate", "--json", "--directory"])
+            .arg(&dir)
+            .arg("--output")
+            .arg(&profile)
+            .args(["--disk-reserve", "0"])
+            .output()
+            .unwrap()
+    };
+    let output = run();
+    assert_eq!(
+        output.status.code(),
+        Some(4),
+        "unsupported free-space check"
+    );
+    assert!(
+        !lines(&output.stdout)
+            .iter()
+            .any(|r| r["kind"] == "calibration")
+    );
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+
+    std::fs::write(&profile, b"kept").unwrap();
+    assert_eq!(
+        run().status.code(),
+        Some(3),
+        "existing profile is a conflict"
+    );
+    assert_eq!(std::fs::read(&profile).unwrap(), b"kept");
     std::fs::remove_dir_all(&dir).unwrap();
 }

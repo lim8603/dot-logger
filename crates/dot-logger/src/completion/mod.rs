@@ -79,6 +79,9 @@ pub(crate) struct Registry {
     sweep_left: AtomicUsize,
     /// The sweep skipped an abandoned slot that was being updated.
     sweep_missed: AtomicBool,
+    /// One reconciler owns the sweep state (`swept`, `sweep_left`,
+    /// `sweep_missed`, `cursor`) at a time (REV-053 RV-131).
+    sweeping: AtomicBool,
     reserved: usize,
     origin: Instant,
     retention: u64,
@@ -265,6 +268,7 @@ impl Registry {
             swept: AtomicU64::new(0),
             sweep_left: AtomicUsize::new(0),
             sweep_missed: AtomicBool::new(false),
+            sweeping: AtomicBool::new(false),
             reserved,
             origin: Instant::now(),
             retention,
@@ -505,8 +509,20 @@ impl<'owner> Completion<'owner> {
     /// without one this does no work (TASK-023 S3 finding ⑪: sweeping on
     /// every turn took ~37 % of the host thread). A sweep that skipped an
     /// abandoned slot under update runs once more.
+    ///
+    /// A call that overlaps another reconciliation returns 0 without waiting;
+    /// the sweep state has one owner, and a newer abandonment stays visible to
+    /// the next call (REV-053 RV-131).
     pub fn reconcile(self, limit: usize) -> usize {
         let registry = self.registry;
+        if registry
+            .sweeping
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            return 0;
+        }
+        let _owner = SweepOwner(&registry.sweeping);
         let total = registry.producers.len() * registry.limits.window;
         let generation = registry.abandons.load(Ordering::Acquire);
         if registry.swept.swap(generation, Ordering::AcqRel) != generation {
@@ -553,6 +569,12 @@ impl<'owner> Completion<'owner> {
             slot.phase.store(phase, Ordering::Release);
         }
         let rest = left - count;
+        #[cfg(test)]
+        BEFORE_SWEEP_STORE.with(|hook| {
+            if let Some(hook) = hook.borrow_mut().as_mut() {
+                hook();
+            }
+        });
         registry.sweep_left.store(rest, Ordering::Release);
         if rest == 0 && registry.sweep_missed.swap(false, Ordering::AcqRel) {
             registry.sweep_left.store(total, Ordering::Release);
@@ -1020,12 +1042,24 @@ fn accumulate(target: &mut u64, value: u64, overflow: &mut bool) {
     }
 }
 
+/// Releases the reconcile claim, also on unwind.
+struct SweepOwner<'a>(&'a AtomicBool);
+impl Drop for SweepOwner<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
 #[cfg(test)]
 thread_local! {
     static TOTALS_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Runs inside `reconcile` just before it stores the sweep remainder, so a
+    /// test can pause one reconciler there (REV-053 RV-131).
+    pub(crate) static BEFORE_SWEEP_STORE: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+        const { std::cell::RefCell::new(None) };
 }
 /// Full ledger counts started on this thread (test-only probe, T5 ⑫).
 #[cfg(test)]

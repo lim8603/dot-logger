@@ -38,6 +38,10 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo +${{ matrix.toolchain }} doc --workspace --all-features --no-deps --locked
+      - name: Core-only API documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo +${{ matrix.toolchain }} doc -p dot-logger --no-default-features --no-deps --locked
 
   audit:
     runs-on: ubuntu-24.04

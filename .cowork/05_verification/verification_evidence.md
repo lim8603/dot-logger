@@ -1213,12 +1213,13 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ## EV-076 — REV-054 조치: 표면 snapshot 계약 조건·레시피 개념 import 해석
 
-- **판정:** 로컬 **Pass**. RV-134·135 모두 수용·조치([REV-054](reviews/REV-054_INTEGRATION_GUARD_REVIEW.md)), Human 리뷰 대기. 커밋 `64e9d69`. 제품 Rust 코드 변경 없음(가드 스크립트·snapshot·CI만).
+- **판정:** 로컬 **Pass**. RV-134·135 모두 수용·조치([REV-054](reviews/REV-054_INTEGRATION_GUARD_REVIEW.md)). 2026-11-12 Human 「승인」 → REV-054 Closed. 커밋 `64e9d69`. 제품 Rust 코드 변경 없음(가드 스크립트·snapshot·CI만).
 - **Red:** 새 자가 시험 `scripts/test_check_integration_surface.py` 18개 중 17개 실패·오류 — 최소 crate(고정 `nightly-2026-10-26` rustdoc JSON) 계약 변경 10종(상위 제약 `'static`, 연관 상수 `u64→u32`, 연관 타입 제약, 기본 구현 제거, impl 제약·where·대상 타입, 고유 impl 제약, 비공개 필드 추가, type alias 대상)이 모두 같은 snapshot. 본문만 변경은 동일(의도대로 Pass). 개념 시험은 별칭·`self as` import를 「cannot resolve」로 처리하고 모듈 import 변이본을 0개념으로 계산.
 - **변경:** API §20.4 참조. snapshot 301 → 314줄 — 추가 줄은 `Channel<T>` 고유 impl 머리줄 2개·비공개 필드 표시 11개, 바뀐 줄은 trait impl의 `for 대상`·제약 표기와 `const SCHEMA: Schema`. 제품 API 자체의 변화가 아니라 표기 확장이며 이름 있는 항목 30/60은 그대로다.
 - **Green:** 자가 시험 18/18 OK(약 2초). 리뷰어 제품 JSON 변이(`Record` bounds에 `'static`, `Copy for Channel`에 `where T: 'static`) 차이 감지 True. 전체 가드 `python3 scripts/check-integration-surface.py` Pass — 30항목·314줄, L1 20줄/6개념·L2 40줄/7개념·L3 tracing +3/7·remote +5/7(계수 불변), 레시피 4개 실행 exit 0, README 일치. CI `integration-surface` job에 자가 시험 단계 추가.
 - **미실행:** cargo fmt/clippy/test·Miri — Rust 소스 변경이 없어 반복하지 않았다(직전 REV-054 리뷰 실행 561 Pass 유지). CI job 원격 실행은 T3(native).
 - **한계:** 개념 계수는 정규식 기반 경로 해석이다. 지역 `mod`·매크로 생성 경로·문자 리터럴 `'"'`은 해석하지 않으며(레시피 금지 항목·관례상 없음), 지역 변수가 binding 이름과 같아도 `::` 경로만 보므로 영향이 없다. snapshot은 rustdoc JSON format 61에 묶여 있고, 새 항목 종류는 실패로 드러난다. 상수 기본값·discriminant·`#[must_use]` 등 동작 의미 속성은 여전히 snapshot에 넣지 않았다.
+- **Human 승인(2026-11-12 「승인」):** 조치와 리뷰 포인트 4건(snapshot 301→314줄 표기 확장, 범위 밖 추가 표기, 레시피 glob import 금지, 정규식 경로 해석 한계)을 수락.
 
 ## Open Evidence Gaps
 

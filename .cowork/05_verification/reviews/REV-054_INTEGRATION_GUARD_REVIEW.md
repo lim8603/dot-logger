@@ -9,7 +9,7 @@
 | 대상 | REV-053 이후 누적 변경 `8dbd999..2fe4e49`, 시작 작업 트리 clean |
 | 범위 | 40파일: REV-053 완료 추적·비 Linux calibration 조치, TASK-029 S1~S4의 공개 API 검사·레시피·README/rustdoc·facade 예제 |
 | 종합 판정 | **Conditional — P1 0건·P2 2건·P3 0건** |
-| 상태 | **Resolved** — RV-134~135 수용·조치 [EV-076](../verification_evidence.md#ev-076) `64e9d69`, Human 리뷰 대기 |
+| 상태 | **Closed** — RV-134~135 수용·조치 [EV-076](../verification_evidence.md#ev-076) `64e9d69`, 2026-11-12 Human 「승인」 |
 
 현재 제품 회귀는 통과했지만, 새 NFR-008 가드가 API 계약 변경과 레시피 개념 상한 초과를 놓치는 두 경로를 재현했다. 제품 코드·저장소 테스트는 수정하지 않았다. 기존 TASK-029 수락·EV-072~075의 실행 사실과 native T3 이월은 유지한다.
 
@@ -30,8 +30,8 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-134 | P2 | `check-integration-surface.py:204~253`, API §20.1 | trait 제약·연관 상수 타입 등 공개 계약 변경이 snapshot에 나타나지 않음 | 계약 필드를 정규화해 직렬화하고 실제 rustdoc JSON 변이로 검증 | 수용 | Resolved |
-| RV-135 | P2 | `check-integration-surface.py:348~368`, API §18.6·20.2 | 모듈을 거친 import에서 개념이 0개로 계산되어 L1의 7개념 초과가 통과 | import 경로를 해석하거나 지원하지 않는 표기를 명시적으로 거절 | 수용 | Resolved |
+| RV-134 | P2 | `check-integration-surface.py:204~253`, API §20.1 | trait 제약·연관 상수 타입 등 공개 계약 변경이 snapshot에 나타나지 않음 | 계약 필드를 정규화해 직렬화하고 실제 rustdoc JSON 변이로 검증 | 수용 | Closed |
+| RV-135 | P2 | `check-integration-surface.py:348~368`, API §18.6·20.2 | 모듈을 거친 import에서 개념이 0개로 계산되어 L1의 7개념 초과가 통과 | import 경로를 해석하거나 지원하지 않는 표기를 명시적으로 거절 | 수용 | Closed |
 
 ### RV-134 — 공개 계약 일부가 snapshot에서 빠짐 (P2)
 

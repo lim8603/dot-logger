@@ -43,6 +43,21 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo +${{ matrix.toolchain }} doc -p dot-logger --no-default-features --no-deps --locked
 
+  # NFR-008 (TASK-029, API §20): facade surface snapshot and recipe limits.
+  integration-surface:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install fixed toolchains
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup toolchain install nightly-2026-10-26 --profile minimal
+      - name: Check facade surface and recipes
+        run: python scripts/check-integration-surface.py
+
   audit:
     runs-on: ubuntu-24.04
     steps:

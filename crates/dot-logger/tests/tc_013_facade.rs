@@ -139,7 +139,10 @@ fn f1_builder_start_try_log_shutdown_syncs_every_record_without_support_code() {
     });
     let sent = rt.join().unwrap();
     let directories = logger.directories().to_vec();
-    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+    let shutdown = logger.shutdown(Duration::from_secs(10)).unwrap();
+    // TASK-029 (API §20.3): one call judges the whole shutdown.
+    assert!(shutdown.is_success(), "{shutdown:?}");
+    let Shutdown::Closed(report) = shutdown else {
         panic!("shutdown did not close within its deadline");
     };
     assert!(report.is_success(), "{report:?}");
@@ -269,7 +272,9 @@ fn f4_expired_deadline_reports_incomplete_then_closes_without_forced_release() {
     let logger = start(&temp);
     let directory = logger.directories()[0].clone();
     let sent = log_poses(&logger, 100);
-    let Shutdown::Incomplete { report, pending } = logger.shutdown(Duration::ZERO).unwrap() else {
+    let shutdown = logger.shutdown(Duration::ZERO).unwrap();
+    assert!(!shutdown.is_success(), "Incomplete is never success");
+    let Shutdown::Incomplete { report, pending } = shutdown else {
         panic!("an already expired deadline cannot close on time");
     };
     assert!(report.core.deadline_elapsed);
@@ -294,7 +299,9 @@ fn f5_file_failure_is_reported_and_never_success() {
     // The namespace vanishes underneath the writer: directory sync and the
     // final publication fail even though the open file still accepts writes.
     std::fs::remove_dir_all(&directory).unwrap();
-    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+    let shutdown = logger.shutdown(Duration::from_secs(10)).unwrap();
+    assert!(!shutdown.is_success(), "a Closed failure is not success");
+    let Shutdown::Closed(report) = shutdown else {
         panic!("a failed file must still settle to Closed");
     };
     assert!(report.io_failed, "{report:?}");

@@ -305,6 +305,15 @@ pub enum Shutdown {
     },
 }
 
+impl Shutdown {
+    /// Closed and [`FacadeReport::is_success`]: every required record was
+    /// written and synchronized on time. `Incomplete` is never success
+    /// (dropping it detaches the pending wait, as below).
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Closed(report) if report.is_success())
+    }
+}
+
 /// Remaining shutdown after a deadline. Dropping it detaches: the worker
 /// finishes and frees everything on its own management thread.
 #[derive(Debug)]

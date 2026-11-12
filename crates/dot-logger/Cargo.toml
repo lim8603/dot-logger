@@ -61,3 +61,22 @@ path = "../../examples/telemetry_overhead.rs"
 name = "general_logs"
 path = "../../examples/general_logs.rs"
 required-features = ["tracing-adapter"]
+
+# TASK-029 recipes (NFR-008), checked by scripts/check-integration-surface.py.
+[[example]]
+name = "recipe_l1_file"
+path = "../../examples/recipes/l1_file.rs"
+
+[[example]]
+name = "recipe_l2_rt_writers"
+path = "../../examples/recipes/l2_rt_writers.rs"
+
+[[example]]
+name = "recipe_l3_tracing"
+path = "../../examples/recipes/l3_tracing.rs"
+required-features = ["tracing-adapter"]
+
+[[example]]
+name = "recipe_l3_remote"
+path = "../../examples/recipes/l3_remote.rs"
+required-features = ["remote"]

@@ -1,4 +1,5 @@
 struct logger::Budget
+  field .. (private)
   fn new() -> Self
   fn memory_bytes(self, bytes: usize) -> Self
   fn sync_every(self, period: Duration) -> Self
@@ -8,19 +9,20 @@ struct logger::Budget
   fn batching(self, records: usize, wait: Duration) -> Self
   fn idle_wait(self, wait: Duration) -> Self
   fn worker_cpus(self, cpus: &[usize], requirement: Requirement) -> Self
-  impl Clone
-  impl Debug
-  impl Default
+  impl Clone for Budget
+  impl Debug for Budget
+  impl Default for Budget
 struct logger::Retention
+  field .. (private)
   const fn ring(bytes: u64) -> Self
   const fn continuous(bytes: u64) -> Self
   const fn reserve(self, bytes: u64) -> Self
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Retention
+  impl Copy for Retention
+  impl Debug for Retention
+  impl Eq for Retention
+  impl StructuralPartialEq for Retention
+  impl PartialEq for Retention
 struct logger::WriterQuota
   field small_slots: usize
   field small_slot_bytes: usize
@@ -28,66 +30,67 @@ struct logger::WriterQuota
   field raw_slot_bytes: usize
   const fn small(slots: usize, slot_bytes: usize) -> Self
   const fn with_raw(self, slots: usize, slot_bytes: usize) -> Self
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for WriterQuota
+  impl Copy for WriterQuota
+  impl Debug for WriterQuota
+  impl Eq for WriterQuota
+  impl StructuralPartialEq for WriterQuota
+  impl PartialEq for WriterQuota
 enum logger::Degradation
   variant RecordsFailed
   variant SyncOverdue
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Degradation
+  impl Copy for Degradation
+  impl Debug for Degradation
+  impl Eq for Degradation
+  impl StructuralPartialEq for Degradation
+  impl PartialEq for Degradation
 enum logger::Failure
   variant WorkerFailed
   variant IoPoisoned
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Failure
+  impl Copy for Failure
+  impl Debug for Failure
+  impl Eq for Failure
+  impl StructuralPartialEq for Failure
+  impl PartialEq for Failure
 struct logger::Health
   field state: HealthState
   field outputs: Vec<OutputHealth>
   field affinity: Option<bool>
   field telemetry: Option<crate::telemetry::Observation<crate::telemetry::Sample>>
   field tracing_dropped: Option<u64>
-  impl Clone
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Health
+  impl Debug for Health
+  impl Eq for Health
+  impl StructuralPartialEq for Health
+  impl PartialEq for Health
 enum logger::HealthState
   variant Running
   variant Degraded(Degradation)
   variant Failed(Failure)
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for HealthState
+  impl Copy for HealthState
+  impl Debug for HealthState
+  impl Eq for HealthState
+  impl StructuralPartialEq for HealthState
+  impl PartialEq for HealthState
 struct logger::OutputHealth
   field since_sync: Option<std::time::Duration>
   field failed_records: u64
   field failed: bool
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for OutputHealth
+  impl Copy for OutputHealth
+  impl Debug for OutputHealth
+  impl Eq for OutputHealth
+  impl StructuralPartialEq for OutputHealth
+  impl PartialEq for OutputHealth
 enum logger::Preset
   fn control(hz: u32) -> Sizing
   fn sensor(hz: u32, bytes: usize) -> Sizing
   fn black_box(hz: u32) -> Sizing
 struct logger::Sizing
+  field .. (private)
   fn new(sync_every: Duration, drop_deadline: Duration) -> Self
   fn small(self, hz: u32, bytes: usize) -> Self
   fn raw(self, hz: u32, bytes: usize) -> Self
@@ -95,32 +98,36 @@ struct logger::Sizing
   fn profile(self, profile: &crate::calibrate::Profile) -> Self
   fn sync_every(self, period: Duration) -> Self
   fn drop_deadline(self, deadline: Duration) -> Self
-  impl Clone
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Sizing
+  impl Debug for Sizing
+  impl Eq for Sizing
+  impl StructuralPartialEq for Sizing
+  impl PartialEq for Sizing
 struct logger::TracingSink
-  impl Clone
-  impl Debug
-  impl Subscriber
-  impl Log
+  field .. (private)
+  impl Clone for TracingSink
+  impl Debug for TracingSink
+  impl Subscriber for TracingSink
+  impl Log for TracingSink
 struct logger::Channel<T: ?Sized>
+  field .. (private)
+  impl<T: ?Sized> Channel<T>
   fn at(self, level: Level) -> Self
+  impl<T: Record + ?Sized> Channel<T>
   fn metadata(&Self, mono_ns: u64, real_ns: i64) -> RecordMetadata
-  impl Clone
-  impl Copy
-  impl Debug
+  impl<T: ?Sized> Clone for Channel<T>
+  impl<T: ?Sized> Copy for Channel<T>
+  impl<T: ?Sized> Debug for Channel<T>
 struct logger::EncodeError
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Default
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
-  impl Display
-  impl Error
+  impl Clone for EncodeError
+  impl Copy for EncodeError
+  impl Debug for EncodeError
+  impl Default for EncodeError
+  impl Eq for EncodeError
+  impl StructuralPartialEq for EncodeError
+  impl PartialEq for EncodeError
+  impl Display for EncodeError
+  impl Error for EncodeError
 enum logger::LogError
   variant Closing
   variant Capacity
@@ -130,42 +137,44 @@ enum logger::LogError
   variant SchemaMismatch
   variant Exhausted
   fn is_capacity(&Self) -> bool
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
-  impl From<CaptureError>
+  impl Clone for LogError
+  impl Copy for LogError
+  impl Debug for LogError
+  impl Eq for LogError
+  impl StructuralPartialEq for LogError
+  impl PartialEq for LogError
+  impl From<CaptureError> for LogError
 enum logger::Logged
   variant Accepted(crate::capture::CaptureReceipt)
   variant Skipped
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Logged
+  impl Copy for Logged
+  impl Debug for Logged
+  impl Eq for Logged
+  impl StructuralPartialEq for Logged
+  impl PartialEq for Logged
 trait logger::Record
-  assoc_const SCHEMA
+  const SCHEMA: Schema
   fn encode(&Self, out: &mut [u8]) -> Result<usize, EncodeError>
 struct logger::Schema
+  field .. (private)
   const fn new(id: u128, version: u32, encoding: &'static str) -> Self
   const fn id(&Self) -> u128
   const fn version(&Self) -> u32
   const fn encoding(&Self) -> &'static str
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Schema
+  impl Copy for Schema
+  impl Debug for Schema
+  impl Eq for Schema
+  impl StructuralPartialEq for Schema
+  impl PartialEq for Schema
 struct logger::Writer
+  field .. (private)
   fn producer(&mut Self) -> Producer<'_>
   fn now_ns(&Self) -> u64
   fn try_log<T: Record + ?Sized>(&mut Self, channel: Channel<T>, message: &T) -> Result<Logged, LogError>
   fn try_log_at<T: Record + ?Sized>(&mut Self, channel: Channel<T>, message: &T, mono_ns: u64, real_ns: i64) -> Result<Logged, LogError>
-  impl Drop
+  impl Drop for Writer
 enum logger::Missing
   variant Budget
   variant Memory
@@ -175,12 +184,12 @@ enum logger::Missing
   variant FileOutput
   variant Channel
   variant Writer
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Missing
+  impl Copy for Missing
+  impl Debug for Missing
+  impl Eq for Missing
+  impl StructuralPartialEq for Missing
+  impl PartialEq for Missing
 enum logger::StartError
   variant Missing(Vec<Missing>)
   variant Duplicate
@@ -196,33 +205,33 @@ enum logger::StartError
   variant Io(std::io::Error)
   variant WorkerFailed
   variant Remote(crate::adapters::remote::RemoteError)
-  impl Debug
-  impl Display
-  impl Error
-  impl From<ConfigError>
-  impl From<CaptureBuildError>
-  impl From<RoutingError>
-  impl From<ControlError>
-  impl From<CompletionError>
-  impl From<RetentionError>
+  impl Debug for StartError
+  impl Display for StartError
+  impl Error for StartError
+  impl From<ConfigError> for StartError
+  impl From<CaptureBuildError> for StartError
+  impl From<RoutingError> for StartError
+  impl From<ControlError> for StartError
+  impl From<CompletionError> for StartError
+  impl From<RetentionError> for StartError
 enum logger::LookupError
   variant Unknown
   variant AlreadyTaken
   variant SchemaMismatch
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
-  impl Display
-  impl Error
+  impl Clone for LookupError
+  impl Copy for LookupError
+  impl Debug for LookupError
+  impl Eq for LookupError
+  impl StructuralPartialEq for LookupError
+  impl PartialEq for LookupError
+  impl Display for LookupError
+  impl Error for LookupError
 enum logger::ShutdownError
   variant WorkerFailed
   variant Unresponsive(PendingShutdown)
-  impl Debug
-  impl Display
-  impl Error
+  impl Debug for ShutdownError
+  impl Display for ShutdownError
+  impl Error for ShutdownError
 struct logger::FacadeReport
   field core: crate::control::ShutdownReport
   field writers_outstanding: usize
@@ -230,25 +239,27 @@ struct logger::FacadeReport
   field io_failed: bool
   field unconfirmed: Vec<crate::completion::ProducerRange>
   fn is_success(&Self) -> bool
-  impl Clone
-  impl Debug
+  impl Clone for FacadeReport
+  impl Debug for FacadeReport
 enum logger::Shutdown
   variant Closed(FacadeReport)
   variant Incomplete { report: FacadeReport, pending: PendingShutdown }
   fn is_success(&Self) -> bool
-  impl Debug
+  impl Debug for Shutdown
 struct logger::PendingShutdown
+  field .. (private)
   fn wait(self, timeout: Duration) -> Result<Shutdown, ShutdownError>
-  impl Debug
+  impl Debug for PendingShutdown
 struct logger::ChannelOptions
+  field .. (private)
   fn new() -> Self
   fn outputs(self, outputs: &[usize]) -> Self
-  impl Clone
-  impl Debug
-  impl Default
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for ChannelOptions
+  impl Debug for ChannelOptions
+  impl Default for ChannelOptions
+  impl Eq for ChannelOptions
+  impl StructuralPartialEq for ChannelOptions
+  impl PartialEq for ChannelOptions
 struct logger::Plan
   field memory: crate::config::MemoryBudget
   field required_bytes: usize
@@ -258,21 +269,22 @@ struct logger::Plan
   field preset_filled: Vec<Missing>
   field batch_records: usize
   field warnings: Vec<PlanWarning>
-  impl Clone
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for Plan
+  impl Debug for Plan
+  impl Eq for Plan
+  impl StructuralPartialEq for Plan
+  impl PartialEq for Plan
 enum logger::PlanWarning
   variant Memory { budget_bytes: usize, available_bytes: u64 }
   variant Load { offered_bytes_per_second: u64, limit_bytes_per_second: u64 }
-  impl Clone
-  impl Copy
-  impl Debug
-  impl Eq
-  impl StructuralPartialEq
-  impl PartialEq
+  impl Clone for PlanWarning
+  impl Copy for PlanWarning
+  impl Debug for PlanWarning
+  impl Eq for PlanWarning
+  impl StructuralPartialEq for PlanWarning
+  impl PartialEq for PlanWarning
 struct logger::LoggerBuilder
+  field .. (private)
   fn budget(self, budget: Budget) -> Self
   fn preset(self, sizing: Sizing) -> Self
   fn file_output(self, directory: impl AsRef<Path>, retention: Retention) -> Self
@@ -286,8 +298,9 @@ struct logger::LoggerBuilder
   fn remote_with(self, server: crate::adapters::remote::ServerConfig, limits: crate::adapters::remote::RemoteLimits) -> Self
   fn plan(&Self) -> Result<Plan, StartError>
   fn start(self) -> Result<Logger, StartError>
-  impl Default
+  impl Default for LoggerBuilder
 struct logger::Logger
+  field .. (private)
   fn builder() -> LoggerBuilder
   fn channel<T: Record + ?Sized>(&Self, topic: &str) -> Result<Channel<T>, LookupError>
   fn take_writer(&Self, name: &str) -> Result<Writer, LookupError>
@@ -297,5 +310,5 @@ struct logger::Logger
   fn remote_addr(&Self) -> Option<std::net::SocketAddr>
   fn tracing(&Self) -> Result<TracingSink, LookupError>
   fn shutdown(self, deadline: Duration) -> Result<Shutdown, ShutdownError>
-  impl Drop
-  impl Debug
+  impl Drop for Logger
+  impl Debug for Logger

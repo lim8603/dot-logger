@@ -55,6 +55,8 @@ jobs:
         run: |
           rustup toolchain install 1.96.0 --profile minimal --component rustfmt
           rustup toolchain install nightly-2026-10-26 --profile minimal
+      - name: Self-test the surface guard (REV-054)
+        run: python scripts/test_check_integration_surface.py
       - name: Check facade surface and recipes
         run: python scripts/check-integration-surface.py
 

@@ -1043,3 +1043,69 @@ fn calibrate_on_other_platforms_fails_without_writing() {
     assert_eq!(std::fs::read(&profile).unwrap(), b"kept");
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// TASK-030 S1 (API §21): `export --standard` writes a new standard MCAP file
+/// (user channel + meta channel), refuses to overwrite, and rejects inputs
+/// that are not `dot-logger/1` without leaving an output behind.
+#[test]
+fn export_standard_writes_a_new_file_and_never_overwrites() {
+    let fx = fixture([10, 20]);
+    let target = fx.dir.join("standard.mcap");
+    let run = |input: &std::path::Path| {
+        command()
+            .args(["export", "--standard", "--json", "--input"])
+            .arg(input)
+            .arg("--output")
+            .arg(&target)
+            .output()
+            .unwrap()
+    };
+    let output = run(&fx.source);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = lines(&output.stdout);
+    assert_eq!(rows[0]["kind"], "export");
+    assert_eq!(rows[0]["data"]["messages"], 2);
+    assert_eq!(rows[0]["data"]["truncated"], Value::Null);
+    assert_eq!(rows[0]["data"]["channels"][0]["topic"], "raw");
+    assert_eq!(rows[0]["data"]["channels"][0]["message_encoding"], "opaque");
+    assert_eq!(rows[0]["data"]["channels"][0]["schema_name"], Value::Null);
+    assert_eq!(rows.last().unwrap()["kind"], "summary");
+    let bytes = std::fs::read(&target).unwrap();
+    let topics: Vec<_> = mcap::MessageStream::new(&bytes)
+        .unwrap()
+        .map(|m| m.unwrap().channel.topic.clone())
+        .collect();
+    assert_eq!(
+        topics,
+        ["raw", "_dot_logger/meta", "raw", "_dot_logger/meta"]
+    );
+
+    let output = run(&fx.source);
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "existing output is a conflict"
+    );
+    assert_eq!(std::fs::read(&target).unwrap(), bytes);
+
+    std::fs::remove_file(&target).unwrap();
+    let plain = fx.dir.join("plain.mcap");
+    std::fs::write(&plain, b"not an mcap file").unwrap();
+    let output = run(&plain);
+    assert_eq!(output.status.code(), Some(2), "not a dot-logger file");
+    assert!(!target.exists(), "a failed export leaves no output");
+
+    let output = command()
+        .args(["export", "--json", "--input"])
+        .arg(&fx.source)
+        .arg("--output")
+        .arg(&target)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2), "--standard is required");
+}

@@ -66,6 +66,7 @@ mod codec;
 mod index;
 pub(crate) mod recovery;
 mod retention;
+pub mod standard;
 pub(crate) use retention::{log_required, smallest_rotated_segment};
 mod writer;
 use crate::capture::ChannelConfig;
@@ -266,6 +267,10 @@ pub struct PayloadSchema {
     pub encoding: String,
     /// Descriptor bytes, bounded by the configured total metadata limit.
     pub descriptor: Vec<u8>,
+    /// Type name standard tools resolve in the descriptor (for protobuf the
+    /// fully-qualified message name). Kept in the channel metadata as
+    /// `payload_schema_name` (API §21.1 ⑥); at most 256 bytes.
+    pub name: Option<String>,
 }
 /// Immutable mapping from a product channel to a file-local channel.
 #[derive(Clone, Debug)]

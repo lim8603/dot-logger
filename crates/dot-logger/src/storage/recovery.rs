@@ -519,6 +519,7 @@ impl Validation<'_> {
         }
         let mut meta = Fields(f.string()?);
         let mut seen = 0u8;
+        let named = c.schema.as_ref().and_then(|s| s.name.as_deref());
         while !meta.0.is_empty() {
             let key = meta.string()?;
             let value = meta.string()?;
@@ -551,6 +552,9 @@ impl Validation<'_> {
                         ),
                     ),
                 ),
+                b"payload_schema_name" if named.is_some() => {
+                    (128, Some(value) == named.map(str::as_bytes))
+                }
                 _ => return Err(RecoveryStop::InvalidRecord),
             };
             if seen & bit != 0 || !matches {
@@ -558,7 +562,12 @@ impl Validation<'_> {
             }
             seen |= bit;
         }
-        if seen != if c.schema.is_some() { 127 } else { 63 } || !f.0.is_empty() {
+        let expected = match (&c.schema, named) {
+            (None, _) => 63,
+            (Some(_), None) => 127,
+            (Some(_), Some(_)) => 255,
+        };
+        if seen != expected || !f.0.is_empty() {
             return Err(RecoveryStop::InvalidRecord);
         }
         self.seen[i] = true;

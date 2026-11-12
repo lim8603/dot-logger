@@ -76,6 +76,9 @@ pub struct Channel {
 struct Descriptor {
     encoding: String,
     data_hex: String,
+    /// Type name for standard tools (API §21.1 ⑥), such as `my.Pose`.
+    #[serde(default)]
+    name: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -121,6 +124,7 @@ impl Manifest {
                             Ok::<PayloadSchema, Failure>(PayloadSchema {
                                 encoding: d.encoding.clone(),
                                 descriptor: unhex(&d.data_hex)?,
+                                name: d.name.clone(),
                             })
                         })
                         .transpose()?,

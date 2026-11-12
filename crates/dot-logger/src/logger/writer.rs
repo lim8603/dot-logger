@@ -16,6 +16,8 @@ pub struct Schema {
     id: u128,
     version: u32,
     encoding: &'static str,
+    /// (type name, descriptor encoding, descriptor bytes).
+    descriptor: Option<(&'static str, &'static str, &'static [u8])>,
 }
 
 impl Schema {
@@ -26,7 +28,23 @@ impl Schema {
             id,
             version,
             encoding,
+            descriptor: None,
         }
+    }
+    /// Attach the payload's schema descriptor so standard MCAP tools can
+    /// decode it after `dot-logger export --standard` (API §21): `name` is the
+    /// type the tools resolve (for protobuf the fully-qualified message name,
+    /// `data` a serialized `FileDescriptorSet` with imports), `encoding` the
+    /// MCAP schema encoding (`"protobuf"`, `"jsonschema"`, ...). Stored once
+    /// per file; without it the payload stays opaque bytes.
+    pub const fn descriptor(
+        mut self,
+        name: &'static str,
+        encoding: &'static str,
+        data: &'static [u8],
+    ) -> Self {
+        self.descriptor = Some((name, encoding, data));
+        self
     }
     /// Schema identity.
     pub const fn id(&self) -> u128 {
@@ -39,6 +57,14 @@ impl Schema {
     /// Payload encoding label.
     pub const fn encoding(&self) -> &'static str {
         self.encoding
+    }
+    pub(crate) fn payload_schema(&self) -> Option<crate::storage::PayloadSchema> {
+        self.descriptor
+            .map(|(name, encoding, data)| crate::storage::PayloadSchema {
+                encoding: encoding.into(),
+                descriptor: data.into(),
+                name: Some(name.into()),
+            })
     }
 }
 

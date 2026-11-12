@@ -36,6 +36,13 @@ pub fn command() -> Command {
                 .long("disconnect-on-overflow")
                 .global(true)
                 .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("standard")
+                .long("standard")
+                .global(true)
+                .action(ArgAction::SetTrue)
+                .help("export: standard MCAP (user schema channels + meta channel)"),
         );
     for (name, default) in [
         ("endpoint", None),
@@ -81,6 +88,8 @@ pub fn command() -> Command {
         ("write-limit", Some("4294967296")),
         ("time-limit-ms", Some("15000")),
         ("disk-reserve", Some("1073741824")),
+        ("input", None),
+        ("max-record-bytes", Some("268435456")),
     ] {
         let arg = value(name, default);
         c = c.arg(if matches!(name, "from" | "to") {
@@ -110,6 +119,10 @@ pub fn command() -> Command {
         (
             "calibrate",
             "Measure an output filesystem once (writes up to --write-limit) and save a new preset profile",
+        ),
+        (
+            "export",
+            "Convert a dot-logger file into a new standard MCAP file (--standard)",
         ),
     ] {
         c = c.subcommand(Command::new(name).about(help));

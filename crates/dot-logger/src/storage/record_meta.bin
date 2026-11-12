@@ -1,0 +1,20 @@
+
+ý
+record_meta.proto
+dot_logger"G
+RecordSource
+ticks (Rticks!
+clock_domain (RclockDomain"Š
+
+RecordMeta
+channel (Rchannel
+producer (Rproducer
+sequence (Rsequence
+mono (Rmono
+real (Rreal
+revision (Rrevision
+level (Rlevel
+
+importance (R
+importance0
+source	 (2.dot_logger.RecordSourceRsourcebproto3

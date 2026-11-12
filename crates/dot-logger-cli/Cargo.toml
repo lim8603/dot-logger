@@ -17,5 +17,9 @@ serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["signal"] }
 
+[dev-dependencies]
+# TASK-030 S1: read exported files back in CLI tests.
+mcap.workspace = true
+
 [lints]
 workspace = true

@@ -159,6 +159,7 @@ trait logger::Record
 struct logger::Schema
   field .. (private)
   const fn new(id: u128, version: u32, encoding: &'static str) -> Self
+  const fn descriptor(self, name: &'static str, encoding: &'static str, data: &'static [u8]) -> Self
   const fn id(&Self) -> u128
   const fn version(&Self) -> u32
   const fn encoding(&Self) -> &'static str

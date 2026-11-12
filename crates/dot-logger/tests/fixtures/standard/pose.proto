@@ -1,0 +1,9 @@
+// TC-014 fixture: a user payload schema for standard MCAP export.
+// Regenerate: protoc --include_imports --descriptor_set_out=pose.fds pose.proto
+syntax = "proto3";
+package test;
+
+message Pose {
+  float x = 1;
+  float y = 2;
+}

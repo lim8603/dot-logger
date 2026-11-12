@@ -157,10 +157,13 @@ impl WriterConfig {
             {
                 return Err(StorageError::InvalidConfig);
             }
-            if c.schema
-                .as_ref()
-                .is_some_and(|s| s.encoding.is_empty() || s.encoding.len() > 64)
-            {
+            if c.schema.as_ref().is_some_and(|s| {
+                s.encoding.is_empty()
+                    || s.encoding.len() > 64
+                    || s.name
+                        .as_ref()
+                        .is_some_and(|n| n.is_empty() || n.len() > 256)
+            }) {
                 return Err(StorageError::InvalidConfig);
             }
             if channels[..i].iter().any(|p| {
@@ -175,6 +178,10 @@ impl WriterConfig {
                 c.payload_encoding.len(),
                 c.schema.as_ref().map_or(0, |s| s.encoding.len()),
                 c.schema.as_ref().map_or(0, |s| s.descriptor.len()),
+                c.schema
+                    .as_ref()
+                    .and_then(|s| s.name.as_ref())
+                    .map_or(0, String::len),
             ] {
                 metadata = metadata
                     .checked_add(bytes)
@@ -359,6 +366,7 @@ impl<W: SyncSink> SegmentWriter<W> {
                     s.descriptor = std::mem::take(&mut s.descriptor)
                         .into_boxed_slice()
                         .into_vec();
+                    s.name = s.name.take().map(|n| n.into_boxed_str().into_string());
                 }
                 c
             })
@@ -415,6 +423,9 @@ impl<W: SyncSink> SegmentWriter<W> {
                     &s.descriptor,
                 )?;
                 metadata.insert("payload_schema_file_id".into(), id.to_string());
+                if let Some(name) = &s.name {
+                    metadata.insert("payload_schema_name".into(), name.clone());
+                }
             }
             writer.add_channel_with_id((i + 1) as u16, schema, &c.topic, "protobuf", &metadata)?;
         }

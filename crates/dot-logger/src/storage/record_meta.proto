@@ -1,0 +1,28 @@
+// Per-message product fields kept beside user channels in a standard MCAP
+// export (API §21.1/21.2). One RecordMeta follows each user message with the
+// same log_time on the `_dot_logger/meta` topic.
+// Regenerate: protoc --include_imports --descriptor_set_out=record_meta.bin record_meta.proto
+syntax = "proto3";
+package dot_logger;
+
+message RecordSource {
+  sint64 ticks = 1;
+  uint64 clock_domain = 2;
+}
+
+message RecordMeta {
+  // MCAP channel id of the user message in the exported file.
+  uint32 channel = 1;
+  uint32 producer = 2;
+  // Full-width accepted sequence; the MCAP sequence keeps the low 32 bits.
+  uint64 sequence = 3;
+  // Monotonic capture time (ns); log_time and publish_time carry `real`.
+  uint64 mono = 4;
+  sint64 real = 5;
+  uint64 revision = 6;
+  // dot_logger::capture::Level as u32 (Trace 0 .. Error 4).
+  uint32 level = 7;
+  // 0 Normal, 1 Important.
+  uint32 importance = 8;
+  RecordSource source = 9;
+}

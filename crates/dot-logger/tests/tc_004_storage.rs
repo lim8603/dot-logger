@@ -1345,6 +1345,7 @@ fn schema_versions_and_wide_channel_ids_use_distinct_file_local_ids() {
         mapping[0].schema = Some(dot_logger::storage::PayloadSchema {
             encoding: "vendor-schema".into(),
             descriptor: vec![1, 2],
+            name: None,
         });
         let mut second = mapping[0].clone();
         second.channel.channel_id = u32::MAX;

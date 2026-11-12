@@ -264,6 +264,7 @@ dependencies = [
  "clap",
  "dot-logger",
  "dot-logger-client",
+ "mcap",
  "serde",
  "serde_json",
  "tokio",

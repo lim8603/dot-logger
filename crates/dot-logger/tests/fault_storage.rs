@@ -628,6 +628,7 @@ fn full_width_receipts_and_optional_user_schema_survive_recovery() {
         registrations[0].schema = Some(PayloadSchema {
             encoding: "opaque".into(),
             descriptor: vec![0, 128, 255],
+            name: Some("test.Opaque".into()),
         });
         let sink = Buffer::default();
         let mut writer = SegmentWriter::new(

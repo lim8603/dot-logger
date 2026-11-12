@@ -108,6 +108,15 @@ impl Context {
             ("recover", _) if !remote => {
                 self.text("output")?;
             }
+            ("export", _) if !remote => {
+                if !self.args.get_flag("standard") {
+                    return Err(Failure::Input);
+                }
+                self.text("input")?;
+                self.text("output")?;
+                self.number::<usize>("max-record-bytes")?;
+                return Ok(());
+            }
             ("calibrate", _) if !remote => {
                 self.text("directory")?;
                 self.text("output")?;
@@ -243,6 +252,9 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     let (command, sub) = ctx.command()?;
     if command == "calibrate" {
         return calibrate(ctx, out);
+    }
+    if command == "export" {
+        return export_standard(ctx, out);
     }
     if command == "config" && sub == Some("diff") {
         let before: Value = serde_json::from_slice(&model::read(Path::new(ctx.text("before")?))?)?;
@@ -885,4 +897,65 @@ fn calibrate(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
         }
     })?;
     Ok(json!({"profile": output.to_string_lossy()}))
+}
+
+/// TASK-030 S1 (API §21): `export --standard`. The output is created new and
+/// removed again if the export fails or is cancelled.
+fn export_standard(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
+    use dot_logger::storage::standard::{ExportError, ExportLimits, export};
+    let input = File::open(ctx.text("input")?)?;
+    let target = Path::new(ctx.text("output")?);
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(target)
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                Failure::Conflict
+            } else {
+                Failure::Io
+            }
+        })?;
+    let result = export(
+        std::io::BufReader::new(input),
+        std::io::BufWriter::new(file),
+        ExportLimits::new(ctx.number("max-record-bytes")?),
+        ctx.cancel.as_atomic(),
+    );
+    let report = match result {
+        Ok(report) => report,
+        Err(e) => {
+            let _ = std::fs::remove_file(target);
+            return Err(match e {
+                ExportError::NotDotLogger | ExportError::TopicConflict => Failure::Input,
+                ExportError::RecordTooLarge => Failure::Limit,
+                ExportError::Cancelled => Failure::Cancelled,
+                ExportError::InvalidRecord => Failure::Corrupt,
+                ExportError::Io(_) | ExportError::Output(_) => Failure::Io,
+            });
+        }
+    };
+    let channels: Vec<Value> = report
+        .channels
+        .iter()
+        .map(|c| {
+            json!({
+                "topic": c.topic,
+                "message_encoding": c.message_encoding,
+                "schema_name": c.schema_name,
+                "messages": c.messages,
+            })
+        })
+        .collect();
+    out.emit(
+        "export",
+        json!({
+            "messages": report.messages,
+            "channels": channels,
+            "meta_topic": dot_logger::storage::standard::META_TOPIC,
+            "truncated": report.truncated,
+            "skipped_records": report.skipped_records,
+        }),
+    )?;
+    Ok(json!({"output": target.to_string_lossy()}))
 }

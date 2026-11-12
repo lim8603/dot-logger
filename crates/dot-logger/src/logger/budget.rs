@@ -515,7 +515,13 @@ pub(crate) fn derive(
 
     let metadata: usize = channels
         .iter()
-        .map(|c| c.topic.len() + c.payload_encoding.len())
+        .map(|c| {
+            c.topic.len()
+                + c.payload_encoding.len()
+                + c.schema.as_ref().map_or(0, |s| {
+                    s.encoding.len() + s.descriptor.len() + s.name.as_ref().map_or(0, String::len)
+                })
+        })
         .sum();
     let writer = WriterConfig {
         max_payload_bytes: max_payload,

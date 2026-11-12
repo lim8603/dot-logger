@@ -631,7 +631,7 @@ impl LoggerBuilder {
                     ),
                     topic: spec.topic.clone(),
                     payload_encoding: spec.schema.encoding().into(),
-                    schema: None,
+                    schema: spec.schema.payload_schema(),
                 })
             })
             .collect::<Result<_, StartError>>()?;

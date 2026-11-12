@@ -1203,7 +1203,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ## EV-075 — TASK-029 S4: dot-probe 형태 facade 예제·support 감소 기록
 
-- **판정:** 로컬 **Pass**. 커밋 `cd53f37`. TASK-029 S1~S4 로컬 완료, Human 리뷰 대기.
+- **판정:** 로컬 **Pass**. 커밋 `cd53f37`. TASK-029 S1~S4 로컬 완료, 2026-11-12 Human 「승인」.
 - **Human 결정(2026-11-12 「facade 예제 추가 + 기존 유지」):** `dot_probe_pipeline`의 InfluxDB 경로·설정 변경 전후 비교는 facade에 경로가 없어 통째로 옮기지 않는다. facade만 쓰는 dot-probe 형태 예제를 추가하고 pipeline은 고급 경로 참고 예제로 유지한다. DB·설정 변경의 facade 편입은 TASK-026(실제 적용)에서 필요성을 보고 판단한다. `dot_probe_tail`(클라이언트 화면 구독 경계)·`dot_probe_bridge`·`dot_probe_check`(제품 진단 모듈 재사용, support 4줄)는 소비처 배선 support가 없어 대상이 아니다.
 - **변경:** `examples/dot_probe_facade.rs`(`dot-logger` 예제, feature `remote`·`tracing-adapter`). tracing 로그·1 kHz 관절 상태(사용자 `Record`, 48 B)·30 Hz 256 KiB 카메라 프레임(raw loan)을 파일로 기록하고 loopback gRPC 서버를 연다(`dot-logger tail`로 구독 가능). writer별 거절 수를 세고 종료 보고와 `Shutdown::is_success()`로 판정한다. README 예제 표에 추가.
 - **실행:** exit 0, 「synchronized 2062 records; rejected control 0, camera 0」(관절 2000 + 프레임 60 + 로그 2), 파일 1개 16 MB(tmpfs `TMPDIR`, 실행 뒤 삭제), 약 2초.

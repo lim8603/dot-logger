@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-12 |
-| 다음 액션 | S1~S4 로컬 완료 — S4 Human 리뷰 후 완료 처리 → MS-009 |
+| 다음 액션 | S1~S4 로컬 완료·Human 승인(2026-11-12). 잔여: CI `integration-surface`·레시피의 native 실행(T3) |
 | 의존 | TASK-027·TASK-028 |
 | 예상 소요 | 1~2 인일, 리뷰 대기 제외 |
 
@@ -34,7 +34,7 @@
 | S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | 진행 |
 | S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | Human 승인 [EV-073](../../05_verification/verification_evidence.md#ev-073) |
 | S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | Human 승인 [EV-074](../../05_verification/verification_evidence.md#ev-074) |
-| S4 | facade 전용 `dot_probe_facade` 예제 추가·support 줄 수 비교 기록(pipeline은 고급 경로로 유지, 2026-11-12 Human 결정) | 로컬 Pass [EV-075](../../05_verification/verification_evidence.md#ev-075) |
+| S4 | facade 전용 `dot_probe_facade` 예제 추가·support 줄 수 비교 기록(pipeline은 고급 경로로 유지, 2026-11-12 Human 결정) | Human 승인 [EV-075](../../05_verification/verification_evidence.md#ev-075), Human 승인 |
 
 ## 변경 대상과 첫 검증
 
@@ -53,4 +53,4 @@
 - [ ] 레시피의 실패/포화·종료 처리 예시가 실제 계약과 일치한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 제품 코드·테스트 실행 결과: 없음.
+테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013) F21·F22. 실행 결과: [EV-073](../../05_verification/verification_evidence.md#ev-073)~[EV-075](../../05_verification/verification_evidence.md#ev-075) 로컬 Pass, 2026-11-12 Human 승인.

@@ -9,7 +9,7 @@
 | 대상 | REV-052 이후 누적 변경 `93db6e3..8dbd999`, 시작 작업 트리 clean |
 | 범위 | 변경 123파일(비 vendor Rust 30파일). REV-052 sync 조치, TASK-023 S2/S3·RT harness, T5 완료 장부 최적화, MCAP 단일 CRC 패치, TASK-028 S2 calibration·preset·CLI 및 관련 시험/계약 |
 | 종합 판정 | **Conditional — P1 1건·P2 1건·P3 1건** |
-| 상태 | **Open** — 후속 개발 세션에서 판정·조치 |
+| 상태 | **Resolved** — 2026-11-12 3건 모두 수용·조치([EV-072](../verification_evidence.md#ev-072)), Human 리뷰 대기 |
 
 공개 `Completion::reconcile`의 동시 호출로 새 정리 작업이 유실되어 완료 slot 재사용이 막히는 문제를 재현했다. Linux의 전체 회귀는 통과하지만, `calibrate`의 비 Linux 분기는 타입 오류가 있고 기본 feature의 rustdoc 링크도 깨진다. 제품 코드와 저장소 테스트는 수정하지 않았다. 기존 Human 수락과 EV-056~071의 과거 실행 사실은 유지하며, 이번에 확인한 공백을 별도로 추적한다.
 
@@ -30,9 +30,9 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-131 | P1 | `completion/mod.rs:511~558`, API §19.7 완료 장부 정리 | 이전 reconcile의 잔여량 저장이 새 세대의 정리 작업을 지워 slot 재사용이 계속 거절됨 | 정리 작업 소유권을 단일화하고 세대·cursor·잔여량 갱신을 보호 | 미판정 | Open |
-| RV-132 | P2 | `calibrate.rs:662~674`, API §19.8~19.9 플랫폼 대체 경로 | 비 Linux 분기의 closure 반환형이 `Fact<String>`으로 고정되어 다른 필드에서 컴파일 오류 | 제네릭 함수 또는 필드별 생성으로 수정, 플랫폼별 시험 기대값 정렬 | 미판정 | Open |
-| RV-133 | P3 | `logger/preset.rs:75`, core 선택 feature 경계 | 기본 feature에서는 존재하지 않는 `Self::profile` 링크로 rustdoc 경고/엄격 빌드 실패 | feature에 맞게 링크를 조건화하거나 일반 코드 표기로 변경 | 미판정 | Open |
+| RV-131 | P1 | `completion/mod.rs:511~558`, API §19.7 완료 장부 정리 | 이전 reconcile의 잔여량 저장이 새 세대의 정리 작업을 지워 slot 재사용이 계속 거절됨 | 정리 작업 소유권을 단일화하고 세대·cursor·잔여량 갱신을 보호 | 수용 | Resolved |
+| RV-132 | P2 | `calibrate.rs:662~674`, API §19.8~19.9 플랫폼 대체 경로 | 비 Linux 분기의 closure 반환형이 `Fact<String>`으로 고정되어 다른 필드에서 컴파일 오류 | 제네릭 함수 또는 필드별 생성으로 수정, 플랫폼별 시험 기대값 정렬 | 수용 | Resolved |
+| RV-133 | P3 | `logger/preset.rs:75`, core 선택 feature 경계 | 기본 feature에서는 존재하지 않는 `Self::profile` 링크로 rustdoc 경고/엄격 빌드 실패 | feature에 맞게 링크를 조건화하거나 일반 코드 표기로 변경 | 수용 | Resolved |
 
 ### RV-131 — 이전 정리 호출이 새 세대의 잔여 작업을 지움 (P1)
 
@@ -52,9 +52,9 @@
 
 #### [처리담당]
 
-- 판정 결과: 미판정.
-- 처리 내용: 후속 개발 세션에서 기록.
-- 검증 근거(EV·시험·커밋): 미등록.
+- 판정 결과: **수용** (2026-11-12, 처리담당 AI). router turn(`routing/mod.rs`)과 control poll(`control/mod.rs`)이 같은 completion을 각자 정리하므로 내부 경로에서도 겹칠 수 있다.
+- 처리 내용: `Registry.sweeping` 진입 claim(비대기 CAS) 하나로 정리 상태(`swept`·`sweep_left`·`sweep_missed`·`cursor`) 전체를 한 호출만 갱신한다. 겹친 호출은 0을 반환하고, 그 사이 새 abandonment 세대는 다음 호출이 감지한다. claim은 Drop guard로 unwind에서도 해제한다. 리뷰어의 정지 지점(잔여량 저장 직전)에 test-only thread-local hook을 두고 재현 순서를 저장소 시험 `completion::tests::a_stale_sweep_cannot_erase_a_new_abandonment`로 옮겼다. 중첩 호출·새 abandonment·slot 재사용은 이 시험이, UPDATING 재훑기는 기존 `an_abandoned_slot_skipped_while_updating_is_reconciled_later`가 확인한다. API §19.7 ⑪ 항목에 소유권 규칙을 추가했다.
+- 검증 근거(EV·시험·커밋): [EV-072](../verification_evidence.md#ev-072). 수정 전 Red(`got Err(CompletionCapacity)`) → Green, Miri 8 seeds. 커밋 `aa62e04`.
 
 ### RV-132 — 비 Linux calibration 대체 경로가 컴파일되지 않음 (P2)
 
@@ -68,9 +68,9 @@
 
 #### [처리담당]
 
-- 판정 결과: 미판정.
-- 처리 내용: 후속 개발 세션에서 기록.
-- 검증 근거(EV·시험·커밋): 미등록.
+- 판정 결과: **수용** (2026-11-12).
+- 처리 내용: 비 Linux 대체 값을 제네릭 `fn none<T>() -> Fact<T>`로 바꿨다. Linux에서만 쓰는 `host::parse_cpus`는 `cfg(target_os = "linux")`로 묶었다(비 Linux dead_code 방지). §19.9 계약대로 측정 성공 시험 4개(`tc_013_calibrate` F19 write/time/reserve 2종)와 CLI `calibrate_saves_a_new_profile_and_never_overwrites`는 Linux 한정으로 표시했다. 비 Linux 대체 경로 시험 `f19_other_platforms_fail_unsupported_without_files`·CLI `calibrate_on_other_platforms_fails_without_writing`(exit 4·파일 없음·기존 프로필 Conflict 유지)를 추가했다. 누락 디렉터리 기대값은 플랫폼별(NotFound/Unsupported)이다.
+- 검증 근거(EV·시험·커밋): [EV-072](../verification_evidence.md#ev-072). nightly `-Zbuild-std` 타입 검사로 macOS·Windows Red(E0308 8건) → `-D warnings` 0(lib + 전체 시험 대상). CLI 크레이트는 C 의존성(ring·zstd) 때문에 이 PC에서 교차 검사하지 못했다 — native(T3). 커밋 `aa62e04`.
 
 ### RV-133 — 기본 feature 문서의 선택 API 링크가 깨짐 (P3)
 
@@ -83,9 +83,9 @@
 
 #### [처리담당]
 
-- 판정 결과: 미판정.
-- 처리 내용: 후속 개발 세션에서 기록.
-- 검증 근거(EV·시험·커밋): 미등록.
+- 판정 결과: **수용** (2026-11-12).
+- 처리 내용: 링크를 코드 표기 `profile`(feature `calibrate`)로 바꿨다. CI `contracts`에 core-only rustdoc(`-p dot-logger --no-default-features`, `-D warnings`) 단계를 추가해 같은 누락을 막는다.
+- 검증 근거(EV·시험·커밋): [EV-072](../verification_evidence.md#ev-072). core-only·all-features rustdoc `-D warnings` 모두 exit 0. 커밋 `aa62e04`.
 
 ## 5. 검증 및 인계
 

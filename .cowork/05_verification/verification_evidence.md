@@ -1172,6 +1172,17 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미시험:** 취소는 시작 전 취소만 시험했다. 측정 도중 취소(블록마다 확인, 정리 경로는 같은 `Probe` Drop)는 자동 시험이 없다.
 - **Human 승인(2026-11-11 「승인」):** S2 구현·리뷰 포인트 4건(×0.5 근거 1대, 흡수가 sync 최대로 1.4~1.5배, 부하 경고는 preset writer만, CLI 기본 제한 시간)을 수락.
 
+## EV-072 — REV-053 조치: 완료 장부 훑기 단일 소유·비 Linux calibrate·core-only rustdoc
+
+- **판정:** 로컬 **Pass**. RV-131~133 모두 수용·조치([REV-053](reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md)), Human 리뷰 대기. 커밋 `aa62e04`.
+- **RV-131(P1) 변경:** `Completion::reconcile`에 진입 claim(`Registry.sweeping`, 비대기 CAS + Drop guard)을 두어 세대·잔여량·재훑기 표시·cursor를 한 호출만 갱신한다. 겹친 호출은 0을 반환한다(문서 계약 「최대 `limit`」 안). 새 abandonment 세대는 claim 밖에서도 `abandons`에 남아 다음 호출이 훑기를 시작한다. 제어 바이트 산식은 `size_of::<Registry>()`를 그대로 쓰므로 별도 변경이 없다. [API §19.7](../03_design_artifacts/interface_contract.md#197-task-023-s2d-조치-반영--2026-11-08).
+- **RV-131 Red → Green:** 리뷰어 순서(window 2, A가 잔여량 저장 직전 정지 → seq3 재사용·버림 → B 정리 → A 재개)를 test-only thread-local hook + Barrier 2개로 고정한 `completion::tests::a_stale_sweep_cannot_erase_a_new_abandonment`. 수정 전 `got Err(CompletionCapacity)`, 수정 후 seq5 수락·Unknown 2건.
+- **RV-132(P2) 변경:** 비 Linux `Host` 대체 값을 제네릭 `none<T>()`로 바꾸고 `parse_cpus`를 Linux 한정으로 묶었다. 측정 성공 시험(F19 4개·CLI 1개)은 Linux 한정, 비 Linux 대체 경로 시험 2개를 추가했다(`Io(Unsupported)`·파일 없음, CLI exit 4·기존 프로필 Conflict 유지).
+- **RV-132 Red → Green:** `cargo +nightly-2026-10-26 check -Zbuild-std=std,panic_abort --target {x86_64-apple-darwin, x86_64-pc-windows-msvc} -p dot-logger --features calibrate,tracing-adapter --all-targets`(`RUSTFLAGS=-D warnings`) — 수정 전 E0308 8건(리뷰 수와 같음), 수정 후 두 타깃 모두 경고 0. 첫 수정 후 비 Linux 전용 `unused import: Stop`도 이 검사로 찾아 정리했다. **한계:** 타입 검사만 했고 실행은 하지 않았다. CLI 크레이트와 `remote`·`influxdb`·`compression-zstd`는 C 의존성(ring·zstd-sys)이 이 PC의 교차 컴파일러로 빌드되지 않아 교차 검사를 하지 못했다 — native CI(T3, GAP-004)에서 확인한다.
+- **RV-133(P3) 변경:** `Sizing::absorb` 문서의 feature 조건 링크를 코드 표기로 바꿨다. CI `contracts` job에 core-only rustdoc 단계를 추가했다. `RUSTDOCFLAGS='-D warnings' cargo doc -p dot-logger --no-default-features --no-deps`: 수정 전 exit 101(`unresolved link to Self::profile`) → exit 0. all-features rustdoc도 exit 0.
+- **회귀:** fmt Pass, clippy 1.96.0 workspace `--all-targets --all-features` `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 **560 passed**(559 + 신규 1)·5 ignored(기존 외부 DB). Miri(`-Zmiri-strict-provenance -Zmiri-many-seeds=0..8`): `--lib completion::` 10개 × 8 seeds Pass, reconcile을 부르는 `tc_003_completion`·`tc_003_routing`·`tc_003_control`(15·19·22개) × 8 seeds Pass(32초). 비 Linux 신규 시험 2개는 Linux에서 제외되어 실행 횟수에 들지 않는다.
+- **미실행:** 성능 측정(정리 경로 비용 변화는 겹치지 않을 때 CAS 1회·store 1회), native, `check-feature-matrix.py`(feature 경계 변경 없음).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

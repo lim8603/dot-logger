@@ -7,6 +7,10 @@
 //! rings are preallocated. Event buffers belong to the caller. A full event buffer
 //! leaves work in place instead of losing an outcome. Router Drop is general
 //! cleanup, not a successful drain, completion acknowledgment, or shutdown.
+//!
+//! `Router` dispatches into bounded output queues and a writer reports the actual
+//! outcome with `Delivery::report`. `Router::writer_budget(target)` shares the
+//! output budget left after the real queue reservation.
 
 use crate::capture::{CaptureConsumer, CapturedRecord, ReadError};
 use crate::completion::{

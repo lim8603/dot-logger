@@ -6,6 +6,49 @@
 //! Restarting a writer does not discover existing DB points. No raw payload,
 //! file IO, spool, worker or exactly-once guarantee is provided here. Numeric
 //! queries use fixed scope, finite response/row/time limits and no retries.
+//!
+//! # Writes
+//!
+//! `Writer::new(&QueryBudget, Config)` validates the fixed measurement, device,
+//! channel, typed schema, original session and finite batch/event/retry/TTL limits
+//! and reserves shared external memory. The host calls `write(&[Point], &AtomicBool)`
+//! on its own Tokio runtime. Numbers become `integer`/`float`/`boolean` fields and
+//! small events an `event` field; `session`/`producer`/`sequence` are fields, not
+//! tags. A failed whole preflight keeps the high-water mark; an attempted batch
+//! consumes its timestamps even when Unknown. HTTP 204 is `Acknowledged`; a 400/422
+//! partial failure, a broken response or timeout and cancellation in flight are
+//! `Unknown`; cancellation before the attempt is `NotSent`. Retries resend the same
+//! encoded body. Only HTTPS or a literal loopback HTTP endpoint is accepted, with
+//! redirects, proxies and implicit retries off; the token is a sensitive header and
+//! server error bodies are not reported. The shared reservation lasts until HTTP
+//! drops the last body, and a body still held makes the next batch `Busy`.
+//! HTTP/TLS/runtime internals and RSS are separate headroom.
+//!
+//! # Numeric queries
+//!
+//! `Writer::query_numeric(NumericQuery, &AtomicBool)` reads `[from_ns, to_ns)` of a
+//! fixed numeric channel with at most 1024 rows, a 1 MiB response, request timeout,
+//! TTL and cancellation, keeping session, measurement, device, channel, receipt,
+//! Unix ns and the typed value in `NumericPage`. Row/byte limits, damage, late
+//! errors, partial responses and deadline expiry fail the whole query. The query
+//! reservation lasts until the page and HTTP body are dropped. This bounds neither
+//! the DB engine's CPU/RAM nor any remote rollback.
+//!
+//! # Routed deliveries
+//!
+//! `RoutedWriter::new(writer, completion, db_target, schemas)` fixes the session,
+//! initial revision, DB completion contract and each channel's schema and
+//! `I64Le`/`F64Le`/`BoolByte`/`Utf8Event` decoding. `write_delivery(delivery,
+//! cancel)` is a synchronous one-record step for the host's general worker: it
+//! keeps the original metadata, bytes and `Delivery` until local IO on its own
+//! current-thread runtime ends, and returns the untried guard when called inside an
+//! async runtime. `DeliveryAttempt::result()` gives the write result and
+//! `publish()` reports `DatabaseAcknowledged`, failure, drop or Unknown for the
+//! original receipt; on `Busy`, keep the attempt and call `publish` again - the
+//! HTTP request is never resubmitted. `into_delivery()` recovers only an untried
+//! guard; dropping an unpublished attempt is Unknown. File output runs in a
+//! separate host worker. A real DB check: `python3 scripts/check-influxdb.py`
+//! (needs Docker; `cargo test` ignores the four live tests).
 mod numeric;
 mod routed;
 use crate::{

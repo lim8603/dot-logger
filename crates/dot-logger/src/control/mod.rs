@@ -5,6 +5,13 @@
 //! performs its adapter-specific barrier, then acknowledges the actual result.
 //! Guard lifetimes keep control state alive across IO. Deadline expiry never
 //! invalidates an in-flight guard or substitutes a successful File Drop.
+//!
+//! A `SyncWork` from an explicit `ControlOwner` request is held until the real
+//! synchronization ends. Past the shutdown deadline, in-flight IO and loans stay
+//! valid and the same owner continues cleanup. A shutdown sync that expired
+//! before it started settles unconfirmed boundaries as Unknown only after the
+//! actual access and preceding syncs end. A `Closed` report still needs
+//! `is_success()` and its failure and timeout fields checked.
 use crate::capture::CaptureControl;
 use crate::completion::{
     Boundary, Completion, CompletionError, CompletionScope, FailureReason, ProducerRange,

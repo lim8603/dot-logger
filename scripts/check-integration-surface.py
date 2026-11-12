@@ -9,6 +9,7 @@
 2. Recipes in `examples/recipes/`: rustfmt-clean, no support module, `unsafe`,
    user lifetime parameter, `thread::scope` or memory split, and within the
    approved line and concept limits. Each recipe is run.
+3. The README quickstart block equals the L1 recipe.
 
 Rustdoc JSON comes from the pinned Miri nightly (format 61); no other tool.
 """
@@ -461,6 +462,23 @@ def check_recipes(surface, run):
     return ok
 
 
+def check_readme():
+    """The README quickstart is the L1 recipe verbatim."""
+    text = (ROOT / "README.md").read_text()
+    blocks = re.findall(r"<!-- recipe:([\w.]+) -->\n```rust\n(.*?)```\n<!-- /recipe -->",
+                        text, re.S)
+    if not blocks:
+        print("FAIL: README.md has no recipe block")
+        return False
+    ok = True
+    for name, body in blocks:
+        if body != (RECIPES / name).read_text():
+            print(f"FAIL: README.md block differs from examples/recipes/{name}")
+            ok = False
+    print(f"README recipe blocks: {len(blocks)}")
+    return ok
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -471,6 +489,7 @@ def main():
     surface = Surface(rustdoc_json())
     ok = check_surface(surface, args.bless, args.snapshot.resolve())
     ok = check_recipes(surface, not args.no_run) and ok
+    ok = check_readme() and ok
     print("NFR-008 integration guard:", "Pass" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

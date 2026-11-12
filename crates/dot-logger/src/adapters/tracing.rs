@@ -12,6 +12,14 @@
 //! formatting RT safe or impose a CPU/time budget on those callbacks. A host
 //! should avoid logging recursively from its sink and keep worker scratch within
 //! its own memory budget. Do not attach this hook to RT producers.
+//!
+//! `EncodedLog::capture` submits once to an existing `Producer`, converting only
+//! the level; the host's time, channel, schema and importance are kept. Filter or
+//! sampling `Skipped` and `Capacity`/`Closing` are returned as they are, a receipt
+//! means admission only, and Error is not promoted to Important. A short buffer is
+//! `EncodeError::TooLarge` and a failing user formatter `Formatting`; a truncated
+//! event is never submitted. With the facade, `LoggerBuilder::tracing` does this
+//! wiring (see `examples/recipes/l3_tracing.rs`).
 
 use crate::capture::{CaptureError, Level, Producer, RecordMetadata, RecordOutcome};
 use ::tracing::field::{Field, Visit};

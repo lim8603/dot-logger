@@ -4,6 +4,10 @@
 //! the last handle's Drop cannot free queue memory. No worker is started here.
 //! A receipt acknowledges admission. Tracked construction reserves completion
 //! metadata before admission; neither form acknowledges dispatch/write/durability.
+//!
+//! `CaptureOwner::new_tracked` preallocates the raw pool and completion windows;
+//! inside `scope` it hands out producer, consumer and management handles that
+//! borrow it.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;

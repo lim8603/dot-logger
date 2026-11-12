@@ -1,4 +1,66 @@
 //! Management-path file storage. Payload encoding and file IO never run on RT handles.
+//!
+//! # Single segment
+//!
+//! `SegmentWriter` keeps one active writer per target and checks the stated
+//! maximum payload, record, chunk and metadata limits. The default writer is
+//! uncompressed with chunk CRC and indexes and publishes the safe offset of a
+//! complete chunk only after `flush_chunk` succeeds. `write_batch(&[&Delivery])`
+//! accumulates up to the chunk target and reports Written together after the last
+//! flush; a batch error keeps the append/flush/report progress, and after `Busy`
+//! only the same guard's `report` is retried. `write_delivery` is the single-record
+//! path for an immediate Written. A `WriterConfig::write_buffer_bytes` buffer is
+//! charged to the shared output budget (0 writes directly). `finish` writes the
+//! summary and footer; `FinishedSegment::sync_work` confirms a control request
+//! after the real file sync. A sync validation error before IO returns the
+//! original work in `SyncWorkError::work`, so it can be retried on the right file.
+//! A new file's sync never confirms records of another, already finished segment.
+//! Apart from the `compression-zstd` dependency option, the product writer is
+//! uncompressed.
+//!
+//! # Rotation and retention
+//!
+//! `SegmentLog` rotates on bytes, monotonic time, message count and index
+//! bytes/chunk limits. `RetentionConfig` states continuous, ring or event mode and
+//! the file/disk/protection/query-pin budgets. Rotation publishes the closed
+//! catalog only after footer → file sync → final name → directory sync.
+//! Overlapping events do not charge protected bytes twice and report the real
+//! pre/post record ranges and any missing history. Query pins bound their deadline
+//! and read bytes and must be released explicitly after reading before deletion can
+//! proceed. A partial `write_batch` failure keeps the appended / written / reported
+//! prefixes and the original error in `RetentionBatchError`. Deliveries of one
+//! target arrive in producer FIFO order and an admitted prefix is never rewritten.
+//! File/index byte limits use conservative bounds of the pinned MCAP and may rotate
+//! earlier than the exact size requires.
+//!
+//! `SegmentStore` requires a fresh free-space observation from the host and
+//! directory sync. The standard `FileStore` creates fresh session/target
+//! directories and implements Unix directory sync; elsewhere the primitive is an
+//! explicit `Unsupported`, never an automatic success. Real free-space discovery,
+//! space contention with other processes, restart recovery, active readers and
+//! device durability are host or later verification scope.
+//!
+//! # Recovering an interrupted segment
+//!
+//! `recover_segment` reads an unchanged original through `Read + Seek` into an
+//! independent empty sink. The caller supplies the original session, revision and
+//! channel registrations, `RecoveryOptions` (input size, record/chunk limits,
+//! output `WriterConfig`) and a cancel flag. It targets the product's uncompressed
+//! `dot-logger/1` format with nonzero chunk CRC and copies a complete chunk only
+//! after its length, CRC, references, envelopes and producer sequences all check.
+//! It does not resynchronize after damage: `RecoveryReport` names the verified
+//! prefix, the excluded suffix and the cause. Original and opaque payloads are
+//! kept under a new standard summary and auxiliary indexes, and the new file is
+//! synced. Written/Synced answers of the earlier process are neither restored nor
+//! guessed.
+//!
+//! `recover_to_store` drives new file → recovery and file sync → close → final
+//! name → directory sync, using `SegmentStore`'s exclusive namespace and
+//! no-overwrite contract (`FileStore`'s directory sync is Unix-only). A failed
+//! active or renamed file is left for investigation: no automatic deletion, retry
+//! or catalog registration. The host opens the original read-only, keeps it
+//! unchanged during recovery and links per-target IO errors to the existing
+//! completion failure reports.
 mod catalog;
 mod codec;
 mod index;

@@ -1,4 +1,12 @@
 //! General-path evidence and checked capacity arithmetic. No device is measured here.
+//!
+//! `Profile` points at evidence the host obtained. A load ratio is computed only
+//! when device, OS, features, load, codec, fanout, revision, output, completion
+//! boundary and the session's valid interval all match. The denominator is
+//! completion capacity comparable with global ingress, not the sum of fanout
+//! assignments. `Value` separates observed, verified, assumption-based, unmeasured
+//! and expired. Dropping work so a queue stabilizes still reports `Overloaded`;
+//! intentional filtering is separate.
 use crate::completion::Boundary;
 
 /// Conditions identifying an externally measured completion-capacity profile.

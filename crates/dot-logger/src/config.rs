@@ -1,4 +1,29 @@
 //! Explicit memory reservations and startup validation.
+//!
+//! The facade ([`crate::logger`]) derives all of this from a `Budget` or preset;
+//! this module is the advanced path.
+//!
+//! `SessionBuilder::validate` checks the memory total and its partitions,
+//! per-producer small/raw pools, Important reservations, worker stacks, CPU lists
+//! and required platform capabilities. It creates no execution resource, file or
+//! thread. `ValidatedConfig` keeps the checked configuration and platform state
+//! read-only; an actual start must re-check applied capabilities and final
+//! allocations.
+//!
+//! The application states every memory number: no default budget or device
+//! performance is assumed. A pool's payload is `slots × slot_bytes`; Important
+//! reservations protect slots and bytes together. Input, raw metadata, output
+//! references/copies and completion/control metadata are checked against their
+//! partitions when created. The completion window must cover the larger of a
+//! producer's small/raw Important reservations, and Normal admission leaves as
+//! many reusable slots as the next Important reservation needs. File encoders,
+//! indexes and upstream summary copies are reserved conservatively by count and
+//! matched against allocation measurements. Custom sink buffers are adapter
+//! budget; real workers and allocator internals belong to separate headroom.
+//! None of this bounds whole-process memory, the OS page cache or device latency.
+//!
+//! Platform state comes from an adapter and defaults to `Unavailable`.
+//! `Supported` is a probe result, not applied success or real-time performance.
 
 use std::fmt;
 

@@ -2,6 +2,14 @@
 //! for exactly the window and conditions below; no clock, IO or worker runs here.
 //! Missing/stale resource measurements must stay explicit. Ingress bytes are not
 //! substituted for physical buffer/disk bytes (fanout/compression/raw pins differ).
+//!
+//! Buffer bytes/slots limits, the absorb time assuming output and reclaim stop,
+//! the time to exhaust the filesystem reserve or output quota, the ring retention
+//! estimate and the real retained timestamp span are separate results; physical
+//! file writes/deletes and free-space changes are different observations.
+//! `NoGrowth` means no positive growth was observed, `AtLimit` that no room is
+//! left, and a finite time beyond u64 ns is `BeyondRange`. Passing synthetic checks
+//! is not the PC/RT ≤ 20 % prediction error nor the ≤ 5 % instrumentation cost.
 use super::capacity::{
     self, Assumption, Conditions, Forecast, Profile, Rate, Ratio, Reason, Value,
 };

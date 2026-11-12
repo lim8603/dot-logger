@@ -2,6 +2,20 @@
 //! Protected records are accepted before the alarm into existing input/raw quotas.
 //! This first policy admits zero extra final snapshots after notification. No
 //! side channel bypasses capture receipts, writer bounds, or actual IO lifetimes.
+//!
+//! Disabled by default. `ControlOwner::enable_emergency` declares, before start,
+//! the file ranks, protected bytes and safety margin. A `PowerAlarm` closes new
+//! input and the normal shutdown coordinator syncs files in rank/target-ID order;
+//! duplicate alarms never extend the deadline and in-flight IO stays owned until
+//! it actually ends. `PowerAlarm::new(id, generated_at, hold_up)` can express
+//! minutes; the accepted profile keeps 3 s from signal generation to cut-off with
+//! a 200 ms safety margin, not 3 s from reception. `observe_protected_bytes` must
+//! state each file's frozen payload; unobserved, over-limit or already failed or
+//! expired records are never reported as success. File framing and pending OS IO
+//! belong to separate budgets. `emergency_files` gives per-file barrier results and
+//! `poll_emergency` the overall protection, deadline and cleanup state. The host
+//! connects a real UPS driver or OS alarm on the general path; nothing is installed
+//! automatically. See `examples/ups_simulation.rs` (`--plan`, `--run DIR`).
 use super::*;
 use crate::platform::power::{PowerAlarm, PowerNotice};
 use std::time::Duration;

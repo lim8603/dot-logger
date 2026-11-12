@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
 | 활성 Task | MS-009 착수 대기 — 다음 TASK-030(MCAP 표준 호환). 직전 TASK-029 로컬 완료·Human 승인(EV-073~075, 2026-11-12) |
-| 미처리 리뷰 | 없음 — REV-053 Closed(2026-11-12) |
-| 상태 | Green — REV-053 조치 로컬 Pass(EV-072, 1.96.0/1.85.0 각 560 Pass·Miri 8 seeds), Human 승인(2026-11-12). TASK-028 S1·S2 Human 승인(EV-071)·TASK-023 RT 행 Pass(EV-070) 유지. 다음 TASK-029. 장기·운영/실앱·native 후속 |
+| 미처리 리뷰 | REV-054 Open — TASK-029 회귀 가드 P2 2건(RV-134~135), 2026-11-12 |
+| 상태 | Conditional — REV-054 회귀 가드 누락 2건 Open. 1.96.0/1.85.0 각 561 Pass·완료 추적 Miri 8 seeds. TASK-029 기존 승인·장기/실앱/native 후속 유지 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-12 / #001 세션 종료 / AI |
-| 세션 상태 | 2026-11-12 #001 종료 — Human 「세션 마무리하고 다음 세션에서 시작하자」. REV-053 Closed, TASK-029 로컬 완료·승인. 다음: TASK-030 착수 결정 4건 |
+| 갱신 | 2026-11-12 / REV-054 리뷰 세션 종료 / AI |
+| 세션 상태 | REV-054 리뷰 완료·Open — 제품 코드 미수정. 다음: RV-134~135 개발 조치, TASK-030 착수 결정 4건 유지 |
 | 최근 세션 | [2026-11-12 #001](../members/lim8603/workspace/session_logs/session_2026-11-12_001.md) — REV-053 조치·TASK-029 완료 |
 
 ## 현재 결정과 제약
@@ -86,12 +86,13 @@
 | [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | Closed | Conditional Pass 8건(P1 1·P2 5·P3 2) 전부 수용·조치 [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`, 2026-11-07 Human 「승인」 |
 | [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) | REV-051 조치·TASK-023 S2a/S2b 누적 독립 코드리뷰(`49df7d3..93db6e3`) | Closed | Conditional, P1 2·P2 1(RV-128~130) 전부 수용·조치 [EV-056](../05_verification/verification_evidence.md#ev-056) `97e2b12`·`f8f2859`, 정정 `b2899a3`(EV-057). 2026-11-08 Human 「승인」 |
 | [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) | REV-052 조치·TASK-023 S2/S3·T5·RT harness·TASK-028 S2 누적 리뷰(`93db6e3..8dbd999`) | Closed | Conditional, P1 1·P2 1·P3 1(RV-131~133) 전부 수용·조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04` — 훑기 단일 소유 claim, 비 Linux 대체 경로·시험 분리, core-only rustdoc CI. 2026-11-12 Human 「승인」 |
+| [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) | REV-053 조치·TASK-029 S1~S4 누적 리뷰(`8dbd999..2fe4e49`) | Open | Conditional, P2 2건(RV-134~135): API 계약 snapshot 누락·모듈 import 개념 계수 누락. 후속 개발 조치 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
 
 ## 다음 시작점
 
-0. **리뷰 후속:** [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) RV-131~133 조치 완료([EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04`). 2026-11-12 Human 「승인」으로 Closed. CLI 크레이트의 비 Linux 빌드는 C 의존성 때문에 교차 검사하지 못해 native(T3)에서 확인한다. TASK-028 S2의 기존 Human 수락과 native T3 이월은 유지한다.
+0. **리뷰 후속:** [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) Open — RV-134(API 계약 snapshot)·RV-135(레시피 import 개념 계수) 실패 재현·개발 조치. REV-053 Closed·TASK-029 기존 승인은 유지한다. 비 Linux CLI 및 기존 native 검증은 T3다.
 1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. TASK-029 로컬 완료·Human 승인(EV-073~075). **다음 MS-009 TASK-030**(MCAP 표준 호환) — 착수 시 Task 문서의 Human 확인 4건(MCAP sequence u32↔u64 매핑·`log_time` mono/real·level/importance/producer 보존·ROS 2 encoding T1 유지)부터. S2 native 표준 모드는 ADR 채번·승인 후 → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
@@ -139,8 +140,8 @@
 
 ## 최근 작업·이력
 
+- 2026-11-12 리뷰 전용: [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) Open — P2 2건·Conditional, 1.96.0/MSRV 각 561 Pass·완료 추적 Miri 8 seeds, 제품 코드 미수정.
 - 2026-11-12 #001: REV-053 조치·Closed([EV-072](../05_verification/verification_evidence.md#ev-072)), TASK-029 S1~S4 로컬 완료·승인(표면 가드·레시피 L1~L3·README/rustdoc·`dot_probe_facade`, [EV-073](../05_verification/verification_evidence.md#ev-073)~[EV-075](../05_verification/verification_evidence.md#ev-075)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-12_001.md).
 - 2026-11-11 리뷰 전용: [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Open — RV-131~133, Conditional(P1 1·P2 1·P3 1). 1.96.0/MSRV 전체 회귀 각각 559 passed·5 ignored, 동시 정리 실패 재현·비 Linux 타입 오류·core-only rustdoc 실패 확인. 제품 코드 미수정.
-- 2026-11-11 #002: RT 행 실행·generic 복귀([EV-070](../05_verification/verification_evidence.md#ev-070)), 빌드 산출물 정리(약 265 GB), TASK-028 S2 구현·Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).
 
 이전 이력과 상세 원문은 [상태 아카이브](state_archive.md) #027·#026·#025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.

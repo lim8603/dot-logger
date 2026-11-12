@@ -1108,3 +1108,16 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 - **snapshot 내용:** 기존(항목·variant·공개 필드·공개 메서드 시그니처·trait 구현 이름)에 더해 trait 상위 제약·where, 연관 상수 타입·연관 타입 제약/기본값·trait 메서드 기본 구현 여부, trait impl의 대상 타입·제네릭 제약·where(`impl<T: ?Sized> Copy for Channel<T>`), 제네릭 고유 impl 머리줄, 비공개 필드·숨은 variant 표시, `#[non_exhaustive]`, type alias·const·static 대상 타입. 렌더러가 모르는 항목 종류는 실패한다.
 - **개념 계수:** `use` binding(모듈·별칭·중첩·`self`·crate 별칭)을 풀어 본문 모듈 상대 경로까지 해석하고, 같은 항목은 한 번만 센다. glob import와 풀리지 않는 `dot_logger` 경로는 실패다(§20.3의 「풀리지 않는 경로는 실패」를 실제 종료 코드로 보장).
 - **가드 자가 시험:** `scripts/test_check_integration_surface.py`(CI `integration-surface` job).
+
+## 21. TASK-030 MCAP 표준 호환 — 2026-11-12
+
+### 21.1 Human 결정 — 2026-11-12
+
+착수 확인 4건 모두 권고안. S1(export)과 S2(native 표준 모드) 공통 매핑이며, S2 저장 모드 자체는 ADR 채번·승인 후 착수한다.
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | MCAP `sequence`(u32, 채널 단위) ↔ Envelope `sequence`(u64, producer 단위) | MCAP `sequence` = Envelope sequence 하위 32비트(wrap, 표준 도구의 간격 확인용). 원래 u64는 보조 메타 채널에 보존 |
+| 2 | `log_time`·`publish_time` 시계 | 둘 다 real(ns, 현재 writer와 같음). mono는 보조 메타 채널에 보존하고 단조 순서는 mono와 파일 내 기록 순서로 판단. real 시각 점프 시 표준 도구 정렬이 흔들릴 수 있음을 손실/한계로 명시 |
+| 3 | 메시지별 level·importance·producer(+revision·source) | 보조 메타 채널 1개. 같은 `log_time`으로 protobuf `RecordMeta`(channel·producer·u64 sequence·mono·revision·level·importance·source 등)를 기록. 사용자 채널은 사용자 schema·encoding 그대로 |
+| 4 | ROS 2 encoding(cdr/ros2msg) | 이번 범위 밖, 기존 T1 이월 유지 |

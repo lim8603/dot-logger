@@ -8,8 +8,8 @@
 | 설계 | [데이터](../../03_design_artifacts/data_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) |
 | ADR | ADR-009·010 Accepted. 표준 저장 모드 ADR 후보(S2 전 채번) |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-11-04 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-12 |
 | 다음 액션 | S1 — Envelope 해제 표준 MCAP export와 독립 reader·Foxglove 계열 판독 |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
@@ -35,12 +35,9 @@
 - [ ] 최소 구현 후 관련 `TC-014`의 표준 판독 하위 시나리오를 통과시킨다.
 - [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
-## Human 확인 필요 사항
+## Human 결정 — 2026-11-12
 
-- MCAP `sequence`는 u32, Envelope sequence는 u64 — 매핑/보조 채널 방식.
-- `log_time`에 mono와 real 중 무엇을 둘지(표준 도구 타임라인 vs 순서 보장).
-- 메시지 단위 level·importance·producer 보존 방식(보조 채널·채널 분리·metadata).
-- ROS 2 encoding(cdr/ros2msg) 지원은 T1 검토 범위로 둔다.
+착수 확인 4건 모두 권고안([API §21.1](../../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12)): ① MCAP `sequence` = 하위 32비트, u64는 보조 메타 채널 ② `log_time`·`publish_time` = real, mono는 보조 ③ level·importance·producer·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`) ④ ROS 2 encoding은 T1 유지.
 
 ## 완료 기준
 

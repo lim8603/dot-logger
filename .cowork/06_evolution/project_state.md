@@ -10,17 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | MS-009 착수 대기 — 다음 TASK-030(MCAP 표준 호환). 직전 TASK-029 로컬 완료·Human 승인(EV-073~075, 2026-11-12) |
+| 활성 Task | TASK-030 In Progress — 착수 결정 4건 확정(API §21.1), S1 표준 export 진행. 직전 TASK-029 로컬 완료·승인 |
 | 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
 | 상태 | Green(로컬) — REV-054 Closed. 가드 자가 시험 18 Pass·가드 Pass, 1.96.0/1.85.0 각 561 Pass(Rust 무변경). TASK-029 기존 승인·장기/실앱/native 후속 유지 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-12 / REV-054 반입·조치 / AI |
-| 세션 상태 | REV-054 Closed. 다음: TASK-030 착수 결정 4건 |
+| 세션 상태 | REV-054 Closed, TASK-030 결정 4건 확정. 다음: S1 표준 export |
 | 최근 세션 | [2026-11-12 #002](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md) — REV-054 반입·조치 |
 
 ## 현재 결정과 제약
 
+- **2026-11-12 Human 결정 — TASK-030 착수 4건(권고안):** MCAP `sequence` = Envelope 하위 32비트, `log_time`·`publish_time` = real, mono·u64 sequence·producer·level·importance·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`), ROS 2 encoding T1 유지. [API §21.1](../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12).
 - **2026-11-12 Human 결정 — TASK-029 S4 범위:** `dot_probe_pipeline`(InfluxDB·설정 비교)은 facade로 옮기지 않고 고급 경로 예제로 유지, facade 전용 `dot_probe_facade` 예제 추가. DB·설정 변경의 facade 편입은 TASK-026에서 판단([EV-075](../05_verification/verification_evidence.md#ev-075)).
 - **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
 - **2026-11-11 Human 결정 — TASK-028 S2(착수 3건 권고안·「승인」):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5, 수락 ≤ 1.2 × S3 S), JSON 프로필(feature `calibrate`), 흡수·메모리·부하 경고. 측정 도중 취소 시험 미실시. [API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).

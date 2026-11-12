@@ -80,3 +80,9 @@ required-features = ["tracing-adapter"]
 name = "recipe_l3_remote"
 path = "../../examples/recipes/l3_remote.rs"
 required-features = ["remote"]
+
+# TASK-029 S4: the dot-probe style integration on the facade only.
+[[example]]
+name = "dot_probe_facade"
+path = "../../examples/dot_probe_facade.rs"
+required-features = ["remote", "tracing-adapter"]

@@ -109,7 +109,8 @@ cargo doc --open -p dot-logger --all-features
 | 예제 | 내용 |
 |---|---|
 | [`dot-logger-cli`](crates/dot-logger-cli) | `dot-logger` CLI(`status`·`query`·`replay`·`tail`·`recover`·`calibrate` 등) |
-| [`dot_probe_*`](crates/dot-logger-client/examples) | 고급 경로 통합 예제, [client README](crates/dot-logger-client/README.md) |
+| [`dot_probe_facade`](examples/dot_probe_facade.rs) | dot-probe 형태 통합(로그·1 kHz 관절·30 Hz 프레임 → 파일 + gRPC)을 facade만으로, support 없음 |
+| [`dot_probe_*`](crates/dot-logger-client/examples) | 고급 경로 통합 예제(InfluxDB 경로·설정 변경 비교 포함), [client README](crates/dot-logger-client/README.md) |
 | [`general_logs`](examples/general_logs.rs) | 고급 경로의 tracing/log 입력 |
 | [`ups_simulation`](crates/dot-logger/examples/ups_simulation.rs) | UPS 알람·차단 기한 시뮬레이션(`--plan`, `--run DIR`) |
 | [`tests/api-consumer`](tests/api-consumer/src/main.rs) | 독립 crate에서의 공개 API 사용 |

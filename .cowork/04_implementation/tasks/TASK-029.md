@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-12 |
-| 다음 액션 | S1·S2 Human 리뷰 → S3 quickstart·README·rustdoc → S4 예제 이전 |
+| 다음 액션 | S3 Human 리뷰 → S4 `dot_probe_*` 예제 facade 이전·support 줄 수 기록 |
 | 의존 | TASK-027·TASK-028 |
 | 예상 소요 | 1~2 인일, 리뷰 대기 제외 |
 
@@ -33,12 +33,12 @@
 |---|---|---|
 | S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | 진행 |
 | S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | 로컬 Pass [EV-073](../../05_verification/verification_evidence.md#ev-073) |
-| S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | 대기 |
+| S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | 로컬 Pass [EV-074](../../05_verification/verification_evidence.md#ev-074) |
 | S4 | `dot_probe_*` 예제 facade 이전·support 줄 수 감소 기록 | 대기 |
 
 ## 변경 대상과 첫 검증
 
-경로: `examples/recipes/`·`scripts/check-integration-surface.py`·`tests/api-surface/logger.txt`(S1·S2 생성), `README.md`·`crates/dot-logger-client/examples`(S3·S4 예정).
+경로: `examples/recipes/`·`scripts/check-integration-surface.py`·`tests/api-surface/logger.txt`(S1·S2), `README.md`·모듈 rustdoc(S3), `crates/dot-logger-client/examples`(S4 예정).
 
 첫 실패/리뷰 조건: **레시피 예제가 support 모듈 없이 빌드·실행되고, 연동 코드 줄 수·도입 개념 수가 NFR-008 승인 수치를 넘으면 검사 실패**.
 

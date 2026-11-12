@@ -1186,12 +1186,20 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ## EV-073 — TASK-029 S1·S2: 접점 표면 가드·레시피 L1~L3
 
-- **판정:** 로컬 **Pass**. 커밋 `79d376e`. Human 리뷰 대기. S3(quickstart·README·rustdoc)·S4(예제 이전) 미착수.
+- **판정:** 로컬 **Pass**. 커밋 `79d376e`. 2026-11-12 Human 「승인」.
 - **Human 결정(2026-11-12):** 계수 단위 「이름 있는 항목」, 감지 도구 「rustdoc JSON + 스크립트」([API §20.1](../03_design_artifacts/interface_contract.md#201-human-결정--2026-11-12)), L1 개념 초과 해소 「`Shutdown::is_success()` 추가」([§20.3](../03_design_artifacts/interface_contract.md#203-s1s2-구현-반영--2026-11-12)).
 - **Red:** ① 가드 첫 실행 — snapshot·레시피 없음으로 실패. ② 첫 L1 — 29줄·7개념(`> 20`·`> 6`) 실패. 줄은 rustfmt가 펼친 체인·struct literal·끝 주석 때문이었고, 표현을 줄여 20줄로 맞췄다. 개념 7은 API 추가로 해소. ③ L3 tracing +7(인자 폭 61 > 60으로 펼쳐짐) → `use tracing::Level`로 +3. ④ `Shutdown::is_success` 단언 추가 시 E0599 2건 → 구현 후 `tc_013_facade` 16 Pass. ⑤ 표면 가드가 `is_success` 추가를 차이로 탐지(이후 bless). 첫 diff 출력은 같은 줄이 다른 타입에 있으면 숨기는 버그가 있어 `difflib` unified diff로 고치고, 오래된 snapshot 사본으로 두 추가 줄이 보이는 것을 확인.
 - **결과(현재):** facade 이름 있는 항목 30/60, snapshot 301줄. L1 20줄·6개념, L2 40줄·7개념(`capture::Importance` 포함), L3 tracing +3줄·7, L3 remote +5줄·7. 금지 항목 0. 네 레시피 모두 exit 0(L2 「1030 records synchronized」 = pose 1000 + 프레임 30, remote는 loopback 임의 port). 레시피 1회 실행 쓰기 합계 약 8 MB(tmpfs `TMPDIR`).
 - **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0(레시피 포함), workspace 테스트 1.96.0·1.85.0 각 560 passed·5 ignored, rustdoc core-only·all-features `-D warnings` 0. CI에 `integration-surface` job 추가(native 실행은 T3).
 - **한계:** 줄 계수는 줄 단위 휴리스틱(최상위 `struct`/`enum`/`#[derive]`·`impl ... Record for` 블록 제외)이다. snapshot의 타입 표기는 rustdoc JSON을 그대로 옮긴 것이라 `crate::` 경로·`&Self` 표기가 섞인다. nightly rustdoc JSON에서만 나는 `redundant_explicit_links` 경고 1건(위치 미표시, `logger/mod.rs` 모듈 문서로 추정)은 stable rustdoc `-D warnings`에서 나지 않아 남겨 두었다. 레시피는 이 PC(Linux)에서만 실행했다.
+
+## EV-074 — TASK-029 S3: quickstart·README 축소·계약 상세 rustdoc 이동
+
+- **판정:** 로컬 **Pass**. 커밋 `0622982`. Human 리뷰 대기. S4(예제 이전) 미착수.
+- **변경:** README 250 → 136줄(한국어). 빠른 시작(L1 레시피 전문)·레시피 표(한도·현재 값)·두 계층 안내·feature·다른 예제·개발 명령·검증 범위만 남겼다. 모듈별 계약 문단(설정·수집·분배·sync/종료·storage 단일 파일/회전·보존/복구·운영 계측/리포트/capacity·InfluxDB write/query/routed·tracing 입력·UPS 긴급 저장)은 해당 모듈 rustdoc에 영문으로 옮겼다(코드 주석 영문 규칙, 11개 파일 +224줄). crate 문서에 두 계층·quickstart·레시피 표·feature 표를 추가했다. quickstart는 `include_str!`로 L1 레시피 파일을 `no_run` doctest로 넣어 항상 컴파일된다. 가드는 README 블록(`<!-- recipe:l1_file.rs -->`)이 레시피 파일과 같은지 확인한다.
+- **확인:** README 블록을 한 글자 바꾸면 가드 FAIL(「README.md block differs」), 되돌리면 Pass. README 상대 링크 12개 대상 존재. 옛 README 앵커를 참조하는 문서 없음. CLI 명령 이름은 `args.rs` 실제 목록과 대조(「점검」 표기를 실제 명령 이름으로 정정).
+- **회귀:** fmt Pass, clippy 1.96.0 `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 561 passed(560 + quickstart doctest)·5 ignored, rustdoc core-only·all-features `-D warnings` 0(기존 `output filename collision` 경고만), 가드 Pass.
+- **한계:** 옮긴 문서는 기존 한국어 README 서술을 번역·정리한 것이며 계약 의미를 새로 정하지 않았다. 계약 원문 기준은 계속 `interface_contract.md`다.
 
 ## Open Evidence Gaps
 

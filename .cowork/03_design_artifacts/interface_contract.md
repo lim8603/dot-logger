@@ -1100,3 +1100,11 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 - **가드:** `scripts/check-integration-surface.py`. 표면 snapshot `tests/api-surface/logger.txt`(항목·variant·공개 필드·공개 메서드 시그니처·trait 구현 이름). 차이는 unified diff로 보여 주고 실패한다. 의도한 변경은 `--bless`로 같은 커밋에 갱신해 리뷰한다. CI `integration-surface` job(1.96.0 + nightly-2026-10-26).
 - **계수 구현(§18.6 규칙):** rustfmt 결과에서 `use`·주석·빈 줄·사용자 메시지 타입(`struct`/`enum`/`#[derive]`)과 그 `Record` 구현 블록을 빼고 센다. 개념은 `use dot_logger::...`와 본문의 `dot_logger::` 경로를 crate 공개 트리(재수출 포함)에서 찾아 모듈이 아닌 것만 센다. 풀리지 않는 경로는 실패다.
 - **레시피:** `examples/recipes/`(`dot-logger` 예제 `recipe_l1_file`·`recipe_l2_rt_writers`·`recipe_l3_tracing`·`recipe_l3_remote`). 출력 디렉터리는 `std::env::temp_dir()`(이미 있는 디렉터리)이고, 가드는 레시피마다 새 `TMPDIR`을 주고 실행 뒤 지운다. L2는 `Preset::sensor(30, 256 KiB).small(1000, 256)`으로 선언 부하를 실제 주기(1 kHz pose·30 Hz 프레임)에 맞춘다 — 선언보다 빠른 루프는 RT 수락에서 거절된다(초안에서 1000건 중 68건만 수락됨을 확인).
+
+### 20.4 REV-054 조치 — 가드 감지 범위 — 2026-11-12
+
+[EV-076](../05_verification/verification_evidence.md#ev-076). 승인된 §20.1 결정(도구·계수 단위)은 그대로이고, 가드가 그 결정을 지키도록 감지 범위를 넓혔다.
+
+- **snapshot 내용:** 기존(항목·variant·공개 필드·공개 메서드 시그니처·trait 구현 이름)에 더해 trait 상위 제약·where, 연관 상수 타입·연관 타입 제약/기본값·trait 메서드 기본 구현 여부, trait impl의 대상 타입·제네릭 제약·where(`impl<T: ?Sized> Copy for Channel<T>`), 제네릭 고유 impl 머리줄, 비공개 필드·숨은 variant 표시, `#[non_exhaustive]`, type alias·const·static 대상 타입. 렌더러가 모르는 항목 종류는 실패한다.
+- **개념 계수:** `use` binding(모듈·별칭·중첩·`self`·crate 별칭)을 풀어 본문 모듈 상대 경로까지 해석하고, 같은 항목은 한 번만 센다. glob import와 풀리지 않는 `dot_logger` 경로는 실패다(§20.3의 「풀리지 않는 경로는 실패」를 실제 종료 코드로 보장).
+- **가드 자가 시험:** `scripts/test_check_integration_surface.py`(CI `integration-surface` job).

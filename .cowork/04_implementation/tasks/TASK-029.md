@@ -8,9 +8,9 @@
 | 설계 | [인터페이스](../../03_design_artifacts/interface_contract.md) · [CLI](../../03_design_artifacts/ui_spec.md) |
 | ADR | ADR-007 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-11-04 |
-| 다음 액션 | TASK-027·028 S1 뒤 레시피 3단계·quickstart·공개 API 회귀 가드 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-12 |
+| 다음 액션 | S1·S2 Human 리뷰 → S3 quickstart·README·rustdoc → S4 예제 이전 |
 | 의존 | TASK-027·TASK-028 |
 | 예상 소요 | 1~2 인일, 리뷰 대기 제외 |
 
@@ -18,16 +18,27 @@
 
 소비처가 support 모듈 없이 따라 할 수 있는 단계별 레시피와 짧은 quickstart를 제공하고, 접점 크기를 수락 기준으로 측정·회귀 감시한다.
 
-- **L1 일반 로그:** tracing/log만 연결(최소 줄 수).
-- **L2 typed facade:** preset→start→typed channel→shutdown.
-- **L3 RT 원본:** raw loan·중요도·이벤트 보호·완료 확인.
+레시피 단계는 승인된 [API §18.6](../../03_design_artifacts/interface_contract.md#186-nfr-008-수락-수치-제안)을 따른다([§20.2](../../03_design_artifacts/interface_contract.md#202-레시피-단계186-기준)에서 초안 서술 정렬, 2026-11-12).
+
+- **L1 최소 file 기록:** 시작→RT thread 기록→shutdown 판정(≤ 20줄·개념 ≤ 6).
+- **L2 RT 다중 writer:** raw loan·종료 보고 확인(≤ 40줄·≤ 10).
+- **L3 선택 연결:** tracing·remote 각각 L1에 +6줄 이하.
 - README는 quickstart와 레시피 링크 중심으로 줄이고, 계약 상세는 모듈 rustdoc으로 옮긴다.
 - 기존 `dot_probe_*` 예제를 facade 경로로 옮기고 support 줄 수 감소를 기록한다.
-- 공개 API 변경 감지: api-consumer 컴파일 검사 확장 또는 rustdoc JSON snapshot(도구 추가 시 tech_stack 확인).
+- 공개 API 변경 감지: rustdoc JSON(nightly-2026-10-26) + 스크립트, 이름 있는 항목 ≤ 60과 전체 표면 snapshot(2026-11-12 Human 결정, [API §20.1](../../03_design_artifacts/interface_contract.md#201-human-결정--2026-11-12)).
+
+## 작업 단위
+
+| 단위 | 내용 | 상태 |
+|---|---|---|
+| S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | 진행 |
+| S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | 로컬 Pass [EV-073](../../05_verification/verification_evidence.md#ev-073) |
+| S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | 대기 |
+| S4 | `dot_probe_*` 예제 facade 이전·support 줄 수 감소 기록 | 대기 |
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `examples/recipes/`, `README.md`, `tests/api-consumer`, `crates/dot-logger-client/examples`. 아직 생성된 코드 경로가 아니다.
+경로: `examples/recipes/`·`scripts/check-integration-surface.py`·`tests/api-surface/logger.txt`(S1·S2 생성), `README.md`·`crates/dot-logger-client/examples`(S3·S4 예정).
 
 첫 실패/리뷰 조건: **레시피 예제가 support 모듈 없이 빌드·실행되고, 연동 코드 줄 수·도입 개념 수가 NFR-008 승인 수치를 넘으면 검사 실패**.
 

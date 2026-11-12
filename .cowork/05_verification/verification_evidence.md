@@ -1184,6 +1184,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행:** 성능 측정(정리 경로 비용 변화는 겹치지 않을 때 CAS 1회·store 1회), native, `check-feature-matrix.py`(feature 경계 변경 없음).
 - **Human 승인(2026-11-12 「승인」):** RV-131~133 조치와 리뷰 포인트 3건(겹친 호출 0 반환, 비 Linux CLI 교차 검사 T3 이월, 비 Linux calibrate CLI exit 4 유지)을 수락. REV-053 Closed.
 
+## EV-073 — TASK-029 S1·S2: 접점 표면 가드·레시피 L1~L3
+
+- **판정:** 로컬 **Pass**. 커밋 `79d376e`. Human 리뷰 대기. S3(quickstart·README·rustdoc)·S4(예제 이전) 미착수.
+- **Human 결정(2026-11-12):** 계수 단위 「이름 있는 항목」, 감지 도구 「rustdoc JSON + 스크립트」([API §20.1](../03_design_artifacts/interface_contract.md#201-human-결정--2026-11-12)), L1 개념 초과 해소 「`Shutdown::is_success()` 추가」([§20.3](../03_design_artifacts/interface_contract.md#203-s1s2-구현-반영--2026-11-12)).
+- **Red:** ① 가드 첫 실행 — snapshot·레시피 없음으로 실패. ② 첫 L1 — 29줄·7개념(`> 20`·`> 6`) 실패. 줄은 rustfmt가 펼친 체인·struct literal·끝 주석 때문이었고, 표현을 줄여 20줄로 맞췄다. 개념 7은 API 추가로 해소. ③ L3 tracing +7(인자 폭 61 > 60으로 펼쳐짐) → `use tracing::Level`로 +3. ④ `Shutdown::is_success` 단언 추가 시 E0599 2건 → 구현 후 `tc_013_facade` 16 Pass. ⑤ 표면 가드가 `is_success` 추가를 차이로 탐지(이후 bless). 첫 diff 출력은 같은 줄이 다른 타입에 있으면 숨기는 버그가 있어 `difflib` unified diff로 고치고, 오래된 snapshot 사본으로 두 추가 줄이 보이는 것을 확인.
+- **결과(현재):** facade 이름 있는 항목 30/60, snapshot 301줄. L1 20줄·6개념, L2 40줄·7개념(`capture::Importance` 포함), L3 tracing +3줄·7, L3 remote +5줄·7. 금지 항목 0. 네 레시피 모두 exit 0(L2 「1030 records synchronized」 = pose 1000 + 프레임 30, remote는 loopback 임의 port). 레시피 1회 실행 쓰기 합계 약 8 MB(tmpfs `TMPDIR`).
+- **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0(레시피 포함), workspace 테스트 1.96.0·1.85.0 각 560 passed·5 ignored, rustdoc core-only·all-features `-D warnings` 0. CI에 `integration-surface` job 추가(native 실행은 T3).
+- **한계:** 줄 계수는 줄 단위 휴리스틱(최상위 `struct`/`enum`/`#[derive]`·`impl ... Record for` 블록 제외)이다. snapshot의 타입 표기는 rustdoc JSON을 그대로 옮긴 것이라 `crate::` 경로·`&Self` 표기가 섞인다. nightly rustdoc JSON에서만 나는 `redundant_explicit_links` 경고 1건(위치 미표시, `logger/mod.rs` 모듈 문서로 추정)은 stable rustdoc `-D warnings`에서 나지 않아 남겨 두었다. 레시피는 이 PC(Linux)에서만 실행했다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

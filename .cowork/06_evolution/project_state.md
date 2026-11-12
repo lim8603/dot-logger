@@ -10,17 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-029 착수(계수 규칙·API 변경 감지 도구 결정부터). REV-053 Closed(EV-072 `aa62e04`, 2026-11-12 Human 「승인」). TASK-028 S2 Human 승인(EV-071) 유지 |
+| 활성 Task | TASK-029 In Progress — S1·S2 로컬 Pass([EV-073](../05_verification/verification_evidence.md#ev-073) `79d376e`), Human 리뷰 대기 → S3 quickstart·README·rustdoc → S4 예제 이전. REV-053 Closed(EV-072) |
 | 미처리 리뷰 | 없음 — REV-053 Closed(2026-11-12) |
 | 상태 | Green — REV-053 조치 로컬 Pass(EV-072, 1.96.0/1.85.0 각 560 Pass·Miri 8 seeds), Human 승인(2026-11-12). TASK-028 S1·S2 Human 승인(EV-071)·TASK-023 RT 행 Pass(EV-070) 유지. 다음 TASK-029. 장기·운영/실앱·native 후속 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-12 / REV-053 조치 EV-072 / AI |
-| 세션 상태 | 2026-11-12 진행 중 — REV-053 RV-131~133 조치·검증 완료(`aa62e04`). Human 승인·Closed → TASK-029 착수(계수 규칙·API 감지 도구 결정부터) |
+| 갱신 | 2026-11-12 / TASK-029 S1·S2 EV-073 / AI |
+| 세션 상태 | 2026-11-12 진행 중 — REV-053 Closed, TASK-029 결정 3건(계수 단위·감지 도구·`Shutdown::is_success`)·S1·S2 완료(`79d376e`). 다음: S1·S2 Human 리뷰 → S3 |
 | 최근 세션 | [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) — 완료 이력 정리·장비 측정 누적 리뷰. 직전 개발: [2026-11-11 #002](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md) |
 
 ## 현재 결정과 제약
 
+- **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
 - **2026-11-11 Human 결정 — TASK-028 S2(착수 3건 권고안·「승인」):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5, 수락 ≤ 1.2 × S3 S), JSON 프로필(feature `calibrate`), 흡수·메모리·부하 경고. 측정 도중 취소 시험 미실시. [API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).
 - **완료된 Human 결정(11-07~11-11: TASK-023 S2·S3 마감·⑪·T5·CRC vendor·rustix·TASK-027 S3c/S3d·TASK-028 S1):** 원문은 [상태 아카이브](state_archive.md) #026, 계약은 API §18~19·ADR-010 개정 1·EV-054~069. T4·T6 이월은 아래 백로그.
 
@@ -69,6 +70,7 @@
 | TASK-021 | UPS 긴급 계획·모의 시험 | AI | In Progress | 2026-11-02 | S1~S3 EV-043 로컬 구현/UPS 모의 수락·REV-042 Closed, native T3·통합 후속; 다음 TASK-026 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-09 | S2 완료(EV-054·055·057·058), S3 도구·⑩ 조치(EV-059), ⑪ 비차단(T5) → 축소 S3 1회차 실행 [EV-064](../05_verification/verification_evidence.md#ev-064): P1·제어·P2 효율 Pass, P3 효율 66% 미달(T5 도래), 후속 [EV-065](../05_verification/verification_evidence.md#ev-065): P3 미달 재현 안 됨(T5 미확정), raw 거절은 풀 사이징, 계측 비용 2.5% |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-07 | S3a [EV-048](../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../05_verification/verification_evidence.md#ev-051) 로컬 Pass(F1~F13) — S1~S3 로컬 완료, Human 리뷰 대기; 잔여 TASK-023 성능·TASK-029 계수·T3, S3d는 T4 |
+| TASK-029 | 연결 레시피·문서·접점 회귀 가드 | AI | In Progress | 2026-11-12 | S1 표면 가드·S2 레시피 L1~L3 로컬 Pass [EV-073](../05_verification/verification_evidence.md#ev-073), Human 리뷰 대기 → S3 quickstart·README·rustdoc, S4 `dot_probe_*` 예제 이전 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -89,7 +91,7 @@
 ## 다음 시작점
 
 0. **리뷰 후속:** [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) RV-131~133 조치 완료([EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04`). 2026-11-12 Human 「승인」으로 Closed. CLI 크레이트의 비 Linux 빌드는 C 의존성 때문에 교차 검사하지 못해 native(T3)에서 확인한다. TASK-028 S2의 기존 Human 수락과 native T3 이월은 유지한다.
-1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. **다음 TASK-029**(레시피·quickstart·NFR-008 회귀 가드 — 착수 시 계수 규칙·API 변경 감지 도구 결정) → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
+1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. **TASK-029 진행** — S1 가드·S2 레시피 로컬 Pass(EV-073), 다음 S3 quickstart·README 축소·rustdoc 이동, S4 `dot_probe_*` 예제 facade 이전 → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -136,6 +138,7 @@
 
 ## 최근 작업·이력
 
+- 2026-11-12: TASK-029 S1·S2 [EV-073](../05_verification/verification_evidence.md#ev-073) `79d376e` — 표면 가드(이름 있는 항목 30/60·snapshot), 레시피 L1 20줄·6개념/L2 40·7/L3 +3·+5, `Shutdown::is_success()`.
 - 2026-11-12: REV-053 RV-131~133 조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04` — reconcile 진입 claim(Red `CompletionCapacity` → Green), 비 Linux calibrate 타입 오류(nightly build-std 교차 검사 E0308 8 → 0), core-only rustdoc CI 단계.
 - 2026-11-11 리뷰 전용: [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Open — RV-131~133, Conditional(P1 1·P2 1·P3 1). 1.96.0/MSRV 전체 회귀 각각 559 passed·5 ignored, 동시 정리 실패 재현·비 Linux 타입 오류·core-only rustdoc 실패 확인. 제품 코드 미수정.
 - 2026-11-11 #002: RT 행 실행·generic 복귀([EV-070](../05_verification/verification_evidence.md#ev-070)), 빌드 산출물 정리(약 265 GB), TASK-028 S2 구현·Human 승인([EV-071](../05_verification/verification_evidence.md#ev-071)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).

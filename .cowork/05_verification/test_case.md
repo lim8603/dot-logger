@@ -285,6 +285,8 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 | F18 | 64 MiB continuous 출력에 8B 기록 20만 건(TASK-023 S2b 발견 ⑥) | 기록당 상한 추정으로 작아진 segment가 10개를 넘어도 failed 0·성공 종료(설정 보존 바이트가 한도) |
 | F19 | `Calibration::run` — 쓰기·시간 한도, disk reserve 부족, 취소, 측정 파일 정리, 읽을 수 없는 host 값(TASK-028 S2) | 먼저 닿은 한도로 멈추고 사유 기록, reserve로 블록 하나도 못 쓰면 거절·파일 없음, 취소·실패에도 측정 파일 없음, 처리량·IO 정체는 Observed, 지속 처리량은 Estimated(가정 명시), 못 읽은 값은 Unavailable(0 아님) |
 | F20 | `Sizing::profile` 적용·JSON 저장/읽기 왕복·잘못된 형식/버전, 사용자 `.absorb` 고정, 메모리·부하 초과(TASK-028 S2) | 흡수 = max(기존, ⌈최대 정체×2⌉)이고 사용자 흡수는 유지, 왕복 동일·기존 파일 덮어쓰기 거절·잘못된 형식은 오류, 초과는 `plan().warnings`에 항목·수치로 남고 시작은 막지 않음, 프로필 없으면 S1과 같은 plan |
+| F21 | `scripts/check-integration-surface.py`: rustdoc JSON(nightly-2026-10-26) `dot_logger::logger` 표면 snapshot·이름 있는 항목 수, `examples/recipes/` L1·L2·L3(tracing·remote) rustfmt·금지 항목·줄/개념 계수·실행(TASK-029 S1·S2) | 이름 있는 항목 ≤ 60, snapshot과 다르면 diff와 함께 실패, L1 ≤ 20줄·≤ 6개념, L2 ≤ 40줄·≤ 10개념, L3 L1 대비 +6줄 이하, support·`unsafe`·사용자 수명·`thread::scope`·메모리 분할 0, 모든 레시피 성공 종료 |
+| F22 | `Shutdown::is_success()` — 정상 Closed, 기한 초과 Incomplete, 파일 실패 Closed(TASK-029, API §20.3) | 정상만 true, Incomplete·실패 Closed는 false, `FacadeReport::is_success`와 같은 판정 |
 
 <a id="tc-014"></a>
 ### TC-014 — 표준 MCAP 판독·원격 시각화

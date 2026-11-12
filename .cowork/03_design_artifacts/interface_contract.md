@@ -1074,3 +1074,29 @@ let plan = builder.plan()?;      // plan.warnings: 메모리·부하 경고(시�
 - **형식 v1:** `format`·`version`·`measured_unix_s`·`directory`·`host`(각 값 `{"observed": v}` 또는 `{"unavailable": 사유}`, cgroup 무제한은 `{"observed": null}`)·`write`(바이트·`elapsed_ns`·sync 수·`sync_max_ns`·`write_call_max_ns`·`stopped_by`)·`derived`(읽는 사람용, 읽을 때 무시하고 재계산). 저장은 새 파일만.
 - **측정:** 블록 하나는 항상 쓴 뒤 시간 한도를 본다. reserve는 시작 시 여유 snapshot으로 한도를 줄이며(실행 중 재확인 없음) 그때 정지 사유는 `DiskReserve`. 다른 OS는 여유 확인이 `Unsupported` I/O 오류다 — 파일을 쓰지 않으며 CLI는 IO 실패(exit 4)로 보고한다(REV-053 RV-132, [EV-072](../05_verification/verification_evidence.md#ev-072)).
 - **CLI:** `dot-logger calibrate --directory D --output P` — `P`가 있으면 측정 전 Conflict(exit 3), 사용자가 `--timeout-ms`를 주지 않으면 제한 시간 = `--time-limit-ms` + 120초.
+
+## 20. TASK-029 레시피·접점 회귀 가드 — 2026-11-12
+
+### 20.1 Human 결정 — 2026-11-12
+
+착수 질문 2건 모두 권고안(「이름 있는 항목」·「rustdoc JSON + 스크립트」).
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | §18.6 「facade 공개 항목 ≤ 60」의 계수 단위 | `dot_logger::logger` 공개 모듈 트리(재수출 포함, 모든 feature)에서 **이름 있는 항목** — struct·enum·trait·union·type alias·const·static·자유 함수·macro. enum variant·필드·메서드·trait 연관 항목은 세지 않는다(「도입 개념」 규칙과 같은 단위). 결정 시점 실측 30개(struct 17·enum 12·trait 1). variant 포함 77·메서드 포함 138 |
+| 2 | 공개 API 변경 감지 도구 | 이미 쓰는 Miri 검증용 `nightly-2026-10-26`의 rustdoc JSON(format 61) + Python 스크립트. 개수 상한을 검사하고, 전체 표면(항목·variant·공개 메서드·trait 구현)을 snapshot 파일과 비교해 차이가 있으면 실패시킨다. snapshot 갱신은 같은 커밋에서 리뷰 대상이 된다. 새 도구 설치 없음 |
+
+참고: 534(2026-11-04 core)는 산출 방법이 기록되지 않았다. 현재 crate 전체는 이름 있는 항목 248·variant 포함 633이므로 variant 포함 단위였던 것으로 추정한다. 결정 1의 단위와 직접 비교하지 않는다.
+
+### 20.2 레시피 단계(§18.6 기준)
+
+TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-11-05 승인된 §18.6 표와 달랐다. 승인 수치를 기준으로 정렬한다: **L1** 최소 file 기록(시작→RT thread 기록→shutdown 판정) ≤ 20줄·개념 ≤ 6, **L2** RT 다중 writer + raw loan + 종료 보고 ≤ 40줄·≤ 10, **L3** 선택 연결 1개(tracing·remote 각각)를 L1에 더할 때 +6줄 이하. 공통 금지: support 모듈·`unsafe`·사용자 수명 매개변수·`thread::scope` 강제·메모리 7분할 직접 기입.
+
+### 20.3 S1·S2 구현 반영 — 2026-11-12
+
+[EV-073](../05_verification/verification_evidence.md#ev-073).
+
+- **Human 결정(2026-11-12 「`Shutdown::is_success()` 추가」):** L1이 개념 7개(`Shutdown` match 때문)로 상한을 넘어 facade에 `Shutdown::is_success(&self) -> bool`을 추가했다. `Closed(report)`이고 `report.is_success()`일 때만 true이며, `Incomplete`는 항상 false다(버리면 기존 문서대로 대기 handle이 분리된다). 메서드라 이름 있는 항목 수(30)는 그대로다.
+- **가드:** `scripts/check-integration-surface.py`. 표면 snapshot `tests/api-surface/logger.txt`(항목·variant·공개 필드·공개 메서드 시그니처·trait 구현 이름). 차이는 unified diff로 보여 주고 실패한다. 의도한 변경은 `--bless`로 같은 커밋에 갱신해 리뷰한다. CI `integration-surface` job(1.96.0 + nightly-2026-10-26).
+- **계수 구현(§18.6 규칙):** rustfmt 결과에서 `use`·주석·빈 줄·사용자 메시지 타입(`struct`/`enum`/`#[derive]`)과 그 `Record` 구현 블록을 빼고 센다. 개념은 `use dot_logger::...`와 본문의 `dot_logger::` 경로를 crate 공개 트리(재수출 포함)에서 찾아 모듈이 아닌 것만 센다. 풀리지 않는 경로는 실패다.
+- **레시피:** `examples/recipes/`(`dot-logger` 예제 `recipe_l1_file`·`recipe_l2_rt_writers`·`recipe_l3_tracing`·`recipe_l3_remote`). 출력 디렉터리는 `std::env::temp_dir()`(이미 있는 디렉터리)이고, 가드는 레시피마다 새 `TMPDIR`을 주고 실행 뒤 지운다. L2는 `Preset::sensor(30, 256 KiB).small(1000, 256)`으로 선언 부하를 실제 주기(1 kHz pose·30 Hz 프레임)에 맞춘다 — 선언보다 빠른 루프는 RT 수락에서 거절된다(초안에서 1000건 중 68건만 수락됨을 확인).

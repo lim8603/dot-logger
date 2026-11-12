@@ -15,8 +15,8 @@
 | 상태 | Green(로컬) — REV-054 Closed, TASK-030 S1 Pass. 1.96.0/1.85.0 각 568 Pass, 가드 Pass(자가 시험 18). TASK-029 기존 승인·장기/실앱/native 후속 유지 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-12 / REV-054 Closed·TASK-030 S1 / AI |
-| 세션 상태 | TASK-030 S1 로컬 Pass. 다음: S1 Human 리뷰·GUI 판독 → S2 native 표준 모드 ADR 채번 |
+| 갱신 | 2026-11-13 / 세션 #002 종료 / AI |
+| 세션 상태 | 종료 — 미커밋 없음. 다음: TASK-030 S1 Human 리뷰(GUI 판독·`PayloadSchema.name` 호환·잘린 입력 exit 0 여부) → S2 ADR 채번 |
 | 최근 세션 | [2026-11-12 #002](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md) — REV-054 반입·Closed, TASK-030 착수·S1 |
 
 ## 현재 결정과 제약
@@ -73,6 +73,7 @@
 | TASK-023 | P0~P5 성능·RT·자원 검증 | AI | In Progress | 2026-11-09 | S2 완료(EV-054·055·057·058), S3 도구·⑩ 조치(EV-059), ⑪ 비차단(T5) → 축소 S3 1회차 실행 [EV-064](../05_verification/verification_evidence.md#ev-064): P1·제어·P2 효율 Pass, P3 효율 66% 미달(T5 도래), 후속 [EV-065](../05_verification/verification_evidence.md#ev-065): P3 미달 재현 안 됨(T5 미확정), raw 거절은 풀 사이징, 계측 비용 2.5% |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | AI | In Progress | 2026-11-07 | S3a [EV-048](../05_verification/verification_evidence.md#ev-048)·S3b [EV-049](../05_verification/verification_evidence.md#ev-049)·S3c [EV-050](../05_verification/verification_evidence.md#ev-050)·S3e [EV-051](../05_verification/verification_evidence.md#ev-051) 로컬 Pass(F1~F13) — S1~S3 로컬 완료, Human 리뷰 대기; 잔여 TASK-023 성능·TASK-029 계수·T3, S3d는 T4 |
 | TASK-029 | 연결 레시피·문서·접점 회귀 가드 | AI | In Progress | 2026-11-12 | S1~S4 로컬 완료·Human 승인 [EV-073](../05_verification/verification_evidence.md#ev-073)~[EV-075](../05_verification/verification_evidence.md#ev-075). 잔여 native T3 |
+| TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-12 | S1 표준 export 로컬 Pass [EV-077](../05_verification/verification_evidence.md#ev-077), Human 리뷰·GUI 판독 대기; S2 native 모드는 ADR 후 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | AI | In Progress | 2026-10-31 | local-pc-v1 수치 Approved·선행 harness 준비, RT 행 부팅/capability 확인 후 |
 
 ## 코드리뷰 현황 (Reviews)

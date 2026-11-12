@@ -10,18 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress — 소비처 통합 접점 경량화; MS-009 Planned; MS-006 In Progress; MS-002~005/007 검증 후속 |
-| 활성 Task | TASK-030 In Progress — 착수 결정 4건 확정(API §21.1), S1 표준 export 진행. 직전 TASK-029 로컬 완료·승인 |
+| 활성 Task | TASK-030 In Progress — S1 표준 export 로컬 Pass(EV-077 `04bf3aa`), Human 리뷰·GUI 판독 확인 대기. 다음 S2 ADR |
 | 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
-| 상태 | Green(로컬) — REV-054 Closed. 가드 자가 시험 18 Pass·가드 Pass, 1.96.0/1.85.0 각 561 Pass(Rust 무변경). TASK-029 기존 승인·장기/실앱/native 후속 유지 |
+| 상태 | Green(로컬) — REV-054 Closed, TASK-030 S1 Pass. 1.96.0/1.85.0 각 568 Pass, 가드 Pass(자가 시험 18). TASK-029 기존 승인·장기/실앱/native 후속 유지 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-12 / REV-054 반입·조치 / AI |
-| 세션 상태 | REV-054 Closed, TASK-030 결정 4건 확정. 다음: S1 표준 export |
-| 최근 세션 | [2026-11-12 #002](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md) — REV-054 반입·조치 |
+| 갱신 | 2026-11-12 / REV-054 Closed·TASK-030 S1 / AI |
+| 세션 상태 | TASK-030 S1 로컬 Pass. 다음: S1 Human 리뷰·GUI 판독 → S2 native 표준 모드 ADR 채번 |
+| 최근 세션 | [2026-11-12 #002](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md) — REV-054 반입·Closed, TASK-030 착수·S1 |
 
 ## 현재 결정과 제약
 
-- **2026-11-12 Human 결정 — TASK-030 착수 4건(권고안):** MCAP `sequence` = Envelope 하위 32비트, `log_time`·`publish_time` = real, mono·u64 sequence·producer·level·importance·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`), ROS 2 encoding T1 유지. [API §21.1](../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12).
+- **2026-11-12 Human 결정 — TASK-030 착수 4건 + 구현 중 2건(권고안):** facade `Schema::descriptor`(선택 descriptor), 타입 이름은 채널 metadata `payload_schema_name`. MCAP `sequence` = Envelope 하위 32비트, `log_time`·`publish_time` = real, mono·u64 sequence·producer·level·importance·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`), ROS 2 encoding T1 유지. [API §21.1](../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12).
 - **2026-11-12 Human 결정 — TASK-029 S4 범위:** `dot_probe_pipeline`(InfluxDB·설정 비교)은 facade로 옮기지 않고 고급 경로 예제로 유지, facade 전용 `dot_probe_facade` 예제 추가. DB·설정 변경의 facade 편입은 TASK-026에서 판단([EV-075](../05_verification/verification_evidence.md#ev-075)).
 - **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
 - **2026-11-11 Human 결정 — TASK-028 S2(착수 3건 권고안·「승인」):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5, 수락 ≤ 1.2 × S3 S), JSON 프로필(feature `calibrate`), 흡수·메모리·부하 경고. 측정 도중 취소 시험 미실시. [API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).
@@ -94,7 +94,7 @@
 ## 다음 시작점
 
 0. **리뷰 후속:** 없음 — [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) Closed([EV-076](../05_verification/verification_evidence.md#ev-076), 2026-11-12 Human 「승인」). 비 Linux CLI 및 기존 native 검증은 T3다.
-1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. TASK-029 로컬 완료·Human 승인(EV-073~075). **다음 MS-009 TASK-030**(MCAP 표준 호환) — 착수 시 Task 문서의 Human 확인 4건(MCAP sequence u32↔u64 매핑·`log_time` mono/real·level/importance/producer 보존·ROS 2 encoding T1 유지)부터. S2 native 표준 모드는 ADR 채번·승인 후 → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
+1. **단독 작업(2026-11-03 결정, MS-008/009):** TASK-023 S3·T5·RT 행(EV-064~070)과 TASK-028 S2(EV-071) 완료. TASK-029 로컬 완료·Human 승인(EV-073~075). **TASK-030 S1 로컬 Pass**([EV-077](../05_verification/verification_evidence.md#ev-077)) — Human 리뷰와 Foxglove/Lichtblick GUI 판독 확인 대기. 다음 S2 native 표준 모드는 ADR 채번·승인 후 → MS-009(TASK-030~032) → probe 연동 인계 패키지. 이전 서사 원문은 [상태 아카이브](state_archive.md) #026.
 2. **TASK-026 실제 첫 적용·화면 연동(dot-probe 저장소 세션):** 별도 저장소 지침과 기존 composition/화면을 확인하고 logger off/on 동일 제어 시나리오부터 TDD로 진행한다. 아직 미착수다. TASK-020 S1~S3·TASK-021 S1~S3는 로컬 수락, TASK-026은 [진입점](../04_implementation/tasks/TASK-026.md)을 따르며 MS-008/009 뒤 facade 경로로 연동한다. TASK-018은 질문 프리셋 부분만 FR-015 승인 대기다.
 3. **UPS 수락 완료/환경 후속:** TC-011 현재 PC ext4의 승인된 모의3초·실제 sync/중단/복구는 EV-043으로 수락했다. 실물 UPS는 필요하지 않다. 지속 앱/화면/off-on·P0~P6/RT/24h·native는 TASK-026/022~024·공개 후 T3다. 첫 적용 전이라 T1 미도래다.
 4. 설정/비교 backend·worker, RV-049/TASK-022, PC/RT 비용/오차·장기·native/OS·Gate4/5 미완료. RV-053의 유한 화면 예제는 EV-042로 소비했으나 장기 tail/구독 간 복원은 미수락이다. RT 부팅·T2/T3 조건 유지.
@@ -141,7 +141,7 @@
 
 ## 최근 작업·이력
 
-- 2026-11-12 #002: REV-054 반입·조치·Closed([EV-076](../05_verification/verification_evidence.md#ev-076) `64e9d69`) — 가드 snapshot 계약 조건·개념 import 해석, 자가 시험 18개 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md).
+- 2026-11-12 #002: TASK-030 착수 결정 6건·S1 표준 export 로컬 Pass([EV-077](../05_verification/verification_evidence.md#ev-077) `04bf3aa`). REV-054 반입·조치·Closed([EV-076](../05_verification/verification_evidence.md#ev-076) `64e9d69`) — 가드 snapshot 계약 조건·개념 import 해석, 자가 시험 18개 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md).
 - 2026-11-12 리뷰 전용: [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) Open — P2 2건·Conditional, 1.96.0/MSRV 각 561 Pass·완료 추적 Miri 8 seeds, 제품 코드 미수정.
 - 2026-11-12 #001: REV-053 조치·Closed([EV-072](../05_verification/verification_evidence.md#ev-072)), TASK-029 S1~S4 로컬 완료·승인(표면 가드·레시피 L1~L3·README/rustdoc·`dot_probe_facade`, [EV-073](../05_verification/verification_evidence.md#ev-073)~[EV-075](../05_verification/verification_evidence.md#ev-075)) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-12_001.md).
 - 2026-11-11 리뷰 전용: [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Open — RV-131~133, Conditional(P1 1·P2 1·P3 1). 1.96.0/MSRV 전체 회귀 각각 559 passed·5 ignored, 동시 정리 실패 재현·비 Linux 타입 오류·core-only rustdoc 실패 확인. 제품 코드 미수정.

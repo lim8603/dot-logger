@@ -292,7 +292,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: Planned(2026-11-04 등록) / 최근 실행: Not Run / EV: 없음
+- 상태: In Progress / 최근 실행: 2026-11-12 S1 export 하위(F1~F6·CLI) 로컬 Pass / EV: [EV-077](verification_evidence.md#ev-077). 표준 모드 파일·viewer·대시보드·GUI 도구 판독 Not Run
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

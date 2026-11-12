@@ -1121,3 +1121,16 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 | 2 | `log_time`·`publish_time` 시계 | 둘 다 real(ns, 현재 writer와 같음). mono는 보조 메타 채널에 보존하고 단조 순서는 mono와 파일 내 기록 순서로 판단. real 시각 점프 시 표준 도구 정렬이 흔들릴 수 있음을 손실/한계로 명시 |
 | 3 | 메시지별 level·importance·producer(+revision·source) | 보조 메타 채널 1개. 같은 `log_time`으로 protobuf `RecordMeta`(channel·producer·u64 sequence·mono·revision·level·importance·source 등)를 기록. 사용자 채널은 사용자 schema·encoding 그대로 |
 | 4 | ROS 2 encoding(cdr/ros2msg) | 이번 범위 밖, 기존 T1 이월 유지 |
+| 5 | facade 사용자의 schema descriptor(구현 중 발견: facade는 항상 `schema: None`) | facade `Schema`에 선택 descriptor 추가 — `Schema::new(..).descriptor(name, encoding, &'static [u8])`(const fn). 기록 시점에 파일에 저장해 S1·S2 모두 사용 |
+| 6 | 표준 도구용 schema 타입 이름 저장 위치 | 채널 metadata 키 `payload_schema_name` 추가(가산, `dot-logger/1` 형식·기존 파일 판독 영향 없음). schema record 이름 `payload.<id>.v<n>`은 유지 |
+
+### 21.2 S1 구현 반영 — 2026-11-12
+
+[EV-077](../05_verification/verification_evidence.md#ev-077).
+
+- **라이브러리:** `dot_logger::storage::standard::{export, ExportLimits, ExportReport, ExportedChannel, ExportError, META_TOPIC}`. `export(input: Read, output: Write + Seek, ExportLimits::new(max_record_bytes), cancel: &AtomicBool)`. 입력은 `sans_io::LinearReader`로 앞에서부터 한 번 읽는다(파일 전체를 메모리에 올리지 않음). chunk는 CRC를 먼저 검증한 뒤 메시지를 내보낸다(`prevalidate_chunk_crcs`). 입력 header profile이 `dot-logger/1`이 아니거나 채널이 `dot_logger.Envelope`가 아니면 `NotDotLogger`.
+- **출력:** profile `""`, library `dot-logger/0.1.0 export --standard`, 무압축 chunk. 사용자 채널 = 같은 topic, message encoding = `payload_encoding`, schema = 저장된 descriptor(이름은 `payload_schema_name`, 없으면 저장 이름 `payload.<id>.v<n>`). descriptor가 없으면 schema 없는 채널(schema id 0). 채널 metadata는 `payload_schema_file_id`(입력 파일 내부 id)만 빼고 유지. 메시지 = payload 원문, `sequence` = 하위 32비트, `log_time` = `publish_time` = real.
+- **메타 채널:** topic `_dot_logger/meta`(`META_TOPIC`), schema `dot_logger.RecordMeta`(protobuf, `storage/record_meta.proto`·protoc FileDescriptorSet `record_meta.bin`). 사용자 메시지마다 바로 뒤에 같은 `log_time`·`sequence`로 1건: `channel`(출력 파일의 사용자 MCAP 채널 id)·`producer`·`sequence`(u64)·`mono`·`real`·`revision`·`level`(Trace 0~Error 4)·`importance`(0 Normal·1 Important)·`source{ticks, clock_domain}`. session·schema id/version은 채널 metadata에 있으므로 메시지마다 반복하지 않는다.
+- **오류·손실:** 잘린 파일·CRC 불일치 chunk·해석 불가 레코드를 만나면 그 앞의 검증된 chunk까지 내보내고 `ExportReport::truncated`에 이유를 남긴다(성공 반환). 한도 초과 레코드/chunk → `RecordTooLarge`, 사용자 topic이 `_dot_logger/meta` → `TopicConflict`, `cancel` → `Cancelled`(출력은 버려야 함). 입력의 MCAP metadata/attachment 레코드는 내보내지 않고 `skipped_records`로 센다(현재 writer는 쓰지 않음).
+- **CLI:** `dot-logger export --standard --input <dot-logger file> --output <new file> [--max-record-bytes 268435456]`. 출력은 새 파일만(있으면 exit 3 Conflict), 실패·취소 시 만든 출력을 지운다. `--standard` 없으면 exit 2. 입력 오류(`NotDotLogger`·`TopicConflict`) exit 2, 한도·취소 exit 3, 손상·IO exit 4. JSON 행 `export`(messages·channels·meta_topic·truncated·skipped_records). 명시하지 않으면 timeout 1시간(일반 5초 기본값 대신, Ctrl-C 취소 유지).
+- **저장 계층:** `PayloadSchema.name: Option<String>`(1~256 bytes) — writer가 `payload_schema_name` metadata로 쓰고 metadata 예산에 포함, 복구는 설정과 일치할 때만 수락(bit 128). CLI manifest descriptor에 선택 `name`.

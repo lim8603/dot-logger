@@ -1221,6 +1221,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **한계:** 개념 계수는 정규식 기반 경로 해석이다. 지역 `mod`·매크로 생성 경로·문자 리터럴 `'"'`은 해석하지 않으며(레시피 금지 항목·관례상 없음), 지역 변수가 binding 이름과 같아도 `::` 경로만 보므로 영향이 없다. snapshot은 rustdoc JSON format 61에 묶여 있고, 새 항목 종류는 실패로 드러난다. 상수 기본값·discriminant·`#[must_use]` 등 동작 의미 속성은 여전히 snapshot에 넣지 않았다.
 - **Human 승인(2026-11-12 「승인」):** 조치와 리뷰 포인트 4건(snapshot 301→314줄 표기 확장, 범위 밖 추가 표기, 레시피 glob import 금지, 정규식 경로 해석 한계)을 수락.
 
+## EV-077 — TASK-030 S1: 표준 MCAP export·facade schema descriptor
+
+- **판정:** 로컬 **Pass**(GUI 도구 판독 제외). 커밋 `04bf3aa`. Human 리뷰 대기.
+- **Human 결정(2026-11-12):** 착수 4건 + 구현 중 발견 2건(facade descriptor 경로 없음 → `Schema::descriptor`, 타입 이름 → `payload_schema_name` 채널 metadata) 모두 권고안. [API §21.1](../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12).
+- **Red:** `tc_014_standard`·`fault_storage` 컴파일 실패 4종(`storage::standard` 없음, `PayloadSchema.name` 없음, `Schema::descriptor` 없음). CLI 시험 `export --standard` → exit 2(`invalid_input`). 구현 후 f5는 chunk 한도 초과를 「truncated」로 분류해 실패 → `ChunkTooLarge`·`ChunkBufferTooLarge`를 `RecordTooLarge`로 매핑해 Green.
+- **변경:** [API §21.2](../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12). 새 `storage/standard.rs`·`record_meta.proto`/`.bin`, `PayloadSchema.name`·writer metadata·복구 검증, facade `Schema::descriptor`·`payload_schema()`·예산 계수, CLI `export --standard`, README CLI 목록. 표면 snapshot +1줄(`const fn descriptor(..)`), 이름 있는 항목 30/60 그대로, 레시피 계수 불변.
+- **시험:** `tc_014_standard` F1~F6 — ① facade 파일(protobuf `test.Pose` + descriptor 없는 `vendor-blob`) export: 사용자 채널 schema 이름·encoding·descriptor 원문, payload 원문, `sequence` 하위 32비트, `log_time`=`publish_time`=real, 메타 110건 필드를 테스트 쪽 독립 prost 정의로 대조, descriptor 없는 채널 schemaless ② 2/3에서 자른 1 MB 파일 → 검증된 앞부분만·`truncated` 보고 ③ 일반 MCAP 거절 ④ 메타 topic 충돌 거절 ⑤ 한도 초과 거절 ⑥ 취소. `fault_storage` 복구 시험에 `name` 추가(복구 수락). CLI 1개(새 파일·덮어쓰기 거절 exit 3·비 dot-logger exit 2 후 출력 없음·`--standard` 필수).
+- **독립 판독(저장소 밖):** facade 임시 예제(실행 뒤 삭제)로 기록 → release 아닌 dev CLI `export --standard` exit 0. ① MCAP 명세만으로 짠 stdlib Python 판독기(vendor `mcap` crate와 별개 코드): magic·header profile `''`·schema 2개·채널 2개·메시지 10건·chunk CRC 일치. ② 파일에서 꺼낸 schema 바이트 = `pose.fds`, `protoc 3.21.12 --decode=test.Pose`가 payload를 x 0.5/y -0, x 1.5/y -1로 디코딩, `--decode=dot_logger.RecordMeta`가 channel 2·sequence·mono·real(=log_time)·revision·level 디코딩.
+- **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0, core-only clippy 0, workspace 테스트 1.96.0·1.85.0 각 **568 passed**(561 + 신규 7)·5 ignored, rustdoc all-features·core-only `-D warnings` 0(기존 `output filename collision` 경고만), 표면 가드 Pass(자가 시험 포함 bless 1줄).
+- **미실행:** Foxglove/Lichtblick GUI 판독(이 세션에 GUI 없음), 공식 `mcap` Python 라이브러리 대조(이 PC에 pip 없음, 시스템 패키지 설치는 하지 않음), `check-feature-matrix.py`(feature 경계 변경 없음 — `standard`는 core), 큰 파일 export 시간·메모리 측정, native(T3). Miri — unsafe·동시성 변경 없음.
+- **한계:** 출력은 무압축이다. 여러 segment는 파일마다 따로 export한다(병합 없음). real 시각이 뒤로 가면 표준 도구의 `log_time` 정렬이 기록 순서와 달라진다(메타 `mono`로 복원). descriptor 없는 채널과 protobuf 외 encoding은 표준 도구에서 raw bytes로 보인다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

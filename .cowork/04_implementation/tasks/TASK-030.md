@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-12 |
-| 다음 액션 | S1 — Envelope 해제 표준 MCAP export와 독립 reader·Foxglove 계열 판독 |
+| 다음 액션 | S1 GUI 판독 확인(Human) → S2 native 표준 모드 ADR 채번·승인 |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -22,7 +22,7 @@
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | Planned |
+| S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)) — Foxglove/Lichtblick GUI 판독은 미실행(Human 확인 대기) |
 | S2 | native 표준 쓰기 모드 | ADR 승인 후 writer 옵션으로 표준 모드 기록, 복구·조회·재생이 두 형식 모두 지원, 기존 `dot-logger/1` 파일 판독 유지 | Planned |
 
 ## 변경 대상과 첫 검증
@@ -37,7 +37,7 @@
 
 ## Human 결정 — 2026-11-12
 
-착수 확인 4건 모두 권고안([API §21.1](../../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12)): ① MCAP `sequence` = 하위 32비트, u64는 보조 메타 채널 ② `log_time`·`publish_time` = real, mono는 보조 ③ level·importance·producer·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`) ④ ROS 2 encoding은 T1 유지.
+착수 확인 4건 + 구현 중 확인 2건(⑤ facade `Schema::descriptor`, ⑥ `payload_schema_name` 채널 metadata) 모두 권고안([API §21.1](../../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12)): ① MCAP `sequence` = 하위 32비트, u64는 보조 메타 채널 ② `log_time`·`publish_time` = real, mono는 보조 ③ level·importance·producer·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`) ④ ROS 2 encoding은 T1 유지.
 
 ## 완료 기준
 

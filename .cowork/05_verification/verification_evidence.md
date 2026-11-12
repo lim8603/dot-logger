@@ -1195,11 +1195,21 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ## EV-074 — TASK-029 S3: quickstart·README 축소·계약 상세 rustdoc 이동
 
-- **판정:** 로컬 **Pass**. 커밋 `0622982`. Human 리뷰 대기. S4(예제 이전) 미착수.
+- **판정:** 로컬 **Pass**. 커밋 `0622982`. 2026-11-12 Human 「승인」.
 - **변경:** README 250 → 136줄(한국어). 빠른 시작(L1 레시피 전문)·레시피 표(한도·현재 값)·두 계층 안내·feature·다른 예제·개발 명령·검증 범위만 남겼다. 모듈별 계약 문단(설정·수집·분배·sync/종료·storage 단일 파일/회전·보존/복구·운영 계측/리포트/capacity·InfluxDB write/query/routed·tracing 입력·UPS 긴급 저장)은 해당 모듈 rustdoc에 영문으로 옮겼다(코드 주석 영문 규칙, 11개 파일 +224줄). crate 문서에 두 계층·quickstart·레시피 표·feature 표를 추가했다. quickstart는 `include_str!`로 L1 레시피 파일을 `no_run` doctest로 넣어 항상 컴파일된다. 가드는 README 블록(`<!-- recipe:l1_file.rs -->`)이 레시피 파일과 같은지 확인한다.
 - **확인:** README 블록을 한 글자 바꾸면 가드 FAIL(「README.md block differs」), 되돌리면 Pass. README 상대 링크 12개 대상 존재. 옛 README 앵커를 참조하는 문서 없음. CLI 명령 이름은 `args.rs` 실제 목록과 대조(「점검」 표기를 실제 명령 이름으로 정정).
 - **회귀:** fmt Pass, clippy 1.96.0 `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 561 passed(560 + quickstart doctest)·5 ignored, rustdoc core-only·all-features `-D warnings` 0(기존 `output filename collision` 경고만), 가드 Pass.
 - **한계:** 옮긴 문서는 기존 한국어 README 서술을 번역·정리한 것이며 계약 의미를 새로 정하지 않았다. 계약 원문 기준은 계속 `interface_contract.md`다.
+
+## EV-075 — TASK-029 S4: dot-probe 형태 facade 예제·support 감소 기록
+
+- **판정:** 로컬 **Pass**. 커밋 `cd53f37`. TASK-029 S1~S4 로컬 완료, Human 리뷰 대기.
+- **Human 결정(2026-11-12 「facade 예제 추가 + 기존 유지」):** `dot_probe_pipeline`의 InfluxDB 경로·설정 변경 전후 비교는 facade에 경로가 없어 통째로 옮기지 않는다. facade만 쓰는 dot-probe 형태 예제를 추가하고 pipeline은 고급 경로 참고 예제로 유지한다. DB·설정 변경의 facade 편입은 TASK-026(실제 적용)에서 필요성을 보고 판단한다. `dot_probe_tail`(클라이언트 화면 구독 경계)·`dot_probe_bridge`·`dot_probe_check`(제품 진단 모듈 재사용, support 4줄)는 소비처 배선 support가 없어 대상이 아니다.
+- **변경:** `examples/dot_probe_facade.rs`(`dot-logger` 예제, feature `remote`·`tracing-adapter`). tracing 로그·1 kHz 관절 상태(사용자 `Record`, 48 B)·30 Hz 256 KiB 카메라 프레임(raw loan)을 파일로 기록하고 loopback gRPC 서버를 연다(`dot-logger tail`로 구독 가능). writer별 거절 수를 세고 종료 보고와 `Shutdown::is_success()`로 판정한다. README 예제 표에 추가.
+- **실행:** exit 0, 「synchronized 2062 records; rejected control 0, camera 0」(관절 2000 + 프레임 60 + 로그 2), 파일 1개 16 MB(tmpfs `TMPDIR`, 실행 뒤 삭제), 약 2초.
+- **줄 수(§18.6 계수 규칙, 가드와 같은 함수):** facade 예제 68줄(원문 107줄)·support 0줄. `dot_probe_pipeline` 예제 37줄 + support 889줄(원문 996줄, 2026-11-04 기준값 「약 1,000줄」). **범위가 같지 않다:** pipeline은 InfluxDB route·설정 변경 전후 비교·파일/DB 결과 검증 보고까지 포함하고, facade 예제는 파일·로그·raw·원격 구독 경로만 다룬다. 금지 항목(support·`unsafe`·사용자 수명·`thread::scope`·메모리 분할) 0.
+- **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 561 passed·5 ignored, 가드 Pass.
+- **한계:** 구독 쪽 수신 확인은 예제에 넣지 않았다(클라이언트 구독은 async runtime·구독 예산이 필요하고 viewer는 MS-009 TASK-031 범위). 원격 copy 경로 자체는 TC-013 F13(EV-050)이 검증한다.
 
 ## Open Evidence Gaps
 

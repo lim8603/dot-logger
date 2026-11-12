@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-12 |
-| 다음 액션 | S3 Human 리뷰 → S4 `dot_probe_*` 예제 facade 이전·support 줄 수 기록 |
+| 다음 액션 | S1~S4 로컬 완료 — S4 Human 리뷰 후 완료 처리 → MS-009 |
 | 의존 | TASK-027·TASK-028 |
 | 예상 소요 | 1~2 인일, 리뷰 대기 제외 |
 
@@ -24,7 +24,7 @@
 - **L2 RT 다중 writer:** raw loan·종료 보고 확인(≤ 40줄·≤ 10).
 - **L3 선택 연결:** tracing·remote 각각 L1에 +6줄 이하.
 - README는 quickstart와 레시피 링크 중심으로 줄이고, 계약 상세는 모듈 rustdoc으로 옮긴다.
-- 기존 `dot_probe_*` 예제를 facade 경로로 옮기고 support 줄 수 감소를 기록한다.
+- 기존 `dot_probe_*` 예제를 facade 경로로 옮기고 support 줄 수 감소를 기록한다. → 2026-11-12 Human 결정: facade 전용 예제를 추가하고 pipeline(DB·설정 비교)은 고급 경로로 유지([EV-075](../../05_verification/verification_evidence.md#ev-075)).
 - 공개 API 변경 감지: rustdoc JSON(nightly-2026-10-26) + 스크립트, 이름 있는 항목 ≤ 60과 전체 표면 snapshot(2026-11-12 Human 결정, [API §20.1](../../03_design_artifacts/interface_contract.md#201-human-결정--2026-11-12)).
 
 ## 작업 단위
@@ -32,13 +32,13 @@
 | 단위 | 내용 | 상태 |
 |---|---|---|
 | S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | 진행 |
-| S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | 로컬 Pass [EV-073](../../05_verification/verification_evidence.md#ev-073) |
-| S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | 로컬 Pass [EV-074](../../05_verification/verification_evidence.md#ev-074) |
-| S4 | `dot_probe_*` 예제 facade 이전·support 줄 수 감소 기록 | 대기 |
+| S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | Human 승인 [EV-073](../../05_verification/verification_evidence.md#ev-073) |
+| S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | Human 승인 [EV-074](../../05_verification/verification_evidence.md#ev-074) |
+| S4 | facade 전용 `dot_probe_facade` 예제 추가·support 줄 수 비교 기록(pipeline은 고급 경로로 유지, 2026-11-12 Human 결정) | 로컬 Pass [EV-075](../../05_verification/verification_evidence.md#ev-075) |
 
 ## 변경 대상과 첫 검증
 
-경로: `examples/recipes/`·`scripts/check-integration-surface.py`·`tests/api-surface/logger.txt`(S1·S2), `README.md`·모듈 rustdoc(S3), `crates/dot-logger-client/examples`(S4 예정).
+경로: `examples/recipes/`·`scripts/check-integration-surface.py`·`tests/api-surface/logger.txt`(S1·S2), `README.md`·모듈 rustdoc(S3), `examples/dot_probe_facade.rs`(S4).
 
 첫 실패/리뷰 조건: **레시피 예제가 support 모듈 없이 빌드·실행되고, 연동 코드 줄 수·도입 개념 수가 NFR-008 승인 수치를 넘으면 검사 실패**.
 

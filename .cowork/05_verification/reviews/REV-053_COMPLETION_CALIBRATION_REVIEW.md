@@ -9,7 +9,7 @@
 | 대상 | REV-052 이후 누적 변경 `93db6e3..8dbd999`, 시작 작업 트리 clean |
 | 범위 | 변경 123파일(비 vendor Rust 30파일). REV-052 sync 조치, TASK-023 S2/S3·RT harness, T5 완료 장부 최적화, MCAP 단일 CRC 패치, TASK-028 S2 calibration·preset·CLI 및 관련 시험/계약 |
 | 종합 판정 | **Conditional — P1 1건·P2 1건·P3 1건** |
-| 상태 | **Resolved** — 2026-11-12 3건 모두 수용·조치([EV-072](../verification_evidence.md#ev-072)), Human 리뷰 대기 |
+| 상태 | **Closed** — 2026-11-12 3건 모두 수용·조치([EV-072](../verification_evidence.md#ev-072)), 같은 날 Human 「승인」 |
 
 공개 `Completion::reconcile`의 동시 호출로 새 정리 작업이 유실되어 완료 slot 재사용이 막히는 문제를 재현했다. Linux의 전체 회귀는 통과하지만, `calibrate`의 비 Linux 분기는 타입 오류가 있고 기본 feature의 rustdoc 링크도 깨진다. 제품 코드와 저장소 테스트는 수정하지 않았다. 기존 Human 수락과 EV-056~071의 과거 실행 사실은 유지하며, 이번에 확인한 공백을 별도로 추적한다.
 
@@ -30,9 +30,9 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-131 | P1 | `completion/mod.rs:511~558`, API §19.7 완료 장부 정리 | 이전 reconcile의 잔여량 저장이 새 세대의 정리 작업을 지워 slot 재사용이 계속 거절됨 | 정리 작업 소유권을 단일화하고 세대·cursor·잔여량 갱신을 보호 | 수용 | Resolved |
-| RV-132 | P2 | `calibrate.rs:662~674`, API §19.8~19.9 플랫폼 대체 경로 | 비 Linux 분기의 closure 반환형이 `Fact<String>`으로 고정되어 다른 필드에서 컴파일 오류 | 제네릭 함수 또는 필드별 생성으로 수정, 플랫폼별 시험 기대값 정렬 | 수용 | Resolved |
-| RV-133 | P3 | `logger/preset.rs:75`, core 선택 feature 경계 | 기본 feature에서는 존재하지 않는 `Self::profile` 링크로 rustdoc 경고/엄격 빌드 실패 | feature에 맞게 링크를 조건화하거나 일반 코드 표기로 변경 | 수용 | Resolved |
+| RV-131 | P1 | `completion/mod.rs:511~558`, API §19.7 완료 장부 정리 | 이전 reconcile의 잔여량 저장이 새 세대의 정리 작업을 지워 slot 재사용이 계속 거절됨 | 정리 작업 소유권을 단일화하고 세대·cursor·잔여량 갱신을 보호 | 수용 | Closed |
+| RV-132 | P2 | `calibrate.rs:662~674`, API §19.8~19.9 플랫폼 대체 경로 | 비 Linux 분기의 closure 반환형이 `Fact<String>`으로 고정되어 다른 필드에서 컴파일 오류 | 제네릭 함수 또는 필드별 생성으로 수정, 플랫폼별 시험 기대값 정렬 | 수용 | Closed |
+| RV-133 | P3 | `logger/preset.rs:75`, core 선택 feature 경계 | 기본 feature에서는 존재하지 않는 `Self::profile` 링크로 rustdoc 경고/엄격 빌드 실패 | feature에 맞게 링크를 조건화하거나 일반 코드 표기로 변경 | 수용 | Closed |
 
 ### RV-131 — 이전 정리 호출이 새 세대의 잔여 작업을 지움 (P1)
 

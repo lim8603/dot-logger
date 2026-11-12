@@ -1182,6 +1182,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **RV-133(P3) 변경:** `Sizing::absorb` 문서의 feature 조건 링크를 코드 표기로 바꿨다. CI `contracts` job에 core-only rustdoc 단계를 추가했다. `RUSTDOCFLAGS='-D warnings' cargo doc -p dot-logger --no-default-features --no-deps`: 수정 전 exit 101(`unresolved link to Self::profile`) → exit 0. all-features rustdoc도 exit 0.
 - **회귀:** fmt Pass, clippy 1.96.0 workspace `--all-targets --all-features` `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 **560 passed**(559 + 신규 1)·5 ignored(기존 외부 DB). Miri(`-Zmiri-strict-provenance -Zmiri-many-seeds=0..8`): `--lib completion::` 10개 × 8 seeds Pass, reconcile을 부르는 `tc_003_completion`·`tc_003_routing`·`tc_003_control`(15·19·22개) × 8 seeds Pass(32초). 비 Linux 신규 시험 2개는 Linux에서 제외되어 실행 횟수에 들지 않는다.
 - **미실행:** 성능 측정(정리 경로 비용 변화는 겹치지 않을 때 CAS 1회·store 1회), native, `check-feature-matrix.py`(feature 경계 변경 없음).
+- **Human 승인(2026-11-12 「승인」):** RV-131~133 조치와 리뷰 포인트 3건(겹친 호출 0 반환, 비 Linux CLI 교차 검사 T3 이월, 비 Linux calibrate CLI exit 4 유지)을 수락. REV-053 Closed.
 
 ## Open Evidence Gaps
 

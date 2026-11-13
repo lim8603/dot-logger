@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-13 / 세션 #001 / AI |
-| 세션 상태 | 진행 — 완료 기준 변경·Task 전수 갱신 반영. 다음: TASK-030 S1 리뷰 마무리(나머지 토픽 판독·blob 채널 처리 결정·`records:0` 원인) 또는 TASK-033 S2 |
+| 세션 상태 | 종료 — 미커밋 없음. 다음: TASK-030 S1 리뷰 마무리(pose·meta 판독, blob 채널 처리, `records:0` 원인) 또는 TASK-033 S2 사용 사례 조사. Human 확인 대기: native·24h를 일정 판단에서 뺄지, client `diagnostics/bridge.rs` 이동 여부 |
 | 최근 세션 | 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
 
 ## 현재 결정과 제약

@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-03 |
-| 다음 액션 | 운영 backend(status·apply·compare) EV-044 로컬 수락·REV-044 Closed; 실앱 화면(TASK-026)·PC/RT 비용/오차·native 후속 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -55,3 +55,11 @@
 ## 운영 backend — 2026-11-03 #001
 
 Human 결정(2026-11-03)으로 probe 연동 전에 원격 운영 backend를 구현했다. `telemetry::operations::OperationsHost`가 host 일반 worker에서 GetStatus(`dot_logger.status.v1` 지표)·ApplyConfig(`dot_logger.config_patch.v1`)·Compare(host 등록 snapshot, `dot_logger.compare.v1`)를 처리한다. 게시 없는 세 거절은 새 `RemoteError::{Conflict, Busy, RestartRequired}`로 구분하고 CLI에 각각 exit3/3/2로 노출한다. Status 지표는 기존 `Reply.data`에 싣고 proto는 바꾸지 않았다. 1초 sampling·snapshot 생성·producer poll은 host 책임이다. [API§15.8](../../03_design_artifacts/interface_contract.md#158-운영-backendstatusapplycompare--2026-11-03)·[EV-044](../../05_verification/verification_evidence.md#ev-044)·[REV-044](../../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) Closed, source `a738ebf`. 실제 dot-probe 화면·PC/RT 비용/오차·native가 남아 Task는 In Progress, TC-009 Partial을 유지한다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 이 PC 정량 성능·RT: [TASK-023](TASK-023.md)에서 수행한 범위(EV-064~070)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

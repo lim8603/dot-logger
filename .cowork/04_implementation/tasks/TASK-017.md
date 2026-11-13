@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | 고정 routed RunCheck 구현/기능 검증 EV-035; 지속 실앱/화면(TASK-020/026)·통합 실측(TASK-021~024)·공개 후 native(T3) 수락 대기 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-015·TASK-013 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -42,7 +42,7 @@
 
 - [x] S1 — 무부하 `CheckPlan::build`·원본 provenance/명시 예산 보존·메모리 선언/경로 문법 검증·`write_allowance` 순수 계산. 신규5개 Red→Green, [API §15.3](../../03_design_artifacts/interface_contract.md#153-task-017-s1-로컬-계획예산-판정--2026-11-01).
 - [x] S2 — plan 뒤 별도 명시 run, 배타적으로 소유한 전용 경로만 생성/정리, bounded workload·실제 physical write/reserve·운영 기록 불변, budget/cancel/IO 실패 뒤 drain/sync/close·최종 범위/원인·Pass/Fail/Aborted/Inconclusive.
-- [ ] S3 — 실제 Report/측정 provenance·CLI/runtime/원격 backend 연결 및 실제 수신자·실앱/PC/RT/native 검증. 동일 scope에 필요한 구현 단위로 진행하고 FR-015/TASK-018은 별도 승인 전 착수하지 않는다.
+- [x] S3 — (2026-11-13: 로컬 S3는 EV-033~035로 완료. 실앱·PC/RT·native 잔여는 TASK-023·024·026으로 이관) 실제 Report/측정 provenance·CLI/runtime/원격 backend 연결 및 실제 수신자·실앱/PC/RT/native 검증. 동일 scope에 필요한 구현 단위로 진행하고 FR-015/TASK-018은 별도 승인 전 착수하지 않는다.
 
 S1의 `required_memory_bytes`는 host의 예약 계산 선언이지 실제 예약/측정 증명이 아니다. 예산 판정은 host 관측의 stateless 계산이며 reservation/IO 취소를 수행하지 않는다. final drain/index/footer/outstanding bytes까지 미리 예약하고 신규 IO를 직렬화하는 host 책임을 API에 명시했다. 네트워크는 미측정/loopback/remote 요청 선언만 구분한다. S2에서는 아래 수락 기록처럼 실제 종료·정리와 함께 검증했으며 운영 host 연결은 S3에 남아 있다.
 
@@ -66,7 +66,7 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 - [x] 실제 Linux statvfs·원 OS 오류/checked available bytes, probe 뒤 시간/취소 재검사. 안전한 rustix1.1.4·lock 신규2개, 제품 unsafe/RT 변경 없음.
 - [x] 원래 Report/profile·session/revision/구간/조건·만료를 native로 원문 보존하고 CLI 요약에 출처를 표시. 합성 결과를 capacity로 승격하지 않음.
 - [x] 실제 CLI→TCP/gRPC→host→MCAP footer/sync/close/cleanup. read/manage·단일 사용·메시지 부족 pre-IO·timeout 중 pacing 취소·기존 경로 보존·Fail/Inconclusive exit 구분 검증.
-- [ ] 생산/실앱 전체: #007 snapshot/ACK 및 #008 고정 routed backend(EV-035)는 수락. 지속 수집/화면·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS 수락 잔여.
+- [x] (2026-11-13 이관: 실앱 TASK-026·장기 TASK-024·native T3) 생산/실앱 전체: #007 snapshot/ACK 및 #008 고정 routed backend(EV-035)는 수락. 지속 수집/화면·PC/RT 비용/오차/성능·UPS/장기/native(T3)/다른 OS 수락 잔여.
 
 S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기존 종료·수락 범위를 실제 장비 능력 검증으로 확대하지 않는다. 자동 worker/상시 서버·임의 remote 경로·무제한 실행·FR-015/TASK-018은 도입하지 않는다.
 
@@ -79,7 +79,7 @@ S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기�
 - [x] 실제 dot-probe `269d348`의 `robot-serve` 실행·기존 `PROBE_TICK_REPORT` export 1,618B 생성·SIGTERM 정상 종료(exit0) 후 해당 원문을 전달했다. SafetyThread120/ControlThread60/battery_main24 ticks는 입력 내용이며 logger 비용/RT 달성 근거로 쓰지 않는다. [원문·명령·결과](../../06_evolution/imported_context/task_017_routed_2026-11-01/results.json).
 - [x] 신규7개 Red→Green, Rust1.96/MSRV1.85 workspace 각364·fmt/clippy/doc/protocol/core 의존 분리·실제 예제 실행 Pass. 개발 자가 점검 미해결 P1/P2/P3 없음.
 - [x] #008의 `register_routed/run_routed`·`handle_command`로 고정 routed backend/원 Report·기존 CLI 관리 권한을 연결했다(EV-035). EV-033 file backend와 별도 bridge 예제도 유지하며 자동 worker는 도입하지 않는다.
-- [ ] export snapshot 연결은 dot-probe 내장 상시 capture·기존 화면·off/on 비교·TASK-020/026 첫 적용 완료가 아니다. T1은 미도래다. source freshness/boot identity·capacity/network/RSS 측정은 Unavailable. LAN·실제 PC/RT 오차/비용·UPS/장기/native(T3)/다른 OS 및 Task/MS/TC 전체·Gate4/5 미완료 유지.
+- [x] (2026-11-13 이관: TASK-026·024) export snapshot 연결은 dot-probe 내장 상시 capture·기존 화면·off/on 비교·TASK-020/026 첫 적용 완료가 아니다. T1은 미도래다. source freshness/boot identity·capacity/network/RSS 측정은 Unavailable. LAN·실제 PC/RT 오차/비용·UPS/장기/native(T3)/다른 OS 및 Task/MS/TC 전체·Gate4/5 미완료 유지.
 
 
 ## S3 고정 routed RunCheck 구현·잔여 조건 정리 — 2026-11-01 #008
@@ -104,3 +104,12 @@ TASK-017의 로컬 기능 구현 잔여는 처리했으나 위 통합/환경 수
 ## REV-034 조치 — 2026-11-01 #010
 
 RV-071/072를 `SnapshotCheck::TARGET_ID`·`REQUIRED_MEMORY_BYTES` 공개와 24MiB 구성/RSS 한계 rustdoc로 조치했다. trait/bridge/예제가 상수를 공유한다. 소스 `a972229`·[EV-036](../../05_verification/verification_evidence.md#ev-036) 로컬 회귀 수락, REV-034 Closed. 위 통합/실측/native 조건과 Task In Progress는 유지한다. 다음 개발 단위는 TASK-019 S1이다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 이 PC 정량 성능·RT: [TASK-023](TASK-023.md)에서 수행한 범위(EV-064~070)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)
+- 장기 24h·전원 차단: [TASK-024](TASK-024.md)

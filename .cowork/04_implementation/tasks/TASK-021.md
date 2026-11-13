@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress — 로컬 구현/UPS 시뮬레이션 수락, native T3 이월 |
-| 마지막 갱신일 | 2026-11-02 |
-| 다음 액션 | S1~S3 EV-043 로컬 수락·REV-042 Closed, 다음 구현 TASK-026. native T3·장기 통합 TASK-024 별도 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-009·TASK-006 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
@@ -59,3 +59,11 @@ Human 「TASK-021 UPS 긴급 계획·모의 시험까지 진행하자」 및 실
 - source `a5fafcd`·검증파일139개 commit blob 일치. 두 Rust1.96/MSRV1.85 workspace각434 Pass(DB5개 일반회귀 ignore), 두 Rust16 feature/독립 consumer·RT allocator·fmt/clippy/doc Pass. Miri strict provenance seeds0..7: TC-011 non-IO10×8 + control4×8=112 Pass, 알람/RT 거절 할당·해제0/0. default/core에 새 network dependency 없음, Cargo.lock/의존 버전/unsafe/wire 불변.
 - **현재 PC ext4 수락:** 8/64MiB×전달0/50/250/1000ms·원점→차단3초·여유200ms를 두 Rust로 각각8조건 실행했다. rank1/2의64MiB 분배48/16MiB, 각8 receipt/metadata/source clock/바이트 복구 일치·sync 순서10→20·actual close 뒤 output 예약0. 두 도구체인16조건의 관측 최대1.803017545초로 work 기한2.8초 이내다. 각 child의 exit17/destructor 없는 중단·잘린 꼬리·parent 사전 oracle/새 reader/출력에서도8개를 대조했고 이전 completion은 복원하지 않았다.
 - ENOSPC/sync 실패·늦은 기한·더 이른 기한은 partial, 진행 중 큰 원본은 실제 guard Drop까지 보존했다. 단일 순차 합성 보호 부하 결과이며 P3 동시 부하/장기/RT/native·물리 전원 소실 내구성 수락으로 확대하지 않는다. **실물 UPS는 완료 차단 조건이 아니다.** 로컬 구현/UPS 모의 수락은 완료, Task 상태는 기존 정책대로 native 이월을 명시해 In Progress로 유지한다. 다음 구현 TASK-026, TASK-018은 별도 FR-015 승인 대기다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 장기 24h·전원 차단: [TASK-024](TASK-024.md)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

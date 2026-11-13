@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-004·005·011 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-11 |
-| 다음 액션 | S1·S2 로컬 완료·Human 승인(S2 2026-11-11 「승인」, [EV-071](../../05_verification/verification_evidence.md#ev-071)). 잔여: 측정 도중 취소 시험(사전 취소만 시험), NFR-008 계수는 TASK-029, native T3. 다음 TASK-029 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-027(S1 계약)·TASK-017·TASK-023(S2의 정확도 oracle) |
 | 예상 소요 | S1 1~2 + S2 2~3 인일, 측정/리뷰 대기 제외 |
 
@@ -58,13 +58,13 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger/src/logger/preset.rs`, `crates/dot-logger/src/diagnostics/calibrate.rs`, `crates/dot-logger-cli`. 아직 생성된 코드 경로가 아니다.
+구현 경로: `crates/dot-logger/src/logger/preset.rs`, `crates/dot-logger/src/calibrate.rs`, `crates/dot-logger-cli`(2026-11-13 정정: 초기 계획 문구가 남아 있었다).
 
 첫 실패/리뷰 조건: **입력 부하 대비 예산 부족을 항목·부족량과 함께 거절하고, 사용자 고정 값을 덮어쓰지 않으며, 미측정 장비 값은 Unavailable과 대체 근거로 표시**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-013`의 preset/auto preset 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] (EV-052·071 Red) 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] (TC-013 F12·F13·F19·F20) 최소 구현 후 관련 `TC-013`의 preset/auto preset 하위 시나리오를 통과시킨다.
+- [x] (EV-072 REV-053 조치 포함) 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## Human 확인 필요 사항
 
@@ -74,9 +74,17 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 
 ## 완료 기준
 
-- [ ] S1 결정적 사이징·preset, S2 auto preset 측정·저장·적용과 금지 규칙 검증.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계(측정 중 취소·디스크 reserve 포함)를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] (EV-052·071) S1 결정적 사이징·preset, S2 auto preset 측정·저장·적용과 금지 규칙 검증.
+- [x] (EV-052·071·078) 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] (사전 취소·reserve EV-071, 측정 중 취소 2026-11-13 EV-078) 실패/포화·취소/종료·예산 경계(측정 중 취소·디스크 reserve 포함)를 해당 범위에서 검증한다.
+- [x] Human 리뷰 완료 — S1 REV-051(2026-11-07), S2 2026-11-11 「승인」·REV-053(2026-11-12 「승인」). 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S1 [EV-052](../../05_verification/verification_evidence.md#ev-052), S2 [EV-071](../../05_verification/verification_evidence.md#ev-071).
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 측정 도중 취소 시험: 2026-11-13 추가·변이 확인(EV-078)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

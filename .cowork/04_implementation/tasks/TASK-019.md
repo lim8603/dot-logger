@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-01 |
-| 다음 액션 | S1/S2/S3 로컬 기능 수락(EV-037~039); 통합/환경·공개 후 native 후속, 다음 개발 후보 TASK-020 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-006·TASK-007 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -68,7 +68,7 @@ S1은 Task 전체 완료가 아니며 MS-006 In Progress·TC-008 Partial·Gate4/
 - [x] 기능 부재 compile Red·실제 query dialect 불일치 Red → 명시 JSON annotations와 엄격한 parser로 Green. 신규 TCP/실패/예산9개, 실제 DB3개: typed write/query·i64/u64/u32 경계/정확 ns·같은 시각 병합과 adapter 거절·partial type conflict 뒤 유효 bool 행 보존.
 - [x] 두 Rust workspace394개씩(실제 DB3개는 일반 회귀에서 ignore), 별도 실제 DB 시험3개씩·16 feature/독립 core·RT allocator·fmt/clippy/API docs 검증. 최종 명령/형상은 EV-038을 따른다.
 - [x] S3 원 Delivery/schema projection·DatabaseAcknowledged/Unknown·원본/IO 수명과 로컬 파일 영향 관측은 EV-039/아래 S3에서 완료했다.
-- [ ] 통합/환경 수락: TASK-020/026 실앱·PC/RT/RSS/비용·공개 후 native(T3), TC-008/MS 전체·Gate4/5 미완료.
+- [x] (2026-11-13 이관: 실앱 TASK-026·native TASK-024(T3)·성능 TASK-023) 통합/환경 수락: TASK-020/026 실앱·PC/RT/RSS/비용·공개 후 native(T3), TC-008/MS 전체·Gate4/5 미완료.
 
 이후 브리핑에서는 위 표의 S1/S2/S3/통합·환경 **전체 단계**를 완료/현재/미착수/대기로 구분해 보여준다. 이는 사용자 선호를 [소통 규칙](../../01_cowork_protocol/communication_convention.md)에 반영한 것이다.
 
@@ -85,3 +85,10 @@ S1은 Task 전체 완료가 아니며 MS-006 In Progress·TC-008 Partial·Gate4/
 - [x] 전체 회귀에서 발견한 기존 proxy fixture의 자식 업로드 작업 미합류를 수정했다. 자식까지 abort/await한 뒤 기존 예약0 검사를 유지, 두 Rust각5회+최종 workspace 회귀 Pass. 제품 remote transport 동작은 변경하지 않았다.
 
 **로컬 기능 S1/S2/S3는 수락 완료**다. Task In Progress·TC-008 Partial·MS-006/Gate4/5 미완료는 통합/환경·정량 성능/장기·공개 후 native가 남았기 때문이다. TASK-020/026 등의 기능/실앱과 native T3를 별도 추적하며 임의 면제하지 않는다. 다음 개발 후보는 TASK-020이며 이번 S3 요청으로 자동 착수하지 않았다. TASK-018은 별도 FR-015 범위 승인 대기로 미착수다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-029/sourceeaf736c·REV-025 Closed; PC/RT 비용·오차/native·실앱 후속, 다음 후보 TASK-016 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-014·TASK-008 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -61,3 +61,11 @@ Human 「세션 마무리해줘. 다음 세션에서 TASK-015 시작하자」. �
 [EV-029](../../05_verification/verification_evidence.md#ev-029) sourceeaf736c·source101개/검사14개·Miri224·commit blob일치, [REV-025](../../05_verification/reviews/REV-025_TASK-014-015_INDEPENDENT_REVIEW.md) Closed. 제출/대여 거절 총계와 capacity/contract/lifecycle 6개 범주를 보존하고 용량 거절만 압력·부하율에 사용한다. 시도율은 재시도 중복을 포함하므로 고유 입력/손실 records로 비교하지 않는다. target_totals 호스트 유한 이력을 실제 window 양끝에 맞추는 절차·실제 completion 연결 시험, poison reset 복구·history_len Observation 반환 migration을 반영했다. CounterCell128B·RT 할당/해제0·추가 이력 크기의 checked control 예약을 확인했다.
 
 Human 「권고대로 진행」과 기존 위임으로 API 정정·로컬 수락/마감을 수행했다. 기존 계약/검증의 이력은 보존하며 실제 비용≤5%·PC/RT 예측 오차≤20%·native 공개 후T3·실앱/운영 backend는 여전히 미완료다. TASK-016 Planned/미착수, Task/MS/TC 전체·Gate4/5 미완료를 유지한다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 이 PC 정량 성능·RT: [TASK-023](TASK-023.md)에서 수행한 범위(EV-064~070)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted, ADR-007 범위 안. 소유 모델 [ADR-012](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md) Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-07 |
-| 다음 액션 | S1~S3 로컬 완료. 다음 TASK-028 S1. 잔여: 성능(TASK-023 S2/S3)·NFR-008 정식 계수(TASK-029)·native(T3), S3d는 이월 T4 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-006·TASK-008·TASK-014·TASK-021 |
 | 예상 소요 | 4~6 인일, 리뷰 대기 제외 |
 
@@ -90,6 +90,15 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 - [x] 기본 worker·typed channel·shutdown 보고 구현, 기존 RT·예산·완료 계약 회귀 없음(로컬, rt-allocation 포함).
 - [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 리뷰 완료 — S1 결정 2026-11-05, S2~S3e는 REV-051 Closed(2026-11-07 「승인」). 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013). 실행 결과: S2 [EV-047](../../05_verification/verification_evidence.md#ev-047), S3a [EV-048](../../05_verification/verification_evidence.md#ev-048), S3b [EV-049](../../05_verification/verification_evidence.md#ev-049), S3c [EV-050](../../05_verification/verification_evidence.md#ev-050), S3e [EV-051](../../05_verification/verification_evidence.md#ev-051). 성능 수치는 TASK-023 S2/S3가 이 경로로 측정한다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- S3d 소형 slot 직접 encode: 이월 T4(미도래)
+- facade `Logged::Skipped`(설정 변경 뒤 level 필터) 경로 시험 공백: [TASK-033](TASK-033.md) 공백 목록(EV-078)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

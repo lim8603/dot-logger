@@ -9,8 +9,8 @@
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | Planned |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | 현재 PC P6 장애/24h·UPS 모의 차단/복구 oracle 준비, native/OS 교환은 공개 후 |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 현재 PC P6 장애/24h·UPS 모의 차단/복구 oracle 준비. native·다른 OS 행(GAP-004)은 T3 공개 후 — 기능 Task의 native 잔여를 이 Task로 통합(2026-11-13) |
 | 의존 | TASK-023 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -41,3 +41,11 @@
 ## 2026-10-31 수락 방식·검증 시점 갱신
 
 Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)에 따라 실제 장치 시험은 TASK-022의 현재 PC 실측으로 대체하고 UPS는 시뮬레이션으로 판정한다. native는 GitHub 공개 완료 후 진행한다. 일반 Linux/RT는 실제 실행 커널을 기록하며 물리 전원 소실 내구성의 관측 결과로 표시하지 않는다. 기존 수치/예산/24h/소프트웨어 통합 목표와 선행 의존은 유지하며 이번 문서 갱신만으로 제품 시험을 Pass 처리하지 않는다.
+
+## native·다른 OS 잔여 통합 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)으로 기능 Task(TASK-004~017·019~023·027~029)를 Done으로 닫으면서, 각 Task에 흩어져 있던 native·다른 OS 잔여를 이 Task가 소유한다. 트리거는 그대로 T3(GitHub 공개 완료 확인)이다.
+
+- GitHub CI 6 contracts·audit·raw-memory·`integration-surface` job을 공개 시점 source hash로 실행·확인(GAP-004).
+- Windows/macOS 등 Tier 2 대상의 생성·읽기 교환(기존 범위).
+- 공개 전에는 CI 재시도나 계정·과금 조회를 하지 않는다(기존 결정 유지).

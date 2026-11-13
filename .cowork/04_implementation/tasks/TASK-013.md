@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-026 REV-022 로컬 조치/판정 수락·Closed; native T3·실앱/실측 잔여, TASK-014 후속 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-011·TASK-012 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -72,3 +72,10 @@ Human 「TASK-013까지 진행할래?」·「계속 이어서 진행해줘」에
 ## REV-022 조치 수락 — 2026-10-31 #011
 
 Human 「권고대로 진행하자」에 따라 EV-026 source92개/검사14개·Miri32·소스b3c08bd를 로컬 검증/위임 수락했다. REV-022 Closed이며 상세는 REV §8과 API§14.5를 따른다. RV-049 포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성과 화면 불연속 표시는 TASK-020 후속이다. heartbeat wire 변경은 하지 않았다. 기존 EV-023/025는 이전 형상 근거로 보존하고 현재 조치는 EV-026을 사용한다. native T3·실앱/성능·Gate4/5 미완료는 유지한다. TASK-014는 이번 지시에 따라 착수한다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

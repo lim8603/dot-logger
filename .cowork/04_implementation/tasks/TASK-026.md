@@ -2,16 +2,16 @@
 
 | 항목 | 값 |
 |---|---|
-| Intent / Milestone | INT-001 / MS-006 |
+| Intent / Milestone | INT-001 / MS-007 (2026-11-13 MS-006에서 이동) |
 | Story | US-001·002·003·004 |
 | 요구사항 | FR-001 FR-002 FR-004 FR-005 FR-006 FR-010 FR-017 CON-003 |
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
 | 상태 | Planned |
-| 마지막 갱신일 | 2026-10-26 |
-| 다음 액션 | 실제 앱에서 logger off/on 동일 제어 시나리오·record→query→replay→관측 조절 |
-| 의존 | TASK-020·TASK-021 |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 프로젝트 마지막 단계에서 진행(일정 판단 밖). 그 전에는 착수하지 않음 |
+| 의존 | TASK-020·TASK-021, 라이브러리 기능 MS(MS-002~006·008·009) 완료 |
 | 예상 소요 | 2~4 인일, 장비/리뷰 대기 제외 |
 
 ## 진입 조건
@@ -37,3 +37,7 @@
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-007](../../05_verification/test_case.md#tc-007). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+
+## 위치 변경 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 이 Task는 라이브러리 완료나 일정 판단의 조건이 아니다. dot-logger는 범용 라이브러리이고 dot-probe는 첫 사용처다. 실사용처 적용은 프로젝트 마지막 단계에서 진행하며, 결과는 사용 사례 확인과 회귀 발견에 쓴다. 다른 Task가 실사용처 미적용을 이유로 열려 있지 않도록 MS-006에서 MS-007로 옮겼다. 다른 Task에서 넘어온 실사용처 잔여(TASK-004·012~017·019~021·023·027·028)도 이 Task가 소유한다.

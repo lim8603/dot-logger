@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-11 |
-| 다음 액션 | RT 요청(2026-11-11) 1~4단계 완료 — generic·RT FIFO 행 모두 miss 0([EV-070](../../05_verification/verification_evidence.md#ev-070)), 21:39 generic 복귀 확인. 실앱·장기 RT는 TASK-026·024 뒤 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | Done — local-pc-v1 프로필 승인(EV-021)·generic/RT capability와 RT 행 확인(EV-070). native·다른 OS는 TASK-024(T3) |
 | 의존 | TASK-001 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -26,16 +26,16 @@
 첫 실패/리뷰 조건: **문서 검토: 장비/OS/CPU/SSD/FS/NIC/UPS·제어 주기·deadline 누락 탐지**.
 
 - [x] 문서/환경 검토: 장비 미확정과 RT 설치/실행 혼동을 확인하고 ADR-011로 수락 기준·관측 사실을 구분했다.
-- [ ] 최소 구현 후 관련 `TC-012`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] (TASK-023 S3·RT 행 EV-064~070) 최소 구현 후 관련 `TC-012`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] (EV-070 harness `37c71ad`·회귀) 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
 - [x] Human 검증 장비·UPS 방법 확정 — 현재 PC 실측을 실제 장치 시험으로 대체, UPS 시뮬레이션 수락(ADR-011).
 - [x] P0 도구 계획/부하·제어 주기/deadline·저장 경로/예산·수치 수락 프로필 고정 — local-pc-v1 Human 승인.
-- [ ] 실행 커널별 환경/capability 확인 — generic 관측 완료, RT 행은 해당 커널 부팅 후. GitHub native는 공개 완료 후 이월.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] 실행 커널별 환경/capability 확인 — generic 관측 완료, RT 커널 부팅·capability 확인 완료(EV-070). GitHub native는 공개 완료 후 이월.
+- [x] (EV-021·EV-070) 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] (프로필 점검 거절·RT 권한 거절 시 실패 — EV-021·070) 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [x] Human 수치 프로필 리뷰 완료 — 2026-10-31 「승인」. 실제 실행/제품 검증은 별도이며 새 H/J 결정이 필요하면 기록한다.
 
 테스트 정의: [TC-012](../../05_verification/test_case.md#tc-012). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
@@ -144,3 +144,10 @@ RT 시험이 필요한 시점에는 AI가 먼저 시험 harness·측정 항목/�
 **합계:** SSD 약 135 GB, 실행 약 20분 + 재부팅 2회. RT 결과는 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.
 
 **결과(2026-11-11):** 1단계 generic 20:12~20:20, 3단계 RT(`7.0.0-38-realtime`, realtime=1) 20:42~20:50 — 두 커널 모두 모든 행 miss 0, RT는 부하 중 wake 꼬리 감소(P1 최대 108 → 25 µs). 유휴 wake 약 1 ms는 두 커널 공통(C-state 추정). 실제 SSD 약 141 GB, RT 부팅은 데스크톱 inhibitor 거절과 Human의 첫 RT 세션 재시작으로 예약 2회. [EV-070](../../05_verification/verification_evidence.md#ev-070). 4단계 `rt-boot.sh back` → 21:39 generic 부팅 확인(`boot.log`).
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004) — GitHub native와 다른 OS 행
+- 실앱·장기 RT: TASK-026·TASK-024

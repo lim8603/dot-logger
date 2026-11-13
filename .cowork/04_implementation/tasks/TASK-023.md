@@ -8,10 +8,10 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-11 |
-| 다음 액션 | S3 완료(EV-064·065). T5 해소(EV-066~068). RT 행 완료 — generic·PREEMPT_RT FIFO 모두 control·safety miss 0, P1·P3 정상 부하([EV-070](../../05_verification/verification_evidence.md#ev-070)). generic 복귀 완료, 다음 TASK-028 S2. P4·P5 이월 |
-| 의존 | TASK-027(S2)·TASK-026(실앱 행)·TASK-017·TASK-021·TASK-022 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | Done — P0~P3 합성·계측 비용·generic/RT 행(EV-064~070). P4·P5·RV-049는 이월 T7, 실앱 행은 TASK-026 |
+| 의존 | TASK-027(S2)·TASK-017·TASK-021·TASK-022 (실앱 행은 2026-11-13 TASK-026으로 이관) |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
 ## 진입 조건
@@ -26,15 +26,15 @@
 첫 실패/리뷰 조건: **P0 기준선 없는 비율·RAM 수락만 잰 처리량을 결과에서 거절**.
 
 - [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다. — S1 판정 규칙 Red→Green(EV-046)
-- [ ] 최소 구현 후 관련 `TC-012`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] (S2·S3 EV-054~065) 최소 구현 후 관련 `TC-012`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] (EV-066~068·070) 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] P1~P5 무결성·호출 p99/p99.9·동기화 포함 처리량·TCP 대비·메모리 3종·계측 비용.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] P1~P3 무결성·호출 p99/p99.9·동기화 포함 처리량·메모리·계측 비용(EV-064·065), RT 행(EV-070). P4(TCP 대비)·P5는 2026-11-08 Human 결정으로 이월 T7.
+- [x] (EV-064~070) 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] (판정 규칙 거절 NoFinalSync·Incomplete·MissingBaseline 등 EV-046·056) 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] Human 리뷰 완료 — S3 판정 2026-11-10 「a」, REV-052·053 Closed(2026-11-08·11-12 「승인」). 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-012](../../05_verification/test_case.md#tc-012). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
@@ -74,3 +74,12 @@ S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../cra
 2026-11-07 독립 리뷰: [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional, P1 2·P2 1). 공개 L4 sync coverage·부분 scope watermark와 P0/logger 측정 구간을 후속 개발 세션에서 조치·검증한 뒤 S2c/S3로 진행한다. EV-054·055의 로컬 구현·과거 실행 결과와 정식 측정 NotRun은 유지한다.
 
 2026-11-08 #001 조치: RV-128·129(공개 L4 sync 경계) `97e2b12`, RV-130(측정 구간) `f8f2859` — [EV-056](../../05_verification/verification_evidence.md#ev-056). **판정 규칙 추가:** 부하와 control/safety는 공통 `Gate` 시작 시각부터 계시하고(setup 제외), `LoadWindow`가 skew 0·control 구간 99% 이상 중첩일 때만 off/on 비교에 쓴다(아니면 `NotConcurrent`). 최종 내구화 tail은 부하 구간과 분리해 보고한다. S3의 예열 10초 분리는 S3 구현에서 이 공통 시작 기준으로 둔다(아직 미구현).
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- P4(TCP receiver 대비)·P5, 원격 포화 회복(RV-049): 이월 T7(2026-11-08 Human 이월 결정)
+- 실앱 부하·화면 행: 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)
+- 장기 24h·전원 차단: [TASK-024](TASK-024.md)
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)

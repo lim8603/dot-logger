@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-02 |
-| 다음 액션 | S1~S3 EV-040~042 로컬 수락, 통합/환경 TASK-026/022·native T3 대기. 다음 구현 TASK-021 |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-013·TASK-016·TASK-019 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -77,3 +77,10 @@ TASK-018은 별도 FR-015 범위 승인 대기로 미착수다. S1 수락은 Tas
 - 화면 최대64행/실행32행·payload64B·수신1슬롯·종료 전용1행, 시나리오 대기10초·서버 정리 관측2초·SDK250ms·lease1500ms다. 별도 JSON/runtime/OS headroom과 선언8MiB/external4MiB를 구분한다. 무제한 retry/재전송/복원·heartbeat는 없다.
 - RV-083 큰 u128 schema JSON panic을 실제 Red→hex/큰 정수·시각 문자열/source clock 구조 보존 Green으로 조치했다. 기능/renderer 부재 Red 후 신규8개, 두 Rust workspace각421개(일반 회귀 DB5개 ignore)·default/remote·fmt/clippy/doc·CLI plan0/run0/invalid4/stdout-full4·default dependency graph Pass. source `0b02274`·검증파일134개 commit blob 일치, 제품 src/lock 불변. [EV-042](../../05_verification/verification_evidence.md#ev-042)·[REV-041](../../05_verification/reviews/REV-041_TASK-020_TAIL_SCREEN.md) Closed·기존 위임 로컬 수락.
 - S1~S3 로컬 구현 잔여를 마쳤지만 TASK-020 In Progress·TC-007 Partial·MS-006/전체 Gate4/5 미완료다. 실제 지속 dot-probe/화면·장기 tail/재구독 복원·PC/RT/UPS/성능/native(T3)는 미수락이다. 새 Miri/실제DB 재실행은 하지 않았다. 다음 구현 단위는 TASK-021, TASK-018은 FR-015 별도 승인 대기로 미착수다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 실사용처 적용: [TASK-026](TASK-026.md)(마지막 단계, 일정 판단 밖)

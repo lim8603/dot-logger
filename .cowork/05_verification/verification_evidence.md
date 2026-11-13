@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-02 / EV-001~043 |
+| 버전 | 2026-11-13 / EV-001~078 |
 
 ---
 
@@ -1231,16 +1231,26 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **독립 판독(저장소 밖):** facade 임시 예제(실행 뒤 삭제)로 기록 → release 아닌 dev CLI `export --standard` exit 0. ① MCAP 명세만으로 짠 stdlib Python 판독기(vendor `mcap` crate와 별개 코드): magic·header profile `''`·schema 2개·채널 2개·메시지 10건·chunk CRC 일치. ② 파일에서 꺼낸 schema 바이트 = `pose.fds`, `protoc 3.21.12 --decode=test.Pose`가 payload를 x 0.5/y -0, x 1.5/y -1로 디코딩, `--decode=dot_logger.RecordMeta`가 channel 2·sequence·mono·real(=log_time)·revision·level 디코딩.
 - **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0, core-only clippy 0, workspace 테스트 1.96.0·1.85.0 각 **568 passed**(561 + 신규 7)·5 ignored, rustdoc all-features·core-only `-D warnings` 0(기존 `output filename collision` 경고만), 표면 가드 Pass(자가 시험 포함 bless 1줄).
 - **미실행:** Foxglove/Lichtblick GUI 판독(이 세션에 GUI 없음), 공식 `mcap` Python 라이브러리 대조(이 PC에 pip 없음, 시스템 패키지 설치는 하지 않음), `check-feature-matrix.py`(feature 경계 변경 없음 — `standard`는 core), 큰 파일 export 시간·메모리 측정, native(T3). Miri — unsafe·동시성 변경 없음.
-- **한계:** 출력은 무압축이다. 여러 segment는 파일마다 따로 export한다(병합 없음). real 시각이 뒤로 가면 표준 도구의 `log_time` 정렬이 기록 순서와 달라진다(메타 `mono`로 복원). descriptor 없는 채널과 protobuf 외 encoding은 표준 도구에서 raw bytes로 보인다.
+- **한계:** 출력은 무압축이다. 여러 segment는 파일마다 따로 export한다(병합 없음). real 시각이 뒤로 가면 표준 도구의 `log_time` 정렬이 기록 순서와 달라진다(메타 `mono`로 복원). ~~descriptor 없는 채널과 protobuf 외 encoding은 표준 도구에서 raw bytes로 보인다.~~ **2026-11-13 정정:** 확인 없이 쓴 예측이었고 틀렸다. Foxglove는 모르는 message encoding(`vendor-blob`)을 raw bytes로 보여 주지 않고 해당 토픽만 `Unsupported encoding` 오류로 표시한다(Human 판독). 나머지 토픽 판독과 처리 방식 결정은 TASK-030 S1 리뷰에서 기록한다.
+
+## EV-078 — 2026-11-13 완료 기준 변경: 커버리지 기준선·공백 시험 2건·Task 전수 판정
+
+- **판정:** 로컬 **Pass**. Human 결정(2026-11-13): 「실사용처 테스트는 마지막에 진행은 하겠지만, 일정 판단에 두지 말고, 일정 판단은 유닛테스트 케이스 커버리지, 실제 로깅 사용 사례 조사 등을 통해서 마무리」·「바뀐 기준으로 TASK도 완료처리 할 껀 완료처리하고 전수 갱신」·「커버리지 도구는 필요한건 알아서 설치」. 기준은 [quality_gate](quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정).
+- **도구:** rustup component `llvm-tools`(toolchain 1.96.0, LLVM 22.1.2), `cargo-llvm-cov 0.9.1`(`cargo install --locked`, 사용자 `~/.cargo/bin`). 전역 rustup default는 바꾸지 않았다.
+- **커버리지 기준선:** `cargo llvm-cov --workspace --all-features` — 시험 546 passed·0 failed(doctest 제외, `#[ignore]` 5개 미실행). 라인 **91.15%**(18,826 / 미실행 1,667), 함수 90.92%(1,796 / 163), 리전 88.27%(28,005 / 3,284). 85% 미만 파일의 미실행 줄을 직접 보고 분류했다 — [TASK-033](../04_implementation/tasks/TASK-033.md#커버리지-기준선과-공백-분류--s1-2026-11-13). 요약: `Display`·`Debug`·const fn 같은 비동작 줄이 다수이고, 실제 동작 공백은 CLI remote `blob`·`completion`·`replay` 명령과 blob payload 출력, facade `Skipped`(설정 변경 뒤), client `diagnostics/bridge.rs`의 검증·취소 분기다.
+- **공백 시험 추가(Red는 변이로 확인):** ① `tc_013_facade::f8_channel_from_another_logger_is_rejected_and_never_stored` — 세션 검사를 끈 변이에서 실패. ② `tc_013_calibrate::f19_cancellation_during_measurement_stops_and_removes_the_probe` — TASK-028의 「측정 도중 취소」 잔여. 루프 취소 검사를 끈 변이에서 `Ok(Profile)`(512 MiB, tmpfs)로 실패. 두 변이 모두 원복했고 `git diff`로 제품 코드 무변경을 확인했다.
+- **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features -D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 **570 passed**(568 + 신규 2)·0 failed·5 ignored.
+- **Task 전수 판정:** Done 22건(TASK-004~017·019~023·027~029). 잔여 소유처는 native·다른 OS → TASK-024(T3, GAP-004), 실사용처 → TASK-026(MS-007로 이동, 마지막 단계), P4·P5·원격 포화 회복(RV-049) → 이월 T7, S3d → T4. 신규 TASK-033(사용 사례 조사·커버리지 판정). MS-002~006·008 Done.
+- **미실행/한계:** 커버리지에는 doctest·`#[ignore]` 성능 시험·examples 실행이 들어가지 않는다. 분기(branch) 커버리지는 nightly 전용이라 재지 않았다. 미분류 파일 6개는 TASK-033 S3에서 분류한다. native·장기·실사용처 시험은 계속 Not Run이다.
 
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
 |---|---|---|---|
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
-| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여. TASK-020 S1~S3 EV-040~042 로컬 수락, TASK-021 EV-043 로컬 구현/UPS 시뮬레이션 수락. 지속 실앱/환경/장기·native 후속 | AI, Task별 TDD/인수·실측 및 공개 후 GAP-004 | Open |
+| GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여. TASK-020 S1~S3 EV-040~042 로컬 수락, TASK-021 EV-043 로컬 구현/UPS 시뮬레이션 수락. 지속 실앱/환경/장기·native 후속 | AI. 2026-11-13 완료 기준 변경으로 기능 Task는 Done(EV-078). 남은 실사용처는 TASK-026, 장기는 TASK-024, native는 GAP-004 | Open — 실사용처·장기 잔여 |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
+| GAP-004 | TASK-004 f0ce6ee run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 902043b. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, 소유 Task: TASK-024(2026-11-13 통합). T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 공개 완료 후 재개 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `13523f1`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |

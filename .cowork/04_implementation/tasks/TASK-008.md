@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~010 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-10-31 |
-| 다음 액션 | EV-012/013 Human 승인·현재 PC 실측 준비, native 공개 후(T3) |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-007 |
 | 예상 소요 | 2~3 인일, 장비/리뷰 대기 제외 |
 
@@ -88,3 +88,11 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 ## 후속 Human 승인 — 2026-10-31
 
 Human 「승인, 다음작업 진행하자」로 EV-012/013의 구현/조치 최종 리뷰를 승인했다. 관련 리뷰 Closed·Human 리뷰 체크 완료. 앞선 승인 대기 본문은 이력이며 현재 PC 실측/UPS 시뮬레이션·native 공개 후(T3) 잔여로 In Progress를 유지한다. 다음 작업은 TASK-022 프로필 구체화다.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- native·다른 OS: [TASK-024](TASK-024.md)(T3, GAP-004)
+- 이 PC 정량 성능·RT: [TASK-023](TASK-023.md)에서 수행한 범위(EV-064~070)
+- 장기 24h·전원 차단: [TASK-024](TASK-024.md)

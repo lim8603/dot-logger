@@ -8,9 +8,9 @@
 | 설계 | [인터페이스](../../03_design_artifacts/interface_contract.md) · [CLI](../../03_design_artifacts/ui_spec.md) |
 | ADR | ADR-007 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-12 |
-| 다음 액션 | S1~S4 로컬 완료·Human 승인(2026-11-12). 잔여: CI `integration-surface`·레시피의 native 실행(T3) |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-13 |
+| 다음 액션 | 없음 — Done(2026-11-13 완료 기준 변경). 잔여는 아래 「완료 판정」 절의 소유처로 이관 |
 | 의존 | TASK-027·TASK-028 |
 | 예상 소요 | 1~2 인일, 리뷰 대기 제외 |
 
@@ -31,7 +31,7 @@
 
 | 단위 | 내용 | 상태 |
 |---|---|---|
-| S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | 진행 |
+| S1 | `scripts/check-api-surface.py`(개수·snapshot)·`scripts/check-recipes.py`(줄·개념·금지 항목) | Human 승인 [EV-073](../../05_verification/verification_evidence.md#ev-073) |
 | S2 | `examples/recipes/` L1·L2·L3(tracing·remote), `Shutdown::is_success()` | Human 승인 [EV-073](../../05_verification/verification_evidence.md#ev-073) |
 | S3 | quickstart·README 축소·계약 상세 rustdoc 이동 | Human 승인 [EV-074](../../05_verification/verification_evidence.md#ev-074) |
 | S4 | facade 전용 `dot_probe_facade` 예제 추가·support 줄 수 비교 기록(pipeline은 고급 경로로 유지, 2026-11-12 Human 결정) | Human 승인 [EV-075](../../05_verification/verification_evidence.md#ev-075), Human 승인 |
@@ -42,15 +42,21 @@
 
 첫 실패/리뷰 조건: **레시피 예제가 support 모듈 없이 빌드·실행되고, 연동 코드 줄 수·도입 개념 수가 NFR-008 승인 수치를 넘으면 검사 실패**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-013`의 레시피 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] (EV-073 Red ①~④) 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] (F21·F22) 최소 구현 후 관련 `TC-013`의 레시피 하위 시나리오를 통과시킨다.
+- [x] (EV-074·075·076) 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] 레시피 3단계·quickstart·rustdoc 이동·예제 이전과 접점 측정 결과.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 레시피의 실패/포화·종료 처리 예시가 실제 계약과 일치한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] (EV-073~075) 레시피 3단계·quickstart·rustdoc 이동·예제 이전과 접점 측정 결과.
+- [x] (EV-073~076) 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] (`check-recipes.py`·L1~L3 실행) 레시피의 실패/포화·종료 처리 예시가 실제 계약과 일치한다.
+- [x] Human 리뷰 완료 — 2026-11-12 「승인」, REV-054 Closed. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-013](../../05_verification/test_case.md#tc-013) F21·F22. 실행 결과: [EV-073](../../05_verification/verification_evidence.md#ev-073)~[EV-075](../../05_verification/verification_evidence.md#ev-075) 로컬 Pass, 2026-11-12 Human 승인.
+
+## 완료 판정 — 2026-11-13
+
+[완료 기준 변경](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)에 따라 **Done**으로 닫는다. DoD 범위의 시험과 로컬 회귀, Human 리뷰(또는 위임 수락)는 이 문서의 EV·REV 기록으로 끝났다. 1.96.0·1.85.0 전체 회귀와 커버리지 기준선은 [EV-078](../../05_verification/verification_evidence.md#ev-078)이다. 아래 잔여는 소유처로 옮긴다. 미실행 상태는 그대로이며 Pass로 바꾸지 않는다.
+
+- CI `integration-surface`·레시피 native 실행: [TASK-024](TASK-024.md)(T3)

@@ -129,6 +129,61 @@ fn f19_reserve_shrinks_the_write_limit() {
     assert_eq!(temp.entries(), 0);
 }
 
+/// TASK-028 residual (EV-071): cancellation while blocks are being written,
+/// not only before the run. A watcher cancels once the probe holds data; the
+/// run must stop with `Cancelled` and remove the probe and its directory.
+#[cfg(target_os = "linux")]
+#[test]
+fn f19_cancellation_during_measurement_stops_and_removes_the_probe() {
+    fn probe_bytes(dir: &Path) -> u64 {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return 0;
+        };
+        entries
+            .filter_map(Result::ok)
+            .map(|e| {
+                let path = e.path();
+                if path.is_dir() {
+                    probe_bytes(&path)
+                } else {
+                    e.metadata().map_or(0, |m| m.len())
+                }
+            })
+            .sum()
+    }
+    let temp = Temp::new();
+    let cancel = go();
+    let done = AtomicBool::new(false);
+    // At most 512 MiB if the watcher were never scheduled; it normally
+    // cancels after the first 8 MiB block.
+    let calibration = Calibration::new(&temp.0)
+        .write_limit(512 * MIB)
+        .time_limit(Duration::from_secs(60))
+        .disk_reserve(0);
+    let (result, seen) = std::thread::scope(|s| {
+        let watcher = s.spawn(|| {
+            while !done.load(Ordering::Acquire) {
+                let seen = probe_bytes(&temp.0);
+                if seen > 0 {
+                    cancel.store(true, Ordering::Release);
+                    return seen;
+                }
+                std::thread::sleep(Duration::from_micros(200));
+            }
+            0
+        });
+        let result = calibration.run(&cancel);
+        done.store(true, Ordering::Release);
+        (result, watcher.join().unwrap())
+    });
+    assert!(seen > 0, "the watcher must observe written data first");
+    assert!(
+        matches!(result, Err(CalibrateError::Cancelled)),
+        "{result:?}"
+    );
+    assert_eq!(temp.entries(), 0, "probe file and directory are removed");
+}
+
 #[test]
 fn f19_cancellation_and_invalid_input_leave_no_file() {
     let temp = Temp::new();

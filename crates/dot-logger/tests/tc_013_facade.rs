@@ -240,6 +240,30 @@ fn f8_lookup_errors_are_explicit() {
     assert!(report.is_success(), "{report:?}");
 }
 
+/// TASK-033 coverage gap: a `Channel` is bound to the logger that issued it,
+/// even when another logger registered the same topic and schema.
+#[test]
+fn f8_channel_from_another_logger_is_rejected_and_never_stored() {
+    let (temp_a, temp_b) = (Temp::new(), Temp::new());
+    let (a, b) = (start(&temp_a), start(&temp_b));
+    let foreign = a.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = b.take_writer("control").unwrap();
+    assert!(matches!(
+        writer.try_log(foreign, &Pose { x: 1, y: 2 }),
+        Err(dot_logger::logger::LogError::InvalidInput)
+    ));
+    drop(writer);
+    for (logger, temp) in [(a, &temp_a), (b, &temp_b)] {
+        assert!(
+            logger
+                .shutdown(Duration::from_secs(10))
+                .unwrap()
+                .is_success()
+        );
+        assert!(stored_poses(&temp.0).is_empty());
+    }
+}
+
 fn start(temp: &Temp) -> Logger {
     Logger::builder()
         .budget(budget())

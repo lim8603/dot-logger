@@ -1135,3 +1135,99 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 - **CLI:** `dot-logger export --standard --input <dot-logger file> --output <new file> [--max-record-bytes 268435456]`. 출력은 새 파일만(있으면 exit 3 Conflict), 실패·취소 시 만든 출력을 지운다. `--standard` 없으면 exit 2. 입력 오류(`NotDotLogger`·`TopicConflict`) exit 2, 한도·취소 exit 3, 손상·IO exit 4. JSON 행 `export`(messages·channels·meta_topic·truncated·skipped_records). 공통 summary의 `records`는 출력한 `record` 줄 수라 export에서는 항상 0이다(2026-11-15 확인, 변환 메시지 수는 `export` 행 `messages`). 명시하지 않으면 timeout 1시간(일반 5초 기본값 대신, Ctrl-C 취소 유지).
 - **descriptor 없는 채널(2026-11-15 Human 「권고대로」):** export는 payload 원문과 사용자 `payload_encoding`을 그대로 둔다(변환·`application/octet-stream` 대체 없음). 표준 도구가 모르는 encoding이면 그 토픽만 판독 불가다 — Foxglove는 `Unsupported encoding <encoding>` 오류로 표시하고 다른 토픽은 영향 없다. 표준 도구 판독이 필요한 채널은 `Schema::descriptor`로 descriptor를 붙이거나 표준 encoding(protobuf·json 등)을 쓴다.
 - **저장 계층:** `PayloadSchema.name: Option<String>`(1~256 bytes) — writer가 `payload_schema_name` metadata로 쓰고 metadata 예산에 포함, 복구는 설정과 일치할 때만 수락(bit 128). CLI manifest descriptor에 선택 `name`.
+
+## 22. TASK-034 facade에 core 기능 노출 — 계약안 2026-11-15
+
+상태: **계약안 — Human 승인 대기**(TASK-034 S1). 배경은 [TASK-034](../04_implementation/tasks/TASK-034.md)에 있다. §18.2가 원래 약속한 `Retention::event`와 §18.3의 레코드별 importance 지정 중 구현되지 않았던 부분도 여기서 마무리한다. 기존 RT 계약(무대기·무할당·Arc clone 0)과 손실 값 필수 원칙(§18.7 ②)은 유지한다.
+
+### 22.1 core 사실(2026-11-15 코드 조사)
+
+- **설정 변경:**
+  - core는 revision 두 벌(bank) 방식이다(`ConfigUpdates::apply_config(base, ChannelPatch{level, sample_every})`).
+  - 다음 apply를 받으려면 모든 producer가 직전 revision을 확인(ack)해야 한다. ack는 그 producer가 다음에 기록할 때 일어난다. 그 전까지는 `RevisionBusy`다.
+  - 첫 apply는 항상 받아들여진다.
+  - 적용된 revision은 각 기록에 저장되므로, 변경 전후 비교(FR-017, TASK-016)가 이 값으로 기록을 구분한다.
+  - facade가 이 기능을 쓰려면 `start()`에서 `enable_config_updates`를 호출하고, control 예산에 그 상태 크기를 더해야 한다(지금은 계산식에 항목이 없다).
+- **이벤트 보존:**
+  - core 모드 `RetentionMode::Event`(순환 삭제 + 보호)에서만 `protect_event(at, expires, now)`가 동작한다. 창은 `[at − pre, at + post]`이고 시각은 세션 단조 ns다.
+  - 동시 이벤트 수(`max_events`)와 보호 바이트(`protected_bytes`)를 넘으면 `EventQuota`로 거절한다.
+  - 보호는 `expires`나 `release_event`로만 풀린다.
+  - `SegmentLog`는 IO thread에 있고, 지금은 `Logger`에서 그곳까지 가는 경로가 없다.
+- **중요도:**
+  - 우선순위는 레코드 지정(`metadata.importance`) > 채널 매핑(`ImportanceMapping::{Default, ByLevel}`)이다.
+  - 예약은 `PoolQuota.important_slots`가 담당하는데, facade `WriterQuota`가 이를 **0으로 고정**한다. 그래서 중요 표시를 해도 포화 때 보호받지 못한다.
+
+### 22.2 ① 실행 중 채널 level·샘플링 변경
+
+```rust
+logger.set_channel(pose, Level::Warn, 1)?;          // 일반 경로(&self), Revision 반환
+// 원격: ApplyConfig(dot_logger.config_patch.v1)도 같은 경로로 처리
+```
+
+- `Logger::set_channel<T>(&self, Channel<T>, minimum: Level, sample_every: u32) -> Result<u64, ConfigError>`
+  - host thread에 요청을 보내고 결과를 기다린다(일반 경로, 기한 내부 고정).
+  - 성공하면 새 revision을 돌려준다.
+  - 각 writer는 다음 `try_log`에서 새 revision을 적용한다(기존 고정 비용, §18.3).
+- **쉬고 있는 writer 처리(결정 D1):**
+  - 아직 꺼내지 않은 writer와 tracing 내부 writer는 facade가 `Mutex` 안에서 직접 ack시킨다.
+  - 사용자가 꺼낸 writer가 쉬고 있으면 다음 변경은 `ConfigError::Busy`가 된다.
+  - 이 경우를 위해 `Writer::refresh(&mut self)`를 둔다. 기존 `producer().apply_pending_config()`와 같고, 무대기·무할당이다. 쉬는 thread가 주기적으로 부르면 된다.
+- 시작 시 초기값: `ChannelOptions::minimum(Level)`. 지금은 Trace로 고정이다.
+- 원격 `ApplyConfig`: facade host가 `handle_command`에 `config_updates()`를 넘긴다(지금은 `None` → Unsupported). route·memory 변경은 facade에서도 계속 거절한다(`InvalidPatch`·`RestartRequired`).
+- 이렇게 되면 `Logged::Skipped`에 도달할 수 있다. S2에서 시험한다.
+
+### 22.3 ② 이벤트 전후 구간 보존
+
+```rust
+.file_output("/data/logs", Retention::ring(4 * GIB)
+    .events(EventWindow::new(Duration::from_secs(30), Duration::from_secs(10))
+        .hold(Duration::from_secs(3600))
+        .limits(8, 512 * MIB)))
+let mark = logger.mark_event()?;                      // 일반 경로
+logger.release_event(mark)?;                          // 선택: 기한 전에 해제
+```
+
+- `Retention::events(self, EventWindow)`: 해당 출력을 core Event 모드로 바꾼다. `ring`에만 붙일 수 있고, `continuous`에 붙이면 `start()`가 거절한다.
+- `EventWindow::new(pre, post)`, `.hold(d)`, `.limits(max_events, protected_bytes)`:
+  - 보호 기한은 `expires = at + post + hold`다.
+  - hold·max_events·protected_bytes는 무엇이 남는지를 정하는 **손실 값**이라 필수다. 빠지면 `start()`가 `Missing`으로 거절한다.
+  - `protected_bytes`는 ring 크기보다 작아야 하고, 2 × segment 이상 여유가 남아야 한다. 아니면 `StartError::Retention`.
+- `Logger::mark_event(&self) -> Result<EventMark, EventError>`:
+  - host → IO thread로 보내, 이벤트 출력마다 `protect_event(now, expires, now)`를 실행한다.
+  - `EventMark`는 id와 보호된 출력 수를 담는다.
+  - `EventError` 종류: `NotConfigured`·`Quota`·`Closing`·`Failed`.
+- `Logger::release_event(&self, EventMark)`: 기한 전에 보호를 푼다.
+- 기한이 지난 보호는 host가 sync 주기마다 `expire_events`로 정리한다.
+- **RT thread에서 trigger(결정 D2):** S2 범위 밖이다. RT 코드는 `mark_event`를 부르는 일반 thread에 알리면 된다. 직접 RT trigger가 필요해지면 B1에 추가한다.
+
+### 22.4 ③ 중요도 지정
+
+```rust
+writer.try_log(alarm.important(), &msg)?;            // 레코드 단위(Channel::at과 같은 형태)
+.channel_with::<Status>("robot/status", ChannelOptions::new().important_from(Level::Warn))
+.writer_with("control", WriterQuota::small(64, 256).important(8))
+```
+
+- `Channel<T>::important(self) -> Self`: 레코드 지정 override다. 채널 토큰에 붙여 쓰며 무비용이다. `metadata()`에도 반영된다.
+- `ChannelOptions::important_from(Level)`: 그 level 이상을 Important로 분류한다(core `ByLevel`). 레벨로 분류하는 FR-009 옵션이다.
+- `WriterQuota::important(slots)`: Important 전용 예약이다(core `important_slots`). 기본은 0으로 지금과 같다.
+  - 중요도를 쓰는 채널이 있는데 예약이 0이면 `Plan`에 `PlanWarning::NoImportantReserve`가 뜬다.
+  - 예약을 손실 값으로 보아 필수로 만들지는 결정 D3이다.
+
+### 22.5 공개 표면(NFR-008)
+
+| 항목 | 추가 |
+|---|---|
+| 이름 있는 항목 | `Level`(재수출, 지금은 `Channel::at`에 쓰면서도 `dot_logger::capture`에서 가져와야 한다), `EventWindow`, `EventMark`, `EventError`, `ConfigError` → **+5, 30 → 35 / 60** |
+| 메서드 | `Logger::{set_channel, mark_event, release_event}`, `Writer::refresh`, `Channel::important`, `ChannelOptions::{minimum, important_from}`, `WriterQuota::important`, `Retention::events`, `EventWindow::{new, hold, limits}` |
+| variant | `PlanWarning::NoImportantReserve`, `StartError`(이벤트 설정 거절은 기존 `Retention`·`Missing` 재사용) |
+| 레시피 | L1~L3 변경 없음(선택 기능). 새 레시피를 추가할지는 결정 D4 |
+
+### 22.6 결정 요청
+
+| # | 항목 | 권고 | 대안 |
+|---|---|---|---|
+| D1 | 쉬고 있는 writer와 연속 변경 | 22.2대로: 꺼내지 않은 writer·tracing writer는 facade가 ack시키고, 쉬는 사용자 writer는 `Busy` + `Writer::refresh`. core 계약은 그대로 두며 revision 기반 비교(FR-017)도 유지된다 | (b) host가 쉬는 producer 대신 ack — core 경쟁 조건 설계가 필요해 ADR 대상. (c) facade 전용 atomic 필터 — 기록의 revision이 변경을 반영하지 않아 전후 비교를 잃는다 |
+| D2 | 이벤트 trigger 위치 | 일반 경로 `Logger::mark_event`만. RT trigger는 B1 | RT `Writer::mark_event` — 무대기 mailbox가 하나 더 필요하다 |
+| D3 | 중요 예약 기본값 | 0 유지 + `PlanWarning`. 기존 사용자 영향 없음 | 중요도를 쓰면 예약을 필수로(손실 값 원칙에 더 엄격) |
+| D4 | 레시피 | 추가하지 않고 README 절과 rustdoc 예제로 | L3 「event」 레시피 추가(+6줄 이하 규칙 적용) |

@@ -9,8 +9,8 @@
 | ADR | 없음 — 완료 기준은 [quality_gate](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정) |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-13 |
-| 다음 액션 | S2 — 로보틱스/RTOS 로깅 사용 사례 조사·UC 목록 |
+| 마지막 갱신일 | 2026-11-15 |
+| 다음 액션 | S3 — UC↔TC 대응표·공백 시험, 기능 공백 UC는 Human 결정 요청 |
 | 의존 | 없음(기존 시험·EV-078 기준선 사용) |
 | 예상 소요 | 3~5 인일, 리뷰 대기 제외 |
 
@@ -28,7 +28,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 커버리지 측정 도구와 기준선 | `cargo llvm-cov` workspace all-features 측정·파일별 미실행 줄 목록, 저위 파일 분류 — [EV-078](../../05_verification/verification_evidence.md#ev-078) | Done |
-| S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | Planned |
+| S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — [UC 31개](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
 | S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | Planned |
 | S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | Planned |
 
@@ -64,7 +64,7 @@
 ## 완료 기준
 
 - [x] S1 커버리지 기준선·파일별 공백 분류(EV-078).
-- [ ] S2 사용 사례 목록(출처 포함).
+- [x] S2 사용 사례 목록(출처 포함) — 2026-11-15, [조사 문서](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md).
 - [ ] S3 UC↔TC 대응표와 공백 시험(실제 동작 공백 0 또는 사유 기록).
 - [ ] S4 목표치 Human 승인과 재측정 결과.
 - [ ] Human 리뷰 완료.

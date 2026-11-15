@@ -47,7 +47,7 @@
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | In Progress | 2026-11-12 | S1 로컬 Pass(EV-077), GUI 판독 Human 확인 → S2 ADR | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |
 | TASK-031 | 원격 소비처 dot-logger-viewer와 시각화 bridge | MS-009 | INT-001 | US-003·004 | AI | Planned | 2026-11-04 | S1 — Foxglove WebSocket 프로토콜·SDK·Lichtblick 호환/라이선스 조사와 결정 | TASK-012·TASK-013·TASK-030 | [상세](tasks/TASK-031.md) | 2~3 |
 | TASK-032 | viewer 운영 대시보드 | MS-009 | INT-001 | US-004 | AI | Planned | 2026-11-04 | S1 — UI 방식(viewer 내장 웹·native·Foxglove 확장 패널) 결정 | TASK-031·TASK-016·TASK-017 | [상세](tasks/TASK-032.md) | 2~4 |
-| TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-13 | S2 — 로보틱스/RTOS 로깅 사용 사례 조사·UC 목록(S1 기준선 EV-078 완료) | 없음 | [상세](tasks/TASK-033.md) | 3~5 |
+| TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-15 | S3 — UC↔TC 대응·공백 시험(S1 기준선 EV-078, S2 UC 31개 2026-11-15 완료) | 없음 | [상세](tasks/TASK-033.md) | 3~5 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

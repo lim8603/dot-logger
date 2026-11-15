@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·원격 시각화; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
-| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S1 커버리지 기준선 완료(EV-078), 다음 S2 사용 사례 조사 |
+| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S1 기준선(EV-078)·S2 UC 31개 완료, 다음 S3 UC↔TC 대응 |
 | 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
 | 상태 | Green(로컬) — 1.96.0/1.85.0 각 570 Pass, 라인 커버리지 91.15%(EV-078). Done 25/33 Task. native·장기·실사용처 Not Run(소유 TASK-024·026) |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-15 / 세션 #001 / AI |
-| 세션 상태 | 진행 중. 다음: TASK-030 S2 ADR 초안, 또는 TASK-033 S2 사용 사례 조사. Human 확인 대기: client `diagnostics/bridge.rs` 이동(TASK-033 S3에서 권고안과 함께) |
-| 최근 세션 | 2026-11-15 #001 — native·24h 일정 판단 제외, TASK-030 S1 Done(Foxglove 판독), TASK-025 순서 변경. 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
+| 세션 상태 | 진행 중. 다음: TASK-033 S3 UC↔TC 대응·공백 시험, 또는 TASK-030 S2 ADR 초안. Human 확인 대기: client `diagnostics/bridge.rs` 이동(TASK-033 S3에서 권고안과 함께) |
+| 최근 세션 | 2026-11-15 #001 — native·24h 일정 판단 제외, TASK-030 S1 Done(Foxglove 판독), TASK-025 순서 변경, TASK-033 S2 UC 31개. 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
 
 ## 현재 결정과 제약
 
@@ -58,7 +58,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-15 | S1 Done(Foxglove 판독 Human 확인, blob 한계 수락). 다음 S2 native 표준 모드 ADR |
-| TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-13 | S1 기준선 완료([EV-078](../05_verification/verification_evidence.md#ev-078)). 다음 S2 사용 사례 조사 |
+| TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-15 | S1 기준선([EV-078](../05_verification/verification_evidence.md#ev-078))·S2 [UC 31개](imported_context/research_2026-11-15_logging_use_cases.md) 완료. 다음 S3 UC↔TC 대응 — 기능 공백 UC(rate 제한·backtrace 등)는 Human 결정 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
@@ -85,7 +85,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 0. **리뷰 후속:** 없음(REV-054 Closed).
 1. **TASK-030 S2:** S1 Done(2026-11-15, Foxglove 판독 확인). native 표준 쓰기 모드 ADR 채번·초안 → Human 승인 → 구현.
-2. **TASK-033 S2~S4:** 로보틱스/RTOS 로깅 사용 사례 조사 → UC↔TC 대응·공백 시험(커버리지 공백 중 실제 동작: CLI remote `blob`·`completion`·`replay`와 blob payload 출력, facade `Skipped`, client `diagnostics/bridge.rs`) → 목표치 Human 승인.
+2. **TASK-033 S3~S4:** (S2 UC 31개 완료, 2026-11-15) UC↔TC 대응·공백 시험(커버리지 공백 중 실제 동작: CLI remote `blob`·`completion`·`replay`와 blob payload 출력, facade `Skipped`, client `diagnostics/bridge.rs`) → 목표치 Human 승인.
 3. **MS-009:** TASK-030 S2 → TASK-031 → TASK-032.
 4. **TASK-025 문서·인수 정리:** TASK-033·MS-009 뒤(2026-11-15 TASK-024 의존 해제).
 5. **마지막 단계(일정 판단 밖):** TASK-024(장기·native T3)·TASK-026 실사용처 적용(2026-11-13·11-15 Human 결정).

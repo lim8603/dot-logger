@@ -212,6 +212,11 @@ pub struct Retention {
 
 impl Retention {
     /// Delete the oldest closed files to stay within `bytes`.
+    ///
+    /// `bytes` must hold two segments (at least 16 MiB); a smaller ring could
+    /// never rotate, so start rejects it with [`StartError::Retention`].
+    ///
+    /// [`StartError::Retention`]: crate::logger::StartError::Retention
     pub const fn ring(bytes: u64) -> Self {
         Self {
             mode: RetentionMode::Circular,
@@ -543,6 +548,16 @@ pub(crate) fn derive(
                 });
             }
             let segment = (r.bytes / 8).clamp(floor, SEGMENT_CEILING.max(floor));
+            // A ring rotates only when the closing segment and the next one
+            // both fit, so below two segments it would fail almost every
+            // record after a successful start (TASK-033 S3).
+            let ring_minimum = segment.saturating_mul(2);
+            if r.mode == RetentionMode::Circular && r.bytes < ring_minimum {
+                return Err(StartError::Retention {
+                    required: ring_minimum,
+                    available: r.bytes,
+                });
+            }
             Ok(RetentionConfig {
                 mode: r.mode,
                 disk_bytes: r.bytes,

@@ -516,6 +516,7 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
             let mut snapshot = Some(snapshot);
             let mut replay: Option<Replay<File>> = None;
             let mut blobs = Vec::new();
+            let mut return_invalid = false;
             let mut query = Query {
                 basis: TimeBasis::Mono,
                 from: 0,
@@ -610,12 +611,21 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
                                     ReplayAction::Stop => {
                                         r.stop();
                                     }
-                                    ReplayAction::Speed => r.set_speed(speed, now, &no).unwrap(),
+                                    ReplayAction::Speed => {
+                                        if speed != Speed::new(3, 2).unwrap() {
+                                            return_invalid = true;
+                                        }
+                                        r.set_speed(speed, now, &no).unwrap()
+                                    }
                                 }
-                                Ok(ManagementReply::Replay {
-                                    generation: r.generation(),
-                                    state: r.state(),
-                                })
+                                if std::mem::take(&mut return_invalid) {
+                                    Err(RemoteError::InvalidInput)
+                                } else {
+                                    Ok(ManagementReply::Replay {
+                                        generation: r.generation(),
+                                        state: r.state(),
+                                    })
+                                }
                             }
                         }
                         ManagementRequest::GetCompletion { .. } => Ok(ManagementReply::Completion(
@@ -682,11 +692,41 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
         let rows = lines(&output.stdout);
         assert_eq!(rows[0]["data"]["data_hex"], "010203");
         assert_eq!(rows.last().unwrap()["data"]["snapshot"], "9");
+        assert_eq!(rows[0]["data"]["blob"], "1");
+        let output = command()
+            .args([
+                "blob",
+                "--json",
+                "--endpoint",
+                &endpoint,
+                "--snapshot",
+                "9",
+                "--blob",
+                "1",
+                "--offset",
+                "1",
+                "--length",
+                "2",
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let rows = lines(&output.stdout);
+        assert_eq!(rows[0]["command"], "blob");
+        assert_eq!(rows[0]["kind"], "blob");
+        assert_eq!(rows[0]["data"]["bytes"], 2);
+        assert_eq!(rows[0]["data"]["data_hex"], "0203");
         for (action, generation, expected) in [
             ("start", "0", "1"),
             ("pause", "1", "1"),
             ("resume", "1", "1"),
             ("seek", "1", "2"),
+            ("speed", "2", "2"),
             ("stop", "2", "2"),
         ] {
             let output = command()
@@ -703,13 +743,15 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
                     generation,
                     "--from",
                     "0",
+                    "--speed",
+                    "3/2",
                 ])
                 .output()
                 .unwrap();
             assert_eq!(
                 output.status.code(),
                 Some(0),
-                "{}",
+                "{action}: {}",
                 String::from_utf8_lossy(&output.stdout)
             );
             assert_eq!(lines(&output.stdout)[0]["data"]["generation"], expected);
@@ -756,6 +798,181 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
         drop(hub);
         assert_eq!(budget.used_bytes(), 0);
     });
+}
+
+#[test]
+fn actual_cli_remote_completion_reports_host_outcome_and_confirmed_boundaries() {
+    use dot_logger::{
+        adapters::remote::*,
+        completion::{Boundaries, Boundary, FailureReason, QueryOutcome, RecordStatus},
+        query::QueryBudget,
+        routing::DropReason,
+    };
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let mut c = support::plan().config().clone();
+        c.memory.external_bytes = 8 * 1024 * 1024;
+        c.memory.total_bytes += 8 * 1024 * 1024;
+        let plan = SessionBuilder::new(c)
+            .validate(&PlatformCapabilities::default())
+            .unwrap();
+        let budget = QueryBudget::new(&plan);
+        let limits = RemoteLimits {
+            connections: 8,
+            subscriptions: 2,
+            commands: 4,
+            message_bytes: 4096,
+            record_bytes: 8192,
+            subscription_records: 2,
+            subscription_bytes: 16384,
+            max_age: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(2),
+        };
+        let (hub, mut inbox) = RemoteHub::new(&budget, limits).unwrap();
+        let server = RemoteServer::bind(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            hub.clone(),
+        )
+        .await
+        .unwrap();
+        let endpoint = format!("http://{}", server.local_addr().unwrap());
+        let (stop, done) = tokio::sync::oneshot::channel();
+        let server_task = tokio::spawn(server.serve(async {
+            let _ = done.await;
+        }));
+        let both = Boundaries::only(Boundary::Enqueued) | Boundaries::only(Boundary::Written);
+        let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = finished.clone();
+        let host = tokio::spawn(async move {
+            let mut served = 0;
+            while !flag.load(Ordering::Acquire) {
+                let Some(command) = inbox.try_next() else {
+                    tokio::task::yield_now().await;
+                    continue;
+                };
+                served += 1;
+                // The host answers only the exact receipt/target/boundary the CLI was given.
+                let result = match *command.request() {
+                    ManagementRequest::GetCompletion {
+                        receipt,
+                        target: 3,
+                        boundary: Boundary::Synced,
+                    } if receipt.session_id == 42 && receipt.producer_id == 1 => {
+                        let (confirmed, outcome) = match receipt.accepted_seq {
+                            1 => (
+                                both | Boundaries::only(Boundary::Synced),
+                                QueryOutcome::Complete,
+                            ),
+                            2 => (
+                                Boundaries::only(Boundary::Enqueued),
+                                QueryOutcome::Dropped(DropReason::PendingFull),
+                            ),
+                            3 => (both, QueryOutcome::Failed(FailureReason::SyncFailure)),
+                            _ => (Boundaries::default(), QueryOutcome::NotRouted),
+                        };
+                        Ok(ManagementReply::Completion(RecordStatus {
+                            confirmed,
+                            outcome,
+                        }))
+                    }
+                    _ => Err(RemoteError::Unsupported),
+                };
+                command.respond(result);
+            }
+            served
+        });
+        for (sequence, outcome, confirmed) in [
+            ("1", "Complete", json!(["Enqueued", "Written", "Synced"])),
+            ("2", "Dropped(PendingFull)", json!(["Enqueued"])),
+            ("3", "Failed(SyncFailure)", json!(["Enqueued", "Written"])),
+            ("4", "NotRouted", json!([])),
+        ] {
+            let output = command()
+                .args([
+                    "completion",
+                    "--json",
+                    "--endpoint",
+                    &endpoint,
+                    "--session",
+                    "0000000000000000000000000000002a",
+                    "--producer",
+                    "1",
+                    "--sequence",
+                    sequence,
+                    "--target",
+                    "3",
+                    "--boundary",
+                    "synced",
+                ])
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.code(),
+                Some(0),
+                "{sequence}: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            let rows = lines(&output.stdout);
+            assert_eq!(rows[0]["command"], "completion");
+            assert_eq!(rows[0]["kind"], "completion");
+            assert_eq!(rows[0]["data"]["outcome"], outcome, "{sequence}");
+            assert_eq!(rows[0]["data"]["confirmed"], confirmed, "{sequence}");
+        }
+        finished.store(true, Ordering::Release);
+        assert_eq!(host.await.unwrap(), 4);
+        stop.send(()).unwrap();
+        server_task.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+
+#[test]
+fn invalid_blob_and_completion_arguments_are_input_errors_before_any_connect() {
+    let receipt = [
+        "--session",
+        "0000000000000000000000000000002a",
+        "--sequence",
+    ];
+    for args in [
+        vec!["blob", "--snapshot", "9", "--blob", "1", "--length", "0"],
+        vec![
+            "blob",
+            "--snapshot",
+            "9",
+            "--blob",
+            "1",
+            "--offset",
+            "18446744073709551615",
+            "--length",
+            "2",
+        ],
+        [&["completion"][..], &receipt, &["0"]].concat(),
+        [
+            &["completion"][..],
+            &receipt,
+            &["1", "--boundary", "flushed"],
+        ]
+        .concat(),
+        vec!["completion", "--session", "2a", "--sequence", "1"],
+    ] {
+        let output = command()
+            .args(&args)
+            .args(["--json", "--endpoint", "http://127.0.0.1:1"])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        let last = lines(&output.stdout).pop().unwrap();
+        assert_eq!(last["kind"], "error", "{args:?}");
+        assert_eq!(last["data"]["outcome"], "invalid_input", "{args:?}");
+    }
 }
 
 #[test]

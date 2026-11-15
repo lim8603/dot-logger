@@ -105,7 +105,20 @@ fn record(seq: u64, mono: u64, real: i64) -> CapturedRecord {
         payload_len: 3,
     }
 }
+fn two_channels() -> Vec<StorageChannel> {
+    let mut c = channels();
+    c.push(StorageChannel {
+        channel: ChannelConfig::new(8, 99, 1),
+        topic: "other".into(),
+        payload_encoding: "opaque".into(),
+        schema: None,
+    });
+    c
+}
 fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
+    with_writer_on(channels(), f)
+}
+fn with_writer_on(storage: Vec<StorageChannel>, f: impl FnOnce(SegmentWriter<File>, File)) {
     let p = support::plan();
     let mut o = CaptureOwner::new(&p, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
     o.scope(|s| {
@@ -121,7 +134,7 @@ fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
                 max_chunks: 16,
                 max_metadata_bytes: 1024,
             },
-            channels(),
+            storage,
             file.clone(),
         )
         .unwrap();
@@ -129,11 +142,19 @@ fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
     });
 }
 fn snapshot(file: File, safe: u64, c: QueryConfig) -> Snapshot<File> {
+    snapshot_on(channels(), file, safe, c)
+}
+fn snapshot_on(
+    storage: Vec<StorageChannel>,
+    file: File,
+    safe: u64,
+    c: QueryConfig,
+) -> Snapshot<File> {
     Snapshot::new(
         &budget(),
         42,
         1,
-        channels(),
+        storage,
         vec![QuerySource::active(file, 1, safe)],
         c,
         0,
@@ -676,4 +697,78 @@ fn replay_error_display_explains_failures_and_preserves_io_diagnostics() {
     assert!(
         matches!(error, ReplayError::Query(QueryError::Io(ref e)) if e.kind() == io::ErrorKind::PermissionDenied)
     );
+}
+
+/// Poll at each record's due time until End, returning `(channel, seq, mono)`
+/// per delivery. Fails if the replay waits past `limit_ns` without ending.
+fn run_to_end(r: &mut Replay<File>, limit_ns: u64) -> Vec<(u32, u64, u64)> {
+    let no = AtomicBool::new(false);
+    let mut got = vec![];
+    let mut now = 0;
+    loop {
+        assert!(now <= limit_ns, "replay did not end by {limit_ns}");
+        match r.poll(now, true, &no).unwrap() {
+            ReplayPoll::Ready(frame) => {
+                let m = &frame.record.metadata;
+                got.push((m.channel_id, frame.record.receipt.accepted_seq, m.mono_ns));
+            }
+            ReplayPoll::Waiting { due_ns, .. } => now = due_ns,
+            ReplayPoll::End => return got,
+            other => panic!("unexpected poll: {other:?}"),
+        }
+    }
+}
+
+/// TASK-033 S3 (UC-24): replay with a finite `to` delivers only records before
+/// that exclusive bound and then ends normally, without waiting for later ones.
+#[test]
+fn replay_with_upper_bound_stops_before_to_and_ends_normally() {
+    with_writer(|mut w, f| {
+        for (seq, t) in [(1, 10), (2, 20), (3, 30), (4, 40)] {
+            w.append(record(seq, t, 0), &[seq as u8; 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let no = AtomicBool::new(false);
+        let bounded = Query { to: 30, ..query() };
+        let mut r = Replay::new(
+            snapshot(f, w.safe_offset(), cfg()),
+            bounded,
+            Speed::REALTIME,
+            0,
+            &no,
+        )
+        .unwrap();
+        assert_eq!(run_to_end(&mut r, 99), [(7, 1, 10), (7, 2, 20)]);
+        assert_eq!(r.state(), ReplayState::Ended);
+        assert!(matches!(r.poll(99, true, &no).unwrap(), ReplayPoll::End));
+    });
+}
+
+/// TASK-033 S3 (UC-24): replay with a positive channel selector delivers only
+/// that channel, keeping original spacing, and ends normally.
+#[test]
+fn replay_with_positive_channel_filter_delivers_only_that_channel() {
+    with_writer_on(two_channels(), |mut w, f| {
+        for (seq, (channel, t)) in [(7, 10), (8, 20), (7, 30), (8, 40)].into_iter().enumerate() {
+            let mut r = record(seq as u64 + 1, t, 0);
+            r.metadata.channel_id = channel;
+            w.append(r, &[channel as u8; 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let no = AtomicBool::new(false);
+        let only = Query {
+            channel: Some(8),
+            ..query()
+        };
+        let mut r = Replay::new(
+            snapshot_on(two_channels(), f, w.safe_offset(), cfg()),
+            only,
+            Speed::REALTIME,
+            0,
+            &no,
+        )
+        .unwrap();
+        assert_eq!(run_to_end(&mut r, 40), [(8, 2, 20), (8, 4, 40)]);
+        assert_eq!(r.state(), ReplayState::Ended);
+    });
 }

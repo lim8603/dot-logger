@@ -398,3 +398,71 @@ fn f6_cancellation_stops_the_export() {
     );
     assert!(matches!(result, Err(ExportError::Cancelled)), "{result:?}");
 }
+
+/// TASK-033 S3 (UC-03·UC-11): an Important record with a source time, sent
+/// through the facade's advanced path, keeps both in the meta channel. F1
+/// covers only the facade default (Normal, no source time).
+#[test]
+fn f7_important_records_and_source_time_survive_in_meta() {
+    use dot_logger::capture::{Importance, Level, RecordOutcome, SourceTime};
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_millis(20))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(64, 64)),
+        )
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .start()
+        .unwrap();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    let mut payload = [0_u8; 10];
+    Pose { x: 1.0, y: 2.0 }.encode(&mut payload).unwrap();
+    let mut metadata = pose
+        .at(Level::Error)
+        .metadata(writer.now_ns(), 1_700_000_000_000_000_000);
+    metadata.importance = Some(Importance::Important);
+    metadata.source_time = Some(SourceTime {
+        ticks: -42,
+        clock_domain: 7,
+    });
+    let outcome = writer.producer().try_record_small(metadata, &payload);
+    assert!(
+        matches!(outcome, Ok(RecordOutcome::Accepted(_))),
+        "{outcome:?}"
+    );
+    log(&mut writer, pose, &Pose { x: 3.0, y: 4.0 });
+    drop(writer);
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+    let files = closed_files(&temp.0);
+    let (output, report) = export_bytes(&std::fs::read(&files[0]).unwrap());
+    assert_eq!(report.messages, 2);
+    let metas: Vec<RecordMeta> = mcap::MessageStream::new(&output)
+        .unwrap()
+        .map(|m| m.unwrap())
+        .filter(|m| m.channel.topic == META_TOPIC)
+        .map(|m| RecordMeta::decode(&m.data[..]).unwrap())
+        .collect();
+    assert_eq!(metas.len(), 2);
+    assert_eq!(metas[0].importance, 1, "Important is kept");
+    assert_eq!(metas[0].level, Level::Error as u32);
+    assert_eq!(
+        metas[0].source,
+        Some(RecordSource {
+            ticks: -42,
+            clock_domain: 7
+        })
+    );
+    assert_eq!(metas[1].importance, 0);
+    assert_eq!(metas[1].source, None);
+}

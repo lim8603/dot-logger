@@ -730,3 +730,222 @@ fn f19_raw_loans_through_the_producer_view_use_the_channel_metadata() {
     }
     assert_eq!(stored, frames);
 }
+
+/// TASK-033 S3 (UC-16): a facade ring output small enough to wrap deletes
+/// its oldest closed segment files, stays within the configured bytes and
+/// keeps the newest records readable. A ring needs room for the rotating
+/// segment's bound plus the next segment (2 × 8 MiB here), so 17 MiB
+/// retains about 1 MiB of closed files; 30,000 poses write about 4 MiB.
+#[test]
+fn f20_small_ring_retention_deletes_the_oldest_segment_files() {
+    const RING: u64 = 17 * MIB as u64;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(RING))
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .start()
+        .unwrap();
+    let directory = logger.directories()[0].clone();
+    let sent = log_poses(&logger, 30_000);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    // A ring never rejects for space; it deletes instead.
+    assert_eq!(report.core.totals.failed, 0, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+    let (files, _) = closed_files(&directory);
+    let sequences: Vec<u64> = files
+        .iter()
+        .map(|f| f.file_stem().unwrap().to_str().unwrap().parse().unwrap())
+        .collect();
+    assert!(sequences.len() >= 2, "{sequences:?}");
+    // Segment 0 and its successors were deleted; the survivors are the
+    // newest, contiguous run of segments.
+    assert!(sequences[0] > 0, "the oldest segment file must be deleted");
+    assert!(
+        sequences.windows(2).all(|w| w[1] == w[0] + 1),
+        "{sequences:?}"
+    );
+    let total: u64 = files
+        .iter()
+        .map(|f| std::fs::metadata(f).unwrap().len())
+        .sum();
+    assert!(total <= RING, "{total} > {RING}");
+    // The newest records survive in order, the oldest are gone.
+    let stored = stored_poses(&directory);
+    assert!(!stored.is_empty() && stored.len() < sent.len());
+    assert_eq!(stored, sent[sent.len() - stored.len()..]);
+}
+
+/// TASK-033 S3 (UC-16): `Retention::reserve` is the free-space floor of the
+/// real filesystem probe. A floor no filesystem can satisfy (4 EiB) is
+/// rejected before anything starts and leaves nothing on disk, while a small
+/// floor on the same output starts and stores records. The probe is not
+/// injectable through the facade, so the runtime case (free space shrinking
+/// while recording) is not tested here.
+#[test]
+fn f21_retention_reserve_is_enforced_against_the_free_space_probe() {
+    let temp = Temp::new();
+    let build = |reserve: u64| {
+        Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64).reserve(reserve))
+            .channel::<Pose>("robot/pose")
+            .writer("control")
+    };
+    match build(1 << 62).start() {
+        Err(StartError::Storage(dot_logger::storage::RetentionError::Capacity)) => {}
+        Err(e) => panic!("unexpected error {e:?}"),
+        Ok(_) => panic!("an unsatisfiable free-space floor must not start"),
+    }
+    assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+
+    let logger = build(4096).start().unwrap();
+    let directory = logger.directories()[0].clone();
+    let sent = log_poses(&logger, 10);
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(10))
+            .unwrap()
+            .is_success()
+    );
+    assert_eq!(stored_poses(&directory), sent);
+}
+
+/// TASK-033 S3 (UC-11): `try_log_at` stores exactly the caller-supplied
+/// session monotonic and wall-clock times (log time = wall time) instead of
+/// reading a clock.
+#[test]
+fn f22_try_log_at_stores_the_caller_supplied_times() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    let times: Vec<(u64, i64)> = (0..5_u64)
+        .map(|i| {
+            (
+                1_000 + i * 1_000_000_007,
+                1_234_567_890_123_456_789 + 3 * i as i64,
+            )
+        })
+        .collect();
+    for (i, &(mono, real)) in times.iter().enumerate() {
+        let msg = Pose { x: i as i32, y: 0 };
+        while let Err(e) = writer.try_log_at(pose, &msg, mono, real) {
+            assert!(e.is_capacity(), "{e:?}");
+            std::thread::yield_now();
+        }
+    }
+    drop(writer);
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(10))
+            .unwrap()
+            .is_success()
+    );
+    let (files, _) = closed_files(&directory);
+    let mut stored = Vec::new();
+    for file in files {
+        let bytes = std::fs::read(file).unwrap();
+        for message in mcap::MessageStream::new(&bytes).unwrap() {
+            let message = message.unwrap();
+            let record = decode_record(&message.data, 64).unwrap();
+            let m = record.record.metadata;
+            assert_eq!(message.log_time, m.real_ns as u64);
+            stored.push((m.mono_ns, m.real_ns));
+        }
+    }
+    assert_eq!(stored, times);
+}
+
+/// TASK-033 S3 (builder validation): a missing output directory, or a path
+/// that is not a directory, is `Io(NotFound)` from the up-front check (the
+/// namespace creation would report `NotADirectory` for the file), and a
+/// duplicate or empty writer name is `Duplicate`; in every case nothing
+/// starts and nothing is created on disk.
+#[test]
+fn f23_missing_directory_and_bad_writer_names_are_rejected_before_start() {
+    let temp = Temp::new();
+    let missing = temp.0.join("missing");
+    let file = temp.0.join("file");
+    std::fs::write(&file, b"").unwrap();
+    let builder = |dir: &Path, writers: &[&str]| {
+        writers.iter().fold(
+            Logger::builder()
+                .budget(budget())
+                .file_output(dir, Retention::ring(256 * MIB as u64))
+                .channel::<Pose>("robot/pose"),
+            |b, name| b.writer(name),
+        )
+    };
+    match builder(&missing, &["control"]).start() {
+        Err(StartError::Io(e)) => assert_eq!(e.kind(), std::io::ErrorKind::NotFound),
+        Err(e) => panic!("unexpected error {e:?}"),
+        Ok(_) => panic!("a missing output directory must not start"),
+    }
+    assert!(
+        !missing.exists(),
+        "the missing directory must not be created"
+    );
+    match builder(&file, &["control"]).start() {
+        Err(StartError::Io(e)) => assert_eq!(e.kind(), std::io::ErrorKind::NotFound),
+        Err(e) => panic!("unexpected error {e:?}"),
+        Ok(_) => panic!("a file as output directory must not start"),
+    }
+    assert!(file.is_file());
+    std::fs::remove_file(&file).unwrap();
+    for writers in [&["a", "b", "a"][..], &[""], &["a", ""]] {
+        match builder(&temp.0, writers).start() {
+            Err(StartError::Duplicate) => {}
+            Err(e) => panic!("{writers:?}: unexpected error {e:?}"),
+            Ok(_) => panic!("{writers:?} must not start"),
+        }
+    }
+    assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+}
+
+/// TASK-033 S3 (UC-16) defect: a ring smaller than two segments can never
+/// rotate (the room for the closing segment plus the next one never fits), so
+/// almost every record failed at the file stage after a successful start.
+/// Start must refuse it with the required size instead. A continuous output
+/// of the same size stays valid (it stops when full by design).
+#[test]
+fn f24_a_ring_below_two_segments_is_rejected_before_start() {
+    let temp = Temp::new();
+    let start = |retention: Retention| {
+        Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, retention)
+            .channel::<Pose>("robot/pose")
+            .writer("control")
+            .start()
+    };
+    match start(Retention::ring(15 * MIB as u64)) {
+        Err(StartError::Retention {
+            required,
+            available,
+        }) => {
+            assert_eq!(available, 15 * MIB as u64);
+            assert_eq!(required, 16 * MIB as u64, "two 8 MiB segments");
+        }
+        other => panic!("a ring that cannot rotate must not start: {other:?}"),
+    }
+    assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+    let logger = start(Retention::continuous(15 * MIB as u64)).unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+    let logger = start(Retention::ring(16 * MIB as u64)).unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+}

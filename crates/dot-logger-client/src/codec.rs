@@ -425,4 +425,62 @@ mod tests {
         .unwrap();
         assert_eq!((request.numerator, request.denominator), (3, 2));
     }
+    #[test]
+    fn completion_reply_decodes_every_outcome_and_reason_code_and_rejects_unknown_ones() {
+        let decode = |outcome, reason, confirmed| {
+            reply(
+                wire::Reply {
+                    major: 1,
+                    kind: 5,
+                    outcome,
+                    reason,
+                    confirmed,
+                    ..Default::default()
+                },
+                "GetCompletion",
+                4096,
+                None,
+            )
+        };
+        for (code, reason, expected) in [
+            (0, 0, QueryOutcome::Complete),
+            (1, 0, QueryOutcome::Pending),
+            (2, 0, QueryOutcome::Failed(FailureReason::IoFailure)),
+            (2, 1, QueryOutcome::Failed(FailureReason::SyncFailure)),
+            (2, 2, QueryOutcome::Failed(FailureReason::AdapterFailure)),
+            (3, 0, QueryOutcome::Dropped(DropReason::Capacity)),
+            (3, 1, QueryOutcome::Dropped(DropReason::RetryExhausted)),
+            (3, 2, QueryOutcome::Dropped(DropReason::PendingFull)),
+            (3, 3, QueryOutcome::Dropped(DropReason::Expired)),
+            (3, 4, QueryOutcome::Dropped(DropReason::Cancelled)),
+            (4, 0, QueryOutcome::Unknown),
+            (5, 0, QueryOutcome::Expired),
+            (6, 0, QueryOutcome::NotRouted),
+            (7, 0, QueryOutcome::Busy),
+        ] {
+            let ManagementReply::Completion(status) = decode(code, reason, 0b01010).unwrap() else {
+                panic!("completion")
+            };
+            assert_eq!(status.outcome, expected, "outcome {code} reason {reason}");
+            assert_eq!(
+                status.confirmed,
+                Boundaries::only(Boundary::Written)
+                    | Boundaries::only(Boundary::DatabaseAcknowledged)
+            );
+        }
+        for (code, reason) in [
+            (2, 3),
+            (2, u32::MAX),
+            (3, 5),
+            (3, u32::MAX),
+            (8, 0),
+            (u32::MAX, 0),
+        ] {
+            assert_eq!(
+                decode(code, reason, 0).unwrap_err(),
+                RemoteError::Corrupt,
+                "outcome {code} reason {reason}"
+            );
+        }
+    }
 }

@@ -103,7 +103,20 @@ fn record(seq: u64, mono: u64, real: i64) -> CapturedRecord {
         payload_len: 3,
     }
 }
+fn two_channels() -> Vec<StorageChannel> {
+    let mut c = channels();
+    c.push(StorageChannel {
+        channel: ChannelConfig::new(8, 99, 1),
+        topic: "other".into(),
+        payload_encoding: "opaque".into(),
+        schema: None,
+    });
+    c
+}
 fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
+    with_writer_on(channels(), f)
+}
+fn with_writer_on(storage: Vec<StorageChannel>, f: impl FnOnce(SegmentWriter<File>, File)) {
     let p = support::plan();
     let mut o = CaptureOwner::new(&p, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
     o.scope(|s| {
@@ -119,7 +132,7 @@ fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
                 max_chunks: 16,
                 max_metadata_bytes: 1024,
             },
-            channels(),
+            storage,
             file.clone(),
         )
         .unwrap();
@@ -127,11 +140,19 @@ fn with_writer(f: impl FnOnce(SegmentWriter<File>, File)) {
     });
 }
 fn snapshot(file: File, safe: u64, c: QueryConfig) -> Snapshot<File> {
+    snapshot_on(channels(), file, safe, c)
+}
+fn snapshot_on(
+    storage: Vec<StorageChannel>,
+    file: File,
+    safe: u64,
+    c: QueryConfig,
+) -> Snapshot<File> {
     Snapshot::new(
         &budget(),
         42,
         1,
-        channels(),
+        storage,
         vec![QuerySource::active(file, 1, safe)],
         c,
         0,
@@ -547,5 +568,82 @@ fn observed_expiry_cannot_be_reversed_with_an_older_time_argument() {
         let c = s.start(query(), 1, &no).unwrap();
         assert!(matches!(s.page(&c, 100, &no), Err(QueryError::Expired)));
         assert!(matches!(s.page(&c, 1, &no), Err(QueryError::Expired)));
+    });
+}
+
+/// Drain every page of `q`, returning `(channel, producer, seq)` per record.
+fn drain(s: &mut Snapshot<File>, q: Query) -> Vec<(u32, u32, u64)> {
+    let cancel = AtomicBool::new(false);
+    let mut c = s.start(q, 1, &cancel).unwrap();
+    let mut got = vec![];
+    loop {
+        let p = s.page(&c, 1, &cancel).unwrap();
+        assert!(p.records.len() <= cfg().page_records);
+        got.extend(p.records.iter().map(|x| {
+            let r = &x.record;
+            (
+                r.metadata.channel_id,
+                r.receipt.producer_id,
+                r.receipt.accepted_seq,
+            )
+        }));
+        match p.next {
+            Some(next) => c = next,
+            None => return got,
+        }
+    }
+}
+
+/// TASK-033 S3 (UC-31): a positive channel selector returns exactly that
+/// channel's records, in time order, from a file where two channels interleave.
+#[test]
+fn positive_channel_filter_returns_only_the_selected_channel_across_pages() {
+    with_writer_on(two_channels(), |mut w, f| {
+        for (seq, (channel, t)) in [(7, 10), (8, 20), (7, 30), (8, 40), (8, 50), (7, 60)]
+            .into_iter()
+            .enumerate()
+        {
+            let mut r = record(seq as u64 + 1, t, t as i64);
+            r.metadata.channel_id = channel;
+            w.append(r, &[channel as u8; 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let mut s = snapshot_on(two_channels(), f, w.safe_offset(), cfg());
+        assert_eq!(drain(&mut s, query()).len(), 6);
+        let only = |channel| Query {
+            channel: Some(channel),
+            ..query()
+        };
+        assert_eq!(drain(&mut s, only(8)), [(8, 0, 2), (8, 0, 4), (8, 0, 5)]);
+        assert_eq!(drain(&mut s, only(7)), [(7, 0, 1), (7, 0, 3), (7, 0, 6)]);
+    });
+}
+
+/// TASK-033 S3 (UC-06): equal timestamps from several producers break ties by
+/// producer id, then accepted sequence, consistently across page boundaries.
+#[test]
+fn equal_timestamps_from_two_producers_tie_break_by_producer_then_sequence() {
+    with_writer(|mut w, f| {
+        // Append order interleaves producers so neither append order nor
+        // sequence order alone matches the documented (time, producer, seq).
+        for (producer, seq, t) in [(1, 1, 10), (0, 2, 10), (1, 3, 10), (0, 4, 10), (1, 5, 5)] {
+            let mut r = record(seq, t, 100);
+            r.receipt.producer_id = producer;
+            w.append(r, &[seq as u8; 3]).unwrap();
+        }
+        w.flush_chunk().unwrap();
+        let mut s = snapshot(f, w.safe_offset(), cfg());
+        let expected = [(7, 1, 5), (7, 0, 2), (7, 0, 4), (7, 1, 1), (7, 1, 3)];
+        assert_eq!(drain(&mut s, query()), expected);
+        // Real time is identical for all five, so producer/seq decide alone.
+        let real = Query {
+            basis: TimeBasis::Real,
+            to: i64::MAX as i128 + 1,
+            ..query()
+        };
+        assert_eq!(
+            drain(&mut s, real),
+            [(7, 0, 2), (7, 0, 4), (7, 1, 1), (7, 1, 3), (7, 1, 5)]
+        );
     });
 }

@@ -1180,3 +1180,111 @@ mod sockets {
         }
     }
 }
+#[test]
+fn subscription_channel_and_minimum_level_exclude_non_matching_records() {
+    // UC-09: each subscription applies its own channel and minimum-level filter;
+    // an excluded record neither consumes a transfer position nor creates a gap.
+    let b = budget();
+    let (hub, _inbox) = RemoteHub::new(&b, limits()).unwrap();
+    let peer = "127.0.0.1:5".parse().unwrap();
+    let mut warn_on_7 = filter(OverflowPolicy::Gap);
+    warn_on_7.channel = Some(7);
+    warn_on_7.minimum_level = Level::Warn;
+    let narrow = hub
+        .subscribe(peer, warn_on_7, 2, 8192, Duration::from_secs(2))
+        .unwrap();
+    let mut any_on_8 = filter(OverflowPolicy::Gap);
+    any_on_8.channel = Some(8);
+    let other = hub
+        .subscribe(peer, any_on_8, 2, 8192, Duration::from_secs(2))
+        .unwrap();
+    let at = |seq, channel, level| {
+        let mut r = record(seq, 1);
+        r.metadata.channel_id = channel;
+        r.metadata.level = level;
+        r
+    };
+    let mut accepted = Vec::new();
+    for (seq, channel, level, narrow_ok, other_ok) in [
+        (1, 7, Level::Info, false, false),
+        (2, 8, Level::Error, false, true),
+        (3, 7, Level::Warn, true, false),
+        (4, 7, Level::Debug, false, false),
+        (5, 9, Level::Fatal, false, false),
+        (6, 7, Level::Error, true, false),
+    ] {
+        for (sub, ok) in [(&narrow, narrow_ok), (&other, other_ok)] {
+            match hub.offer(sub.id, at(seq, channel, level), &[1], false, 1) {
+                Ok(ack) => {
+                    assert!(ok, "seq {seq} must be excluded from {}", sub.id);
+                    accepted.push(ack);
+                }
+                Err(e) => {
+                    assert!(!ok, "seq {seq} must reach {}: {e:?}", sub.id);
+                    assert_eq!(e, RemoteError::Unsupported);
+                }
+            }
+        }
+    }
+    let drain = |sub: &super::hub::Subscription| {
+        let mut out = Vec::new();
+        while let Some(event) = sub.next(&waker()).unwrap() {
+            let Event::Chunk(c) = event else {
+                panic!("excluded records must not surface as a gap")
+            };
+            out.push((
+                c.transfer,
+                c.record.receipt.accepted_seq,
+                c.record.metadata.channel_id,
+                c.record.metadata.level,
+            ));
+        }
+        out
+    };
+    assert_eq!(
+        drain(&narrow),
+        vec![(1, 3, 7, Level::Warn), (2, 6, 7, Level::Error)]
+    );
+    assert_eq!(drain(&other), vec![(1, 2, 8, Level::Error)]);
+    drop((narrow, other, accepted, hub));
+    assert_eq!(b.used_bytes(), 0);
+}
+#[test]
+fn completion_reply_pins_every_outcome_and_reason_wire_code() {
+    use crate::completion::*;
+    use crate::routing::DropReason;
+    for (outcome, code, reason) in [
+        (QueryOutcome::Complete, 0, 0),
+        (QueryOutcome::Pending, 1, 0),
+        (QueryOutcome::Failed(FailureReason::IoFailure), 2, 0),
+        (QueryOutcome::Failed(FailureReason::SyncFailure), 2, 1),
+        (QueryOutcome::Failed(FailureReason::AdapterFailure), 2, 2),
+        (QueryOutcome::Dropped(DropReason::Capacity), 3, 0),
+        (QueryOutcome::Dropped(DropReason::RetryExhausted), 3, 1),
+        (QueryOutcome::Dropped(DropReason::PendingFull), 3, 2),
+        (QueryOutcome::Dropped(DropReason::Expired), 3, 3),
+        (QueryOutcome::Dropped(DropReason::Cancelled), 3, 4),
+        (QueryOutcome::Unknown, 4, 0),
+        (QueryOutcome::Expired, 5, 0),
+        (QueryOutcome::NotRouted, 6, 0),
+        (QueryOutcome::Busy, 7, 0),
+    ] {
+        let reply = wire::Reply::native(
+            ManagementReply::Completion(RecordStatus {
+                confirmed: Boundaries::only(Boundary::Enqueued)
+                    | Boundaries::only(Boundary::Synced)
+                    | Boundaries::only(Boundary::ReceiverAcknowledged),
+                outcome,
+            }),
+            "GetCompletion",
+            4096,
+            1000,
+        )
+        .unwrap();
+        assert_eq!(
+            (reply.kind, reply.outcome, reply.reason, reply.confirmed),
+            (5, code, reason, 0b10101),
+            "{outcome:?}"
+        );
+    }
+}

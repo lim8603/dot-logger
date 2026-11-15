@@ -605,6 +605,90 @@ fn completion_claim_without_requested_boundary_is_rejected() {
     });
 }
 #[test]
+fn every_completion_outcome_and_reason_survives_the_actual_wire() {
+    runtime().block_on(async {
+        use dot_logger::{completion::*, routing::DropReason};
+        let statuses = [
+            QueryOutcome::Complete,
+            QueryOutcome::Pending,
+            QueryOutcome::Failed(FailureReason::IoFailure),
+            QueryOutcome::Failed(FailureReason::SyncFailure),
+            QueryOutcome::Failed(FailureReason::AdapterFailure),
+            QueryOutcome::Dropped(DropReason::Capacity),
+            QueryOutcome::Dropped(DropReason::RetryExhausted),
+            QueryOutcome::Dropped(DropReason::PendingFull),
+            QueryOutcome::Dropped(DropReason::Expired),
+            QueryOutcome::Dropped(DropReason::Cancelled),
+            QueryOutcome::Unknown,
+            QueryOutcome::Expired,
+            QueryOutcome::NotRouted,
+            QueryOutcome::Busy,
+        ]
+        .map(|outcome| RecordStatus {
+            confirmed: Boundaries::only(Boundary::Enqueued)
+                | Boundaries::only(Boundary::Written)
+                | Boundaries::only(Boundary::Synced),
+            outcome,
+        });
+        let budget = budget();
+        let (hub, mut inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut client =
+            RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                .await
+                .unwrap();
+        let host = tokio::spawn(async move {
+            for (i, status) in statuses.into_iter().enumerate() {
+                let c = command(&mut inbox).await;
+                let ManagementRequest::GetCompletion {
+                    receipt,
+                    target: 3,
+                    boundary: Boundary::Synced,
+                } = *c.request()
+                else {
+                    panic!("completion request")
+                };
+                assert_eq!(receipt, record(i as u64 + 1, 1).receipt);
+                c.respond(Ok(ManagementReply::Completion(status)));
+            }
+        });
+        for (i, status) in statuses.into_iter().enumerate() {
+            let reply = client
+                .request(
+                    ManagementRequest::GetCompletion {
+                        receipt: record(i as u64 + 1, 1).receipt,
+                        target: 3,
+                        boundary: Boundary::Synced,
+                    },
+                    &cancel,
+                )
+                .await
+                .unwrap();
+            let ManagementReply::Completion(got) = reply else {
+                panic!("completion reply")
+            };
+            assert_eq!(
+                (got.outcome, got.confirmed),
+                (status.outcome, status.confirmed)
+            );
+        }
+        host.await.unwrap();
+        drop(client);
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+#[test]
 fn stale_replay_generation_reply_is_rejected() {
     runtime().block_on(async {
         let budget = budget();

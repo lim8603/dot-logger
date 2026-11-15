@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·원격 시각화; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
-| 활성 Task | TASK-030 In Progress — S1 Human 리뷰(blob 처리·`records:0` 마감, pose·meta 판독만 남음); TASK-033 In Progress — S1 커버리지 기준선 완료(EV-078), 다음 S2 사용 사례 조사 |
+| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S1 커버리지 기준선 완료(EV-078), 다음 S2 사용 사례 조사 |
 | 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
 | 상태 | Green(로컬) — 1.96.0/1.85.0 각 570 Pass, 라인 커버리지 91.15%(EV-078). Done 25/33 Task. native·장기·실사용처 Not Run(소유 TASK-024·026) |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-15 / 세션 #001 / AI |
-| 세션 상태 | 진행 중. 다음: TASK-030 S1 pose·meta 판독(Human) → S2 ADR, 또는 TASK-033 S2 사용 사례 조사. Human 확인 대기: client `diagnostics/bridge.rs` 이동(TASK-033 S3에서 권고안과 함께) |
-| 최근 세션 | 2026-11-15 #001 — native·24h 일정 판단 제외, TASK-030 S1 blob 처리·`records:0` 원인 마감. 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
+| 세션 상태 | 진행 중. 다음: TASK-030 S2 ADR 초안, 또는 TASK-033 S2 사용 사례 조사. Human 확인 대기: client `diagnostics/bridge.rs` 이동(TASK-033 S3에서 권고안과 함께) |
+| 최근 세션 | 2026-11-15 #001 — native·24h 일정 판단 제외, TASK-030 S1 Done(Foxglove 판독), TASK-025 순서 변경. 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
 
 ## 현재 결정과 제약
 
@@ -57,10 +57,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-15 | S1 Human 리뷰 — blob 처리(원문 유지+한계 기록)·`records:0` 원인 마감. `robot/pose`·`_dot_logger/meta` 판독만 남음. 다음 S2 ADR |
+| TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-15 | S1 Done(Foxglove 판독 Human 확인, blob 한계 수락). 다음 S2 native 표준 모드 ADR |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-13 | S1 기준선 완료([EV-078](../05_verification/verification_evidence.md#ev-078)). 다음 S2 사용 사례 조사 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
-| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-10-26 | TASK-024 뒤 |
+| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-031·032 | viewer·대시보드 | AI | Planned | 2026-11-04 | TASK-030 뒤 S1 조사·결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
@@ -84,10 +84,11 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 ## 다음 시작점
 
 0. **리뷰 후속:** 없음(REV-054 Closed).
-1. **TASK-030 S1 리뷰 마무리:** blob 처리·`records:0` 원인은 2026-11-15 마감. 남은 것: `robot/pose`·`_dot_logger/meta` Human 판독 결과 기록. 판독 파일은 세션 임시 폴더라 남지 않을 수 있다 — 같은 방식(facade 임시 예제 → dev CLI `export --standard`)으로 다시 만든다. 그 뒤 S2 native 표준 모드 ADR.
+1. **TASK-030 S2:** S1 Done(2026-11-15, Foxglove 판독 확인). native 표준 쓰기 모드 ADR 채번·초안 → Human 승인 → 구현.
 2. **TASK-033 S2~S4:** 로보틱스/RTOS 로깅 사용 사례 조사 → UC↔TC 대응·공백 시험(커버리지 공백 중 실제 동작: CLI remote `blob`·`completion`·`replay`와 blob payload 출력, facade `Skipped`, client `diagnostics/bridge.rs`) → 목표치 Human 승인.
 3. **MS-009:** TASK-030 S2 → TASK-031 → TASK-032.
-4. **마지막 단계:** TASK-024(장기·native T3)·TASK-025 문서·TASK-026 실사용처 적용. TASK-024·026은 일정 판단 밖(2026-11-13·11-15 Human 결정).
+4. **TASK-025 문서·인수 정리:** TASK-033·MS-009 뒤(2026-11-15 TASK-024 의존 해제).
+5. **마지막 단계(일정 판단 밖):** TASK-024(장기·native T3)·TASK-026 실사용처 적용(2026-11-13·11-15 Human 결정).
 
 ## 승인·재개 제약
 
@@ -132,7 +133,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 최근 작업·이력
 
-- 2026-11-15 #001: Human 결정 — native·24h(TASK-024) 일정 판단 제외, TASK-030 S1 blob 채널 원문 유지+한계 기록. `records:0` 원인(공통 summary = 출력 `record` 줄 수) 확인·CLI README 보완, 판독 파일 재생성 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md).
+- 2026-11-15 #001: Human 결정 — native·24h(TASK-024) 일정 판단 제외, TASK-030 S1 blob 채널 원문 유지+한계 기록. `records:0` 원인(공통 summary = 출력 `record` 줄 수) 확인·CLI README 보완, Foxglove 판독으로 TASK-030 S1 Done, TASK-025 TASK-024 의존 해제(「권고대로」) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md).
 - 2026-11-13 #001: Human 완료 기준 변경 — 실사용처는 마지막·일정 판단 밖, 일정은 커버리지·사용 사례 조사. `cargo-llvm-cov` 설치·기준선 라인 91.15%, 공백 시험 2건(변이로 Red 확인), Task 22건 Done·MS-002~006·008 Done, TASK-033 신규, 추적표 34행 갱신, EV-077 Foxglove 예측 정정([EV-078](../05_verification/verification_evidence.md#ev-078)).
 - 2026-11-12 #002: TASK-030 착수 결정 6건·S1 표준 export 로컬 Pass([EV-077](../05_verification/verification_evidence.md#ev-077) `04bf3aa`). REV-054 반입·조치·Closed([EV-076](../05_verification/verification_evidence.md#ev-076) `64e9d69`) — 가드 snapshot 계약 조건·개념 import 해석, 자가 시험 18개 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-12_002.md).
 - 2026-11-12 리뷰 전용: [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) Open — P2 2건·Conditional, 1.96.0/MSRV 각 561 Pass·완료 추적 Miri 8 seeds, 제품 코드 미수정.

@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S1 GUI 판독 확인(Human) → S2 native 표준 모드 ADR 채번·승인 |
+| 다음 액션 | S2 native 표준 모드 ADR 채번·승인(S1 Done 2026-11-15) |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -22,7 +22,7 @@
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)) — Foxglove/Lichtblick GUI 판독은 미실행(Human 확인 대기) |
+| S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
 | S2 | native 표준 쓰기 모드 | ADR 승인 후 writer 옵션으로 표준 모드 기록, 복구·조회·재생이 두 형식 모두 지원, 기존 `dot-logger/1` 파일 판독 유지 | Planned |
 
 ## 변경 대상과 첫 검증
@@ -45,7 +45,9 @@
 |---|---|
 | `robot/blob`(`vendor-blob`, descriptor 없음) | Foxglove `Unsupported encoding vendor-blob`(2026-11-13 Human 판독). 처리: Human 「권고대로」 — 원문·encoding 유지, 한계 기록([API §21.2](../../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12)) |
 | CLI summary `"records":0` | 결함 아님. `Output::finish`가 모든 명령 summary에 출력한 `record` 줄 수를 넣는데 export는 `record` 줄을 내지 않는다. 변환 메시지 수는 `export` 행 `messages`. CLI README에 의미를 추가 |
-| `robot/pose`·`_dot_logger/meta` | Human 판독 대기 — 재생성 파일(pose 300건 3초 원 궤적·blob 10건) |
+| `robot/pose`·`_dot_logger/meta` | Foxglove Topics 판독(Human, 2026-11-15, 재생성 파일 pose 300·blob 10·meta 310): `robot/pose` = `test.Pose`(protobuf) 300건·99.58 Hz·`.x`/`.y` float32, `_dot_logger/meta` = `dot_logger.RecordMeta`(protobuf) 310건·102.90 Hz·필드 channel·producer·sequence(uint64)·mono·real(int64)·revision·level·importance·source{ticks, clock_domain} 전부 인식. `robot/blob`(channel 3)만 `Unsupported encoding vendor-blob` — 수락한 한계. GUI 값 표시(plot)는 보지 않았고 payload 값 디코딩은 EV-077 protoc 대조로 확인됨 |
+
+**S1 판정: Done(2026-11-15).** 남은 미실행: Lichtblick 판독, 공식 `mcap` Python 대조, 큰 파일 export 시간·메모리, native(T3).
 
 ## 완료 기준
 

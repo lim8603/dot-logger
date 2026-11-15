@@ -1326,3 +1326,58 @@ fn export_standard_writes_a_new_file_and_never_overwrites() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2), "--standard is required");
 }
+
+/// TASK-033 S3 (UC-31): the CLI passes `--channel`, `--level` and `--basis`
+/// into the query. The fixture holds two Info records on channel 7 at mono
+/// 10/20 and real 2; each flag must select or exclude them, and invalid
+/// values are input errors.
+#[test]
+fn offline_query_channel_level_and_basis_flags_reach_the_query() {
+    let f = fixture([10, 20]);
+    let count = |extra: &[&str]| {
+        let output = command()
+            .args(["query", "--json", "--manifest"])
+            .arg(&f.manifest)
+            .args(extra)
+            .output()
+            .unwrap();
+        let rows = lines(&output.stdout);
+        let records = rows.iter().filter(|row| row["kind"] == "record").count();
+        (output.status.code(), records)
+    };
+    let window = ["--from", "0", "--to", "100"];
+    let with = |more: &[&'static str]| [&window[..], more].concat();
+    assert_eq!(count(&with(&["--channel", "7"])), (Some(0), 2));
+    assert_eq!(count(&with(&["--channel", "8"])), (Some(0), 0));
+    assert_eq!(count(&with(&["--level", "info"])), (Some(0), 2));
+    assert_eq!(count(&with(&["--level", "warn"])), (Some(0), 0));
+    // Real time is 2 for both records: inside [0, 3), outside [3, 100).
+    assert_eq!(
+        count(&["--basis", "real", "--from", "0", "--to", "3"]),
+        (Some(0), 2)
+    );
+    assert_eq!(
+        count(&["--basis", "real", "--from", "3", "--to", "100"]),
+        (Some(0), 0)
+    );
+    // Mono 10 and 20: a mono window around 15 keeps only the second.
+    assert_eq!(count(&["--from", "15", "--to", "100"]), (Some(0), 1));
+    for bad in [
+        &["--basis", "wall", "--from", "0", "--to", "100"][..],
+        &[
+            "--basis",
+            "source",
+            "--clock-domain",
+            "0",
+            "--from",
+            "0",
+            "--to",
+            "100",
+        ],
+        &["--from", "5", "--to", "5"],
+        &["--channel", "x", "--from", "0", "--to", "100"],
+        &["--level", "loud", "--from", "0", "--to", "100"],
+    ] {
+        assert_eq!(count(bad).0, Some(2), "{bad:?} is an input error");
+    }
+}

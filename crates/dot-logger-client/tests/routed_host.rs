@@ -2,7 +2,9 @@
 #![cfg(feature = "remote")]
 #![allow(clippy::unwrap_used)]
 use dot_logger::{completion::Boundary, diagnostics::*};
-use dot_logger_client::diagnostics::SnapshotCheck;
+#[path = "../examples/support/dot_probe.rs"]
+mod dot_probe;
+use dot_probe::SnapshotCheck;
 use std::{path::PathBuf, sync::atomic::AtomicBool, time::Instant};
 
 const SNAPSHOT: &[u8] = br#"{"threads":[{"name":"ControlThread","interval_us":10000,"ticks":2}]}"#;

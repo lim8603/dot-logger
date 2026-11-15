@@ -2,7 +2,9 @@
 #![allow(clippy::unwrap_used)]
 mod support;
 use dot_logger::{adapters::remote::*, completion::Boundary, diagnostics::*, query::QueryBudget};
-use dot_logger_client::diagnostics::SnapshotCheck;
+#[path = "../../dot-logger-client/examples/support/dot_probe.rs"]
+mod dot_probe;
+use dot_probe::SnapshotCheck;
 use std::{
     net::SocketAddr,
     process::{Command, Output},

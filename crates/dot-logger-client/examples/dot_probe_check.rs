@@ -1,6 +1,8 @@
 //! Explicit finite CheckHost execution against one host-selected app export.
 use dot_logger::{completion::Boundary, diagnostics::*};
-use dot_logger_client::diagnostics::{SnapshotCheck, bridge};
+#[path = "support/dot_probe.rs"]
+mod bridge;
+use bridge::SnapshotCheck;
 use std::{
     path::Path,
     sync::atomic::AtomicBool,

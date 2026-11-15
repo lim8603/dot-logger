@@ -1,5 +1,6 @@
-//! Explicit, bounded production capture/loopback checks for a trusted host.
-pub mod bridge;
+//! dot-probe snapshot check for a trusted `CheckHost` (moved out of the
+//! library into example support, TASK-033 S3 Human decision 2026-11-15).
+use super::implementation as bridge;
 use dot_logger::diagnostics::*;
 use std::{
     cell::{Cell, RefCell},
@@ -20,7 +21,7 @@ pub struct SnapshotCheck {
 }
 impl SnapshotCheck {
     /// Fixed production route required by `CheckHost::register_routed`.
-    pub const TARGET_ID: u32 = 10;
+    pub const TARGET_ID: u32 = bridge::TARGET;
     /// Minimum declared plan memory: 16 MiB logger plus 8 MiB bookkeeping.
     pub const REQUIRED_MEMORY_BYTES: usize = 24 * 1024 * 1024;
 

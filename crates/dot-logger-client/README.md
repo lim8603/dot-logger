@@ -1,6 +1,6 @@
 # dot-logger Rust 클라이언트
 
-일반 경로용 Rust API다. 기본 feature는 파일 조회/재생과 협력 취소이며, `remote` feature가 실제 gRPC/TLS 클라이언트와 수신자를 추가한다. 일반 클라이언트 API는 runtime이나 애플리케이션 worker를 시작하지 않는다. 명시 실행하는 `diagnostics::SnapshotCheck`는 유한 점검용 current-thread runtime을 소유한다. 원격 호출은 호스트 소유 Tokio runtime에서 실행한다.
+일반 경로용 Rust API다. 기본 feature는 파일 조회/재생과 협력 취소이며, `remote` feature가 실제 gRPC/TLS 클라이언트와 수신자를 추가한다. 일반 클라이언트 API는 runtime이나 애플리케이션 worker를 시작하지 않는다. dot-probe 전용 점검 예제(`examples/support/dot_probe`의 `SnapshotCheck`)는 유한 점검용 current-thread runtime을 소유한다. 원격 호출은 호스트 소유 Tokio runtime에서 실행한다.
 
 ## 원격 요청과 화면 연결
 
@@ -79,7 +79,7 @@ cargo run -p dot-logger-client --features remote --example dot_probe_bridge -- -
 
 ## 고정 RunCheck의 실제 수집·수신 점검
 
-`diagnostics::SnapshotCheck::new(host_payload, receiver)`는 host가 선택한 export만 받는다. 이를 `CheckHost::register_routed(plan, 10, Box::new(backend), source)`로 등록하고 `run_routed` 또는 기존 `PlanCheck`/`RunCheck` 명령으로 실행한다. 임의 원격 경로/수신자/입력이나 자동 재시도는 받지 않는다. core의 `RoutedCheckBackend`는 신뢰된 host 확장점이며 보안 sandbox가 아니다.
+아래 `SnapshotCheck`는 dot-probe export 모양을 전제한 사용처 전용 코드라 라이브러리 공개 API가 아니다(2026-11-15 TASK-033 S3 Human 결정). [`examples/support/dot_probe.rs`](examples/support/dot_probe.rs)를 `#[path]`로 포함해 쓰며, 다른 앱은 이 코드를 본보기로 자기 `RoutedCheckBackend`를 구현한다. `SnapshotCheck::new(host_payload, receiver)`는 host가 선택한 export만 받는다. 이를 `CheckHost::register_routed(plan, 10, Box::new(backend), source)`로 등록하고 `run_routed` 또는 기존 `PlanCheck`/`RunCheck` 명령으로 실행한다. 임의 원격 경로/수신자/입력이나 자동 재시도는 받지 않는다. core의 `RoutedCheckBackend`는 신뢰된 host 확장점이며 보안 sandbox가 아니다.
 
 - 실제 경계: 원 `CaptureReceipt` → raw/routing guard → loopback TCP/gRPC → 1슬롯 소비 큐 수락 → 서버 ACK → 원 receipt 완료 → 실제 연결 종료/예약 회수. byte 비교만으로 수신 ACK를 대신하지 않는다.
 - host는 일반 worker에서 호출한다. 이 backend는 Tokio runtime 내부 호출을 오류로 반환하므로 async host는 기존의 별도 일반 worker에서 `handle_command`를 구동한다. 상시 worker는 자동 생성하지 않는다.

@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S3 남은 시험 공백 3건 → S4 목표치 제안 |
+| 다음 액션 | S4 목표치 Human 승인 → 남은 경미 분기 처리 → 판정 |
 | 의존 | 없음(기존 시험·EV-078 기준선 사용) |
 | 예상 소요 | 3~5 인일, 리뷰 대기 제외 |
 
@@ -29,8 +29,8 @@
 |---|---|---|---|
 | S1 | 커버리지 측정 도구와 기준선 | `cargo llvm-cov` workspace all-features 측정·파일별 미실행 줄 목록, 저위 파일 분류 — [EV-078](../../05_verification/verification_evidence.md#ev-078) | Done |
 | S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — [UC 31개](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
-| S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | In Progress — 대응표·시험 16+1개·결함 1건 수정(2026-11-15). 기능 공백 Human 결정 대기 |
-| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | Planned |
+| S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | **Done** 2026-11-15 — 대응표, 시험 17개 신규·1개 확장, 결함 1건 수정, 기능 공백 결정 4건 반영(TASK-034·035·B1·bridge 이동), 재측정 라인 92.40% |
+| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | 제안(2026-11-15) — Human 승인 대기 |
 
 ## 커버리지 기준선과 공백 분류 — S1 (2026-11-13)
 
@@ -69,8 +69,8 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 
 | UC | 판정 | 대표 시험 | 시험 공백(S3 추가) | 기능 공백(Human 결정) |
 |---|---|---|---|---|
-| UC-01 RT 무대기 호출 | 대응 | `tc_002_capture::copies_input_preserves_metadata…`, `tc_013_facade::f1…`, `tc_012_performance::call_cost_separates…` | facade `try_log`의 무할당 단언 없음(core는 TC-002 allocator guard) | — |
-| UC-02 버퍼 포화 정책 선택 | 일부 | `tc_002_capture::normal_saturation_preserves_important_reservation…`, `::general_producer_observes_deadline…` | facade `producer().into_general()` 제한 시간 대기 | 오래된 기록 덮어쓰기 없음. 정책은 고정(새 기록 거절) |
+| UC-01 RT 무대기 호출 | 대응 | `tc_002_capture::copies_input_preserves_metadata…`, `tc_013_facade::f1…`, `tc_012_performance::call_cost_separates…` | 없음 — facade `try_log`·`producer()` 무할당은 `tests/rt-allocation::f2_try_log_rejections_and_producer_view_never_allocate_or_free`(대응 조사에서 이 crate를 놓쳐 공백으로 잘못 분류, 2026-11-15 정정) | — |
+| UC-02 버퍼 포화 정책 선택 | 일부 | `tc_002_capture::normal_saturation_preserves_important_reservation…`, `::general_producer_observes_deadline…` | 없음 — `writer.producer()`는 core와 같은 `Producer` 타입이고 `into_general().record_until`은 `tc_002_capture`가 시험한다(정정) | 오래된 기록 덮어쓰기 없음. 정책은 고정(새 기록 거절) |
 | UC-03 중요 기록 우선 | 대응(core) | `tc_002_capture::normal_saturation…`, `tc_002_pool::normal_loans_cannot_borrow_important_bytes…`, `tc_009_config_update::sampling_is_explicit_and_important_bypasses_it…` | 표준 export 메타 `importance`·`source` → **F7 추가** | facade 단순 경로(`try_log`)에서 중요도를 지정할 수 없다(고급 `producer()`로만 가능) |
 | UC-04 손실 계수·파일 내 표시 | 일부 | `tc_009_telemetry::capture_small_raw_skip_and_reject_totals…`, `tc_013_facade::f10…`, `tc_013_tracing::f12_oversized_and_recursive…` | — | 채널별 손실 수 없음(producer 단위). **파일 안 손실 기록 없음** — 수락된 기록만 sequence가 올라가 표준 도구가 구멍을 볼 수 없다 |
 | UC-05 버퍼 건강 지표 | 일부 | `tc_002_pool::rejected_loan_is_the_same_loan…`, `tc_013_facade::f9_health_is_running…`, `tc_009_report::full_resource_or_disk_reserve…` | — | 소형 ingress 점유·최대 사용량(high-water) 지표 없음. `BufferTrend`는 host가 채워야 한다 |
@@ -99,7 +99,7 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 | UC-28 원격 실행 중 제어 | 일부 | `tc_009_operations::apply_maps_conflict_busy_restart…`, `operations_host::cli_status_apply_and_compare…`, `cli::actual_cli_remote_query_blob_and_replay_control…` | CLI `blob`(같은 시험 확장)·`completion` → `cli::actual_cli_remote_completion_reports…`·`cli::invalid_blob_and_completion_arguments…`, completion 결과 14종 wire → `remote::tests::completion_reply_pins_every_outcome…`·`codec::tests::completion_reply_decodes_every_outcome…`·`transport::every_completion_outcome_and_reason_survives…` | 기록 일시정지·재개·분할·snapshot 명령 없음. facade 원격 ApplyConfig Unsupported |
 | UC-29 상태 기반 기록 시작·중지 | 기능 없음 | (간접) `tc_009_config_update::configuration_state_and_sampling_survive…` 빈 route | — | 미구현 |
 | UC-30 백그라운드 affinity | 대응 | `tc_013_affinity`, `tc_013_facade::f11_unknown_worker_cpu…` | — | — |
-| UC-31 조회 필터 | 일부 | `tc_006_query::interleaved_queries_and_reused_cursors…`, `cli::real_offline_query_replay…` | 채널 일치 조회 → `tc_006_query::positive_channel_filter_returns_only_the_selected_channel…`. CLI `query --channel/--level/--basis` 플래그는 미시험(남은 항목) | 텍스트 검색 없음 |
+| UC-31 조회 필터 | 일부 | `tc_006_query::interleaved_queries_and_reused_cursors…`, `cli::real_offline_query_replay…` | 채널 일치 조회 → `tc_006_query::positive_channel_filter_returns_only_the_selected_channel…`. CLI `--channel/--level/--basis` → `cli::offline_query_channel_level_and_basis_flags_reach_the_query`(`4559fc7`) | 텍스트 검색 없음 |
 
 **요약:**
 - 31개 판정: 대응 9, 일부 19, 기능 없음 3(UC-18·23·29).
@@ -121,11 +121,11 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 | 조회·재생 | `tc_006_query` 2개, `tc_006_replay` 2개 | 채널 필터 무시 → 6건 모두 반환. 병합 키 producer↔seq 교환 → 순서 불일치. `to` 무시 → 4건 전달 |
 | 원격·CLI | `remote::tests` 2개, `codec::tests` 1개, `transport` 1개, `cli` 2개 신규·1개 확장 | `Busy => 6` → `(NotRouted)`. blob offset 0 → `"0102"`. synced→Written → exit 2. hub level `<`→`<=` → 「seq 3 must reach 1」 |
 
-남은 시험 공백:
-- facade `try_log` 무할당 단언(UC-01)
-- facade `producer().into_general()` 제한 시간 대기(UC-02)
-- CLI `query --channel/--level/--basis` 플래그(UC-31)
-- client `diagnostics/bridge.rs`(이동 여부 결정 대기)
+남은 시험 공백 처리(2026-11-15):
+- UC-01 facade 무할당: 이미 `tests/rt-allocation`에 있었다(정정).
+- UC-02 facade 제한 시간 대기: core와 같은 타입 경로라 이미 시험된다(정정).
+- UC-31 CLI 플래그: 시험을 추가했다. 채널 무시 변이와 real→mono 변이로 Red를 확인했다.
+- client bridge: 결정 4로 예제 support로 옮겼다.
 
 ### 결함 수정 — 작은 ring이 시작 뒤 기록 대부분을 잃음 (2026-11-15)
 
@@ -167,6 +167,41 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
    - **권고:** `examples/support`로 옮기고 시험은 유지한다.
    - 근거: dot-probe export 모양을 전제한 사용처 전용 코드다. 아직 1.0 전이고 외부 사용처가 없어서 공개 항목을 제거해도 영향이 없다.
 
+### 커버리지 재측정 — S3 종료 (2026-11-15)
+
+`cargo llvm-cov --workspace --all-features`(시험 565 passed·0 failed, doctest·`#[ignore]` 제외):
+
+| 지표 | S1 기준선(EV-078) | 같은 범위로 비교(옮긴 client `diagnostics` 597줄 제외) | S3 종료 |
+|---|---|---|---|
+| 라인 | 91.15% | 91.73% | **92.40%**(18,284줄 중 1,389 미실행) |
+| 함수 | 90.92% | — | 92.08% |
+| 리전 | 88.27% | — | 89.50% |
+
+라인 85% 미만 파일의 남은 미실행 줄 분류:
+- **비동작:** `Display`·`Debug`·`From`, const fn(`Schema::new`·`descriptor`), tracing span 빈 메서드. 해당 파일은 `*/types.rs`, `logger/writer.rs`, `logger/sink.rs`, `storage/standard.rs` 일부다.
+- **도달 불가:** `writer.rs` facade `Logged::Skipped` 분기 → [TASK-034](TASK-034.md)에서 도달 가능해진다.
+- **경미한 실제 동작**(오류 코드 매핑·입력 검증 분기):
+  - CLI: `output.rs`의 `QueryError` → exit code 매핑, `model.rs`의 hex·manifest 입력 오류
+  - `completion/query.rs`: 로컬 completion 조회의 BufferTooSmall·취소 중 page, 비완료 결과 집계
+  - `standard.rs`: 손상 입력(schema 재정의·channel topic 충돌·Envelope 아닌 채널)
+  - `sink.rs`: `log` level 일부 매핑
+  - `health.rs`: 원격 affinity 결과
+  - `telemetry/capacity.rs`: forecast 결합 분기
+
+  이 항목들은 S4 규칙 승인 뒤 처리한다.
+
+### S4 목표치 제안 — 2026-11-15 (Human 승인 대기)
+
+| # | 기준 | 제안값 | 현재 |
+|---|---|---|---|
+| 1 | workspace 커버리지 하한(회귀 방지) | 라인 ≥ 92%, 함수 ≥ 92%, 리전 ≥ 89%. 측정은 `cargo llvm-cov --workspace --all-features`(doctest·`#[ignore]` 제외) | 92.40 / 92.08 / 89.50 |
+| 2 | 파일별 공백 규칙 | 라인 85% 미만 파일은 미실행 줄을 분류한다. 「실제 동작」 공백은 시험으로 메우거나 사유를 기록해 미처리 0으로 만든다 | 경미 분기 6묶음 남음(위) |
+| 3 | UC 대응률 | 범위 안 UC에서 구현된 동작의 시험 대응 100%. 기능 공백은 B1(범위 밖) 또는 TASK-034·035가 소유한다 | 시험 공백 0(S3) |
+| 4 | 일정 판단 시점 | 1~3을 충족하고, **TASK-034·035 완료 뒤 재측정 Pass**로 MS-007 일정 판단을 마무리한다 | — |
+
+- 권고 근거(퍼센트 하한): 무작정 높이면 `Display` 같은 비동작 줄을 채우는 시험이 늘어난다. 그래서 퍼센트는 회귀 방지 하한으로만 두고, 판단은 2·3의 분류 규칙으로 한다.
+- 권고 근거(판정 시점): TASK-034·035는 Must 요구(FR-009·011)와 관련된 공백이다. 이것들이 끝난 뒤 판정해야 일정 판단이 실제 사용 사례를 반영한다.
+
 ## 2026-11-13 공백 시험 추가
 
 | 시험 | 대상 | 확인 |
@@ -180,6 +215,6 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 
 - [x] S1 커버리지 기준선·파일별 공백 분류(EV-078).
 - [x] S2 사용 사례 목록(출처 포함) — 2026-11-15, [조사 문서](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md).
-- [ ] S3 UC↔TC 대응표와 공백 시험(실제 동작 공백 0 또는 사유 기록).
+- [x] S3 UC↔TC 대응표와 공백 시험 — 2026-11-15(EV-079). 남은 경미 분기는 S4 규칙으로 처리.
 - [ ] S4 목표치 Human 승인과 재측정 결과.
 - [ ] Human 리뷰 완료.

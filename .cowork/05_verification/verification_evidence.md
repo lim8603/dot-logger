@@ -1255,7 +1255,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   - workspace 테스트 각 **586 passed**(570 + 16)·0 failed·5 ignored.
   - rustdoc all-features·core-only `-D warnings` Pass.
   - 표면 가드 자가 시험 Pass, NFR-008 integration guard Pass(공개 시그니처 변경 없음).
-- **커버리지:** S3 시작 전 재측정에서 라인 91.17%(18,826 / 미실행 1,662). 시험 추가 뒤 재측정은 S4에서 한다.
+- **커버리지:** S3 시작 전 라인 91.17%(18,826 / 미실행 1,662). S3 종료 재측정 라인 **92.40%**(18,284 / 1,389)·함수 92.08%·리전 89.50%, 시험 565 passed(doctest·ignore 제외). 같은 범위(옮긴 client `diagnostics` 597줄 제외) 비교로는 91.73% → 92.40%.
+- **후속(같은 날):** 결정 반영 — client `diagnostics`를 `examples/support/dot_probe`로 이동(`4bd6d04`): clippy 1.96/1.85, feature matrix 16조합, 영향 시험 Pass. CLI query 플래그 시험 추가(`4559fc7`): 채널 무시·real→mono 변이로 Red 확인. 정정: facade 무할당(UC-01)은 `tests/rt-allocation`에 이미 있었고, facade 제한 시간 대기(UC-02)는 core와 같은 경로였다.
 - **미실행:** `check-feature-matrix.py`(feature 경계 변경 없음), Miri(unsafe·동시성 변경 없음), native(T3).
 - **쓰기량:** 시험 데이터는 /tmp(tmpfs) MiB 단위다. ring 재현 probe는 크기 5개로 각 약 4 MiB였고 실행 뒤 삭제했다.
 

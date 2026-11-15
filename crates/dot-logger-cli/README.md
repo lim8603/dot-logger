@@ -79,7 +79,7 @@ offline replay는 start와 실제 caller clock을 지원한다. 실행 중 제�
 
 ## 출력·취소·한도
 
-`--json`은 각 줄이 독립 객체인 NDJSON이다. 공통 필드는 `schema_version:1`, `command`, `kind`, `data`다. record/gap/status 등 뒤에 summary 또는 error가 온다. 128-bit ID는 32자리 hex, 손실 없는 u64/i128 시각·sequence/revision/handle은 문자열이다. `data_hex`는 명시 payload 출력에서만 제공한다. 임의 payload나 credential을 오류 메시지에 포함하지 않는다.
+`--json`은 각 줄이 독립 객체인 NDJSON이다. 공통 필드는 `schema_version:1`, `command`, `kind`, `data`다. record/gap/status 등 뒤에 summary 또는 error가 온다. 128-bit ID는 32자리 hex, 손실 없는 u64/i128 시각·sequence/revision/handle은 문자열이다. `data_hex`는 명시 payload 출력에서만 제공한다. summary·error의 `records`는 이 명령이 stdout에 낸 `record` 줄 수, `acknowledged`는 그중 ACK한 수다 — `record` 줄을 내지 않는 명령(`export`·`calibrate`·`config` 등)은 항상 0이다. `export --standard`가 변환한 메시지 수는 `export` 줄의 `messages`다. 임의 payload나 credential을 오류 메시지에 포함하지 않는다.
 
 | 종료 코드 | 의미 |
 |---|---|

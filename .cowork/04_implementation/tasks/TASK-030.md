@@ -9,7 +9,7 @@
 | ADR | ADR-009·010 Accepted. 표준 저장 모드 ADR 후보(S2 전 채번) |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-12 |
+| 마지막 갱신일 | 2026-11-15 |
 | 다음 액션 | S1 GUI 판독 확인(Human) → S2 native 표준 모드 ADR 채번·승인 |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
@@ -38,6 +38,14 @@
 ## Human 결정 — 2026-11-12
 
 착수 확인 4건 + 구현 중 확인 2건(⑤ facade `Schema::descriptor`, ⑥ `payload_schema_name` 채널 metadata) 모두 권고안([API §21.1](../../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12)): ① MCAP `sequence` = 하위 32비트, u64는 보조 메타 채널 ② `log_time`·`publish_time` = real, mono는 보조 ③ level·importance·producer·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`) ④ ROS 2 encoding은 T1 유지.
+
+## S1 리뷰 기록 — 2026-11-15
+
+| 항목 | 결과 |
+|---|---|
+| `robot/blob`(`vendor-blob`, descriptor 없음) | Foxglove `Unsupported encoding vendor-blob`(2026-11-13 Human 판독). 처리: Human 「권고대로」 — 원문·encoding 유지, 한계 기록([API §21.2](../../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12)) |
+| CLI summary `"records":0` | 결함 아님. `Output::finish`가 모든 명령 summary에 출력한 `record` 줄 수를 넣는데 export는 `record` 줄을 내지 않는다. 변환 메시지 수는 `export` 행 `messages`. CLI README에 의미를 추가 |
+| `robot/pose`·`_dot_logger/meta` | Human 판독 대기 — 재생성 파일(pose 300건 3초 원 궤적·blob 10건) |
 
 ## 완료 기준
 

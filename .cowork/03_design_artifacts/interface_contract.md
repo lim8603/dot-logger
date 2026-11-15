@@ -1231,3 +1231,16 @@ writer.try_log(alarm.important(), &msg)?;            // 레코드 단위(Channel
 | D2 | 이벤트 trigger 위치 | 일반 경로 `Logger::mark_event`만. RT trigger는 B1 | RT `Writer::mark_event` — 무대기 mailbox가 하나 더 필요하다 |
 | D3 | 중요 예약 기본값 | 0 유지 + `PlanWarning`. 기존 사용자 영향 없음 | 중요도를 쓰면 예약을 필수로(손실 값 원칙에 더 엄격) |
 | D4 | 레시피 | 추가하지 않고 README 절과 rustdoc 예제로 | L3 「event」 레시피 추가(+6줄 이하 규칙 적용) |
+
+### 22.7 S2 구현 반영
+
+TASK-034 S2a(③ 중요도)를 구현했다. 시험은 `tc_013_facade` f25~f30이다. ①·②는 아직 구현하지 않았다. §22.4 초안과 달라지거나 초안이 정하지 않았던 점은 다음과 같다.
+
+- **`WriterQuota.important_slots` 필드:** 메서드 `important(slots)`와 함께 공개 필드도 추가했다. `WriterQuota`의 다른 값이 모두 공개 필드이고, `Plan::writer_quota`에서 예약값을 읽을 수 있어야 하기 때문이다.
+- **거절 조건:** `important(slots)`가 small slots 이상이면 `start()`와 `plan()`이 `StartError::InvalidBudget`으로 거절한다. Normal 기록을 하나도 받을 수 없는 quota이므로 "값이 0이거나 서로 맞지 않음"이라는 기존 variant의 뜻에 맞는다. 새 variant는 만들지 않았다.
+- **예약 범위:** 예약은 small pool(`try_log`)에만 적용한다. raw pool(`with_raw`)에는 예약이 없어서, Important loan도 raw slot을 Normal과 똑같이 경쟁해서 얻는다. rustdoc에 적었다.
+- **`PlanWarning::NoImportantReserve`:** preset이 없어도 계산한다. 조건은 "`important_from`을 쓰는 채널이 있고, 사용자 writer의 예약이 모두 0"이다. tracing 내부 writer는 그런 채널에 기록하지 않으므로 계산에서 뺀다. 레코드 단위 `.important()`는 계획 시점에 알 수 없어서 경고 대상이 아니다. rustdoc에 적었다.
+- **`Channel::metadata()`:** §18.3은 "importance 없음"이라고 했지만, 이제 `.important()`를 붙인 토큰은 `Some(Important)`를 돌려준다. 붙이지 않은 토큰은 지금처럼 `None`이다. raw loan은 기록이 최종으로 받는 중요도와 같은 값으로 `try_acquire`해야 한다(core 규칙).
+- **`Channel` 비용:** `Channel`에 `Option<Importance>` 필드 하나가 늘었다. 여전히 `Copy`이고 메모리를 소유하지 않는다. RT 경로에서 추가 연산은 없다. allocator guard(`dot-logger-rt-allocation` f2)에 `.important()` 기록을 넣었고 할당 0으로 통과했다.
+- **공개 표면:** S2a에서 이름 있는 항목은 `Level` 재수출 하나만 늘었다(30 → 31 / 60). §22.5의 35는 ①·② 항목까지 더한 수치다. `Importance`는 재수출하지 않는다. facade 사용자는 메서드만 쓰기 때문이다. 단, 고급 경로의 `Producer::try_acquire`는 지금처럼 `dot_logger::capture::Importance`를 받는다. 레시피 수치는 바뀌지 않았다.
+- **포화 시험(f28)의 결정성:** worker를 멈추지 않는다. Normal 기록이 처음 거절된 순간에는 ingress에 남은 Normal 기록이 `slots − 예약` 이하이고, completion window도 마지막 sequence 뒤로 예약 수만큼 빈 slot을 남겨 둔다. 그 자리를 채울 수 있는 것은 이 writer뿐이고 worker는 자리를 비우기만 한다. 그래서 바로 이어지는 예약 수만큼의 Important 기록은 worker가 언제 돌든 받아들여진다. 20회 반복해 모두 통과했다. 예약을 core로 넘기지 않게 바꾸면 20회 모두 실패했다.

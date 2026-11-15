@@ -21,6 +21,7 @@
 
 ## 현재 결정과 제약
 
+- **2026-11-15 Human 합의 — 일정 목표:** 다음 주(2026-11-16 주) 목표는 핵심 범위 완료와 MS-007 일정 판정이다. 대상은 TASK-034, TASK-030 S2 + TASK-035, TASK-033 최종 재측정, TASK-025다. viewer·대시보드(TASK-031·032)는 그다음 주로 둔다(Human 「뷰어는 그렇게 해도 돼」). 인일은 추정이며 납기 확정이 아니다. 병목은 승인 지점 세 곳이다(TASK-034 결과, TASK-030 S2 ADR, 판정).
 - **2026-11-15 Human 「승인」 — TASK-034 facade 노출 계약(API §22):** D1 쉬는 writer는 facade ack(미반출·tracing) + 사용자 writer `Busy`/`Writer::refresh`, D2 이벤트 trigger는 일반 경로 `mark_event`만(RT trigger B1), D3 중요 예약 기본 0 + `PlanWarning`, D4 레시피 추가 없음.
 - **2026-11-15 Human 「승인」 — 일정 판단 목표치:** 커버리지 하한 라인 92·함수 92·리전 89%(회귀 방지), 85% 미만 파일 실제 동작 공백 미처리 0, 범위 안 UC 구현 동작 시험 대응 100%, TASK-034·035 뒤 재측정으로 MS-007 판정. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정).
 - **2026-11-15 Human 결정 — TASK-033 S3 기능 공백(「모두 권고대로 진행하자」):** facade 노출 ①실행 중 level·샘플링 ②이벤트 전후 보존 trigger ③단순 경로 중요도 → [TASK-034](../04_implementation/tasks/TASK-034.md)(MS-008 재개). 파일 안 손실 기록·채널별 손실 수 → [TASK-035](../04_implementation/tasks/TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께). 나머지 기능 공백 → B1(범위 밖, 일정 판단 제외). client `diagnostics`(dot-probe 전용 `SnapshotCheck`+bridge) → `examples/support/dot_probe` 이동(`4bd6d04`).
@@ -91,7 +92,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 0. **리뷰 후속:** 없음(REV-054 Closed).
 1. **TASK-030 S2:** S1 Done(2026-11-15, Foxglove 판독 확인). native 표준 쓰기 모드 ADR 채번·초안 → Human 승인 → 구현.
 2. **TASK-033 S4:** 기준 1~3 충족(EV-080). TASK-034·035 뒤 재측정으로 판정(기준 4). 참고(S3까지): UC↔TC 대응·공백 시험(커버리지 공백 중 실제 동작: CLI remote `blob`·`completion`·`replay`와 blob payload 출력, facade `Skipped`, client `diagnostics/bridge.rs`) → 목표치 Human 승인.
-3. **MS-008·009:** TASK-034(facade 노출) · TASK-030 S2 ADR(+TASK-035 손실 기록 형식) → TASK-035 → TASK-031 → TASK-032.
+3. **MS-008·009(다음 주 목표):** TASK-034(facade 노출) · TASK-030 S2 ADR(+TASK-035 손실 기록 형식) → TASK-035 → TASK-033 판정 → TASK-025. **그다음 주:** TASK-031 → TASK-032.
 4. **TASK-025 문서·인수 정리:** TASK-033·MS-009 뒤(2026-11-15 TASK-024 의존 해제).
 5. **마지막 단계(일정 판단 밖):** TASK-024(장기·native T3)·TASK-026 실사용처 적용(2026-11-13·11-15 Human 결정).
 

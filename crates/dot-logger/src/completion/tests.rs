@@ -679,3 +679,41 @@ fn a_stale_sweep_cannot_erase_a_new_abandonment() {
         assert_eq!(c.totals(false).unknown, 2);
     });
 }
+/// TASK-033 S3: a row under publication is reported Busy in its page and
+/// summary instead of failing the page, and the scan cannot claim success.
+#[test]
+fn a_query_page_reports_a_row_under_publication_as_busy() {
+    let (mut owner, _, _) = setup();
+    owner.scope(|mut scope| {
+        let completion = scope.completion().unwrap();
+        let (mut p, _) = scope.next().unwrap();
+        p.try_record_small(metadata(), &[1]).unwrap();
+        p.try_record_small(metadata(), &[2]).unwrap();
+        // Sequence 2 lives in slot 2 % window (2).
+        let slot = &completion.registry.producers[0].slots[0];
+        slot.phase.store(UPDATING, Ordering::Release);
+        let ranges = [ProducerRange {
+            producer_id: 0,
+            first: 1,
+            last: 2,
+        }];
+        let requests = [TargetRequest {
+            target_id: 10,
+            boundary: Boundary::Written,
+        }];
+        let mut query = completion
+            .query(completion.scope(&ranges).unwrap(), &requests)
+            .unwrap();
+        let mut page = [None; 2];
+        let report = query.page(&mut page).unwrap();
+        slot.phase.store(ACTIVE, Ordering::Release);
+        assert_eq!(report.items, 2);
+        assert_eq!(
+            page[1].map(|item| (item.receipt.accepted_seq, item.status.outcome)),
+            Some((2, QueryOutcome::Busy))
+        );
+        assert_eq!((report.summary.pending, report.summary.busy), (1, 1));
+        assert!(report.summary.finished);
+        assert!(!report.summary.is_settled());
+    });
+}

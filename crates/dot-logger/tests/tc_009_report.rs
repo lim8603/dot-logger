@@ -503,3 +503,48 @@ fn a_known_quota_limit_is_not_hidden_by_a_horizon_beyond_u64_nanoseconds() {
     assert_eq!(estimated(r.disk_exhaustion), Forecast::AtLimit);
     assert_eq!(r.pressure, Value::Observed(Pressure::Overloaded));
 }
+
+/// TASK-033 S3: the combined buffer limit is the earlier of the byte and slot
+/// horizons; a horizon beyond u64 nanoseconds or without growth never hides a
+/// finite one, in either position.
+#[test]
+fn the_buffer_limit_takes_the_finite_horizon_over_beyond_range_or_no_growth() {
+    // Defaults: bytes and slots both fill after 80 s.
+    let beyond = |i: &mut ReportInput, slots: bool| {
+        if let Observation::Observed(ref mut b) = i.buffer {
+            if slots {
+                b.capacity_slots = u64::MAX;
+                b.start_slots = 0;
+                b.end_slots = 1;
+            } else {
+                b.capacity_bytes = u64::MAX;
+                b.start_bytes = 0;
+                b.end_bytes = 1;
+            }
+        }
+    };
+    let mut i = input();
+    beyond(&mut i, true);
+    let r = Report::build(i, None, 10 * SECOND);
+    assert_eq!(estimated(r.buffer_slots_limit), Forecast::BeyondRange);
+    assert_eq!(estimated(r.buffer_limit), Forecast::AfterNs(80 * SECOND));
+
+    let mut i = input();
+    beyond(&mut i, false);
+    if let Observation::Observed(ref mut b) = i.buffer {
+        b.end_slots = 60; // slots fill after 8 s
+    }
+    let r = Report::build(i, None, 10 * SECOND);
+    assert_eq!(estimated(r.buffer_bytes_limit), Forecast::BeyondRange);
+    assert_eq!(estimated(r.buffer_limit), Forecast::AfterNs(8 * SECOND));
+
+    // No byte growth and slots beyond range: the combination is BeyondRange.
+    let mut i = input();
+    beyond(&mut i, true);
+    if let Observation::Observed(ref mut b) = i.buffer {
+        b.start_bytes = b.end_bytes;
+    }
+    let r = Report::build(i, None, 10 * SECOND);
+    assert_eq!(estimated(r.buffer_bytes_limit), Forecast::NoGrowth);
+    assert_eq!(estimated(r.buffer_limit), Forecast::BeyondRange);
+}

@@ -792,3 +792,142 @@ fn explicitly_unrouted_records_also_retire_terminal_detail_by_age_after_dispatch
         );
     });
 }
+
+/// TASK-033 S3: every non-Complete outcome is counted in its own summary
+/// field, a wait that runs out of time returns its last page, and a settled
+/// or complete scan ends the wait.
+#[test]
+fn query_summary_counts_each_outcome_and_wait_ends_on_time_settle_or_complete() {
+    use dot_logger::completion::{
+        CompletionError, FailureReason, ProducerRange, TargetRequest, WaitOutcome,
+    };
+    use dot_logger::routing::DropReason;
+    use std::sync::atomic::AtomicBool;
+    use std::time::Instant;
+    let plan = plan();
+    let mut route = routing();
+    route.routes[0].targets = vec![10];
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &route,
+        tracking(4),
+    )
+    .unwrap();
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut ingress) = scope.next().unwrap();
+        for (byte, update) in [
+            (1, Update::Confirmed(Boundary::Written)),
+            (2, Update::Failed(FailureReason::IoFailure)),
+            (3, Update::Dropped(DropReason::Cancelled)),
+            (4, Update::Unknown),
+        ] {
+            let receipt = accepted(p.try_record_small(meta(), &[byte]).unwrap());
+            ingress.try_read(&mut [0; 16]).unwrap().unwrap();
+            c.report(receipt, 10, update).unwrap();
+        }
+        // The fifth record reuses the first record's window slot: its detail
+        // is retired (Expired), and it stays Pending on target 10.
+        let fifth = accepted(p.try_record_small(meta(), &[5]).unwrap());
+        let mut buffer = [ProducerRange::default(); 1];
+        assert_eq!(
+            c.capture_scope(&mut buffer).err(),
+            Some(CompletionError::BufferTooSmall),
+            "the plan registers two producers"
+        );
+        let ranges = [ProducerRange {
+            producer_id: 0,
+            first: 1,
+            last: 5,
+        }];
+        let frozen = c.scope(&ranges).unwrap();
+        let written = |target_id| TargetRequest {
+            target_id,
+            boundary: Boundary::Written,
+        };
+        assert_eq!(
+            c.query(frozen, &[]).err(),
+            Some(CompletionError::InvalidScope)
+        );
+        assert_eq!(
+            c.query(frozen, &[written(10), written(10)]).err(),
+            Some(CompletionError::InvalidScope)
+        );
+        let requests = [written(10), written(20)];
+        let mut query = c.query(frozen, &requests).unwrap();
+        assert_eq!(
+            query.page(&mut []).err(),
+            Some(CompletionError::BufferTooSmall)
+        );
+        let mut page = [None; 16];
+        let mut report = query.page(&mut page).unwrap();
+        while !report.summary.finished {
+            report = query.page(&mut page).unwrap();
+        }
+        let s = report.summary;
+        assert_eq!(
+            (
+                s.complete,
+                s.pending,
+                s.failed,
+                s.dropped,
+                s.unknown,
+                s.expired,
+                s.not_routed,
+                s.busy
+            ),
+            (0, 1, 1, 1, 1, 2, 4, 0),
+            "{s:?}"
+        );
+        assert!(!s.is_settled() && !s.is_complete());
+
+        // Pending: the wait scans repeatedly, then returns its last page.
+        let start = Instant::now();
+        let waited = query
+            .wait(
+                start + Duration::from_millis(20),
+                &AtomicBool::new(false),
+                &mut page,
+            )
+            .unwrap();
+        assert_eq!(waited.outcome, WaitOutcome::TimedOut);
+        assert!(start.elapsed() >= Duration::from_millis(20));
+        assert!(waited.page.items > 0);
+
+        // Settled: nothing pending, but failures remain.
+        c.report(fifth, 10, Update::Confirmed(Boundary::Written))
+            .unwrap();
+        let waited = query
+            .wait(
+                Instant::now() + Duration::from_secs(5),
+                &AtomicBool::new(false),
+                &mut page,
+            )
+            .unwrap();
+        assert_eq!(waited.outcome, WaitOutcome::Settled);
+        assert!(waited.page.summary.finished);
+        assert_eq!(waited.page.summary.complete, 1);
+        drop(query);
+
+        // Complete: only the confirmed fifth record on target 10.
+        let only_fifth = [ProducerRange {
+            producer_id: 0,
+            first: 5,
+            last: 5,
+        }];
+        let target_10 = [written(10)];
+        let mut query = c.query(c.scope(&only_fifth).unwrap(), &target_10).unwrap();
+        let waited = query
+            .wait(
+                Instant::now() + Duration::from_secs(5),
+                &AtomicBool::new(false),
+                &mut page,
+            )
+            .unwrap();
+        assert_eq!(waited.outcome, WaitOutcome::Complete);
+        assert_eq!(waited.page.summary.complete, 1);
+    });
+}

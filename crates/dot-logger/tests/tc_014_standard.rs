@@ -466,3 +466,166 @@ fn f7_important_records_and_source_time_survive_in_meta() {
     assert_eq!(metas[1].importance, 0);
     assert_eq!(metas[1].source, None);
 }
+
+/// Hand-built `dot-logger/1` records for damaged inputs the writer cannot
+/// produce (MCAP spec: opcode, u64 length, little-endian fields).
+mod raw {
+    pub const ENVELOPE: &str = "dot_logger.Envelope";
+    fn string(out: &mut Vec<u8>, s: &str) {
+        out.extend_from_slice(&(s.len() as u32).to_le_bytes());
+        out.extend_from_slice(s.as_bytes());
+    }
+    fn record(out: &mut Vec<u8>, opcode: u8, body: &[u8]) {
+        out.push(opcode);
+        out.extend_from_slice(&(body.len() as u64).to_le_bytes());
+        out.extend_from_slice(body);
+    }
+    /// Magic and a `dot-logger/1` header.
+    pub fn file() -> Vec<u8> {
+        let mut out = mcap::MAGIC.to_vec();
+        let mut body = Vec::new();
+        string(&mut body, "dot-logger/1");
+        string(&mut body, "hand-built");
+        record(&mut out, mcap::records::op::HEADER, &body);
+        out
+    }
+    pub fn schema(out: &mut Vec<u8>, id: u16, name: &str, encoding: &str, data: &[u8]) {
+        let mut body = id.to_le_bytes().to_vec();
+        string(&mut body, name);
+        string(&mut body, encoding);
+        body.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        body.extend_from_slice(data);
+        record(out, mcap::records::op::SCHEMA, &body);
+    }
+    /// A channel with the `payload_encoding` metadata the export requires.
+    pub fn channel(out: &mut Vec<u8>, id: u16, schema_id: u16, topic: &str, encoding: &str) {
+        let mut body = id.to_le_bytes().to_vec();
+        body.extend_from_slice(&schema_id.to_le_bytes());
+        string(&mut body, topic);
+        string(&mut body, encoding);
+        let mut map = Vec::new();
+        string(&mut map, "payload_encoding");
+        string(&mut map, "json");
+        body.extend_from_slice(&(map.len() as u32).to_le_bytes());
+        body.extend_from_slice(&map);
+        record(out, mcap::records::op::CHANNEL, &body);
+    }
+    /// A schema record whose body is too short to parse.
+    pub fn broken_schema(out: &mut Vec<u8>) {
+        record(out, mcap::records::op::SCHEMA, &[1]);
+    }
+}
+
+fn export_err(input: &[u8]) -> ExportError {
+    export(
+        input,
+        &mut Cursor::new(Vec::new()),
+        ExportLimits::new(MIB),
+        &AtomicBool::new(false),
+    )
+    .unwrap_err()
+}
+
+/// TASK-033 S3: one schema id defined twice with different content is not a
+/// `dot-logger/1` file the export can trust.
+#[test]
+fn f8_a_schema_id_redefined_with_other_content_is_invalid() {
+    let mut input = raw::file();
+    raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+    raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+    raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"b");
+    let err = export_err(&input);
+    assert!(matches!(err, ExportError::InvalidRecord), "{err:?}");
+}
+
+/// TASK-033 S3: a channel id repeated with another topic is invalid; the
+/// same channel repeated (summary section) is accepted once.
+#[test]
+fn f9_a_channel_id_redefined_with_another_topic_is_invalid() {
+    let mut input = raw::file();
+    raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+    raw::channel(&mut input, 1, 1, "robot/a", "protobuf");
+    raw::channel(&mut input, 1, 1, "robot/a", "protobuf");
+    raw::channel(&mut input, 1, 1, "robot/b", "protobuf");
+    let err = export_err(&input);
+    assert!(matches!(err, ExportError::InvalidRecord), "{err:?}");
+}
+
+/// TASK-033 S3: a channel that does not carry `dot_logger.Envelope` as
+/// protobuf means the file is not `dot-logger/1`, even with the header.
+#[test]
+fn f10_a_channel_without_the_protobuf_envelope_is_not_dot_logger() {
+    for (name, schema_encoding, schema_id, message_encoding) in [
+        ("other.Type", "protobuf", 1, "protobuf"),
+        (raw::ENVELOPE, "jsonschema", 1, "protobuf"),
+        (raw::ENVELOPE, "protobuf", 1, "json"),
+        (raw::ENVELOPE, "protobuf", 0, "protobuf"),
+    ] {
+        let mut input = raw::file();
+        raw::schema(&mut input, 1, name, schema_encoding, b"a");
+        raw::channel(&mut input, 1, schema_id, "robot/a", message_encoding);
+        let err = export_err(&input);
+        assert!(
+            matches!(err, ExportError::NotDotLogger),
+            "{name} {schema_encoding} {schema_id} {message_encoding}: {err:?}"
+        );
+    }
+}
+
+/// TASK-033 S3: a record that cannot be parsed after the output started
+/// ends the export with the records before it and a truncation reason.
+#[test]
+fn f11_an_unparsable_record_after_the_header_truncates_the_export() {
+    let mut input = raw::file();
+    raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+    raw::channel(&mut input, 1, 1, "robot/a", "protobuf");
+    raw::broken_schema(&mut input);
+    raw::channel(&mut input, 2, 1, "robot/after", "protobuf");
+    let (output, report) = export_bytes(&input);
+    assert!(report.truncated.is_some(), "{report:?}");
+    assert_eq!(report.messages, 0);
+    let topics: Vec<_> = report.channels.iter().map(|c| c.topic.as_str()).collect();
+    assert_eq!(topics, ["robot/a"]);
+    let summary = mcap::Summary::read(&output).unwrap().unwrap();
+    let mut out_topics: Vec<_> = summary.channels.values().map(|c| c.topic.clone()).collect();
+    out_topics.sort();
+    assert_eq!(out_topics, [META_TOPIC, "robot/a"]);
+}
+
+/// TASK-033 S3: input metadata and attachments are not exported but are
+/// counted, so the caller can say what was left out.
+#[test]
+fn f12_metadata_and_attachments_are_skipped_and_counted() {
+    let mut input = Cursor::new(Vec::new());
+    {
+        let mut w = mcap::WriteOptions::new()
+            .profile("dot-logger/1")
+            .create(&mut input)
+            .unwrap();
+        let schema = w.add_schema(raw::ENVELOPE, "protobuf", b"a").unwrap();
+        let metadata = [("payload_encoding".to_string(), "json".to_string())].into();
+        w.add_channel(schema, "robot/a", "protobuf", &metadata)
+            .unwrap();
+        w.write_metadata(&mcap::records::Metadata {
+            name: "session".into(),
+            metadata: [("k".to_string(), "v".to_string())].into(),
+        })
+        .unwrap();
+        w.attach(&mcap::Attachment {
+            log_time: 1,
+            create_time: 1,
+            name: "notes.txt".into(),
+            media_type: "text/plain".into(),
+            data: std::borrow::Cow::Borrowed(b"hello"),
+        })
+        .unwrap();
+        w.finish().unwrap();
+    }
+    let (output, report) = export_bytes(&input.into_inner());
+    assert_eq!(report.skipped_records, 2, "{report:?}");
+    assert!(report.truncated.is_none(), "{report:?}");
+    assert_eq!(report.channels.len(), 1);
+    let summary = mcap::Summary::read(&output).unwrap().unwrap();
+    assert!(summary.attachment_indexes.is_empty());
+    assert!(summary.metadata_indexes.is_empty());
+}

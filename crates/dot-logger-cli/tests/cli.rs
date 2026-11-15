@@ -882,6 +882,15 @@ fn actual_cli_remote_completion_reports_host_outcome_and_confirmed_boundaries() 
                             outcome,
                         }))
                     }
+                    // Target 4 confirms exactly the boundary the CLI asked for.
+                    ManagementRequest::GetCompletion {
+                        target: 4,
+                        boundary,
+                        ..
+                    } => Ok(ManagementReply::Completion(RecordStatus {
+                        confirmed: Boundaries::only(boundary),
+                        outcome: QueryOutcome::Unknown,
+                    })),
                     _ => Err(RemoteError::Unsupported),
                 };
                 command.respond(result);
@@ -925,8 +934,30 @@ fn actual_cli_remote_completion_reports_host_outcome_and_confirmed_boundaries() 
             assert_eq!(rows[0]["data"]["outcome"], outcome, "{sequence}");
             assert_eq!(rows[0]["data"]["confirmed"], confirmed, "{sequence}");
         }
+        for (boundary, confirmed) in [
+            ("enqueued", "Enqueued"),
+            ("written", "Written"),
+            ("synced", "Synced"),
+            ("database", "DatabaseAcknowledged"),
+            ("receiver", "ReceiverAcknowledged"),
+        ] {
+            let output = command()
+                .args(["completion", "--json", "--endpoint", &endpoint])
+                .args(["--session", "0000000000000000000000000000002a"])
+                .args(["--sequence", "1", "--target", "4", "--boundary", boundary])
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(0), "{boundary}");
+            let rows = lines(&output.stdout);
+            assert_eq!(rows[0]["data"]["outcome"], "Unknown", "{boundary}");
+            assert_eq!(
+                rows[0]["data"]["confirmed"],
+                json!([confirmed]),
+                "{boundary}"
+            );
+        }
         finished.store(true, Ordering::Release);
-        assert_eq!(host.await.unwrap(), 4);
+        assert_eq!(host.await.unwrap(), 9);
         stop.send(()).unwrap();
         server_task.await.unwrap().unwrap();
         drop(hub);
@@ -962,6 +993,12 @@ fn invalid_blob_and_completion_arguments_are_input_errors_before_any_connect() {
         ]
         .concat(),
         vec!["completion", "--session", "2a", "--sequence", "1"],
+        vec!["tail", "--channel", "x"],
+        vec!["query", "--limit", "0"],
+        vec!["replay", "--action", "jump"],
+        vec!["status", "--token-env", "BAD-NAME"],
+        vec!["status", "--max-output-bytes", "1023"],
+        vec!["status", "--manifest", "session.json"],
     ] {
         let output = command()
             .args(&args)
@@ -1362,6 +1399,12 @@ fn offline_query_channel_level_and_basis_flags_reach_the_query() {
     );
     // Mono 10 and 20: a mono window around 15 keeps only the second.
     assert_eq!(count(&["--from", "15", "--to", "100"]), (Some(0), 1));
+    // The records carry no source time, so a source-time query has no
+    // domain to compare and no conversion is inferred: an input error.
+    assert_eq!(
+        count(&with(&["--basis", "source", "--clock-domain", "5"])),
+        (Some(2), 0)
+    );
     for bad in [
         &["--basis", "wall", "--from", "0", "--to", "100"][..],
         &[
@@ -1380,4 +1423,952 @@ fn offline_query_channel_level_and_basis_flags_reach_the_query() {
     ] {
         assert_eq!(count(bad).0, Some(2), "{bad:?} is an input error");
     }
+}
+
+/// Writes a changed copy of the fixture manifest and returns its path.
+fn manifest_with(f: &Fixture, name: &str, change: impl FnOnce(&mut Value)) -> std::path::PathBuf {
+    let mut manifest: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+    change(&mut manifest);
+    let path = f.dir.join(name);
+    std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    path
+}
+/// Runs the CLI with `--json`; returns the exit code and the NDJSON rows.
+fn run(args: impl IntoIterator<Item = impl AsRef<std::ffi::OsStr>>) -> (Option<i32>, Vec<Value>) {
+    let output = command().arg("--json").args(args).output().unwrap();
+    (output.status.code(), lines(&output.stdout))
+}
+/// The README contract: exit 0/3 end with `summary`, exit 2/4 with `error`,
+/// and the terminal row names the outcome.
+#[track_caller]
+fn assert_outcome(result: &(Option<i32>, Vec<Value>), code: i32, outcome: &str) {
+    let last = result.1.last().unwrap();
+    assert_eq!(result.0, Some(code), "{last}");
+    assert_eq!(last["data"]["outcome"], outcome, "{last}");
+    assert_eq!(
+        last["data"]["exit_code"],
+        if code == 0 { Value::Null } else { json!(code) }
+    );
+    let kind = if matches!(code, 0 | 3) {
+        "summary"
+    } else {
+        "error"
+    };
+    assert_eq!(last["kind"], kind, "{last}");
+}
+fn records(rows: &[Value]) -> Vec<&Value> {
+    rows.iter().filter(|r| r["kind"] == "record").collect()
+}
+
+/// Manifest declaration errors are rejected by `config validate` as input
+/// (exit 2) before any source is read; a valid descriptor is accepted.
+#[test]
+fn offline_manifest_declaration_errors_are_input_errors() {
+    let f = fixture([10, 20]);
+    let validate = |manifest: &std::path::Path| {
+        run([
+            std::ffi::OsStr::new("config"),
+            "validate".as_ref(),
+            "--manifest".as_ref(),
+            manifest.as_os_str(),
+        ])
+    };
+    fn descriptor(hex: &str) -> Value {
+        json!({"encoding":"protobuf","data_hex":hex,"name":"my.Pose"})
+    }
+    /// Adds channel 8 with the same schema id and version as channel 7.
+    fn second(m: &mut Value, hex: Option<&str>) {
+        let mut other = m["channels"][0].clone();
+        other["id"] = json!(8);
+        other["topic"] = json!("other");
+        if let Some(hex) = hex {
+            other["descriptor"] = descriptor(hex);
+        }
+        m["channels"].as_array_mut().unwrap().push(other);
+    }
+    let valid = manifest_with(&f, "valid.json", |m| {
+        m["channels"][0]["descriptor"] = descriptor("0a0B");
+    });
+    let result = validate(&valid);
+    assert_outcome(&result, 0, "complete");
+    assert_eq!(result.1[0]["data"]["valid"], true);
+    type Change = Box<dyn Fn(&mut Value)>;
+    let cases: Vec<(&str, Change)> = vec![
+        (
+            "schema_version",
+            Box::new(|m| m["schema_version"] = json!(2)),
+        ),
+        ("unknown field", Box::new(|m| m["extra"] = json!(1))),
+        (
+            "odd descriptor hex",
+            Box::new(|m| m["channels"][0]["descriptor"] = descriptor("abc")),
+        ),
+        (
+            "non-hex descriptor",
+            Box::new(|m| m["channels"][0]["descriptor"] = descriptor("zz")),
+        ),
+        (
+            "same schema, other descriptor",
+            Box::new(|m| {
+                m["channels"][0]["descriptor"] = descriptor("0a0b");
+                second(m, Some("0a0c"));
+            }),
+        ),
+        (
+            "duplicate source sequence",
+            Box::new(|m| {
+                let mut other = m["sources"][0].clone();
+                other["path"] = json!("other.mcap");
+                m["sources"].as_array_mut().unwrap().push(other);
+            }),
+        ),
+        (
+            "reservation above external bytes",
+            Box::new(|m| m["external_bytes"] = json!(1)),
+        ),
+    ];
+    for (what, change) in cases {
+        let path = manifest_with(&f, "bad.json", change);
+        let result = validate(&path);
+        assert!(result.0 == Some(2), "{what}: {:?}", result.1);
+        assert_outcome(&result, 2, "invalid_input");
+    }
+    // Accepted for a different channel id with the same descriptor.
+    let same = manifest_with(&f, "same.json", |m| {
+        m["channels"][0]["descriptor"] = descriptor("0a0b");
+        second(m, Some("0a0b"));
+    });
+    assert_outcome(&validate(&same), 0, "complete");
+    // Malformed JSON, a directory and an over-4-MiB file are input errors.
+    let malformed = f.dir.join("malformed.json");
+    std::fs::write(&malformed, b"{").unwrap();
+    let large = f.dir.join("large.json");
+    std::fs::File::create(&large)
+        .unwrap()
+        .set_len(4 * 1024 * 1024 + 1)
+        .unwrap();
+    for path in [&malformed, &f.dir, &large] {
+        assert_outcome(&validate(path), 2, "invalid_input");
+    }
+}
+
+/// A relative source resolves next to the manifest. A missing source is IO
+/// (exit 4), a source above `max_source_bytes` is a limit (exit 3), a broken
+/// MCAP is invalid data (exit 4) and a foreign MCAP profile is unsupported
+/// (exit 2).
+#[test]
+fn offline_source_failures_map_to_stable_exit_codes() {
+    let f = fixture([10, 20]);
+    let query = |manifest: &std::path::Path| {
+        run([
+            std::ffi::OsStr::new("query"),
+            "--manifest".as_ref(),
+            manifest.as_os_str(),
+        ])
+    };
+    let relative = manifest_with(&f, "relative.json", |m| {
+        m["sources"][0]["path"] = json!("source.mcap")
+    });
+    let result = query(&relative);
+    assert_outcome(&result, 0, "complete");
+    assert_eq!(records(&result.1).len(), 2);
+    let missing = manifest_with(&f, "missing.json", |m| {
+        m["sources"][0]["path"] = json!("missing.mcap")
+    });
+    assert_outcome(&query(&missing), 4, "io_or_transport");
+    let small = manifest_with(&f, "small.json", |m| {
+        m["limits"]["max_source_bytes"] = json!(16)
+    });
+    assert_outcome(&query(&small), 3, "limit");
+    // A read budget that covers only the opening scan stops the first page
+    // read, for query and for replay.
+    let size = std::fs::metadata(&f.source).unwrap().len();
+    let budget = manifest_with(&f, "budget.json", |m| {
+        m["limits"]["read_bytes"] = json!(size)
+    });
+    assert_outcome(&query(&budget), 3, "limit");
+    let result = run([
+        std::ffi::OsStr::new("replay"),
+        "--manifest".as_ref(),
+        budget.as_os_str(),
+    ]);
+    assert_outcome(&result, 3, "limit");
+    assert!(records(&result.1).is_empty());
+    let mut broken = std::fs::read(&f.source).unwrap();
+    broken[0] = 0;
+    std::fs::write(f.dir.join("broken.mcap"), &broken).unwrap();
+    let broken = manifest_with(&f, "broken.json", |m| {
+        m["sources"][0]["path"] = json!("broken.mcap")
+    });
+    assert_outcome(&query(&broken), 4, "invalid_data");
+    // A valid MCAP header whose profile is not `dot-logger/1`.
+    let mut foreign = b"\x89MCAP0\r\n\x01".to_vec();
+    foreign.extend_from_slice(&9u64.to_le_bytes());
+    foreign.extend_from_slice(&1u32.to_le_bytes());
+    foreign.push(b'x');
+    foreign.extend_from_slice(&0u32.to_le_bytes());
+    foreign.extend_from_slice(b"\x89MCAP0\r\n");
+    std::fs::write(f.dir.join("foreign.mcap"), &foreign).unwrap();
+    let foreign = manifest_with(&f, "foreign.json", |m| {
+        m["sources"][0]["path"] = json!("foreign.mcap")
+    });
+    assert_outcome(&query(&foreign), 2, "unsupported");
+}
+
+/// `--include-payload` returns the bytes of inline and blob records for query
+/// and replay. A payload that does not fit the output cap is a partial limit
+/// (exit 3) with no record row.
+#[test]
+fn offline_payload_output_reads_inline_and_blob_records_within_the_output_cap() {
+    let f = fixture([10, 20]);
+    // `inline_bytes` 16 keeps the 3-byte payloads inline; 0 stores them as blobs.
+    let inline = f.manifest.clone();
+    let blob = manifest_with(&f, "blob.json", |m| m["limits"]["inline_bytes"] = json!(0));
+    for (command, manifest, storage) in [
+        ("query", &inline, "inline"),
+        ("query", &blob, "blob"),
+        ("replay", &inline, ""),
+        ("replay", &blob, ""),
+    ] {
+        let result = run([
+            command.as_ref(),
+            "--include-payload".as_ref(),
+            "--manifest".as_ref(),
+            manifest.as_os_str(),
+        ]);
+        assert_outcome(&result, 0, "complete");
+        let rows = records(&result.1);
+        assert_eq!(rows.len(), 2, "{command} {storage}");
+        for row in rows {
+            assert_eq!(row["data"]["data_hex"], "010203", "{command} {manifest:?}");
+            if command == "query" {
+                assert_eq!(row["data"]["payload_storage"], storage);
+            }
+        }
+    }
+    // A 1024-byte cap leaves no payload capacity after the terminal reserve.
+    // Without payload one record row still fits; the next one does not.
+    for (command, manifest, include, count) in [
+        ("query", &inline, true, 0),
+        ("query", &blob, true, 0),
+        ("replay", &blob, true, 0),
+        ("replay", &inline, false, 1),
+    ] {
+        let mut args = vec![command, "--max-output-bytes", "1024"];
+        if include {
+            args.push("--include-payload");
+        }
+        let result = run(args
+            .iter()
+            .map(std::ffi::OsStr::new)
+            .chain([std::ffi::OsStr::new("--manifest"), manifest.as_os_str()]));
+        assert_outcome(&result, 3, "limit");
+        assert_eq!(records(&result.1).len(), count, "{command} {manifest:?}");
+    }
+}
+
+/// Offline query follows page cursors; like replay, exactly `--limit`
+/// records complete (exit 0) and more selected records are partial (exit 3).
+#[test]
+fn offline_query_pages_and_exact_limit_match_replay() {
+    let f = fixture([10, 20]);
+    let paged = manifest_with(&f, "paged.json", |m| m["limits"]["page_records"] = json!(1));
+    for (limit, code, outcome, count) in [
+        ("1", 3, "limit", 1),
+        ("2", 0, "complete", 2),
+        ("3", 0, "complete", 2),
+    ] {
+        let result = run([
+            std::ffi::OsStr::new("query"),
+            "--limit".as_ref(),
+            limit.as_ref(),
+            "--manifest".as_ref(),
+            paged.as_os_str(),
+        ]);
+        assert_outcome(&result, code, outcome);
+        assert_eq!(records(&result.1).len(), count, "--limit {limit}");
+    }
+    // Replay whose schedule cannot be represented in u64 ns stops as a limit.
+    let far = fixture([0, 1 << 62]);
+    let result = run([
+        std::ffi::OsStr::new("replay"),
+        "--speed".as_ref(),
+        "1/1000".as_ref(),
+        "--manifest".as_ref(),
+        far.manifest.as_os_str(),
+    ]);
+    assert_outcome(&result, 3, "limit");
+    assert_eq!(records(&result.1).len(), 1);
+}
+
+/// Offline mode supports only start playback on the mono basis; remote-only
+/// commands without `--endpoint` and offline-only commands with it are
+/// unsupported (exit 2).
+#[test]
+fn commands_outside_their_mode_are_unsupported() {
+    let f = fixture([10, 20]);
+    let manifest = f.manifest.to_str().unwrap();
+    for args in [
+        vec!["replay", "--basis", "real", "--manifest", manifest],
+        vec!["replay", "--action", "pause", "--manifest", manifest],
+        vec!["tail", "--manifest", manifest],
+        vec!["blob", "--manifest", manifest],
+        vec![
+            "config",
+            "apply",
+            "--patch",
+            manifest,
+            "--manifest",
+            manifest,
+        ],
+        vec!["config", "validate", "--endpoint", "http://127.0.0.1:1"],
+        vec![
+            "recover",
+            "--output",
+            "x.mcap",
+            "--endpoint",
+            "http://127.0.0.1:1",
+        ],
+    ] {
+        let result = run(&args);
+        assert_eq!(result.0, Some(2), "{args:?}");
+        assert_outcome(&result, 2, "unsupported");
+    }
+}
+
+/// `config diff` reports only whether two declarations differ, never their values.
+#[test]
+fn config_diff_reports_only_whether_declarations_changed() {
+    let f = fixture([10, 20]);
+    let changed = manifest_with(&f, "changed.json", |m| m["revision"] = json!(77));
+    for (after, expected) in [(&f.manifest, false), (&changed, true)] {
+        let output = command()
+            .args(["config", "diff", "--json", "--before"])
+            .arg(&f.manifest)
+            .arg("--after")
+            .arg(after)
+            .output()
+            .unwrap();
+        let result = (output.status.code(), lines(&output.stdout));
+        assert_outcome(&result, 0, "complete");
+        assert_eq!(result.1[0]["kind"], "diff");
+        assert_eq!(
+            result.1[0]["data"],
+            json!({"changed": expected, "values": "redacted"})
+        );
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("77"));
+    }
+    let malformed = f.dir.join("malformed.json");
+    std::fs::write(&malformed, b"{").unwrap();
+    let result = run([
+        std::ffi::OsStr::new("config"),
+        "diff".as_ref(),
+        "--before".as_ref(),
+        f.manifest.as_os_str(),
+        "--after".as_ref(),
+        malformed.as_os_str(),
+    ]);
+    assert_outcome(&result, 2, "invalid_input");
+    let result = run([
+        std::ffi::OsStr::new("config"),
+        "diff".as_ref(),
+        "--before".as_ref(),
+        f.manifest.as_os_str(),
+    ]);
+    assert_outcome(&result, 2, "invalid_input");
+}
+
+/// Offline `status` shows the declared identity and no invented metrics;
+/// without `--json` the same rows are human text lines.
+#[test]
+fn offline_status_and_human_text_output() {
+    let f = fixture([10, 20]);
+    let result = run([
+        std::ffi::OsStr::new("status"),
+        "--manifest".as_ref(),
+        f.manifest.as_os_str(),
+    ]);
+    assert_outcome(&result, 0, "complete");
+    assert_eq!(result.1[0]["kind"], "status");
+    assert_eq!(
+        result.1[0]["data"]["session"],
+        "0000000000000000000000000000002a"
+    );
+    assert_eq!(result.1[0]["data"]["revision"], "1");
+    assert_eq!(result.1[0]["data"]["metrics"]["state"], "Unavailable");
+    let output = command()
+        .args(["status", "--manifest"])
+        .arg(&f.manifest)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    let text = String::from_utf8(output.stdout).unwrap();
+    let text: Vec<_> = text.lines().collect();
+    assert_eq!(text.len(), 2, "{text:?}");
+    assert!(text[0].starts_with("status status: {"), "{text:?}");
+    assert!(text[1].starts_with("status summary: {"), "{text:?}");
+    assert!(serde_json::from_str::<Value>(text[0]).is_err());
+}
+
+/// `recover` takes exactly one complete regular source. A broken source
+/// reports the unpublished recovery and keeps the partial output (exit 4); a
+/// truncated source recovers its verified prefix but is partial (exit 3).
+#[test]
+fn recover_rejects_unsupported_sources_and_reports_partial_recovery() {
+    let f = fixture([10, 20]);
+    let recover = |manifest: &std::path::Path, output: &str| {
+        run([
+            std::ffi::OsStr::new("recover"),
+            "--manifest".as_ref(),
+            manifest.as_os_str(),
+            "--output".as_ref(),
+            f.dir.join(output).as_os_str(),
+        ])
+    };
+    let two = manifest_with(&f, "two.json", |m| {
+        let mut other = m["sources"][0].clone();
+        other["sequence"] = json!(2);
+        other["path"] = json!("other.mcap");
+        m["sources"].as_array_mut().unwrap().push(other);
+    });
+    assert_outcome(&recover(&two, "two.mcap"), 2, "invalid_input");
+    let directory = manifest_with(&f, "directory.json", |m| {
+        m["sources"][0]["path"] = json!(".")
+    });
+    assert_outcome(&recover(&directory, "directory.mcap"), 2, "invalid_input");
+    let active = manifest_with(&f, "active.json", |m| {
+        m["sources"][0]["safe_offset"] = json!(8)
+    });
+    assert_outcome(&recover(&active, "active.mcap"), 2, "unsupported");
+    for name in ["two.mcap", "directory.mcap", "active.mcap"] {
+        assert!(!f.dir.join(name).exists(), "{name}");
+    }
+    let mut bytes = std::fs::read(&f.source).unwrap();
+    bytes[0] = 0;
+    std::fs::write(f.dir.join("broken.mcap"), &bytes).unwrap();
+    let broken = manifest_with(&f, "broken.json", |m| {
+        m["sources"][0]["path"] = json!("broken.mcap")
+    });
+    let result = recover(&broken, "broken-out.mcap");
+    assert_outcome(&result, 4, "io_or_transport");
+    assert_eq!(result.1[0]["kind"], "recovery");
+    assert_eq!(result.1[0]["data"]["published"], false);
+    assert_eq!(result.1[0]["data"]["stop"], "Failed");
+    assert!(
+        f.dir.join("broken-out.mcap").exists(),
+        "partial output is kept"
+    );
+    let bytes = std::fs::read(&f.source).unwrap();
+    std::fs::write(f.dir.join("cut.mcap"), &bytes[..900]).unwrap();
+    let cut = manifest_with(&f, "cut.json", |m| {
+        m["sources"][0]["path"] = json!("cut.mcap")
+    });
+    let result = recover(&cut, "cut-out.mcap");
+    assert_outcome(&result, 3, "limit");
+    assert_eq!(result.1[0]["kind"], "recovery");
+    assert_eq!(result.1[0]["data"]["stop"], "Truncated");
+    assert_eq!(result.1[0]["data"]["excluded_to"], 900);
+}
+
+/// `calibrate` maps its failures to stable exits before writing a profile: a
+/// relative directory is input (2), a reserve above the free space is a limit
+/// (3) and a missing directory or profile directory is IO (4).
+#[cfg(target_os = "linux")]
+#[test]
+fn calibrate_failures_map_to_stable_exit_codes_and_write_no_profile() {
+    let f = fixture([10, 20]);
+    let calibrate = |directory: &std::ffi::OsStr, profile: &std::path::Path, reserve: &str| {
+        run([
+            std::ffi::OsStr::new("calibrate"),
+            "--directory".as_ref(),
+            directory,
+            "--output".as_ref(),
+            profile.as_os_str(),
+            "--write-limit".as_ref(),
+            "4096".as_ref(),
+            "--disk-reserve".as_ref(),
+            reserve.as_ref(),
+        ])
+    };
+    let profile = f.dir.join("machine.json");
+    assert_outcome(
+        &calibrate("relative".as_ref(), &profile, "0"),
+        2,
+        "invalid_input",
+    );
+    assert_outcome(
+        &calibrate(f.dir.as_os_str(), &profile, "18446744073709551615"),
+        3,
+        "limit",
+    );
+    assert_outcome(
+        &calibrate(f.dir.join("missing").as_os_str(), &profile, "0"),
+        4,
+        "io_or_transport",
+    );
+    assert!(!profile.exists());
+    // The measurement (4 KiB) is reported, but the profile cannot be saved.
+    let result = calibrate(
+        f.dir.as_os_str(),
+        &f.dir.join("missing").join("machine.json"),
+        "0",
+    );
+    assert_outcome(&result, 4, "io_or_transport");
+    assert_eq!(result.1[0]["kind"], "calibration");
+}
+
+/// `export --standard` failures leave no output: a missing output directory
+/// or input is IO (4) and a record above `--max-record-bytes` is a limit (3).
+/// A chunk with a bad CRC is not an error: the export stops there and says so.
+#[test]
+fn export_failures_map_to_stable_exit_codes_and_leave_no_output() {
+    let f = fixture([10, 20]);
+    let target = f.dir.join("standard.mcap");
+    let export = |input: &std::path::Path, output: &std::path::Path, extra: &[&str]| {
+        run([
+            std::ffi::OsStr::new("export"),
+            "--standard".as_ref(),
+            "--input".as_ref(),
+            input.as_os_str(),
+            "--output".as_ref(),
+            output.as_os_str(),
+        ]
+        .into_iter()
+        .chain(extra.iter().map(std::ffi::OsStr::new)))
+    };
+    assert_outcome(
+        &export(&f.source, &f.dir.join("missing").join("out.mcap"), &[]),
+        4,
+        "io_or_transport",
+    );
+    assert_outcome(
+        &export(&f.source, &target, &["--max-record-bytes", "16"]),
+        3,
+        "limit",
+    );
+    assert!(!target.exists());
+    assert_outcome(
+        &export(&f.dir.join("missing.mcap"), &target, &[]),
+        4,
+        "io_or_transport",
+    );
+    assert!(!target.exists());
+    let mut damaged = std::fs::read(&f.source).unwrap();
+    for b in &mut damaged[200..208] {
+        *b ^= 0xff;
+    }
+    let path = f.dir.join("damaged.mcap");
+    std::fs::write(&path, &damaged).unwrap();
+    let result = export(&path, &target, &[]);
+    assert_outcome(&result, 0, "complete");
+    assert_eq!(result.1[0]["data"]["messages"], 0);
+    assert!(
+        result.1[0]["data"]["truncated"]
+            .as_str()
+            .unwrap()
+            .contains("CRC")
+    );
+}
+
+/// Serves `reply` from a loopback host with a Manage token and runs `body`
+/// (endpoint, hub) on a blocking thread; the budget is released afterwards.
+fn with_host(
+    reply: impl Fn(
+        &dot_logger::adapters::remote::ManagementRequest,
+    ) -> Result<
+        dot_logger::adapters::remote::ManagementReply,
+        dot_logger::adapters::remote::RemoteError,
+    > + Send
+    + 'static,
+    body: impl FnOnce(&str, &dot_logger::adapters::remote::RemoteHub),
+) {
+    use dot_logger::{adapters::remote::*, query::QueryBudget};
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let mut c = support::plan().config().clone();
+        c.memory.external_bytes = 8 * 1024 * 1024;
+        c.memory.total_bytes += 8 * 1024 * 1024;
+        let plan = SessionBuilder::new(c)
+            .validate(&PlatformCapabilities::default())
+            .unwrap();
+        let budget = QueryBudget::new(&plan);
+        let limits = RemoteLimits {
+            connections: 4,
+            subscriptions: 2,
+            commands: 4,
+            message_bytes: 4096,
+            record_bytes: 8192,
+            subscription_records: 2,
+            subscription_bytes: 16384,
+            max_age: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(2),
+        };
+        let (hub, mut inbox) = RemoteHub::new(&budget, limits).unwrap();
+        let server = RemoteServer::bind(
+            ServerConfig {
+                enabled: true,
+                tokens: vec![
+                    AccessToken::new("test-only-manage-credential".into(), Permission::Manage)
+                        .unwrap(),
+                ],
+                ..Default::default()
+            },
+            hub.clone(),
+        )
+        .await
+        .unwrap();
+        let endpoint = format!("http://{}", server.local_addr().unwrap());
+        let (stop, done) = tokio::sync::oneshot::channel();
+        let server_task = tokio::spawn(server.serve(async {
+            let _ = done.await;
+        }));
+        let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = finished.clone();
+        let host = tokio::spawn(async move {
+            while !flag.load(Ordering::Acquire) {
+                if let Some(command) = inbox.try_next() {
+                    let result = reply(command.request());
+                    command.respond(result);
+                } else {
+                    tokio::task::yield_now().await;
+                }
+            }
+        });
+        tokio::task::block_in_place(|| body(&endpoint, &hub));
+        finished.store(true, Ordering::Release);
+        host.await.unwrap();
+        stop.send(()).unwrap();
+        server_task.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+fn remote_record(sequence: u64, payload_len: usize) -> CapturedRecord {
+    let mut metadata = support::meta();
+    metadata.importance = Some(Importance::Normal);
+    CapturedRecord {
+        receipt: CaptureReceipt {
+            session_id: 42,
+            producer_id: 0,
+            accepted_seq: sequence,
+        },
+        metadata,
+        revision: 1,
+        payload_len,
+    }
+}
+
+/// Host replies that are errors, malformed or too large for the output cap
+/// map to the README exit codes. A remote IO failure keeps
+/// `posted_host_io: completion_unconfirmed`; a protocol mismatch and a known
+/// check outcome do not.
+#[test]
+fn remote_reply_failures_map_to_stable_exit_codes() {
+    use dot_logger::adapters::remote::*;
+    with_host(
+        |request| {
+            let report = |v: Value| Ok(ManagementReply::Report(serde_json::to_vec(&v).unwrap()));
+            match *request {
+                ManagementRequest::Compare { before: 1, .. } => Err(RemoteError::Corrupt),
+                ManagementRequest::Compare { before: 2, .. } => Err(RemoteError::Version),
+                ManagementRequest::Compare { before: 3, .. } => report(json!({"schema":"other"})),
+                ManagementRequest::Compare { before: 4, .. } => {
+                    report(json!({"schema":"dot_logger.compare.v1"}))
+                }
+                ManagementRequest::PlanCheck { plan: 1 } => {
+                    report(json!({"schema":"dot_logger.check.v1","kind":"result"}))
+                }
+                ManagementRequest::RunCheck { plan: 2 } => report(
+                    json!({"schema":"dot_logger.check.v1","kind":"result","outcome":"Maybe"}),
+                ),
+                ManagementRequest::RunCheck { plan: 3 } => report(
+                    json!({"schema":"dot_logger.check.v1","kind":"result","outcome":"Aborted"}),
+                ),
+                // Two inline pages: cursor 7 continues at 8, which ends the query.
+                ManagementRequest::Query {
+                    cursor: cursor @ (7 | 8),
+                    ..
+                } => Ok(ManagementReply::Page {
+                    snapshot: 9,
+                    cursor: if cursor == 7 { 8 } else { 0 },
+                    items: vec![RemoteItem {
+                        record: remote_record(cursor, 3),
+                        inline: vec![1, 2, 3],
+                        blob: 0,
+                    }],
+                }),
+                // A cursor that does not advance would loop forever.
+                ManagementRequest::Query { cursor: 5, .. } => Ok(ManagementReply::Page {
+                    snapshot: 9,
+                    cursor: 5,
+                    items: vec![],
+                }),
+                ManagementRequest::Query { .. } => Ok(ManagementReply::Page {
+                    snapshot: 9,
+                    cursor: 0,
+                    items: vec![RemoteItem {
+                        record: remote_record(1, 3),
+                        inline: vec![],
+                        blob: 1,
+                    }],
+                }),
+                // An empty chunk for a non-empty blob would never finish.
+                ManagementRequest::ReadBlob { snapshot: 9, .. } => {
+                    Ok(ManagementReply::Blob(vec![]))
+                }
+                ManagementRequest::ReadBlob { .. } => Ok(ManagementReply::Blob(vec![1, 2, 3])),
+                _ => Err(RemoteError::Unsupported),
+            }
+        },
+        |endpoint, _| {
+            let query = |extra: &[&str]| {
+                let output = command()
+                    .args(["query", "--json", "--endpoint", endpoint, "--cursor", "7"])
+                    .args(extra)
+                    .env("DOT_LOGGER_TOKEN", "test-only-manage-credential")
+                    .output()
+                    .unwrap();
+                (output.status.code(), lines(&output.stdout))
+            };
+            let result = query(&["--include-payload"]);
+            assert_outcome(&result, 0, "complete");
+            let rows = records(&result.1);
+            assert_eq!(rows.len(), 2);
+            assert!(rows.iter().all(|r| r["data"]["data_hex"] == "010203"));
+            assert_eq!(result.1.last().unwrap()["data"]["cursor"], "0");
+            let result = query(&["--limit", "1"]);
+            assert_outcome(&result, 3, "limit");
+            assert_eq!(records(&result.1).len(), 1);
+            let unconfirmed = json!("completion_unconfirmed");
+            for (args, code, outcome, posted) in [
+                (
+                    &["compare", "--before", "1", "--after", "9"][..],
+                    4,
+                    "invalid_data",
+                    &unconfirmed,
+                ),
+                (
+                    &["compare", "--before", "2", "--after", "9"],
+                    4,
+                    "incompatible_protocol",
+                    &Value::Null,
+                ),
+                (
+                    &["compare", "--before", "3", "--after", "9"],
+                    4,
+                    "invalid_data",
+                    &unconfirmed,
+                ),
+                (
+                    &[
+                        "compare",
+                        "--before",
+                        "4",
+                        "--after",
+                        "9",
+                        "--max-output-bytes",
+                        "1024",
+                    ],
+                    3,
+                    "limit",
+                    &Value::Null,
+                ),
+                (
+                    &["check", "plan", "--plan", "1"],
+                    4,
+                    "invalid_data",
+                    &unconfirmed,
+                ),
+                (
+                    &["check", "run", "--plan", "2"],
+                    4,
+                    "invalid_data",
+                    &unconfirmed,
+                ),
+                (
+                    &["check", "run", "--plan", "3"],
+                    3,
+                    "check_aborted",
+                    &Value::Null,
+                ),
+                (&["query", "--cursor", "5"], 4, "invalid_data", &unconfirmed),
+                (
+                    &["query", "--include-payload"],
+                    4,
+                    "invalid_data",
+                    &unconfirmed,
+                ),
+                (
+                    &["query", "--include-payload", "--max-output-bytes", "1024"],
+                    3,
+                    "limit",
+                    &Value::Null,
+                ),
+                (
+                    &[
+                        "blob",
+                        "--snapshot",
+                        "7",
+                        "--blob",
+                        "1",
+                        "--length",
+                        "3",
+                        "--max-output-bytes",
+                        "1024",
+                    ],
+                    3,
+                    "limit",
+                    &Value::Null,
+                ),
+            ] {
+                let output = command()
+                    .args(args)
+                    .args(["--json", "--endpoint", endpoint])
+                    .env("DOT_LOGGER_TOKEN", "test-only-manage-credential")
+                    .output()
+                    .unwrap();
+                let result = (output.status.code(), lines(&output.stdout));
+                assert_eq!(result.0, Some(code), "{args:?}: {:?}", result.1);
+                assert_outcome(&result, code, outcome);
+                let last = result.1.last().unwrap();
+                assert_eq!(&last["data"]["posted_host_io"], posted, "{args:?}");
+                assert!(records(&result.1).is_empty(), "{args:?}");
+                if outcome == "check_aborted" {
+                    assert_eq!(result.1[0]["kind"], "check");
+                    assert_eq!(result.1[0]["data"]["outcome"], "Aborted");
+                }
+            }
+        },
+    );
+}
+
+/// With the default Gap policy an overflowed record is reported as a `gap`
+/// row and later records still arrive and are ACKed. With
+/// `--disconnect-on-overflow` the subscription ends without a gap and without
+/// ACKing anything (exit 3).
+#[test]
+fn remote_tail_reports_overflow_gaps_or_disconnects() {
+    with_host(
+        |_| Err(dot_logger::adapters::remote::RemoteError::Unsupported),
+        |endpoint, hub| {
+            for disconnect in [false, true] {
+                let mut child = command()
+                    .args(["tail", "--json", "--endpoint", endpoint])
+                    .args([
+                        "--record-bytes",
+                        "8",
+                        "--limit",
+                        "2",
+                        "--timeout-ms",
+                        "3000",
+                    ])
+                    .args(disconnect.then_some("--disconnect-on-overflow"))
+                    .stdout(Stdio::piped())
+                    .spawn()
+                    .unwrap();
+                let mut ids = [0; 2];
+                let start = Instant::now();
+                while hub.subscriptions(&mut ids) == 0 {
+                    assert!(start.elapsed() < Duration::from_secs(3), "no subscription");
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                // `--records 1`: the second record overflows while the first is unACKed.
+                let first = hub
+                    .offer(ids[0], remote_record(1, 1), &[9], false, 1)
+                    .unwrap();
+                let second = hub
+                    .offer(ids[0], remote_record(2, 1), &[9], false, 1)
+                    .unwrap();
+                let mut stdout = BufReader::new(child.stdout.take().unwrap());
+                let mut text = String::new();
+                if !disconnect {
+                    for _ in 0..2 {
+                        stdout.read_line(&mut text).unwrap();
+                    }
+                    let rows = lines(text.as_bytes());
+                    assert_eq!(rows[0]["kind"], "record", "{text}");
+                    assert_eq!(rows[1]["kind"], "gap", "{text}");
+                    assert_eq!(rows[1]["data"]["reason"], "overflow");
+                    assert_eq!(rows[1]["data"]["first"], rows[1]["data"]["last"]);
+                    let third = hub
+                        .offer(ids[0], remote_record(3, 1), &[9], false, 1)
+                        .unwrap();
+                    stdout.read_to_string(&mut text).unwrap();
+                    drop(third);
+                } else {
+                    stdout.read_to_string(&mut text).unwrap();
+                }
+                let status = child.wait().unwrap();
+                let rows = lines(text.as_bytes());
+                let last = rows.last().unwrap();
+                let gaps = rows.iter().filter(|r| r["kind"] == "gap").count();
+                if disconnect {
+                    assert_eq!(status.code(), Some(3), "{text}");
+                    assert_eq!(gaps, 0, "{text}");
+                    assert_eq!(last["data"]["acknowledged"], 0, "{text}");
+                } else {
+                    assert_eq!(status.code(), Some(0), "{text}");
+                    assert_eq!(records(&rows).len(), 2, "{text}");
+                    assert_eq!(last["data"]["gaps"], 1);
+                    assert_eq!(last["data"]["acknowledged"], 2);
+                }
+                drop((first, second));
+            }
+        },
+    );
+}
+
+/// A terminal summary that no longer fits the output cap is not cut short:
+/// nothing more is written and the exit is 4, although the export finished.
+/// The output path (over 800 bytes) makes the summary larger than the rest.
+#[test]
+fn terminal_summary_beyond_the_output_cap_is_exit_four() {
+    let f = fixture([10, 20]);
+    let deep = f
+        .dir
+        .join("d".repeat(200))
+        .join("e".repeat(200))
+        .join("f".repeat(200))
+        .join("g".repeat(200));
+    std::fs::create_dir_all(&deep).unwrap();
+    let target = deep.join("standard.mcap");
+    let output = command()
+        .args([
+            "export",
+            "--standard",
+            "--json",
+            "--max-output-bytes",
+            "1024",
+            "--input",
+        ])
+        .arg(&f.source)
+        .arg("--output")
+        .arg(&target)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4));
+    let rows = lines(&output.stdout);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["kind"], "export");
+    assert!(target.exists());
+}
+
+/// An unreachable host is a transport failure (exit 4). Nothing was posted,
+/// so no `posted_host_io` notice is added.
+#[test]
+fn unreachable_host_is_transport_failure_without_posted_notice() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let endpoint = format!("http://127.0.0.1:{port}");
+    let result = run(["status", "--endpoint", &endpoint]);
+    assert_outcome(&result, 4, "io_or_transport");
+    assert_eq!(result.1.len(), 1);
+    assert_eq!(result.1[0]["data"]["posted_host_io"], Value::Null);
 }

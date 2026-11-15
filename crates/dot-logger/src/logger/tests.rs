@@ -259,3 +259,83 @@ fn a_dispatcher_turn_reconciles_one_writer_window_not_the_whole_table() {
     assert_eq!(window, 8192);
     assert_eq!(derived.completion.reconcile_per_turn, window);
 }
+
+/// TASK-033 S3: health derivation on fixed inputs — a late first sync is
+/// `SyncOverdue`, telemetry is Observed, Stale after two seconds, missing
+/// before the first sample or after a poisoned lock, and a remote thread's
+/// placement result is reported.
+#[test]
+fn health_reports_overdue_sync_telemetry_age_and_remote_placement() {
+    use super::health::Shared;
+    use super::{Degradation, OutputHealth};
+    use crate::telemetry::{Observation, Sample, Unavailable};
+    const S: u64 = 1_000_000_000;
+    let overdue = Duration::from_secs(1);
+    let shared = Shared::new(1, true);
+    let health = shared.health(S / 2, overdue);
+    assert_eq!(health.state, HealthState::Running);
+    assert_eq!(
+        health.telemetry,
+        Some(Observation::Unavailable(Unavailable::IncompleteWindow))
+    );
+    assert_eq!(health.affinity, None);
+
+    // Never synced: lateness counts from session start.
+    let health = shared.health(2 * S, overdue);
+    assert_eq!(
+        health.state,
+        HealthState::Degraded(Degradation::SyncOverdue)
+    );
+    assert_eq!(
+        health.outputs,
+        [OutputHealth {
+            since_sync: None,
+            failed_records: 0,
+            failed: false
+        }]
+    );
+    shared.outputs[0].synced(2 * S);
+    assert_eq!(shared.health(2 * S, overdue).state, HealthState::Running);
+
+    let sample = Sample {
+        session_id: 1,
+        revision: 1,
+        at_ns: 10 * S,
+        epoch: 0,
+        capture: Observation::Unavailable(Unavailable::IncompleteWindow),
+        outputs: Observation::Unavailable(Unavailable::IncompleteWindow),
+        required_outputs: Observation::Unavailable(Unavailable::IncompleteWindow),
+    };
+    let latest = shared.telemetry.as_ref().unwrap();
+    *latest.lock().unwrap() = Some(sample);
+    shared.outputs[0].synced(12 * S);
+    assert_eq!(
+        shared.health(12 * S, overdue).telemetry,
+        Some(Observation::Observed(sample))
+    );
+    shared.outputs[0].synced(12 * S + 1);
+    assert_eq!(
+        shared.health(12 * S + 1, overdue).telemetry,
+        Some(Observation::Stale(sample))
+    );
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = latest.lock().unwrap();
+        panic!("inject a poisoned telemetry lock");
+    }));
+    assert_eq!(
+        shared.health(12 * S + 1, overdue).telemetry,
+        Some(Observation::Unavailable(Unavailable::HistoryUnavailable))
+    );
+
+    #[cfg(feature = "remote")]
+    {
+        shared.placed(None);
+        assert_eq!(shared.health(12 * S, overdue).affinity, None);
+        shared.placed(Some(true));
+        assert_eq!(shared.health(12 * S, overdue).affinity, Some(true));
+        // A failed placement is not hidden by another thread's success.
+        shared.placed(Some(false));
+        shared.placed(Some(true));
+        assert_eq!(shared.health(12 * S, overdue).affinity, Some(false));
+    }
+}

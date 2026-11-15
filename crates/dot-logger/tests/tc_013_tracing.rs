@@ -177,3 +177,31 @@ fn f12_tracing_is_absent_unless_declared() {
     assert_eq!(logger.health().tracing_dropped, None);
     closed(logger);
 }
+
+/// TASK-033 S3: every `log` level is compared with the declared minimum on
+/// the `tracing` scale, so `log` filtering matches `tracing` filtering.
+#[test]
+fn f12_log_levels_are_filtered_against_the_declared_minimum() {
+    let temp = Temp::new();
+    let logger = start(&temp, WriterQuota::small(8, 256));
+    let sink = logger.tracing().unwrap();
+    let enabled = |level| {
+        log::Log::enabled(
+            &sink,
+            &log::Metadata::builder().level(level).target("t").build(),
+        )
+    };
+    assert_eq!(
+        [
+            log::Level::Error,
+            log::Level::Warn,
+            log::Level::Info,
+            log::Level::Debug,
+            log::Level::Trace,
+        ]
+        .map(enabled),
+        [true, true, true, false, false],
+        "minimum is INFO"
+    );
+    closed(logger);
+}

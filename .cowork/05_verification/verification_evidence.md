@@ -1243,6 +1243,22 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Task 전수 판정:** Done 22건(TASK-004~017·019~023·027~029). 잔여 소유처는 native·다른 OS → TASK-024(T3, GAP-004), 실사용처 → TASK-026(MS-007로 이동, 마지막 단계), P4·P5·원격 포화 회복(RV-049) → 이월 T7, S3d → T4. 신규 TASK-033(사용 사례 조사·커버리지 판정). MS-002~006·008 Done.
 - **미실행/한계:** 커버리지에는 doctest·`#[ignore]` 성능 시험·examples 실행이 들어가지 않는다. 분기(branch) 커버리지는 nightly 전용이라 재지 않았다. 미분류 파일 6개는 TASK-033 S3에서 분류한다. native·장기·실사용처 시험은 계속 Not Run이다.
 
+## EV-079 — TASK-033 S2·S3: 사용 사례 조사, UC↔TC 대응, 공백 시험, 작은 ring 결함 수정
+
+- **판정:** 로컬 **Pass**. S3 기능 공백 4건은 Human 결정 대기([TASK-033](../04_implementation/tasks/TASK-033.md#human-결정-요청--s3-기능-공백-2026-11-15)).
+- **S2:** 12개 시스템의 1차 출처에서 [UC 31개](../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)를 정리했다. 핵심 2건은 원본 소스를 다시 읽어 일치를 확인했다.
+- **S3 대응:** 대응 9, 일부 19, 기능 없음 3(UC-18·23·29). 「일부」 중 5개는 core에는 있지만 facade에 노출되지 않은 경우다. 핵심 주장 3건(파일 안 손실 기록 없음, facade `max_events: 0`, `.compression(None)`)은 코드에서 직접 확인했다. S1 분류 정정: facade `Logged::Skipped`는 시험 공백이 아니라 도달할 수 없는 경로다.
+- **공백 시험:** 16개 신규, 1개 확장. 구현이 이미 있어서 Red는 시험마다 제품 코드 변이로 확인했고 모두 원복했다. 목록과 변이는 TASK-033 「S3 공백 시험 추가」에 있다.
+- **결함 수정:** facade `Retention::ring`이 8~16 MiB 미만이면 시작 뒤 회전할 수 없어 기록 대부분이 실패했다. Pose 30,000건 중 `failed=26743`이었고, 16 MiB부터는 0이다. 수정 후에는 2 × segment 미만을 시작 전에 `StartError::Retention`으로 거절한다. Red는 수정 전 15 MiB ring이 시작되는 것으로 확인했다(`f24`).
+- **회귀(1.96.0·1.85.0):**
+  - fmt Pass. clippy workspace `--all-targets --all-features --locked -D warnings` 0.
+  - workspace 테스트 각 **586 passed**(570 + 16)·0 failed·5 ignored.
+  - rustdoc all-features·core-only `-D warnings` Pass.
+  - 표면 가드 자가 시험 Pass, NFR-008 integration guard Pass(공개 시그니처 변경 없음).
+- **커버리지:** S3 시작 전 재측정에서 라인 91.17%(18,826 / 미실행 1,662). 시험 추가 뒤 재측정은 S4에서 한다.
+- **미실행:** `check-feature-matrix.py`(feature 경계 변경 없음), Miri(unsafe·동시성 변경 없음), native(T3).
+- **쓰기량:** 시험 데이터는 /tmp(tmpfs) MiB 단위다. ring 재현 probe는 크기 5개로 각 약 4 MiB였고 실행 뒤 삭제했다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -1138,7 +1138,7 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 
 ## 22. TASK-034 facade에 core 기능 노출 — 계약안 2026-11-15
 
-상태: **계약안 — Human 승인 대기**(TASK-034 S1). 배경은 [TASK-034](../04_implementation/tasks/TASK-034.md)에 있다. §18.2가 원래 약속한 `Retention::event`와 §18.3의 레코드별 importance 지정 중 구현되지 않았던 부분도 여기서 마무리한다. 기존 RT 계약(무대기·무할당·Arc clone 0)과 손실 값 필수 원칙(§18.7 ②)은 유지한다.
+상태: **Accepted(2026-11-15 Human 「승인」, TASK-034 S1)** — 결정 D1~D4 모두 권고안. 배경은 [TASK-034](../04_implementation/tasks/TASK-034.md)에 있다. §18.2가 원래 약속한 `Retention::event`와 §18.3의 레코드별 importance 지정 중 구현되지 않았던 부분도 여기서 마무리한다. 기존 RT 계약(무대기·무할당·Arc clone 0)과 손실 값 필수 원칙(§18.7 ②)은 유지한다.
 
 ### 22.1 core 사실(2026-11-15 코드 조사)
 
@@ -1223,7 +1223,7 @@ writer.try_log(alarm.important(), &msg)?;            // 레코드 단위(Channel
 | variant | `PlanWarning::NoImportantReserve`, `StartError`(이벤트 설정 거절은 기존 `Retention`·`Missing` 재사용) |
 | 레시피 | L1~L3 변경 없음(선택 기능). 새 레시피를 추가할지는 결정 D4 |
 
-### 22.6 결정 요청
+### 22.6 결정 — 2026-11-15 Human 「승인」(모두 권고안)
 
 | # | 항목 | 권고 | 대안 |
 |---|---|---|---|

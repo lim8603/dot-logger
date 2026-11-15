@@ -10,17 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress(재개) — TASK-034 facade 노출; MS-009 In Progress — 표준 호환·원격 시각화·TASK-035; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
-| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S3 Done(EV-079, 라인 92.40%), S4 기준 1~3 충족(EV-080, 라인 93.56%), 판정은 TASK-034·035 뒤; TASK-034 In Progress — S1 계약안(API §22) 결정 D1~D4 대기; TASK-035 Planned |
+| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S3 Done(EV-079, 라인 92.40%), S4 기준 1~3 충족(EV-080, 라인 93.56%), 판정은 TASK-034·035 뒤; TASK-034 In Progress — S1 계약 승인(API §22), S2 TDD 진행; TASK-035 Planned |
 | 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
 | 상태 | Green(로컬) — 1.96.0/1.85.0 각 611 Pass, 라인 커버리지 93.56%(EV-080). Done 25/35 Task. native·장기·실사용처 Not Run(소유 TASK-024·026) |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-15 / 세션 #001 / AI |
-| 세션 상태 | 진행 중. Human 승인 대기: TASK-034 S1 계약안 D1~D4(API §22). TASK-033 S4 기준 1~3 충족(EV-080). 다음: TASK-034 S1 또는 TASK-030 S2 ADR(TASK-035 형식 포함) |
+| 세션 상태 | 진행 중. TASK-034 S2 TDD 진행(API §22 승인). TASK-033 S4 기준 1~3 충족(EV-080). 다음: TASK-034 S1 또는 TASK-030 S2 ADR(TASK-035 형식 포함) |
 | 최근 세션 | 2026-11-15 #001 — native·24h 일정 판단 제외, TASK-030 S1 Done(Foxglove 판독), TASK-025 순서 변경, TASK-033 S2·S3(EV-079, ring 결함 수정). 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
 
 ## 현재 결정과 제약
 
+- **2026-11-15 Human 「승인」 — TASK-034 facade 노출 계약(API §22):** D1 쉬는 writer는 facade ack(미반출·tracing) + 사용자 writer `Busy`/`Writer::refresh`, D2 이벤트 trigger는 일반 경로 `mark_event`만(RT trigger B1), D3 중요 예약 기본 0 + `PlanWarning`, D4 레시피 추가 없음.
 - **2026-11-15 Human 「승인」 — 일정 판단 목표치:** 커버리지 하한 라인 92·함수 92·리전 89%(회귀 방지), 85% 미만 파일 실제 동작 공백 미처리 0, 범위 안 UC 구현 동작 시험 대응 100%, TASK-034·035 뒤 재측정으로 MS-007 판정. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정).
 - **2026-11-15 Human 결정 — TASK-033 S3 기능 공백(「모두 권고대로 진행하자」):** facade 노출 ①실행 중 level·샘플링 ②이벤트 전후 보존 trigger ③단순 경로 중요도 → [TASK-034](../04_implementation/tasks/TASK-034.md)(MS-008 재개). 파일 안 손실 기록·채널별 손실 수 → [TASK-035](../04_implementation/tasks/TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께). 나머지 기능 공백 → B1(범위 밖, 일정 판단 제외). client `diagnostics`(dot-probe 전용 `SnapshotCheck`+bridge) → `examples/support/dot_probe` 이동(`4bd6d04`).
 - **2026-11-15 Human 결정 — native·24h 일정 판단 제외·TASK-030 S1 권고안:** 「native·24h 장기 검증을 일정 판단에서 빼자. 나머지는 권고대로」. TASK-024도 TASK-026처럼 마지막 단계·일정 판단 밖, 일정 판단은 TASK-033만. descriptor 없는 채널은 export에서 원문·encoding 유지+한계 기록([API §21.2](../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12)). CLI summary `records:0`은 결함 아님(출력한 `record` 줄 수) — CLI README에 의미 추가. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15).
@@ -61,7 +62,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 |---|---|---|---|---|---|
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-15 | S1 Done(Foxglove 판독 Human 확인, blob 한계 수락). 다음 S2 native 표준 모드 ADR |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-15 | S2 [UC 31개](imported_context/research_2026-11-15_logging_use_cases.md)·S3 대응표·공백 시험 16+1·작은 ring 결함 수정([EV-079](../05_verification/verification_evidence.md#ev-079)), 결정 4건 반영, S3 Done(라인 92.40%). S4 목표치 Human 승인 대기 |
-| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-15 | S1 계약안 [API §22](../03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15) — 결정 D1~D4 Human 승인 대기 |
+| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-15 | S1 [API §22](../03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15) 승인(2026-11-15). S2 TDD ③→①→② |
 | TASK-035 | 손실 기록의 파일 내 표시 | AI | Planned | 2026-11-15 | S1 형식안 — TASK-030 S2 ADR과 함께 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |

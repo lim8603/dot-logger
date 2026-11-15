@@ -1256,3 +1256,41 @@ TASK-034 S2a(③ 중요도)를 구현했다. 시험은 `tc_013_facade` f25~f30�
   - 시작 시 level 지정 `ChannelOptions::minimum(Level)`은 저장과 무관하므로 TASK-034에서 구현한다(f31).
   - **실행 중 변경**(`Logger::set_channel`·`Writer::refresh`·`ConfigError`·facade 원격 ApplyConfig)은 TASK-030 S2 저장 ADR에 「revision 변경 시 출력 파일 회전」과 「한 출력 안의 여러 revision 조회·복구」를 포함해 승인받은 뒤, 보관한 브랜치를 이어 끝낸다.
   - 공개 항목 계획(§22.5)에서 `ConfigError`는 그때 추가한다.
+
+### 22.9 S2c 구현 반영
+
+TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_013_facade` f32~f36이다. RT trigger는 결정 D2대로 범위 밖이다(B1). core 저장·catalog 의미는 바꾸지 않았고, facade에서 기존 `protect_event`·`release_event`·`expire_events`를 부르는 경로만 더했다. §22.3 초안과 달라지거나 초안이 정하지 않았던 점은 다음과 같다.
+
+- **요청 경로(초안과 다름):** 초안은 host → IO thread였다. 구현은 `Logger`가 이벤트 출력마다 만든 요청 채널로 그 출력의 IO thread에 직접 보낸다.
+  - host 루프는 응답을 기다리지 않으므로 dispatch가 멈추지 않는다. host를 거쳐도 IO thread의 응답을 받아야 해서 얻는 것이 없다.
+  - IO thread는 매 회차 batch 쓰기와 sync 처리 뒤에 요청을 꺼낸다. 시각을 그때 새로 읽으므로 로그 시각이 거꾸로 가지 않는다(`TimeBackwards` 없음).
+  - IO thread가 끝나면 요청 수신단을 버린다. 그 뒤의 요청은 기다리지 않고 바로 `Closing`이 된다.
+- **이벤트 시각(초안을 구체화):** `at`은 `mark_event`를 부른 thread에서 `Writer::now_ns`와 같은 시계로 한 번 읽는다. 모든 이벤트 출력이 같은 `at`을 쓴다.
+  - IO thread는 `protect_event(min(at, now), at + post + hold, now)`를 부른다. `now`는 그 IO thread의 시계다.
+  - 출력마다 다른 창이 생기지 않고, 사용자는 `EventMark::at_ns()`로 창 `[at − pre, at + post]`를 알 수 있다.
+- **대기 기한:** 응답은 `4 × sync_every + 1 s`까지 기다린다. health가 sync 지연(`SyncOverdue`)을 판단하는 기준과 같다. 넘으면 `Failed`다. 실패한 mark는 되돌리기 요청을 보내고 같은 기한만큼 한 번 더 기다린다.
+- **mark 표현:** `EventMark`는 `Copy`이고 logger session, facade mark 번호, `at_ns`, 보호한 출력 수를 담는다. 공개 메서드는 `id()`·`at_ns()`·`outputs()`다.
+  - 각 IO thread는 출력마다 「facade mark 번호 → core event id」 목록을 둔다. 크기는 `max_events`로 미리 잡는다.
+  - 목록 항목은 core가 받아들인 경우에만 넣고, 만료 규칙도 core와 같다. 그래서 `max_events`를 넘지 않는다.
+- **되돌리기(rollback):** 한 출력이라도 실패하면 보호에 성공한 출력에서 바로 해제한다. 같은 채널의 요청은 순서대로 처리되므로, 기한 뒤 늦게 처리된 보호도 뒤이은 해제 요청이 푼다. 따라서 오류 뒤에 사용자가 모르는 보호는 남지 않는다.
+- **오류:** 여러 출력의 결과가 다르면 `Failed` > `Closing` > `Quota` 순으로 하나를 돌려준다.
+  - `NotConfigured`: 이벤트 출력이 없다.
+  - `Quota`: core `EventQuota`(동시 창 수 또는 보호 바이트 초과).
+  - `Closing`: worker 실패, 또는 IO thread가 끝나 요청을 받지 못했다.
+  - `Failed`: 파일 오류, 응답 기한 초과, 다른 logger가 발급한 mark를 해제하려 했다.
+- **해제:** `release_event`도 같은 기한으로 모든 이벤트 출력의 응답을 기다린다. 이미 만료되었거나 해제된 mark는 `Ok`다.
+- **만료 주기:** 각 IO thread가 `sync_every`마다 이벤트 출력에 `expire_events(now)`를 부르고 목록도 같이 정리한다. 보호는 `at + post + hold` 뒤 최대 한 sync 주기 안에 풀린다.
+- **검증(`start()`와 `plan()`이 같음, 디스크에 아무것도 만들지 않음):**
+  - hold가 없으면 `Missing::EventHold`, limits가 없으면 `Missing::EventLimits`다. 둘 다 없으면 둘 다 나열한다. 새 `Missing` variant 두 개를 더했다.
+  - `continuous`에 `events`를 붙이면 `InvalidBudget`이다. 지우지 않는 출력에는 보호가 뜻이 없다.
+  - `max_events == 0`, `protected_bytes == 0`, `post + hold == 0`(만료가 이미 지난 창), ns로 나타낼 수 없는 길이는 `InvalidBudget`이다.
+  - `protected_bytes + 2 × segment > ring`이면 `Retention { required: protected_bytes + 2 × segment, available: ring }`이다. segment는 ring / 8을 8 MiB~256 MiB로 자른 값이다. 보호가 가득 차도 회전하는 파일과 다음 파일이 들어갈 자리가 남는다.
+  - `protected_bytes`가 한 segment보다 작아도 거절하지 않는다. 쓰고 있는 파일은 보호 대상이면 한 segment 전체로 계산하므로, 그 경우 기록이 있는 동안 mark는 대부분 `Quota`가 된다. rustdoc에 적었다.
+- **메모리:** core catalog의 event slot(`max_events`)은 기존 `log_required`를 통해 output 예산에 들어간다. facade의 mark 목록은 worker 예산(`facade_bytes`)에 더했다. f36이 `plan()`과 `start()`의 요구량이 정확한지(1바이트 부족 거절, 요구량으로 시작·종료) 확인한다.
+- **시험 결정성:**
+  - f32: 오래된 기록(A)을 쓴 뒤 `pre`보다 오래 잠들고 mark한다. 창 안 기록은 `at_ns` 기준으로 `try_log_at`에 시각을 정해 넣는다. 32 MiB ring에 보호 16 MiB를 주어, 창 기록이 파일 두 개에 걸쳐도 보호 한도 안이다.
+  - f33: 기록 전에 mark해서 창 기록이 첫 파일 안에만 있다. ring이 한 바퀴 돌 때 파일 0이 남아 있는지 확인한 뒤 해제하고, 더 쓴 뒤 창 기록이 지워졌는지 본다.
+  - f34(보호 바이트·되돌리기): 출력 1에 기록을 쓰고 두 번의 periodic sync로 다 쓰였음을 확인한 뒤 mark한다. 출력 0의 창 기록은 mark 직전 시각 + 30분에 둔다. 응답 기한(최대 약 2.2 s)과 무관하게 창(미래 1시간) 안이다.
+  - 구현을 일부러 망가뜨려 확인했다. 보호를 빼면 f32·f33·f34 두 개가 실패하고, 해제를 빼면 f33·f34 두 개가 실패하고, 되돌리기를 빼면 f34(되돌리기)가 실패하고, output 예산에서 event slot을 빼면 f36이 실패한다.
+- **공개 표면:** 이름 있는 항목은 `EventWindow`·`EventMark`·`EventError` 세 개가 늘어 31 → 34 / 60이다. §22.5의 35는 `ConfigError`까지 더한 수치이고, `ConfigError`는 §22.8에 따라 보류했다. 레시피 수치는 바뀌지 않았다(D4).
+- **시험 쓰기량:** f32~f36 합계 약 45 MiB이고 모두 tmpfs(`/tmp`)에 쓴다.

@@ -1268,6 +1268,25 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **커버리지:** 라인 **93.56%**(미실행 1,178)·함수 92.93%·리전 90.88%. 라인 85% 미만 파일 6개는 모두 비동작·도달 불가(TASK-034)·OS 결함 주입 필요로 분류했다.
 - **미실행:** Miri(unsafe 변경 없음), native(T3).
 
+## EV-081 — TASK-034 S2·S3: facade 중요도·시작 시 level·이벤트 보존
+
+- **판정:** 로컬 **Pass**. Human 결과 확인 대기. ① 실행 중 변경은 TASK-030 S2 저장 ADR 뒤로 미뤘다(API §22.8, 로컬 WIP 브랜치 `36c1724`).
+- **커밋:**
+  - `561f2c3` ③ 중요도: `Channel::important`·`ChannelOptions::important_from`·`WriterQuota::important`·`PlanWarning::NoImportantReserve`·`Level` 재수출
+  - `340c19c` 시작 시 level: `ChannelOptions::minimum`
+  - `949a74e` ② 이벤트 보존: `Retention::events(EventWindow)`·`Logger::{mark_event, release_event}`·`EventMark`·`EventError`, README 절
+- **Red:** f25~f36. 신규 API라 시험을 먼저 써서 컴파일 실패를 확인했다(E0432·E0599). 그 뒤 구현을 일부러 깨는 변이로 단언 실패도 확인했다(예: 중요 예약 미전달 → f28이 20/20 실패, core 보호 생략 → f32~f34 실패, 실패 mark rollback 생략 → f34 실패).
+- **결정성:**
+  - f28 포화 시험: core completion runway가 예약분을 보장해서 타이밍에 기대지 않는다. 20회 반복 모두 Pass.
+  - 이벤트 시험: `try_log_at`으로 창 안 시각을 지정하고 주기 sync 두 번을 기다린다. 5회 반복 모두 Pass.
+- **회귀(1.96.0·1.85.0):**
+  - fmt Pass. clippy workspace `-D warnings` 0.
+  - workspace 테스트 각 **625 passed**·0 failed.
+  - rustdoc Pass. feature matrix 16조합 Pass. rt-allocation 18 Pass(`.important()` 포함).
+  - NFR-008 guard Pass: 이름 있는 항목 **34/60**, 레시피 L1 20줄·6개념 / L2 40·7 / L3 +3·+5로 변화 없음.
+- **쓰기량:** 이벤트 시험 약 45 MiB, /tmp(tmpfs).
+- **미실행:** Miri(unsafe·원자 순서 변경 없음), native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

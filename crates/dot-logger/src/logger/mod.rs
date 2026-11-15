@@ -370,6 +370,8 @@ struct ChannelSpec {
     outputs: Option<Vec<usize>>,
     /// Lowest level classified Important; `None` keeps every level Normal.
     important_from: Option<Level>,
+    /// Lowest admitted level; `None` admits every level (Trace).
+    minimum: Option<Level>,
 }
 
 impl ChannelSpec {
@@ -397,6 +399,7 @@ impl ChannelSpec {
 pub struct ChannelOptions {
     outputs: Option<Vec<usize>>,
     important_from: Option<Level>,
+    minimum: Option<Level>,
 }
 
 impl ChannelOptions {
@@ -415,6 +418,16 @@ impl ChannelOptions {
     /// [`PlanWarning::NoImportantReserve`].
     pub fn important_from(mut self, level: Level) -> Self {
         self.important_from = Some(level);
+        self
+    }
+    /// Admit only records sent at `level` or more severe (API §22.2). Lower
+    /// records return [`Logged::Skipped`] on
+    /// the RT path without waiting, are not stored and are not counted as
+    /// losses. The minimum is fixed for the session; changing it while
+    /// running waits for the storage revision rotation planned with TASK-030
+    /// S2 (Human decision 2026-11-15). Default: every level (Trace).
+    pub fn minimum(mut self, level: Level) -> Self {
+        self.minimum = Some(level);
         self
     }
     /// Route only to these file outputs, by `file_output` declaration order
@@ -557,6 +570,7 @@ impl LoggerBuilder {
             schema: T::SCHEMA,
             outputs: options.outputs,
             important_from: options.important_from,
+            minimum: options.minimum,
         });
         self
     }
@@ -627,6 +641,7 @@ impl LoggerBuilder {
                 schema: sink::SCHEMA,
                 outputs: None,
                 important_from: None,
+                minimum: None,
             });
             writers.push((TRACING_WRITER.into(), Some(*quota)));
             *min
@@ -677,6 +692,7 @@ impl LoggerBuilder {
                 Ok(StorageChannel {
                     channel: ChannelConfig {
                         importance: spec.importance(),
+                        minimum_level: spec.minimum.unwrap_or(Level::Trace),
                         ..ChannelConfig::new(
                             u32::try_from(index + 1).map_err(|_| StartError::InvalidBudget)?,
                             spec.schema.id(),

@@ -273,6 +273,7 @@ struct logger::ChannelOptions
   field .. (private)
   fn new() -> Self
   fn important_from(self, level: Level) -> Self
+  fn minimum(self, level: Level) -> Self
   fn outputs(self, outputs: &[usize]) -> Self
   impl Clone for ChannelOptions
   impl Debug for ChannelOptions

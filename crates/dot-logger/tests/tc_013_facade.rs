@@ -2,8 +2,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use dot_logger::logger::{
-    Budget, Channel, EncodeError, Level, Logged, Logger, LookupError, Missing, Record, Retention,
-    Schema, Shutdown, StartError, Writer, WriterQuota,
+    Budget, Channel, ChannelOptions, EncodeError, Level, Logged, Logger, LookupError, Missing,
+    Record, Retention, Schema, Shutdown, StartError, Writer, WriterQuota,
 };
 // Tests compare stored importance; facade users only call methods.
 use dot_logger::capture::Importance;
@@ -1052,7 +1052,6 @@ fn f26_channel_metadata_carries_the_important_mark() {
 fn f27_important_from_classifies_by_level_and_the_record_override_wins() {
     use Importance::{Important, Normal};
     use dot_logger::capture::RecordOutcome;
-    use dot_logger::logger::ChannelOptions;
     let temp = Temp::new();
     let logger = Logger::builder()
         .budget(budget())
@@ -1249,4 +1248,53 @@ fn f30_plan_warns_when_level_importance_has_no_reserve() {
             .unwrap()
             .is_success()
     );
+}
+
+/// TASK-034 S2 (§22.2, 2026-11-15 Human decision): a channel's minimum level
+/// is fixed at start with `ChannelOptions::minimum`. Records below it return
+/// `Logged::Skipped` on the RT path and are never stored; records at or above
+/// it are stored. A channel without the option still admits every level.
+#[test]
+fn f31_start_time_minimum_level_skips_lower_records() {
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel_with::<Pose>("robot/pose", ChannelOptions::new().minimum(Level::Warn))
+        .channel::<Pose>("robot/all")
+        .writer("control")
+        .start()
+        .unwrap();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let all = logger.channel::<Pose>("robot/all").unwrap();
+    let mut w = logger.take_writer("control").unwrap();
+    let mut send = |channel: Channel<Pose>, x: i32| loop {
+        match w.try_log(channel, &Pose { x, y: 0 }) {
+            Err(e) if e.is_capacity() => std::thread::yield_now(),
+            other => break other.unwrap(),
+        }
+    };
+    assert_eq!(send(pose.at(Level::Info), 1), Logged::Skipped);
+    assert_eq!(send(pose.at(Level::Debug), 2), Logged::Skipped);
+    assert!(matches!(send(pose.at(Level::Warn), 3), Logged::Accepted(_)));
+    assert!(matches!(
+        send(pose.at(Level::Error), 4),
+        Logged::Accepted(_)
+    ));
+    assert!(
+        matches!(send(pose, 5), Logged::Skipped),
+        "default Info is below Warn"
+    );
+    assert!(matches!(send(all.at(Level::Trace), 6), Logged::Accepted(_)));
+    drop(w);
+    let directory = logger.directories()[0].clone();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(10))
+            .unwrap()
+            .is_success()
+    );
+    let mut stored: Vec<i32> = stored_importance(&directory).iter().map(|r| r.0).collect();
+    stored.sort_unstable();
+    assert_eq!(stored, [3, 4, 6]);
 }

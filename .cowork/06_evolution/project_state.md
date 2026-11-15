@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress(재개) — TASK-034 facade 노출; MS-009 In Progress — 표준 호환·원격 시각화·TASK-035; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
 | 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S3 Done(EV-079, 라인 92.40%), S4 기준 1~3 충족(EV-080, 라인 93.56%), 판정은 TASK-034·035 뒤; TASK-034 In Progress — S2·S3 Done(EV-081, 실행 중 변경 제외), Human 결과 확인 대기; ① 실행 중 변경은 TASK-030 S2 ADR 뒤; TASK-035 Planned |
-| 미처리 리뷰 | 없음 — REV-054 Closed(2026-11-12 Human 「승인」) |
+| 미처리 리뷰 | **REV-055 요청(2026-11-15)** — 범위 `64e9d69..949a74e` 코드 커밋 9개, 리뷰 전용 세션에서 수행. REV-054 Closed |
 | 상태 | Green(로컬) — 1.96.0/1.85.0 각 625 Pass(EV-081), 라인 커버리지 93.56%(EV-080, TASK-034 전). Done 25/35 Task. native·장기·실사용처 Not Run(소유 TASK-024·026) |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-15 / 세션 #001 / AI |
-| 세션 상태 | 종료 — 미커밋 없음. Human 확인 대기: TASK-034 결과(EV-081). 다음: TASK-030 S2 저장 ADR 초안(native 표준 모드 + TASK-035 손실 기록 + revision 변경 시 파일 회전·다중 revision 조회/복구) → 승인 → 구현 → TASK-034 실행 중 변경 마무리(WIP `36c1724`) |
+| 세션 상태 | 종료 — 미커밋 없음. 다음: REV-055 리뷰 전용 세션(`64e9d69..949a74e`) → 결과 처리. Human 확인 대기: TASK-034 결과(EV-081). 그다음: TASK-030 S2 저장 ADR 초안(native 표준 모드 + TASK-035 손실 기록 + revision 변경 시 파일 회전·다중 revision 조회/복구) → 승인 → 구현 → TASK-034 실행 중 변경 마무리(WIP `36c1724`) |
 | 최근 세션 | 2026-11-15 #001 — TASK-030 S1 Done, TASK-033 S2~S4(UC 31·시험 40여 개·ring 결함 수정·커버리지 93.56%·목표치 승인), TASK-034 S1~S3(중요도·시작 시 level·이벤트 보존), TASK-034/035 신규·B1, client diagnostics 이동. 이전 2026-11-13 #001 — 완료 기준 변경(Human), 커버리지 도구·기준선, Task 22건 Done, TASK-033 신규 |
 
 ## 현재 결정과 제약
@@ -86,11 +86,20 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) | REV-052 조치·TASK-023 S2/S3·T5·RT harness·TASK-028 S2 누적 리뷰(`93db6e3..8dbd999`) | Closed | Conditional, P1 1·P2 1·P3 1(RV-131~133) 전부 수용·조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04` — 훑기 단일 소유 claim, 비 Linux 대체 경로·시험 분리, core-only rustdoc CI. 2026-11-12 Human 「승인」 |
 | [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) | REV-053 조치·TASK-029 S1~S4 누적 리뷰(`8dbd999..2fe4e49`) | Closed | Conditional, P2 2건(RV-134~135) 수용·조치 [EV-076](../05_verification/verification_evidence.md#ev-076) `64e9d69` — snapshot 계약 조건(trait 제약·연관 항목 타입·impl 대상/제약) 직렬화, 개념 계수 import 해석·glob/미해석 실패. 2026-11-12 Human 「승인」 |
 
+| REV-055(요청) | TASK-030 S1 export·TASK-033 S3/S4 시험·ring 결함 수정·client diagnostics 이동·TASK-034 facade 중요도/최소 level/이벤트 보존 누적 리뷰(`64e9d69..949a74e`) | Requested | 리뷰 전용 세션이 REV-055 문서를 만든다. 중점은 아래 「다음 시작점」 0 |
+
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
 
 ## 다음 시작점
 
-0. **리뷰 후속:** 없음(REV-054 Closed). Human 확인 대기: TASK-034 결과([EV-081](../05_verification/verification_evidence.md#ev-081)). 독립 코드리뷰는 2026-11-15 변경(`4158f08`~`949a74e`)에 아직 하지 않았다 — TASK-030 S2 전에 할지 결정.
+0. **REV-055 독립 코드리뷰(요청, 2026-11-15 Human 「리뷰 요청까지 하고 마무리하자」):** 리뷰 전용 세션에서 `64e9d69..949a74e`를 본다. 대상 코드 커밋 9개: `04bf3aa`, `19e04d2`, `4158f08`, `4bd6d04`, `4559fc7`, `11f91a5`, `561f2c3`, `340c19c`, `949a74e`. 로컬 WIP 브랜치 `36c1724`는 범위 밖이다. 리뷰 결과 처리는 TASK-030 S2 ADR보다 먼저 한다. 중점:
+   - ① `949a74e` 이벤트 보존: Logger→IO thread 전용 채널과 IO loop `try_recv`, 거절된 mark의 rollback, 응답 기한(4 × sync 주기 + 1초), 단조 `now`와 `min(at, now)`, sync 주기 만료, 종료 중·IO thread 종료 뒤 `Closing`, 메모리 사이징 정확성(f36), `protected_bytes` 검증
+   - ② `561f2c3`·`340c19c` 중요도·최소 level: RT 경로(`Channel` 필드 추가 뒤 무할당·Copy 유지), `ByLevel` 매핑 경계, `important_slots` 검증과 `with_raw` 순서, `PlanWarning` 조건, tracing 채널 영향, `Skipped` 경로
+   - ③ `4158f08` ring 2 × segment 하한: 경계값, continuous 영향, preset·calibrate가 만드는 ring 크기와의 충돌
+   - ④ `4bd6d04` client `diagnostics` 이동: 공개 API 제거 영향, `#[path]` 포함과 `allow(dead_code, unused_imports)` 범위, feature 경계
+   - ⑤ `04bf3aa` TASK-030 S1 표준 export(아직 독립 리뷰 없음): 손상·잘린 입력, 메모리·레코드 상한, 메타 채널 매핑, 취소 시 출력 정리
+   - ⑥ 시험 커밋(`19e04d2`·`4559fc7`·`11f91a5`·`4158f08` 시험부): 결정성, /tmp 쓰기량, CLI mock 변경(Speed 분기 강화)이 실제 계약을 가리지 않는지
+   Human 확인 대기: TASK-034 결과([EV-081](../05_verification/verification_evidence.md#ev-081)).
 1. **TASK-030 S2(다음 시작점):** 저장 ADR 하나에 세 가지를 담아 채번·초안 → Human 승인 → 구현.
    - native 표준 쓰기 모드
    - TASK-035 파일 안 손실 기록·채널별 손실 수

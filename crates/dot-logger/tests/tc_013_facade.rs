@@ -1298,3 +1298,465 @@ fn f31_start_time_minimum_level_skips_lower_records() {
     stored.sort_unstable();
     assert_eq!(stored, [3, 4, 6]);
 }
+
+/// Event-window tests (§22.3): one pose channel and one writer on `outputs`.
+fn event_logger(outputs: &[(&Path, Retention)]) -> Logger {
+    let mut builder = Logger::builder().budget(budget());
+    for &(dir, retention) in outputs {
+        builder = builder.file_output(dir, retention);
+    }
+    builder
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .start()
+        .unwrap()
+}
+
+/// Log pose `x` at session monotonic `mono`, retrying capacity off the RT path.
+fn log_at(w: &mut Writer, pose: Channel<Pose>, x: i32, mono: u64) {
+    loop {
+        match w.try_log_at(pose, &Pose { x, y: 0 }, mono, 0) {
+            Ok(Logged::Accepted(_)) => return,
+            Err(e) if e.is_capacity() => std::thread::yield_now(),
+            other => panic!("record {x}: {other:?}"),
+        }
+    }
+}
+
+/// Every stored pose x of one closed output, sorted.
+fn stored_xs(dir: &Path) -> Vec<i32> {
+    let mut xs: Vec<i32> = stored_poses(dir).iter().map(|p| p.x).collect();
+    xs.sort_unstable();
+    xs
+}
+
+/// Total bytes of the closed segment files of one output.
+fn stored_bytes(dir: &Path) -> u64 {
+    closed_files(dir)
+        .0
+        .iter()
+        .map(|f| std::fs::metadata(f).unwrap().len())
+        .sum()
+}
+
+/// Wait until every record admitted before this call is written: a periodic
+/// sync that completed after this call was requested after the previous one
+/// retired, so its cutoff covers every earlier record.
+fn wait_written(logger: &Logger) {
+    for _ in 0..2 {
+        let since = std::time::Instant::now();
+        let health = health_until(logger, Duration::from_secs(5), |h| {
+            h.outputs
+                .iter()
+                .all(|o| o.since_sync.is_some_and(|s| s < since.elapsed()))
+        });
+        assert!(
+            health
+                .outputs
+                .iter()
+                .all(|o| o.since_sync.is_some_and(|s| s < since.elapsed())),
+            "no periodic sync within 5 s: {health:?}"
+        );
+    }
+}
+
+const PRE: Duration = Duration::from_millis(100);
+const POST: Duration = Duration::from_secs(1);
+const HOLD: Duration = Duration::from_secs(3600);
+
+/// Window ids of the event tests: history records `P_*`, future records
+/// `B_*`, records before the window `A_*` and after it `C_*`.
+const A_BASE: i32 = 0;
+const P_BASE: i32 = 1_000_000;
+const B_BASE: i32 = 2_000_000;
+const C_BASE: i32 = 3_000_000;
+
+/// Log the records of one marked window: 10 history records at
+/// `at - PRE / 2` and 10 future records at `at + POST / 2`, then `after`
+/// records past the window end. The window times are chosen relative to the
+/// mark, so which records it covers does not depend on scheduling.
+fn log_window(w: &mut Writer, pose: Channel<Pose>, at: u64, after: i32, c_from: i32) {
+    let pre = PRE.as_nanos() as u64;
+    let post = POST.as_nanos() as u64;
+    for i in 0..10 {
+        log_at(w, pose, P_BASE + i, at - pre / 2);
+        log_at(w, pose, B_BASE + i, at + post / 2);
+    }
+    for i in c_from..c_from + after {
+        log_at(w, pose, C_BASE + i, at + post + 1 + i as u64);
+    }
+}
+
+/// TASK-034 S2 (§22.3): a marked window survives ring deletion. A 32 MiB ring
+/// (8 MiB segments) may protect 16 MiB. 10,000 records are logged, then the
+/// test sleeps longer than the history (`PRE`), so all of them are older
+/// than the window. After the mark, 10 history and 10 future records are
+/// logged inside the window (times relative to the mark) and 150,000 records
+/// after it (about 21 MiB of files), which wraps the ring. Records in the
+/// window are all stored; the oldest unprotected records were deleted; the
+/// files stay within the ring.
+#[test]
+fn f32_a_marked_event_window_survives_ring_deletion() {
+    use dot_logger::logger::EventWindow;
+    const RING: u64 = 32 * MIB as u64;
+    let temp = Temp::new();
+    let window = EventWindow::new(PRE, POST)
+        .hold(HOLD)
+        .limits(4, 16 * MIB as u64);
+    let logger = event_logger(&[(&temp.0, Retention::ring(RING).events(window))]);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut w = logger.take_writer("control").unwrap();
+    let mut last_a = 0;
+    for x in 0..10_000 {
+        last_a = w.now_ns();
+        log_at(&mut w, pose, A_BASE + x, last_a);
+    }
+    std::thread::sleep(PRE + Duration::from_millis(50));
+    let mark = logger.mark_event().unwrap();
+    assert_eq!(mark.outputs(), 1);
+    let at = mark.at_ns();
+    assert!(
+        at - PRE.as_nanos() as u64 > last_a,
+        "A is older than the window"
+    );
+    log_window(&mut w, pose, at, 150_000, 0);
+    drop(w);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert_eq!(report.core.totals.failed, 0, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+    let stored = stored_xs(&directory);
+    let window: Vec<i32> = (P_BASE..P_BASE + 10).chain(B_BASE..B_BASE + 10).collect();
+    let kept: Vec<i32> = stored
+        .iter()
+        .copied()
+        .filter(|x| (P_BASE..C_BASE).contains(x))
+        .collect();
+    assert_eq!(kept, window, "every record in the window is stored");
+    assert!(!stored.contains(&A_BASE), "the oldest record was deleted");
+    assert!(
+        stored.contains(&(C_BASE + 149_999)),
+        "the newest record is stored"
+    );
+    let c = stored.iter().filter(|x| **x >= C_BASE).count();
+    assert!(c < 150_000, "older unprotected records were deleted");
+    let total = stored_bytes(&directory);
+    assert!(total <= RING, "{total} > {RING}");
+}
+
+/// TASK-034 S2 (§22.3): `release_event` lifts the protection, so the ring
+/// deletes the marked records like any other. A 24 MiB ring (8 MiB segments,
+/// 8 MiB protectable) is marked before any record, so the 20 window records
+/// (as in f32) are the first ones of the first file and never span two
+/// files. 80,000 records after the window (about 11 MiB) wrap the ring with
+/// the window protected (file 0 stays while later files are deleted); then
+/// the mark is released (twice: the second
+/// release finds nothing and is Ok) and 10,000 more records rotate the ring
+/// further, deleting the oldest file first.
+#[test]
+fn f33_a_released_event_window_is_deleted_like_any_other() {
+    use dot_logger::logger::EventWindow;
+    let temp = Temp::new();
+    let window = EventWindow::new(PRE, POST)
+        .hold(HOLD)
+        .limits(4, 8 * MIB as u64);
+    let logger = event_logger(&[(&temp.0, Retention::ring(24 * MIB as u64).events(window))]);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut w = logger.take_writer("control").unwrap();
+    // The history start `at - PRE` is then a session time after the origin.
+    std::thread::sleep(PRE);
+    let mark = logger.mark_event().unwrap();
+    let at = mark.at_ns();
+    log_window(&mut w, pose, at, 80_000, 0);
+    wait_written(&logger);
+    // The ring wrapped around the protected first file: file 0 is kept,
+    // the files after it were deleted.
+    let sequences: Vec<u64> = closed_files(&directory)
+        .0
+        .iter()
+        .map(|f| f.file_stem().unwrap().to_str().unwrap().parse().unwrap())
+        .collect();
+    assert!(
+        sequences.len() >= 2 && sequences[0] == 0 && sequences[1] > 1,
+        "{sequences:?}"
+    );
+    logger.release_event(mark).unwrap();
+    // Releasing twice (or after expiry) leaves nothing to release.
+    logger.release_event(mark).unwrap();
+    for i in 80_000..90_000 {
+        log_at(
+            &mut w,
+            pose,
+            C_BASE + i,
+            at + POST.as_nanos() as u64 + 1 + i as u64,
+        );
+    }
+    drop(w);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert_eq!(report.core.totals.failed, 0, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+    let stored = stored_xs(&directory);
+    assert!(
+        !stored.iter().any(|x| (P_BASE..C_BASE).contains(x)),
+        "the released window was deleted"
+    );
+    assert!(!stored.contains(&C_BASE));
+    assert!(stored.contains(&(C_BASE + 89_999)));
+}
+
+/// TASK-034 S2 (§22.3): more simultaneous marks than `max_events` are
+/// `Quota`, and a release frees the slot. With two event outputs one mark
+/// protects both (`outputs() == 2`) and the smaller limit (output 1, one
+/// slot) decides. No records are logged, so only the event count limits
+/// the marks.
+#[test]
+fn f34_marks_beyond_max_events_are_quota() {
+    use dot_logger::logger::{EventError, EventWindow};
+    let (a, b) = (Temp::new(), Temp::new());
+    let window = |events| {
+        EventWindow::new(PRE, POST)
+            .hold(HOLD)
+            .limits(events, 8 * MIB as u64)
+    };
+    let ring = Retention::ring(24 * MIB as u64);
+    let logger = event_logger(&[
+        (&a.0, ring.events(window(3))),
+        (&b.0, ring.events(window(1))),
+    ]);
+    let first = logger.mark_event().unwrap();
+    assert_eq!(first.outputs(), 2);
+    for _ in 0..2 {
+        assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+    }
+    logger.release_event(first).unwrap();
+    let second = logger.mark_event().unwrap();
+    assert_ne!(second, first);
+    assert_eq!(second.outputs(), 2);
+    assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+    logger.release_event(second).unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(10))
+            .unwrap()
+            .is_success()
+    );
+}
+
+/// TASK-034 S2 (§22.3): a mark whose window would protect more than
+/// `protected_bytes` is `Quota`, and an output that did protect it releases
+/// it again. Output 1 (24 MiB ring, 8 MiB segments, 8 MiB protectable, one
+/// hour of history) gets 10,000 records of its own channel (about 1.4 MiB:
+/// closed files plus the file being written, which counts a whole segment),
+/// so its next window needs more than 8 MiB. Output 0 has no records yet and
+/// accepts the same mark, so the mark must be rolled back there. Afterwards
+/// output 0 gets 10 records inside that window (30 minutes after the mark,
+/// well within its one-hour future) followed by 80,000 records after it
+/// (about 11 MiB), which wraps its ring: without the rollback the window
+/// records would survive (as in f32); with it they are deleted. Output 1
+/// keeps all its records and nothing fails.
+#[test]
+fn f34_a_window_over_protected_bytes_is_quota_and_rolled_back() {
+    use dot_logger::logger::{EventError, EventWindow};
+    const HOUR: Duration = Duration::from_secs(3600);
+    let (a, b) = (Temp::new(), Temp::new());
+    let ring = Retention::ring(24 * MIB as u64);
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(
+            &a.0,
+            ring.events(
+                EventWindow::new(PRE, HOUR)
+                    .hold(HOLD)
+                    .limits(4, 8 * MIB as u64),
+            ),
+        )
+        .file_output(
+            &b.0,
+            ring.events(
+                EventWindow::new(HOUR, Duration::from_millis(1))
+                    .hold(HOLD)
+                    .limits(4, 8 * MIB as u64),
+            ),
+        )
+        .channel_with::<Pose>("robot/pose", ChannelOptions::new().outputs(&[0]))
+        .channel_with::<Pose>("robot/other", ChannelOptions::new().outputs(&[1]))
+        .writer("control")
+        .start()
+        .unwrap();
+    let (first, second) = (
+        logger.directories()[0].clone(),
+        logger.directories()[1].clone(),
+    );
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let other = logger.channel::<Pose>("robot/other").unwrap();
+    let mut w = logger.take_writer("control").unwrap();
+    for x in 0..10_000 {
+        let now = w.now_ns();
+        log_at(&mut w, other, x, now);
+    }
+    wait_written(&logger);
+    let before = w.now_ns();
+    assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+    // The mark's time lies after `before` and within two answer deadlines
+    // (about 2.2 s) of it, so this is inside its window on output 0.
+    let inside = before + HOUR.as_nanos() as u64 / 2;
+    for i in 0..10 {
+        log_at(&mut w, pose, B_BASE + i, inside);
+    }
+    let after = before + 2 * HOUR.as_nanos() as u64;
+    for i in 0..80_000 {
+        log_at(&mut w, pose, C_BASE + i, after + i as u64);
+    }
+    drop(w);
+    let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+        panic!("shutdown must close");
+    };
+    assert_eq!(report.core.totals.failed, 0, "{report:?}");
+    assert!(report.is_success(), "{report:?}");
+    let stored = stored_xs(&first);
+    assert!(
+        !stored.iter().any(|x| (B_BASE..C_BASE).contains(x)),
+        "the refused mark protects nothing on output 0"
+    );
+    assert!(stored.contains(&(C_BASE + 79_999)));
+    assert_eq!(stored_xs(&second), (0..10_000).collect::<Vec<_>>());
+}
+
+/// TASK-034 S2 (§22.3): event windows are checked before anything starts.
+/// `mark_event` without an event output is `NotConfigured`. `events` on a
+/// continuous output is `InvalidBudget`; a missing hold or missing limits
+/// are loss values listed in `Missing`; zero limits are `InvalidBudget`; a
+/// protected size that leaves less than two segments unprotected is
+/// `Retention` with the ring size it needs. `plan()` and `start()` agree and
+/// nothing is created on disk.
+#[test]
+fn f35_event_windows_are_validated_before_start() {
+    use dot_logger::logger::{EventError, EventWindow};
+    let temp = Temp::new();
+    let plain = start(&temp);
+    assert_eq!(plain.mark_event().unwrap_err(), EventError::NotConfigured);
+    assert!(plain.shutdown(Duration::from_secs(5)).unwrap().is_success());
+    let empty = Temp::new();
+    let build = |retention: Retention| {
+        Logger::builder()
+            .budget(budget())
+            .file_output(&empty.0, retention)
+            .channel::<Pose>("robot/pose")
+            .writer("control")
+    };
+    let full = EventWindow::new(PRE, POST)
+        .hold(HOLD)
+        .limits(4, 16 * MIB as u64);
+    let ring = Retention::ring(32 * MIB as u64);
+    let rejected = |retention: Retention, check: &dyn Fn(&StartError) -> bool| {
+        let planned = build(retention).plan().unwrap_err();
+        assert!(check(&planned), "plan: {planned:?}");
+        let started = build(retention).start().unwrap_err();
+        assert!(check(&started), "start: {started:?}");
+    };
+    rejected(Retention::continuous(32 * MIB as u64).events(full), &|e| {
+        matches!(e, StartError::InvalidBudget)
+    });
+    let missing = |list: &'static [Missing]| move |e: &StartError| matches!(e, StartError::Missing(m) if m == list);
+    rejected(
+        ring.events(EventWindow::new(PRE, POST).limits(4, 16 * MIB as u64)),
+        &missing(&[Missing::EventHold]),
+    );
+    rejected(
+        ring.events(EventWindow::new(PRE, POST).hold(HOLD)),
+        &missing(&[Missing::EventLimits]),
+    );
+    rejected(
+        ring.events(EventWindow::new(PRE, POST)),
+        &missing(&[Missing::EventHold, Missing::EventLimits]),
+    );
+    for (events, bytes) in [(0, 16 * MIB as u64), (4, 0)] {
+        rejected(
+            ring.events(EventWindow::new(PRE, POST).hold(HOLD).limits(events, bytes)),
+            &|e| matches!(e, StartError::InvalidBudget),
+        );
+    }
+    rejected(
+        ring.events(
+            EventWindow::new(PRE, POST)
+                .hold(HOLD)
+                .limits(4, 16 * MIB as u64 + 1),
+        ),
+        &|e| {
+            matches!(e, StartError::Retention { required, available }
+                if *required == 32 * MIB as u64 + 1 && *available == 32 * MIB as u64)
+        },
+    );
+    // A zero window that also holds for zero time could never be protected.
+    rejected(
+        ring.events(
+            EventWindow::new(PRE, Duration::ZERO)
+                .hold(Duration::ZERO)
+                .limits(4, 16 * MIB as u64),
+        ),
+        &|e| matches!(e, StartError::InvalidBudget),
+    );
+    assert_eq!(std::fs::read_dir(&empty.0).unwrap().count(), 0);
+    // Exactly two unprotected segments is valid.
+    assert!(build(ring.events(full)).plan().is_ok());
+}
+
+/// TASK-034 S2 (§22.3): the memory requirement of an event output is exact
+/// (the f14 pattern): the catalog's event slots are counted, one byte short
+/// is rejected with the same requirement, the requirement itself starts and
+/// closes, and `plan()` reports the same number.
+#[test]
+fn f36_memory_requirement_with_event_windows_is_exact() {
+    use dot_logger::logger::EventWindow;
+    let temp = Temp::new();
+    let make = |memory: usize, events: Option<usize>| {
+        let ring = Retention::ring(32 * MIB as u64);
+        let retention = match events {
+            Some(n) => ring.events(
+                EventWindow::new(PRE, POST)
+                    .hold(HOLD)
+                    .limits(n, 16 * MIB as u64),
+            ),
+            None => ring,
+        };
+        Logger::builder()
+            .budget(budget().memory_bytes(memory))
+            .file_output(&temp.0, retention)
+            .channel::<Pose>("robot/pose")
+            .writer("control")
+    };
+    let plain = reported_requirement(&|m| make(m, None));
+    let few = reported_requirement(&|m| make(m, Some(4)));
+    let many = reported_requirement(&|m| make(m, Some(1000)));
+    assert!(plain < few && few < many, "{plain} {few} {many}");
+    for (events, required) in [(4, few), (1000, many)] {
+        match make(4096, Some(events)).plan() {
+            Err(StartError::Budget {
+                required: planned, ..
+            }) => assert_eq!(planned, required),
+            other => panic!("plan must report the same shortfall: {other:?}"),
+        }
+        assert_eq!(
+            make(required, Some(events)).plan().unwrap().required_bytes,
+            required
+        );
+        match make(required - 1, Some(events)).start() {
+            Err(StartError::Budget {
+                required: again, ..
+            }) => assert_eq!(again, required),
+            other => panic!("one byte short must fail: {other:?}"),
+        }
+        let logger = make(required, Some(events)).start().unwrap();
+        assert!(
+            logger
+                .shutdown(Duration::from_secs(10))
+                .unwrap()
+                .is_success()
+        );
+    }
+}

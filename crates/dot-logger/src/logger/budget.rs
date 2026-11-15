@@ -25,6 +25,7 @@ use crate::storage::{RetentionConfig, RetentionMode, StorageChannel, WriterConfi
 use crate::storage::{log_required, smallest_rotated_segment};
 use crate::telemetry::Bank;
 
+use super::event::EventSpec;
 use super::writer::Owned;
 use super::{Missing, StartError};
 
@@ -234,6 +235,67 @@ pub struct Retention {
     mode: RetentionMode,
     bytes: u64,
     reserve: u64,
+    events: Option<EventWindow>,
+}
+
+/// Records kept around a marked event on a ring output (API §22.3), for
+/// [`Retention::events`].
+///
+/// [`Logger::mark_event`] protects the files holding records whose session
+/// monotonic time lies in `[at - pre, at + post]` until `at + post + hold`
+/// or [`Logger::release_event`]. `hold` and both [`limits`](Self::limits)
+/// decide what the ring keeps, so they are loss values without a default:
+/// leaving one out rejects `start()` and `plan()` with
+/// [`StartError::Missing`] ([`Missing::EventHold`], [`Missing::EventLimits`]).
+///
+/// [`Logger::mark_event`]: crate::logger::Logger::mark_event
+/// [`Logger::release_event`]: crate::logger::Logger::release_event
+/// [`StartError::Missing`]: crate::logger::StartError::Missing
+/// [`Missing::EventHold`]: crate::logger::Missing::EventHold
+/// [`Missing::EventLimits`]: crate::logger::Missing::EventLimits
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EventWindow {
+    pre: Duration,
+    post: Duration,
+    hold: Option<Duration>,
+    limits: Option<(usize, u64)>,
+}
+
+impl EventWindow {
+    /// Keep `pre` of history before the mark and `post` after it.
+    pub const fn new(pre: Duration, post: Duration) -> Self {
+        Self {
+            pre,
+            post,
+            hold: None,
+            limits: None,
+        }
+    }
+    /// Keep the window protected for `hold` after its end (`at + post`);
+    /// the worker expires it at least once per `sync_every` after that.
+    /// `post + hold` must not be zero, and should be well above the time a
+    /// mark takes to reach the IO thread (normally under a millisecond),
+    /// otherwise the mark fails because its expiry has already passed.
+    pub const fn hold(mut self, hold: Duration) -> Self {
+        self.hold = Some(hold);
+        self
+    }
+    /// At most `max_events` windows at once, and at most `protected_bytes`
+    /// of files protected by all of them together. Files are protected
+    /// whole: a closed file counts its size, and the file being written
+    /// counts a full segment (ring / 8, between 8 MiB and 256 MiB) while
+    /// it holds a protected record. Both must be above zero, and the ring
+    /// must keep two unprotected segments: `protected_bytes + 2 × segment`
+    /// above the ring size rejects `start()` with [`StartError::Retention`].
+    /// A mark beyond either limit is [`EventError::Quota`]; a record that
+    /// would extend protection beyond `protected_bytes` fails on that output.
+    ///
+    /// [`StartError::Retention`]: crate::logger::StartError::Retention
+    /// [`EventError::Quota`]: crate::logger::EventError::Quota
+    pub const fn limits(mut self, max_events: usize, protected_bytes: u64) -> Self {
+        self.limits = Some((max_events, protected_bytes));
+        self
+    }
 }
 
 impl Retention {
@@ -248,6 +310,7 @@ impl Retention {
             mode: RetentionMode::Circular,
             bytes,
             reserve: 0,
+            events: None,
         }
     }
     /// Stop recording (reject at the file stage) once `bytes` are used.
@@ -256,6 +319,7 @@ impl Retention {
             mode: RetentionMode::Continuous,
             bytes,
             reserve: 0,
+            events: None,
         }
     }
     /// Filesystem free bytes that must remain untouched. Default 0.
@@ -263,6 +327,88 @@ impl Retention {
         self.reserve = bytes;
         self
     }
+    /// Let [`Logger::mark_event`] keep the files around an event on this
+    /// ring (API §22.3). The ring still deletes its oldest files, but skips
+    /// files with records inside a protected window. Only a
+    /// [`ring`](Self::ring) can hold events: on a
+    /// [`continuous`](Self::continuous) output, which never deletes,
+    /// `start()` and `plan()` fail with [`StartError::InvalidBudget`].
+    ///
+    /// ```no_run
+    /// use dot_logger::logger::{EventWindow, Retention};
+    /// use std::time::Duration;
+    /// const MIB: u64 = 1 << 20;
+    ///
+    /// // Keep 30 s before and 10 s after each mark for one more hour;
+    /// // at most 8 marks and 512 MiB of protected files at a time.
+    /// let retention = Retention::ring(4096 * MIB).events(
+    ///     EventWindow::new(Duration::from_secs(30), Duration::from_secs(10))
+    ///         .hold(Duration::from_secs(3600))
+    ///         .limits(8, 512 * MIB),
+    /// );
+    /// # let _ = retention;
+    /// ```
+    ///
+    /// [`Logger::mark_event`]: crate::logger::Logger::mark_event
+    /// [`StartError::InvalidBudget`]: crate::logger::StartError::InvalidBudget
+    pub const fn events(mut self, window: EventWindow) -> Self {
+        self.events = Some(window);
+        self
+    }
+    /// Event loss values this output leaves unset, in a fixed order.
+    pub(crate) fn missing(&self) -> Vec<Missing> {
+        self.events
+            .as_ref()
+            .map_or_else(Vec::new, EventWindow::missing)
+    }
+}
+
+impl EventWindow {
+    /// Loss values left unset, in a fixed order.
+    fn missing(&self) -> Vec<Missing> {
+        [
+            self.hold.is_none().then_some(Missing::EventHold),
+            self.limits.is_none().then_some(Missing::EventLimits),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+}
+
+/// Core event settings of one ring output: (pre, post, hold) in ns and the
+/// limits. Zero limits, a zero `post + hold` and a window too long for
+/// session nanoseconds are `InvalidBudget`.
+fn event_config(
+    window: &EventWindow,
+    ring: u64,
+    segment: u64,
+) -> Result<(u64, EventSpec, u64), StartError> {
+    let (Some(hold), Some((max_events, protected))) = (window.hold, window.limits) else {
+        return Err(StartError::Missing(window.missing()));
+    };
+    let ns = |d: Duration| u64::try_from(d.as_nanos()).map_err(|_| StartError::InvalidBudget);
+    let (pre_ns, post_ns, hold_ns) = (ns(window.pre)?, ns(window.post)?, ns(hold)?);
+    if max_events == 0 || protected == 0 || post_ns.checked_add(hold_ns).is_none_or(|n| n == 0) {
+        return Err(StartError::InvalidBudget);
+    }
+    // Deleting unprotected files must always make room for the rotating
+    // segment and the next one (the ring minimum), whatever is protected.
+    let required = protected
+        .checked_add(segment.saturating_mul(2))
+        .ok_or(StartError::InvalidBudget)?;
+    if required > ring {
+        return Err(StartError::Retention {
+            required,
+            available: ring,
+        });
+    }
+    let spec = EventSpec {
+        post_ns,
+        hold_ns,
+        max_events,
+    };
+    Ok((pre_ns, spec, protected))
 }
 
 /// Dispatch events the host drains per turn.
@@ -270,13 +416,15 @@ pub(crate) const HOST_EVENTS: usize = 256;
 
 /// Heap the facade itself preallocates beside the core (ADR-012, REV-051
 /// RV-124): per writer the encode scratch (one small slot) and the 1-slot
-/// return mailbox; per output the IO write batch; on the host the dispatch
+/// return mailbox; per output the IO write batch and, for `events` event
+/// slots in total, the mark map of its IO thread; on the host the dispatch
 /// event buffer and three per-producer sync range arrays. Thread stacks,
 /// channel queues and the bounded sync work list are not included.
 pub(crate) fn facade_bytes(
     quotas: &[WriterQuota],
     outputs: usize,
     batch_records: usize,
+    events: usize,
 ) -> Option<usize> {
     use std::mem::size_of;
     let mailbox = size_of::<rtrb::RingBuffer<Owned>>() + size_of::<Owned>();
@@ -294,7 +442,10 @@ pub(crate) fn facade_bytes(
                 .checked_mul(3)?
                 .checked_mul(size_of::<ProducerRange>())?,
         )?;
-    writers.checked_add(batches)?.checked_add(host)
+    writers
+        .checked_add(batches)?
+        .checked_add(host)?
+        .checked_add(super::event::held_bytes(events)?)
 }
 
 /// Longest horizon an `Instant` deadline is clamped to: far enough to mean
@@ -332,6 +483,8 @@ pub(crate) struct Derived {
     pub(crate) control: ControlConfig,
     pub(crate) writer: WriterConfig,
     pub(crate) retention: Vec<RetentionConfig>,
+    /// Event window of each output, in declaration order.
+    pub(crate) events: Vec<Option<EventSpec>>,
     pub(crate) tuning: Tuning,
     /// Memory the plan needs before any margin.
     pub(crate) required: usize,
@@ -446,9 +599,22 @@ pub(crate) fn derive(
         .try_fold(0usize, |sum, q| sum.checked_add(q.records()?))
         .ok_or_else(overflow)?;
     let batch_records = budget.batch_records.min((budget_records / 2).max(1));
+    // Event slots of every output; validated with the retention below.
+    let event_slots = retention
+        .iter()
+        .filter_map(|r| r.events.and_then(|w| w.limits))
+        .try_fold(0usize, |sum, (n, _)| sum.checked_add(n))
+        .ok_or_else(overflow)?;
     let worker = threads
         .checked_mul(STACK_BYTES)
-        .and_then(|n| n.checked_add(facade_bytes(&quotas, retention.len(), batch_records)?))
+        .and_then(|n| {
+            n.checked_add(facade_bytes(
+                &quotas,
+                retention.len(),
+                batch_records,
+                event_slots,
+            )?)
+        })
         .ok_or_else(overflow)?;
     let fixed = raw
         .checked_add(input)
@@ -566,6 +732,7 @@ pub(crate) fn derive(
     };
 
     let floor = SEGMENT_FLOOR.max((max_payload as u64).saturating_mul(2) + 1024 * 1024);
+    let mut events = Vec::with_capacity(retention.len());
     let retention = retention
         .iter()
         .map(|r| {
@@ -586,17 +753,35 @@ pub(crate) fn derive(
                     available: r.bytes,
                 });
             }
+            // Event protection only makes sense where files are deleted.
+            let (mode, (pre_ns, post_ns, max_events, protected_bytes)) = match &r.events {
+                None => {
+                    events.push(None);
+                    (r.mode, (0, 0, 0, 0))
+                }
+                Some(_) if r.mode != RetentionMode::Circular => {
+                    return Err(StartError::InvalidBudget);
+                }
+                Some(window) => {
+                    let (pre, spec, protected) = event_config(window, r.bytes, segment)?;
+                    events.push(Some(spec));
+                    (
+                        RetentionMode::Event,
+                        (pre, spec.post_ns, spec.max_events, protected),
+                    )
+                }
+            };
             Ok(RetentionConfig {
-                mode: r.mode,
+                mode,
                 disk_bytes: r.bytes,
                 disk_reserve_bytes: r.reserve,
                 max_age_ns: u64::MAX,
                 max_segment_bytes: segment,
                 max_segment_ns: 60_000_000_000,
                 max_index_bytes: 4 * 1024 * 1024,
-                protected_bytes: 0,
-                pre_ns: 0,
-                post_ns: 0,
+                protected_bytes,
+                pre_ns,
+                post_ns,
                 // Small records close segments far below `segment` bytes (by
                 // record bounds or `max_records`); size the count for the
                 // smallest such segment so the configured bytes are what
@@ -608,7 +793,7 @@ pub(crate) fn derive(
                 .map_err(|_| StartError::InvalidBudget)?
                 .checked_add(2)
                 .ok_or(StartError::InvalidBudget)?,
-                max_events: 0,
+                max_events,
                 max_pins: 0,
                 max_pin_bytes: 0,
                 max_pin_ns: 0,
@@ -700,6 +885,7 @@ pub(crate) fn derive(
         control,
         writer,
         retention,
+        events,
         tuning: Tuning {
             sync_every,
             drop_deadline,

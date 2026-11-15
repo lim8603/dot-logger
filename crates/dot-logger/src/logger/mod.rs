@@ -38,6 +38,7 @@
 
 mod affinity;
 mod budget;
+mod event;
 mod health;
 mod host;
 mod preset;
@@ -59,7 +60,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 /// [`ChannelOptions::important_from`]; the same type as
 /// `dot_logger::capture::Level`.
 pub use crate::capture::Level;
-pub use budget::{Budget, Retention, WriterQuota};
+pub use budget::{Budget, EventWindow, Retention, WriterQuota};
+pub use event::{EventError, EventMark};
 pub use health::{Degradation, Failure, Health, HealthState, OutputHealth};
 pub use preset::{Preset, Sizing};
 #[cfg(feature = "tracing-adapter")]
@@ -98,6 +100,10 @@ pub enum Missing {
     Channel,
     /// No `writer`.
     Writer,
+    /// An [`EventWindow`] without [`hold`](EventWindow::hold).
+    EventHold,
+    /// An [`EventWindow`] without [`limits`](EventWindow::limits).
+    EventLimits,
 }
 
 /// Why `start()` failed. Nothing is left running and no namespace remains.
@@ -108,7 +114,8 @@ pub enum StartError {
     /// A topic or writer name was declared twice, or a name is empty.
     Duplicate,
     /// A value is zero or inconsistent (for example raw slots without bytes,
-    /// or an Important reserve not below the small slots).
+    /// an Important reserve not below the small slots, or an event window
+    /// on a continuous output or with zero limits).
     InvalidBudget,
     /// A channel's output selection is empty, repeats an output or names an
     /// output index that was not declared.
@@ -122,7 +129,8 @@ pub enum StartError {
         /// Bytes it was given.
         available: usize,
     },
-    /// A retention size is below the smallest valid segment.
+    /// A retention size is below the smallest valid segment, or below an
+    /// event window's protected bytes plus two segments.
     Retention {
         /// Smallest acceptable retention bytes.
         required: u64,
@@ -656,6 +664,11 @@ impl LoggerBuilder {
             None => vec![Missing::Budget],
             Some(budget) => budget::missing(budget, &quotas),
         };
+        for item in self.outputs.iter().flat_map(|(_, r)| r.missing()) {
+            if !missing.contains(&item) {
+                missing.push(item);
+            }
+        }
         for (absent, item) in [
             (self.outputs.is_empty(), Missing::FileOutput),
             (channels.is_empty(), Missing::Channel),
@@ -875,6 +888,16 @@ impl LoggerBuilder {
         let shared = Arc::new(Shared::new(self.outputs.len(), self.telemetry));
         #[cfg(feature = "remote")]
         shared.placed(remote_placed);
+        // One request channel per event output, served by its IO thread.
+        let mut marks = Vec::with_capacity(derived.events.len());
+        let mut events = Vec::new();
+        for spec in &derived.events {
+            marks.push(spec.map(|spec| {
+                let (send, work) = mpsc::channel();
+                events.push(send);
+                event::Marks::new(spec, work)
+            }));
+        }
         let (commands, receive) = mpsc::channel();
         let drop_deadline = derived.tuning.drop_deadline;
         let overdue = budget::sync_overdue(derived.tuning.sync_every);
@@ -887,6 +910,7 @@ impl LoggerBuilder {
             control: derived.control,
             writer: derived.writer,
             retention: derived.retention,
+            marks,
             channels: storage,
             outputs: self.outputs.iter().map(|(d, _)| d.clone()).collect(),
             tuning: derived.tuning,
@@ -913,6 +937,8 @@ impl LoggerBuilder {
         };
         Ok(Logger {
             commands: Some(commands),
+            events,
+            next_mark: AtomicU64::new(1),
             writers: Mutex::new(writers),
             channels,
             session,
@@ -963,6 +989,9 @@ fn new_session_id() -> u128 {
 /// ordinary threads; hand [`Writer`]s to RT threads.
 pub struct Logger {
     commands: Option<Sender<Command>>,
+    /// Request channel of each event output's IO thread.
+    events: Vec<Sender<event::EventWork>>,
+    next_mark: AtomicU64,
     writers: Mutex<Vec<(String, Option<Writer>)>>,
     channels: Vec<ChannelSpec>,
     session: u128,
@@ -1051,6 +1080,96 @@ impl Logger {
             .ok_or(LookupError::Unknown)
     }
 
+    /// Protect the records around now on every output declared with
+    /// [`Retention::events`] (API §22.3). General path: it allocates, sends
+    /// one request to each event output's IO thread and waits for the
+    /// answers at most `4 × sync_every + 1 s` (the periodic sync's overdue
+    /// bound); a failed mark waits once more as long for its rollback. RT
+    /// threads do not call this; they notify a thread that does.
+    ///
+    /// The event time is read here, so the window is
+    /// `[at_ns - pre, at_ns + post]` of [`EventMark::at_ns`] on the clock of
+    /// [`Writer::now_ns`], also for records that arrive at the file later.
+    /// Files holding records in it are not deleted until
+    /// `at_ns + post + hold` (expired at least once per `sync_every` after
+    /// that) or [`release_event`](Self::release_event).
+    ///
+    /// # Errors
+    ///
+    /// [`EventError::NotConfigured`] without an event output;
+    /// [`EventError::Quota`] when an output already holds `max_events`
+    /// windows or would exceed its `protected_bytes`;
+    /// [`EventError::Closing`] when the worker has stopped;
+    /// [`EventError::Failed`] on a file fault or no answer in time. After
+    /// any error the outputs that did protect the window release it again,
+    /// so no output keeps a window the caller has no mark for.
+    pub fn mark_event(&self) -> Result<EventMark, EventError> {
+        if self.events.is_empty() {
+            return Err(EventError::NotConfigured);
+        }
+        let at = u64::try_from(self.origin.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        let id = self.next_mark.fetch_add(1, Ordering::Relaxed);
+        let result = self.ask(|reply| event::EventWork::Mark { id, at, reply });
+        match result {
+            Ok(()) => Ok(EventMark::new(self.session, id, at, self.events.len())),
+            Err(error) => {
+                // Requests are served in order, so this also releases a
+                // late protection of an output that did not answer in time.
+                let _ = self.ask(|reply| event::EventWork::Release { id, reply });
+                Err(error)
+            }
+        }
+    }
+
+    /// Release `mark` on every event output before its hold ends, so the
+    /// ring may delete its files again. General path with the same bounded
+    /// wait as [`mark_event`](Self::mark_event). A mark that already expired
+    /// or was released is `Ok`.
+    ///
+    /// # Errors
+    ///
+    /// [`EventError::NotConfigured`] without an event output;
+    /// [`EventError::Failed`] for a mark of another logger or no answer in
+    /// time; [`EventError::Closing`] when the worker has stopped.
+    pub fn release_event(&self, mark: EventMark) -> Result<(), EventError> {
+        if self.events.is_empty() {
+            return Err(EventError::NotConfigured);
+        }
+        if mark.session() != self.session {
+            return Err(EventError::Failed);
+        }
+        let id = mark.id();
+        self.ask(|reply| event::EventWork::Release { id, reply })
+    }
+
+    /// Send one request to every event output and wait for all answers
+    /// until the overdue bound; the most severe failure wins.
+    fn ask(&self, request: impl Fn(event::Reply) -> event::EventWork) -> Result<(), EventError> {
+        if self.worker_failed() {
+            return Err(EventError::Closing);
+        }
+        let (reply, answers) = mpsc::channel();
+        for output in &self.events {
+            output
+                .send(request(reply.clone()))
+                .map_err(|_| EventError::Closing)?;
+        }
+        drop(reply);
+        let deadline = budget::later(Instant::now(), self.overdue);
+        let mut result = Ok(());
+        for _ in 0..self.events.len() {
+            let wait = deadline.saturating_duration_since(Instant::now());
+            match answers.recv_timeout(wait) {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => result = worse(result, error),
+                Err(RecvTimeoutError::Timeout) => return Err(EventError::Failed),
+                // An IO thread ended with the request unanswered.
+                Err(RecvTimeoutError::Disconnected) => return Err(EventError::Closing),
+            }
+        }
+        result
+    }
+
     /// Close admission, drain, synchronize and publish every file, then report.
     /// After `deadline` the current state is returned as `Incomplete`.
     pub fn shutdown(mut self, deadline: Duration) -> Result<Shutdown, ShutdownError> {
@@ -1098,6 +1217,20 @@ impl fmt::Debug for Logger {
             .field("session", &format_args!("{:032x}", self.session))
             .field("directories", &self.directories)
             .finish_non_exhaustive()
+    }
+}
+
+/// Combine per-output answers: Failed over Closing over Quota.
+fn worse(result: Result<(), EventError>, error: EventError) -> Result<(), EventError> {
+    let rank = |e: &EventError| match e {
+        EventError::Failed => 3,
+        EventError::Closing => 2,
+        EventError::Quota => 1,
+        EventError::NotConfigured => 0,
+    };
+    match result {
+        Err(current) if rank(&current) >= rank(&error) => Err(current),
+        _ => Err(error),
     }
 }
 

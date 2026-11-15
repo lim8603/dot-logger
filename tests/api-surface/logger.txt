@@ -27,11 +27,23 @@ struct logger::Budget
   impl Clone for Budget
   impl Debug for Budget
   impl Default for Budget
+struct logger::EventWindow
+  field .. (private)
+  const fn new(pre: Duration, post: Duration) -> Self
+  const fn hold(self, hold: Duration) -> Self
+  const fn limits(self, max_events: usize, protected_bytes: u64) -> Self
+  impl Clone for EventWindow
+  impl Copy for EventWindow
+  impl Debug for EventWindow
+  impl Eq for EventWindow
+  impl StructuralPartialEq for EventWindow
+  impl PartialEq for EventWindow
 struct logger::Retention
   field .. (private)
   const fn ring(bytes: u64) -> Self
   const fn continuous(bytes: u64) -> Self
   const fn reserve(self, bytes: u64) -> Self
+  const fn events(self, window: EventWindow) -> Self
   impl Clone for Retention
   impl Copy for Retention
   impl Debug for Retention
@@ -53,6 +65,30 @@ struct logger::WriterQuota
   impl Eq for WriterQuota
   impl StructuralPartialEq for WriterQuota
   impl PartialEq for WriterQuota
+enum logger::EventError
+  variant NotConfigured
+  variant Quota
+  variant Closing
+  variant Failed
+  impl Clone for EventError
+  impl Copy for EventError
+  impl Debug for EventError
+  impl Eq for EventError
+  impl StructuralPartialEq for EventError
+  impl PartialEq for EventError
+  impl Display for EventError
+  impl Error for EventError
+struct logger::EventMark
+  field .. (private)
+  fn id(&Self) -> u64
+  fn at_ns(&Self) -> u64
+  fn outputs(&Self) -> usize
+  impl Clone for EventMark
+  impl Copy for EventMark
+  impl Debug for EventMark
+  impl Eq for EventMark
+  impl StructuralPartialEq for EventMark
+  impl PartialEq for EventMark
 enum logger::Degradation
   variant RecordsFailed
   variant SyncOverdue
@@ -203,6 +239,8 @@ enum logger::Missing
   variant FileOutput
   variant Channel
   variant Writer
+  variant EventHold
+  variant EventLimits
   impl Clone for Missing
   impl Copy for Missing
   impl Debug for Missing
@@ -331,6 +369,8 @@ struct logger::Logger
   fn health(&Self) -> Health
   fn remote_addr(&Self) -> Option<std::net::SocketAddr>
   fn tracing(&Self) -> Result<TracingSink, LookupError>
+  fn mark_event(&Self) -> Result<EventMark, EventError>
+  fn release_event(&Self, mark: EventMark) -> Result<(), EventError>
   fn shutdown(self, deadline: Duration) -> Result<Shutdown, ShutdownError>
   impl Drop for Logger
   impl Debug for Logger

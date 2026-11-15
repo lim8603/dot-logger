@@ -27,6 +27,7 @@ use crate::storage::{
 
 use super::affinity::pin_current;
 use super::budget::{self, STACK_BYTES, Tuning};
+use super::event::{EventWork, Marks};
 use super::health::{AFFINITY_APPLIED, AFFINITY_FAILED, AFFINITY_NONE, OutputStatus, Shared};
 use super::remote::{Remote, Tap};
 use super::writer::Owned;
@@ -59,6 +60,8 @@ pub(crate) struct HostPlan {
     pub(crate) control: ControlConfig,
     pub(crate) writer: WriterConfig,
     pub(crate) retention: Vec<RetentionConfig>,
+    /// Event state of each output, handed to the IO thread that owns it.
+    pub(crate) marks: Vec<Option<Marks>>,
     pub(crate) channels: Vec<StorageChannel>,
     pub(crate) outputs: Vec<PathBuf>,
     pub(crate) tuning: Tuning,
@@ -164,6 +167,7 @@ fn host_main(
         control,
         writer,
         retention,
+        marks,
         channels,
         outputs,
         tuning,
@@ -196,6 +200,7 @@ fn host_main(
                 &mut mailboxes,
                 routing,
                 &config,
+                marks,
                 Links {
                     commands: &commands,
                     ready: &mut ready,
@@ -337,6 +342,7 @@ fn run(
     mailboxes: &mut [rtrb::Consumer<Owned>],
     routing: RoutingConfig,
     config: &Config<'_>,
+    marks: Vec<Option<Marks>>,
     links: Links<'_>,
 ) -> Result<(), StartError> {
     let Links {
@@ -359,14 +365,16 @@ fn run(
         let mut targets: Vec<IoTarget<'_, '_>> = outputs
             .into_iter()
             .zip(logs.iter_mut())
+            .zip(marks)
             .enumerate()
-            .map(|(index, (consumer, log))| IoTarget {
+            .map(|(index, ((consumer, log), marks))| IoTarget {
                 id: index as u32 + 1,
                 status: &config.flags.outputs[index],
                 // Subscribers see what the first output wrote, once per record.
                 tap: if index == 0 { remote.tap() } else { None },
                 consumer,
                 log,
+                marks,
                 batch: Vec::with_capacity(config.tuning.batch_records),
                 held_since: None,
             })
@@ -391,6 +399,11 @@ fn run(
                         let _ = pinned.send(placed);
                         if ok {
                             io_main(chunk, &receive, config);
+                        }
+                        // Event requests to an ended IO thread fail at once
+                        // (`EventError::Closing`) instead of waiting.
+                        for target in chunk.iter_mut() {
+                            target.marks = None;
                         }
                     })
                     .map_err(StartError::Io)?;
@@ -654,6 +667,8 @@ struct IoTarget<'s, 'o> {
     tap: Option<Tap>,
     consumer: TargetConsumer<'s, 'o>,
     log: &'s mut Log,
+    /// Event windows of an output declared with `Retention::events`.
+    marks: Option<Marks>,
     batch: Vec<Delivery<'o>>,
     held_since: Option<Instant>,
 }
@@ -685,6 +700,7 @@ fn io_loop(
     origin: Instant,
 ) {
     let mut syncs: Vec<SyncWork<'_, '_>> = Vec::new();
+    let mut expired = Instant::now();
     loop {
         let now = Instant::now();
         #[cfg(test)]
@@ -758,6 +774,14 @@ fn io_loop(
             }
             busy = true;
         }
+        // Expiry runs at least once per sync period (API §22.3).
+        let expire = expired.elapsed() >= tuning.sync_every;
+        if expire {
+            expired = Instant::now();
+        }
+        for target in targets.iter_mut() {
+            busy |= serve_events(target, expire, origin, flags);
+        }
         // Read `stop` before `finish`: the host stores `finish` before it
         // releases `stop`, so a seen stop implies a seen finish. Reading them
         // the other way round could see neither finish nor, a moment later,
@@ -797,6 +821,55 @@ impl IoTarget<'_, '_> {
     fn log_target(&self) -> u32 {
         self.id
     }
+}
+
+/// Expire due windows, then answer every queued mark and release request of
+/// one output. Each step reads the clock afresh, after the batch writes of
+/// this turn, so the log's time never goes backwards. Returns whether a
+/// request was served.
+fn serve_events(
+    target: &mut IoTarget<'_, '_>,
+    expire: bool,
+    origin: Instant,
+    flags: &Shared,
+) -> bool {
+    let Some(marks) = target.marks.as_mut() else {
+        return false;
+    };
+    let failed = |error: &RetentionError| {
+        if failure(error) == FailureReason::IoFailure {
+            flags.io_failed.store(true, Ordering::Release);
+            target.status.fail();
+        }
+    };
+    if expire {
+        if let Err(error) = marks.expire(target.log, ns(origin, Instant::now())) {
+            failed(&error);
+        }
+    }
+    let mut served = false;
+    while let Ok(work) = marks.work.try_recv() {
+        served = true;
+        match work {
+            EventWork::Mark { id, at, reply } => {
+                let now = ns(origin, Instant::now());
+                let result = marks
+                    .mark(target.log, id, at, now)
+                    .map_err(|(answer, error)| {
+                        if let Some(error) = error {
+                            failed(&error);
+                        }
+                        answer
+                    });
+                let _ = reply.send(result);
+            }
+            EventWork::Release { id, reply } => {
+                marks.release(target.log, id);
+                let _ = reply.send(Ok(()));
+            }
+        }
+    }
+    served
 }
 
 /// Report with a bounded Busy retry; a failed report leaves the guard Unknown.

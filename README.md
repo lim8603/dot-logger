@@ -81,6 +81,32 @@ cargo run --locked -p dot-logger --features remote --example recipe_l3_remote
 줄은 rustfmt 결과에서 `use`·주석·빈 줄·사용자 메시지 타입과 `Record` 구현을 빼고 셉니다. 개념은
 사용자 코드가 이름으로 쓰는 `dot_logger` 타입·trait·함수 수입니다(계약 [API §18.6·§20](.cowork/03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12)).
 
+## 선택 옵션: 중요도·최소 level·이벤트 보존
+
+기본 경로에 필요할 때만 붙이는 옵션입니다. 계약은 [API §22](.cowork/03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15)에 있습니다.
+
+```rust
+let logger = Logger::builder()
+    .budget(budget)
+    .file_output("/data/logs", Retention::ring(4 << 30)
+        .events(EventWindow::new(Duration::from_secs(30), Duration::from_secs(10))
+            .hold(Duration::from_secs(3600))
+            .limits(8, 512 << 20)))                       // 이벤트 전후 구간 보존
+    .channel_with::<Status>("robot/status", ChannelOptions::new()
+        .minimum(Level::Info)                             // Info 미만은 Skipped
+        .important_from(Level::Warn))                     // Warn 이상은 중요 기록
+    .writer_with("control", WriterQuota::small(64, 256).important(8)) // 중요 기록 예약
+    .start()?;
+writer.try_log(alarm.important(), &msg)?;                 // 기록 하나만 중요로 표시
+let mark = logger.mark_event()?;                          // 지금 시각 기준 [-30 s, +10 s] 보호
+```
+
+- **중요 기록:** writer 예약(`WriterQuota::important`)이 있을 때만 포화에서 보호됩니다. 예약 없이 `important_from`을 쓰면 `plan()`이 `PlanWarning::NoImportantReserve`를 보고합니다.
+- **최소 level:** 시작할 때 정합니다. 실행 중 변경은 저장 계층의 revision 회전 설계(TASK-030 S2) 뒤에 추가됩니다.
+- **이벤트 보존:**
+  - `mark_event`는 일반 thread에서 부릅니다. RT thread는 그 thread에 알리면 됩니다.
+  - `hold`가 끝나거나 `release_event`를 부르면 보호가 풀립니다.
+
 ## 두 계층과 문서
 
 - **기본 경로 — `logger`:** builder, 기본 worker, 스레드 간 이동 가능한 `'static` writer, preset·장비 측정 프로필(`calibrate` feature), health·종료 보고.

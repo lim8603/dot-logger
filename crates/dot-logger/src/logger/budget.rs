@@ -47,6 +47,9 @@ pub struct WriterQuota {
     pub raw_slots: usize,
     /// Largest original payload.
     pub raw_slot_bytes: usize,
+    /// Small slots only Important records may use; 0 (the default) reserves
+    /// none. See [`important`](Self::important).
+    pub important_slots: usize,
 }
 
 impl WriterQuota {
@@ -57,6 +60,7 @@ impl WriterQuota {
             small_slot_bytes: slot_bytes,
             raw_slots: 0,
             raw_slot_bytes: 0,
+            important_slots: 0,
         }
     }
 
@@ -64,6 +68,28 @@ impl WriterQuota {
     pub const fn with_raw(mut self, slots: usize, slot_bytes: usize) -> Self {
         self.raw_slots = slots;
         self.raw_slot_bytes = slot_bytes;
+        self
+    }
+
+    /// Reserve `slots` of the small slots for Important records (API §22.4,
+    /// core `PoolQuota::important_slots`). Normal records are then rejected
+    /// with `Capacity` once `small_slots - slots` of them are queued, so the
+    /// reserved slots stay free for records marked with
+    /// [`Channel::important`] or classified by
+    /// [`ChannelOptions::important_from`]. Important records may also use the
+    /// Normal slots. Default 0: no reserve, every record competes equally.
+    ///
+    /// The reserve must leave a Normal slot: `slots >= small_slots` rejects
+    /// `start()` and `plan()` with [`StartError::InvalidBudget`]. Only the
+    /// small pool (`try_log`) is reserved; the raw pool of
+    /// [`with_raw`](Self::with_raw) has no Important reserve, so Important
+    /// loans from `Producer::try_acquire` compete with Normal ones.
+    ///
+    /// [`Channel::important`]: crate::logger::Channel::important
+    /// [`ChannelOptions::important_from`]: crate::logger::ChannelOptions::important_from
+    /// [`StartError::InvalidBudget`]: crate::logger::StartError::InvalidBudget
+    pub const fn important(mut self, slots: usize) -> Self {
+        self.important_slots = slots;
         self
     }
 
@@ -85,7 +111,7 @@ impl WriterQuota {
             small: PoolQuota {
                 slots: self.small_slots,
                 slot_bytes: self.small_slot_bytes,
-                important_slots: 0,
+                important_slots: self.important_slots,
             },
             raw: (self.raw_slots > 0).then_some(PoolQuota {
                 slots: self.raw_slots,
@@ -384,6 +410,8 @@ pub(crate) fn derive(
             q.small_slots == 0
                 || q.small_slot_bytes == 0
                 || (q.raw_slots > 0) != (q.raw_slot_bytes > 0)
+                // The reserve must leave a Normal slot (API §22.4).
+                || q.important_slots >= q.small_slots
         })
     {
         return Err(StartError::InvalidBudget);

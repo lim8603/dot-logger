@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::capture::{
-    CaptureCore, CaptureError, CaptureReceipt, Level, Producer, RecordMetadata, RecordOutcome,
-    WriteState,
+    CaptureCore, CaptureError, CaptureReceipt, Importance, Level, Producer, RecordMetadata,
+    RecordOutcome, WriteState,
 };
 
 /// Payload identity stored with every record of a channel.
@@ -106,6 +106,8 @@ pub struct Channel<T: ?Sized> {
     pub(crate) session: u128,
     pub(crate) id: u32,
     pub(crate) level: Level,
+    /// Record override; `None` leaves importance to the channel's mapping.
+    pub(crate) importance: Option<Importance>,
     _type: PhantomData<fn(&T)>,
 }
 
@@ -115,6 +117,7 @@ impl<T: ?Sized> Channel<T> {
             session,
             id,
             level: Level::Info,
+            importance: None,
             _type: PhantomData,
         }
     }
@@ -123,11 +126,30 @@ impl<T: ?Sized> Channel<T> {
         self.level = level;
         self
     }
+    /// The same channel with every record marked Important (API §22.4).
+    ///
+    /// Important records may use the writer's reserved slots
+    /// ([`WriterQuota::important`]) when Normal records no longer fit, and
+    /// sampling never drops them. This per-record mark wins over the
+    /// channel's [`ChannelOptions::important_from`] mapping. Like
+    /// [`at`](Self::at) it only changes this copy of the tag: no cost on the
+    /// RT path. Without a reserve the mark is still stored with the record
+    /// but protects nothing; `plan()` cannot see per-record marks, so it does
+    /// not warn about them.
+    ///
+    /// [`WriterQuota::important`]: crate::logger::WriterQuota::important
+    /// [`ChannelOptions::important_from`]: crate::logger::ChannelOptions::important_from
+    pub fn important(mut self) -> Self {
+        self.importance = Some(Importance::Important);
+        self
+    }
 }
 impl<T: Record + ?Sized> Channel<T> {
-    /// Metadata of one record in this channel at its level, for the advanced
-    /// path: `Producer::try_record_raw` with a loan from
-    /// [`Writer::producer`]. Reads no clock and allocates nothing.
+    /// Metadata of one record in this channel at its level and importance
+    /// mark ([`important`](Self::important); `None` otherwise), for the
+    /// advanced path: `Producer::try_record_raw` with a loan from
+    /// [`Writer::producer`]. A loan must be acquired with the importance the
+    /// record resolves to. Reads no clock and allocates nothing.
     ///
     /// ```no_run
     /// # use dot_logger::{capture::{CaptureError, Importance}, logger::{Channel, Writer}};
@@ -150,7 +172,7 @@ impl<T: Record + ?Sized> Channel<T> {
             real_ns,
             source_time: None,
             level: self.level,
-            importance: None,
+            importance: self.importance,
         }
     }
 }

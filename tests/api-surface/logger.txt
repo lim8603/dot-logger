@@ -1,3 +1,18 @@
+enum logger::Level
+  variant Trace
+  variant Debug
+  variant Info
+  variant Warn
+  variant Error
+  variant Fatal
+  impl Clone for Level
+  impl Copy for Level
+  impl Debug for Level
+  impl Eq for Level
+  impl Ord for Level
+  impl StructuralPartialEq for Level
+  impl PartialEq for Level
+  impl PartialOrd for Level
 struct logger::Budget
   field .. (private)
   fn new() -> Self
@@ -28,8 +43,10 @@ struct logger::WriterQuota
   field small_slot_bytes: usize
   field raw_slots: usize
   field raw_slot_bytes: usize
+  field important_slots: usize
   const fn small(slots: usize, slot_bytes: usize) -> Self
   const fn with_raw(self, slots: usize, slot_bytes: usize) -> Self
+  const fn important(self, slots: usize) -> Self
   impl Clone for WriterQuota
   impl Copy for WriterQuota
   impl Debug for WriterQuota
@@ -113,6 +130,7 @@ struct logger::Channel<T: ?Sized>
   field .. (private)
   impl<T: ?Sized> Channel<T>
   fn at(self, level: Level) -> Self
+  fn important(self) -> Self
   impl<T: Record + ?Sized> Channel<T>
   fn metadata(&Self, mono_ns: u64, real_ns: i64) -> RecordMetadata
   impl<T: ?Sized> Clone for Channel<T>
@@ -254,6 +272,7 @@ struct logger::PendingShutdown
 struct logger::ChannelOptions
   field .. (private)
   fn new() -> Self
+  fn important_from(self, level: Level) -> Self
   fn outputs(self, outputs: &[usize]) -> Self
   impl Clone for ChannelOptions
   impl Debug for ChannelOptions
@@ -278,6 +297,7 @@ struct logger::Plan
 enum logger::PlanWarning
   variant Memory { budget_bytes: usize, available_bytes: u64 }
   variant Load { offered_bytes_per_second: u64, limit_bytes_per_second: u64 }
+  variant NoImportantReserve
   impl Clone for PlanWarning
   impl Copy for PlanWarning
   impl Debug for PlanWarning

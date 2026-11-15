@@ -2,9 +2,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use dot_logger::logger::{
-    Budget, EncodeError, Logged, Logger, LookupError, Missing, Record, Retention, Schema, Shutdown,
-    StartError, WriterQuota,
+    Budget, Channel, EncodeError, Level, Logged, Logger, LookupError, Missing, Record, Retention,
+    Schema, Shutdown, StartError, Writer, WriterQuota,
 };
+// Tests compare stored importance; facade users only call methods.
+use dot_logger::capture::Importance;
 use dot_logger::storage::decode_record;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -942,6 +944,305 @@ fn f24_a_ring_below_two_segments_is_rejected_before_start() {
             .is_success()
     );
     let logger = start(Retention::ring(16 * MIB as u64)).unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+}
+
+/// Every stored record of one output as (pose x, level, resolved importance).
+fn stored_importance(dir: &Path) -> Vec<(i32, Level, Option<Importance>)> {
+    let (files, active) = closed_files(dir);
+    assert_eq!(active, 0, "no active segment may remain after Closed");
+    let mut stored = Vec::new();
+    for file in files {
+        let bytes = std::fs::read(file).unwrap();
+        for message in mcap::MessageStream::new(&bytes).unwrap() {
+            let record = decode_record(&message.unwrap().data, 64).unwrap();
+            let m = record.record.metadata;
+            let x = i32::from_le_bytes(record.payload[..4].try_into().unwrap());
+            stored.push((x, m.level, m.importance));
+        }
+    }
+    stored.sort_by_key(|(x, ..)| *x);
+    stored
+}
+
+/// Log one pose per (channel, x) on this thread, retrying capacity off the
+/// RT path, then shut down successfully.
+fn log_each_and_close(logger: Logger, mut w: Writer, records: &[(Channel<Pose>, i32)]) {
+    for &(channel, x) in records {
+        loop {
+            match w.try_log(channel, &Pose { x, y: 0 }) {
+                Ok(Logged::Accepted(_)) => break,
+                Ok(Logged::Skipped) => panic!("record {x} skipped"),
+                Err(e) if e.is_capacity() => std::thread::yield_now(),
+                Err(e) => panic!("record {x}: {e:?}"),
+            }
+        }
+    }
+    drop(w);
+    let shutdown = logger.shutdown(Duration::from_secs(10)).unwrap();
+    assert!(shutdown.is_success(), "{shutdown:?}");
+}
+
+/// TASK-034 S2 (§22.4): `Channel::important` marks one record Important
+/// without changing the channel; the plain channel stays Normal. The core
+/// stores the resolved importance with every record.
+#[test]
+fn f25_channel_important_marks_only_that_record_important() {
+    use Importance::{Important, Normal};
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let records = [
+        (pose, 0),
+        (pose.important(), 1),
+        (pose.at(Level::Warn).important(), 2),
+        (pose.important().at(Level::Debug), 3),
+        (pose, 4),
+    ];
+    let writer = logger.take_writer("control").unwrap();
+    log_each_and_close(logger, writer, &records);
+    assert_eq!(
+        stored_importance(&directory),
+        [
+            (0, Level::Info, Some(Normal)),
+            (1, Level::Info, Some(Important)),
+            (2, Level::Warn, Some(Important)),
+            (3, Level::Debug, Some(Important)),
+            (4, Level::Info, Some(Normal)),
+        ]
+    );
+}
+
+/// TASK-034 S2 (§22.4): `Channel::metadata` carries the `.important()` mark
+/// for the advanced raw path, and only that mark: a plain channel leaves the
+/// importance to the channel mapping (`None`).
+#[test]
+fn f26_channel_metadata_carries_the_important_mark() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    assert_eq!(pose.metadata(5, 6).importance, None);
+    let important = pose.at(Level::Error).important();
+    let metadata = important.metadata(5, 6);
+    assert_eq!(metadata.importance, Some(Importance::Important));
+    assert_eq!(metadata.level, Level::Error);
+    assert_eq!((metadata.mono_ns, metadata.real_ns), (5, 6));
+    // The mark lives in the copy; the original tag is unchanged.
+    assert_eq!(pose.metadata(5, 6).importance, None);
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+}
+
+/// TASK-034 S2 (§22.4): `important_from(Warn)` classifies Info as Normal and
+/// Warn/Error as Important (core `ByLevel`), while a channel without it stays
+/// Normal at every level. An explicit record importance wins over the
+/// mapping in both directions: `.important()` lifts an Info record, and a
+/// Normal override through the advanced producer view lowers an Error one.
+#[test]
+fn f27_important_from_classifies_by_level_and_the_record_override_wins() {
+    use Importance::{Important, Normal};
+    use dot_logger::capture::RecordOutcome;
+    use dot_logger::logger::ChannelOptions;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel_with::<Pose>(
+            "robot/status",
+            ChannelOptions::new().important_from(Level::Warn),
+        )
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .start()
+        .unwrap();
+    let directory = logger.directories()[0].clone();
+    let status = logger.channel::<Pose>("robot/status").unwrap();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    // The advanced path: an Error record explicitly marked Normal.
+    let mut writer = logger.take_writer("control").unwrap();
+    let mut metadata = status.at(Level::Error).metadata(writer.now_ns(), 0);
+    metadata.importance = Some(Importance::Normal);
+    let payload = [9, 0, 0, 0, 0, 0, 0, 0];
+    let outcome = writer.producer().try_record_small(metadata, &payload);
+    assert!(
+        matches!(outcome, Ok(RecordOutcome::Accepted(_))),
+        "{outcome:?}"
+    );
+    let records = [
+        (status, 0),
+        (status.at(Level::Warn), 1),
+        (status.at(Level::Error), 2),
+        (status.important(), 3),
+        (pose.at(Level::Error), 4),
+        (pose.at(Level::Fatal), 5),
+    ];
+    log_each_and_close(logger, writer, &records);
+    assert_eq!(
+        stored_importance(&directory),
+        [
+            (0, Level::Info, Some(Normal)),
+            (1, Level::Warn, Some(Important)),
+            (2, Level::Error, Some(Important)),
+            (3, Level::Info, Some(Important)),
+            (4, Level::Error, Some(Normal)),
+            (5, Level::Fatal, Some(Normal)),
+            (9, Level::Error, Some(Normal)),
+        ]
+    );
+}
+
+/// TASK-034 S2 (§22.4): a writer's Important reserve admits Important records
+/// at the moment Normal admission is saturated. Deterministic without holding
+/// the worker back: when a Normal record is rejected, the Normal records in
+/// this writer's ingress are at most `slots - reserve` and the completion
+/// window kept `reserve` free slots after the last accepted sequence. Only
+/// this writer can fill either, and the worker can only free space, so the
+/// next `reserve` Important records fit whenever the worker runs. (Without a
+/// reserve, whether they fit depends on the worker draining in between.)
+#[test]
+fn f28_important_reserve_admits_important_records_once_normal_ones_are_rejected() {
+    const SLOTS: usize = 8;
+    const RESERVE: usize = 3;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget())
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer_with("control", WriterQuota::small(SLOTS, 64).important(RESERVE))
+        .start()
+        .unwrap();
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    // Saturate Normal admission. The worker drains concurrently, so how many
+    // records this takes varies; the first rejection ends it.
+    let mut normal = 0;
+    for attempt in 0.. {
+        assert!(attempt < 10_000_000, "Normal admission never saturated");
+        match writer.try_log(pose, &Pose { x: normal, y: 0 }) {
+            Ok(Logged::Accepted(_)) => normal += 1,
+            Err(e) if e.is_capacity() => break,
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+    assert!(normal >= (SLOTS - RESERVE) as i32, "{normal}");
+    // Right after the rejection, without any retry, the reserve admits them.
+    for i in 0..RESERVE as i32 {
+        let x = 1_000_000 + i;
+        let logged = writer.try_log(pose.important(), &Pose { x, y: 0 });
+        assert!(matches!(logged, Ok(Logged::Accepted(_))), "{i}: {logged:?}");
+    }
+    drop(writer);
+    let shutdown = logger.shutdown(Duration::from_secs(10)).unwrap();
+    assert!(shutdown.is_success(), "{shutdown:?}");
+    let stored = stored_importance(&directory);
+    let expected: Vec<_> = (0..normal)
+        .map(|x| (x, Level::Info, Some(Importance::Normal)))
+        .chain(
+            (0..RESERVE as i32).map(|i| (1_000_000 + i, Level::Info, Some(Importance::Important))),
+        )
+        .collect();
+    assert_eq!(stored, expected);
+}
+
+/// TASK-034 S2 (§22.4): a reserve must leave at least one Normal small slot,
+/// otherwise every Normal record would be rejected. `plan()` and `start()`
+/// refuse it with `InvalidBudget` (like other inconsistent quota values),
+/// for a writer's own quota and for the budget default, before anything is
+/// created on disk. One slot below the limit is valid and visible in the plan.
+#[test]
+fn f29_an_important_reserve_must_leave_a_normal_slot() {
+    let temp = Temp::new();
+    let own = |quota: WriterQuota| {
+        Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+            .channel::<Pose>("robot/pose")
+            .writer_with("control", quota)
+    };
+    let default = |quota: WriterQuota| {
+        Logger::builder()
+            .budget(budget().writer_quota(quota))
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+            .channel::<Pose>("robot/pose")
+            .writer("control")
+    };
+    for reserve in [8, 9, usize::MAX] {
+        let quota = WriterQuota::small(8, 64).important(reserve);
+        for builder in [own(quota), default(quota)] {
+            assert!(
+                matches!(builder.plan(), Err(StartError::InvalidBudget)),
+                "{reserve}"
+            );
+            match builder.start() {
+                Err(StartError::InvalidBudget) => {}
+                other => panic!("reserve {reserve} must not start: {other:?}"),
+            }
+        }
+    }
+    assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+    // The reserve survives `with_raw` in either order.
+    let quota = WriterQuota::small(8, 64).with_raw(2, 1024).important(7);
+    assert_eq!(
+        quota,
+        WriterQuota::small(8, 64).important(7).with_raw(2, 1024)
+    );
+    let plan = default(quota).plan().unwrap();
+    assert_eq!(plan.writer_quota.unwrap().important_slots, 7);
+    let logger = own(quota).start().unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+}
+
+/// TASK-034 S2 (§22.4, D3): a channel classified by `important_from` while
+/// every writer's Important reserve is 0 is a plan warning, not an error.
+/// One writer with a reserve clears it, and so does having no such channel;
+/// per-record `.important()` cannot be seen by the plan.
+#[test]
+fn f30_plan_warns_when_level_importance_has_no_reserve() {
+    use dot_logger::logger::{ChannelOptions, PlanWarning};
+    let temp = Temp::new();
+    let build = |classified: bool, second: WriterQuota| {
+        let options = if classified {
+            ChannelOptions::new().important_from(Level::Error)
+        } else {
+            ChannelOptions::new()
+        };
+        Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+            .channel::<Pose>("robot/pose")
+            .channel_with::<Pose>("robot/status", options)
+            .writer("first")
+            .writer_with("second", second)
+    };
+    let warned = |classified, second| {
+        build(classified, second)
+            .plan()
+            .unwrap()
+            .warnings
+            .contains(&PlanWarning::NoImportantReserve)
+    };
+    assert!(warned(true, WriterQuota::small(64, 64)));
+    assert!(warned(true, WriterQuota::small(64, 64).important(0)));
+    assert!(!warned(true, WriterQuota::small(64, 64).important(1)));
+    assert!(!warned(false, WriterQuota::small(64, 64)));
+    // A warning never blocks start.
+    let logger = build(true, WriterQuota::small(64, 64)).start().unwrap();
     assert!(
         logger
             .shutdown(Duration::from_secs(5))

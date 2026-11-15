@@ -1627,6 +1627,7 @@ mod facade {
                 }
             }
             let _ = writer.try_log(channel.at(dot_logger::capture::Level::Warn), &Sample(1));
+            let _ = writer.try_log(channel.important(), &Sample(2));
             let mut producer = writer.producer();
             if let Ok(loan) = producer.try_acquire(64, Importance::Normal) {
                 drop(loan);

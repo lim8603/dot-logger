@@ -55,6 +55,10 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+/// Diagnostic severity of a record ([`Channel::at`]) and the threshold of
+/// [`ChannelOptions::important_from`]; the same type as
+/// `dot_logger::capture::Level`.
+pub use crate::capture::Level;
 pub use budget::{Budget, Retention, WriterQuota};
 pub use health::{Degradation, Failure, Health, HealthState, OutputHealth};
 pub use preset::{Preset, Sizing};
@@ -62,7 +66,9 @@ pub use preset::{Preset, Sizing};
 pub use sink::TracingSink;
 pub use writer::{Channel, EncodeError, LogError, Logged, Record, Schema, Writer};
 
-use crate::capture::{CaptureBuildError, CaptureOwner, ChannelConfig};
+use crate::capture::{
+    CaptureBuildError, CaptureOwner, ChannelConfig, Importance, ImportanceMapping,
+};
 use crate::completion::ProducerRange;
 use crate::config::{ConfigError, MemoryBudget, Resource, SessionBuilder, ValidatedConfig};
 use crate::control::{ControlError, ShutdownReport};
@@ -101,7 +107,8 @@ pub enum StartError {
     Missing(Vec<Missing>),
     /// A topic or writer name was declared twice, or a name is empty.
     Duplicate,
-    /// A value is zero or inconsistent (for example raw slots without bytes).
+    /// A value is zero or inconsistent (for example raw slots without bytes,
+    /// or an Important reserve not below the small slots).
     InvalidBudget,
     /// A channel's output selection is empty, repeats an output or names an
     /// output index that was not declared.
@@ -361,21 +368,54 @@ struct ChannelSpec {
     schema: Schema,
     /// Selected output indices; `None` routes to every output.
     outputs: Option<Vec<usize>>,
+    /// Lowest level classified Important; `None` keeps every level Normal.
+    important_from: Option<Level>,
+}
+
+impl ChannelSpec {
+    /// Core importance mapping of this channel (API §22.4).
+    fn importance(&self) -> ImportanceMapping {
+        match self.important_from {
+            None => ImportanceMapping::Default(Importance::Normal),
+            Some(from) => {
+                let mut by_level = [Importance::Normal; 6];
+                // `ByLevel` has one entry per `Level` in declaration order.
+                for slot in &mut by_level[from as usize..] {
+                    *slot = Importance::Important;
+                }
+                ImportanceMapping::ByLevel(by_level)
+            }
+        }
+    }
 }
 
 /// Registration options of one channel (API §18.2).
 ///
 /// `ChannelOptions::new()` keeps the defaults of
-/// [`LoggerBuilder::channel`]: every file output.
+/// [`LoggerBuilder::channel`]: every file output, every level Normal.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ChannelOptions {
     outputs: Option<Vec<usize>>,
+    important_from: Option<Level>,
 }
 
 impl ChannelOptions {
-    /// Defaults: routed to every file output.
+    /// Defaults: routed to every file output, every level Normal.
     pub fn new() -> Self {
         Self::default()
+    }
+    /// Classify records sent at `level` or more severe as Important and the
+    /// rest as Normal (FR-009, API §22.4). A record marked with
+    /// [`Channel::important`] stays Important at any level, and an explicit
+    /// importance in advanced-path metadata always wins over this mapping.
+    ///
+    /// Important records only gain protection from a writer reserve
+    /// ([`WriterQuota::important`]); when every writer's reserve is 0,
+    /// [`plan`](LoggerBuilder::plan) reports
+    /// [`PlanWarning::NoImportantReserve`].
+    pub fn important_from(mut self, level: Level) -> Self {
+        self.important_from = Some(level);
+        self
     }
     /// Route only to these file outputs, by `file_output` declaration order
     /// starting at 0. An empty, repeated or undeclared index rejects
@@ -420,12 +460,15 @@ pub struct Plan {
     /// IO batch actually used: the budget's batch size capped at half of a
     /// target's record budget.
     pub batch_records: usize,
-    /// What a calibration profile on the preset flags; never blocks start.
+    /// What a calibration profile on the preset flags, and an Important
+    /// classification without reserve; never blocks start.
     pub warnings: Vec<PlanWarning>,
 }
 
-/// A plan exceeds what a calibration profile observed (API §19.8). The
-/// profile is a snapshot, so these are warnings, not start errors.
+/// A plan exceeds what a calibration profile observed (API §19.8), or
+/// classifies records Important without reserving room for them (API §22.4).
+/// These are warnings, not start errors: the profile is a snapshot, and a
+/// reserve of 0 is the default (D3).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlanWarning {
     /// The memory budget is larger than the memory available when measured.
@@ -443,6 +486,12 @@ pub enum PlanWarning {
         /// 0.6 × the sustained estimate.
         limit_bytes_per_second: u64,
     },
+    /// A channel uses [`ChannelOptions::important_from`] but every writer's
+    /// [`WriterQuota::important`] reserve is 0, so its Important records get
+    /// no protection when the slots are full (API §22.4, D3). Records marked
+    /// with [`Channel::important`] are invisible to the plan and never raise
+    /// this warning.
+    NoImportantReserve,
 }
 
 /// Collects declarations; allocates nothing until [`start`](Self::start).
@@ -507,6 +556,7 @@ impl LoggerBuilder {
             topic: topic.into(),
             schema: T::SCHEMA,
             outputs: options.outputs,
+            important_from: options.important_from,
         });
         self
     }
@@ -576,6 +626,7 @@ impl LoggerBuilder {
                 topic: topic.clone(),
                 schema: sink::SCHEMA,
                 outputs: None,
+                important_from: None,
             });
             writers.push((TRACING_WRITER.into(), Some(*quota)));
             *min
@@ -624,11 +675,14 @@ impl LoggerBuilder {
             .enumerate()
             .map(|(index, spec)| {
                 Ok(StorageChannel {
-                    channel: ChannelConfig::new(
-                        u32::try_from(index + 1).map_err(|_| StartError::InvalidBudget)?,
-                        spec.schema.id(),
-                        spec.schema.version(),
-                    ),
+                    channel: ChannelConfig {
+                        importance: spec.importance(),
+                        ..ChannelConfig::new(
+                            u32::try_from(index + 1).map_err(|_| StartError::InvalidBudget)?,
+                            spec.schema.id(),
+                            spec.schema.version(),
+                        )
+                    },
                     topic: spec.topic.clone(),
                     payload_encoding: spec.schema.encoding().into(),
                     schema: spec.schema.payload_schema(),
@@ -662,9 +716,19 @@ impl LoggerBuilder {
         }
         let derived = budget::derive(&budget, &quotas, &storage, &routes, &retention, extra)?;
         let plan = SessionBuilder::new(derived.session.clone()).validate(&derived.platform)?;
-        let warnings = self.preset.as_ref().map_or_else(Vec::new, |sizing| {
+        let mut warnings = self.preset.as_ref().map_or_else(Vec::new, |sizing| {
             warnings(sizing, plan.config().memory.total_bytes, &quotas)
         });
+        // Only user writers can log to a classified channel; the tracing
+        // writer is excluded. `derive` already checked every quota resolves.
+        let reserved = self
+            .writers
+            .iter()
+            .filter_map(|(_, q)| q.or(budget.default_quota()))
+            .any(|q| q.important_slots > 0);
+        if !reserved && channels.iter().any(|c| c.important_from.is_some()) {
+            warnings.push(PlanWarning::NoImportantReserve);
+        }
         Ok(Resolved {
             channels,
             writers: writers.into_iter().map(|(name, _)| name).collect(),

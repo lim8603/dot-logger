@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S3 기능 공백 Human 결정 4건 → 남은 시험 공백 → S4 목표치 |
+| 다음 액션 | S3 남은 시험 공백 3건 → S4 목표치 제안 |
 | 의존 | 없음(기존 시험·EV-078 기준선 사용) |
 | 예상 소요 | 3~5 인일, 리뷰 대기 제외 |
 
@@ -47,7 +47,7 @@
 | `dot-logger/src/logger/sink.rs` | 81.8% | 대부분 비동작 | tracing `Subscriber`의 span 관련 빈 메서드·`Debug`. `log` crate의 `enabled`·`flush` 직접 호출은 S3에서 확인 |
 | `dot-logger-cli/src/commands.rs` | 74.9% (204줄) | **실제 동작** | remote `blob`·`completion`·`replay` 관리 명령의 CLI 경로, query/replay `--include-payload`의 blob(큰 payload) 읽기, 일부 출력 한도 초과 → S3 |
 | `dot-logger-cli/src/output.rs`·`model.rs` | 82~83% | 혼합 | 출력 한도·입력 검증 분기 → S3에서 분류 |
-| `dot-logger-client/src/diagnostics/bridge.rs` | 74.4% | **실제 동작** + 범위 의문 | 스냅샷 파일 검증 실패·단계 사이 취소/기한 만료 분기. 이 모듈은 dot-probe export 모양을 전제한 **사용처 전용 코드가 라이브러리 `src`에 있는 경우**다. 범용 라이브러리 기준에서 예제로 옮길지 S3에서 판단(코드 이동은 Human 확인) |
+| `dot-logger-client/src/diagnostics/bridge.rs` (2026-11-15 `examples/support/dot_probe/`로 이동) | 74.4% | **실제 동작** + 범위 의문 → 이동 완료 | 스냅샷 파일 검증 실패·단계 사이 취소/기한 만료 분기. 이 모듈은 dot-probe export 모양을 전제한 **사용처 전용 코드가 라이브러리 `src`에 있는 경우**다. 범용 라이브러리 기준에서 예제로 옮길지 S3에서 판단(코드 이동은 Human 확인) |
 | `dot-logger-client/src/diagnostics/mod.rs` | 73.0% | 혼합 | 위 bridge의 입력 검증 → S3 |
 | `dot-logger/src/storage/standard.rs` | 83.8% | 실제 동작 | TASK-030 진행 중 범위(손상 입력 분기) — TASK-030 S1 리뷰에서 처리 |
 | `dot-logger/src/completion/query.rs`·`logger/health.rs`·`logger/mod.rs`·`telemetry/capacity.rs`·`adapters/remote/wire.rs`·`client/codec.rs` | 82~86% | 미분류 | S3에서 분류 |
@@ -139,6 +139,14 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 - **영향:** 저장소 안의 ring은 모두 64 MiB 이상이라 바뀌는 시험·예제가 없다.
 
 ### Human 결정 요청 — S3 기능 공백 (2026-11-15)
+
+**결정(2026-11-15 Human 「모두 권고대로 진행하자」):**
+- 1번 → [TASK-034](TASK-034.md)(①~③, MS-008 재개). ④는 B1.
+- 2번 → [TASK-035](TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께).
+- 3번 → 범위 밖·백로그 B1, 일정 판단 제외.
+- 4번 → client `diagnostics`(`SnapshotCheck` + bridge)를 `examples/support/dot_probe`로 이동(`4bd6d04`). bridge만 옮기면 라이브러리의 `SnapshotCheck`가 예제 코드에 의존하게 되므로 모듈 전체를 옮겼다.
+
+원래 요청:
 
 1. **core에는 있지만 facade에 없는 기능을 facade에 노출할지**(새 범위). 후보:
    - ① 실행 중 level·샘플링 변경: FR-017, UC-07·08. 지금은 facade 원격 ApplyConfig가 Unsupported다.

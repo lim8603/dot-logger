@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S2 TDD — ③ 중요도 → ① 실행 중 변경 → ② 이벤트 보존 |
+| 다음 액션 | S2c ② 이벤트 보존. ① 실행 중 변경은 TASK-030 S2 저장 ADR 승인 뒤(§22.8) |
 | 의존 | TASK-027·TASK-029(facade·표면 가드) |
 | 예상 소요 | S1 1 + S2 3~4 + S3 1 인일, 리뷰 대기 제외 |
 
@@ -31,7 +31,7 @@ API §18 표에 계획만 있고 구현되지 않은 `Writer::try_log_with(.., M
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 계약안 | 공개 항목(이름·시그니처)·기본값·RT 무대기/무할당 유지 방법·NFR-008 계수(현재 이름 있는 항목 30/60, L1 ≤20줄·≤6개념) 영향을 API §22로 제안 → Human 승인 | [API §22](../../03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15) Done — 2026-11-15 Human 「승인」(D1~D4 권고안) |
-| S2 | 구현 | ①~③ 각각 실패 시험 → 최소 구현. facade `Logged::Skipped`가 실제로 나오는 시험 포함 | Planned |
+| S2 | 구현 | ①~③ 각각 실패 시험 → 최소 구현. facade `Logged::Skipped`가 실제로 나오는 시험 포함 | In Progress — ③ 중요도 Done(`561f2c3`). ① 시작 시 level(`minimum`, f31) Done, 실행 중 변경은 TASK-030 S2 ADR 뒤(§22.8, WIP 브랜치 `36c1724`). ② 이벤트 진행 |
 | S3 | 레시피·가드 | 표면 snapshot bless, 레시피·README 갱신, 1.96/1.85 회귀 | Planned |
 
 ## 완료 기준

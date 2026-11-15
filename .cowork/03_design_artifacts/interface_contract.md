@@ -1244,3 +1244,15 @@ TASK-034 S2a(③ 중요도)를 구현했다. 시험은 `tc_013_facade` f25~f30�
 - **`Channel` 비용:** `Channel`에 `Option<Importance>` 필드 하나가 늘었다. 여전히 `Copy`이고 메모리를 소유하지 않는다. RT 경로에서 추가 연산은 없다. allocator guard(`dot-logger-rt-allocation` f2)에 `.important()` 기록을 넣었고 할당 0으로 통과했다.
 - **공개 표면:** S2a에서 이름 있는 항목은 `Level` 재수출 하나만 늘었다(30 → 31 / 60). §22.5의 35는 ①·② 항목까지 더한 수치다. `Importance`는 재수출하지 않는다. facade 사용자는 메서드만 쓰기 때문이다. 단, 고급 경로의 `Producer::try_acquire`는 지금처럼 `dot_logger::capture::Importance`를 받는다. 레시피 수치는 바뀌지 않았다.
 - **포화 시험(f28)의 결정성:** worker를 멈추지 않는다. Normal 기록이 처음 거절된 순간에는 ingress에 남은 Normal 기록이 `slots − 예약` 이하이고, completion window도 마지막 sequence 뒤로 예약 수만큼 빈 slot을 남겨 둔다. 그 자리를 채울 수 있는 것은 이 writer뿐이고 worker는 자리를 비우기만 한다. 그래서 바로 이어지는 예약 수만큼의 Important 기록은 worker가 언제 돌든 받아들여진다. 20회 반복해 모두 통과했다. 예약을 core로 넘기지 않게 바꾸면 20회 모두 실패했다.
+
+### 22.8 ① 범위 조정 — 2026-11-15 Human 「권고대로」
+
+- **발견:** S2b를 구현하다가 막혔다. core 저장 설계가 「파일 하나 = 설정 revision 하나」이기 때문이다.
+  - `SegmentLog::append`와 `SegmentWriter::append`는 기록의 revision이 로그 예산의 revision과 다르면 `InvalidRecord`로 거절한다.
+  - `Router::writer_budget_for_revision` 주석도 같은 원칙이다: 「writer는 단일 revision이며 새 revision은 회전해 별도 writer를 연다」.
+  - facade에는 그 회전 경로가 없다. 그래서 `set_channel` 뒤의 기록이 파일 단계에서 실패했다.
+  - `set_channel`·`Writer::refresh`·원격 ApplyConfig·`Skipped` 자체는 동작했다. 이 중간 작업은 로컬 브랜치 `wip/task-034-s2b-runtime-config`(`36c1724`)에 보관했다.
+- **결정:**
+  - 시작 시 level 지정 `ChannelOptions::minimum(Level)`은 저장과 무관하므로 TASK-034에서 구현한다(f31).
+  - **실행 중 변경**(`Logger::set_channel`·`Writer::refresh`·`ConfigError`·facade 원격 ApplyConfig)은 TASK-030 S2 저장 ADR에 「revision 변경 시 출력 파일 회전」과 「한 출력 안의 여러 revision 조회·복구」를 포함해 승인받은 뒤, 보관한 브랜치를 이어 끝낸다.
+  - 공개 항목 계획(§22.5)에서 `ConfigError`는 그때 추가한다.

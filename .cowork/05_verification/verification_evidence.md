@@ -1260,6 +1260,14 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행:** `check-feature-matrix.py`(feature 경계 변경 없음), Miri(unsafe·동시성 변경 없음), native(T3).
 - **쓰기량:** 시험 데이터는 /tmp(tmpfs) MiB 단위다. ring 재현 probe는 크기 5개로 각 약 4 MiB였고 실행 뒤 삭제했다.
 
+## EV-080 — TASK-033 S4: 경미 분기 시험과 목표치 1~3 충족
+
+- **판정:** 로컬 **Pass**. Human 승인 목표치(2026-11-15, [quality_gate](quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)) 기준 1~3 충족. 기준 4(TASK-034·035 뒤 재측정)는 남았다.
+- **변경:** 시험 22개 신규·3개 확장(core 8, CLI 14+3). 제품 코드 변경 없음. 변이로 Red를 확인했고 원복했다. 목록과 사유는 [TASK-033 「S4 경미 분기 처리」](../04_implementation/tasks/TASK-033.md#s4-경미-분기-처리--2026-11-15).
+- **회귀(1.96.0·1.85.0):** fmt Pass, clippy workspace `--all-targets --all-features --locked -D warnings` 0, 테스트 각 **611 passed**·0 failed·5 ignored, rustdoc Pass, NFR-008 guard Pass.
+- **커버리지:** 라인 **93.56%**(미실행 1,178)·함수 92.93%·리전 90.88%. 라인 85% 미만 파일 6개는 모두 비동작·도달 불가(TASK-034)·OS 결함 주입 필요로 분류했다.
+- **미실행:** Miri(unsafe 변경 없음), native(T3).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

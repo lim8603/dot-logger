@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S4 목표치 Human 승인 → 남은 경미 분기 처리 → 판정 |
+| 다음 액션 | S4 기준 1~3 충족(2026-11-15, 라인 93.56%) → TASK-034·035 뒤 재측정으로 판정(기준 4) |
 | 의존 | 없음(기존 시험·EV-078 기준선 사용) |
 | 예상 소요 | 3~5 인일, 리뷰 대기 제외 |
 
@@ -30,7 +30,7 @@
 | S1 | 커버리지 측정 도구와 기준선 | `cargo llvm-cov` workspace all-features 측정·파일별 미실행 줄 목록, 저위 파일 분류 — [EV-078](../../05_verification/verification_evidence.md#ev-078) | Done |
 | S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — [UC 31개](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
 | S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | **Done** 2026-11-15 — 대응표, 시험 17개 신규·1개 확장, 결함 1건 수정, 기능 공백 결정 4건 반영(TASK-034·035·B1·bridge 이동), 재측정 라인 92.40% |
-| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | 제안(2026-11-15) — Human 승인 대기 |
+| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | In Progress — 목표치 승인, 기준 1~3 충족(2026-11-15). 판정은 TASK-034·035 뒤 재측정(기준 4) |
 
 ## 커버리지 기준선과 공백 분류 — S1 (2026-11-13)
 
@@ -190,7 +190,7 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 
   이 항목들은 S4 규칙 승인 뒤 처리한다.
 
-### S4 목표치 제안 — 2026-11-15 (Human 승인 대기)
+### S4 목표치 — 2026-11-15 Human 「승인」
 
 | # | 기준 | 제안값 | 현재 |
 |---|---|---|---|
@@ -201,6 +201,36 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 
 - 권고 근거(퍼센트 하한): 무작정 높이면 `Display` 같은 비동작 줄을 채우는 시험이 늘어난다. 그래서 퍼센트는 회귀 방지 하한으로만 두고, 판단은 2·3의 분류 규칙으로 한다.
 - 권고 근거(판정 시점): TASK-034·035는 Must 요구(FR-009·011)와 관련된 공백이다. 이것들이 끝난 뒤 판정해야 일정 판단이 실제 사용 사례를 반영한다.
+
+### S4 경미 분기 처리 — 2026-11-15
+
+시험 22개를 새로 추가했고 3개를 확장했다(core 8개, CLI 14개 신규·3개 확장). 모든 신규·확장 시험은 해당 동작만 깨는 제품 변이로 Red를 확인했고 원복했다. 제품 코드 변경은 없다. `src/completion/tests.rs`·`src/logger/tests.rs`는 crate 내부 상태가 필요해 그 안의 시험 모듈에 추가했다.
+
+| 묶음 | 시험 | 남긴 줄과 사유 |
+|---|---|---|
+| `storage/standard.rs` 손상 입력 | `tc_014_standard::f8`~`f12`: schema 재정의 → `InvalidRecord`, channel topic 재정의 → `InvalidRecord`, Envelope 아닌 채널 4종 → `NotDotLogger`, 중간 파싱 오류 → truncated, Metadata·Attachment → `skipped_records` | L189: sans-io `LinearReader`가 `McapError::Io`를 만들지 않는다 |
+| `completion/query.rs` | `tc_003_completion::query_summary_counts_each_outcome_and_wait_ends…`(결과별 집계·`BufferTooSmall`·`InvalidScope`·wait의 TimedOut/Settled/Complete), `completion::tests::a_query_page_reports_a_row_under_publication_as_busy` | L118: 2^64개 넘는 기록이 있어야 닿는 overflow 보호 |
+| `logger/sink.rs` | `tc_013_tracing::f12_log_levels_are_filtered_against_the_declared_minimum`(`log` 5개 level) | span 콜백: `enabled`가 span을 거절해 tracing이 호출하지 않는다 |
+| `logger/health.rs` | `logger::tests::health_reports_overdue_sync_telemetry_age_and_remote_placement` | — |
+| `telemetry/capacity.rs` | `tc_009_report::the_buffer_limit_takes_the_finite_horizon…` | L158·L181: 호출 측(`report.rs`)이 해당 입력을 넘기지 않는다 |
+| CLI `commands.rs`·`output.rs`·`model.rs` | `cli.rs` 14개 신규·3개 확장: manifest 검증, offline 원본 오류의 exit code, payload·`--max-output-bytes`, paging·정확한 limit, 잘못된 모드의 명령, 연결 전 입력 검증, config diff, text 출력, recover, calibrate, export, 원격 응답 오류의 exit code, tail overflow, completion 경계 5종, summary 상한, 연결 불가 | ACK 사이 연결 끊김·명령 도중 Ctrl-C·파일 교체 같은 타이밍·결함 주입 경로, 클라이언트 decoder가 먼저 거절하는 응답 형식, `validate()`가 먼저 막는 분기 |
+
+결과(1.96.0·1.85.0): 각 **611 passed**·0 failed·5 ignored. fmt·clippy·rustdoc·표면 가드 Pass. CLI 파일 커버리지: `commands.rs` 84→96.4%, `output.rs` 83→94.4%, `model.rs` 86→99.5%.
+
+**재측정:** 라인 **93.56%**(미실행 1,178), 함수 92.93%, 리전 90.88%. 승인 기준 1(92/92/89)을 충족한다.
+
+라인 85% 미만으로 남은 파일 6개와 그 사유:
+- `routing/types.rs`·`capture/types.rs`·`control/types.rs`: `Display`
+- `logger/writer.rs`: const fn·`Debug`, 도달 불가 `Skipped` → TASK-034
+- `logger/affinity.rs`: `sched_getaffinity` 실패, OS 결함 주입이 필요하다
+- `logger/sink.rs`: span 콜백·`Debug`
+
+→ 기준 2(실제 동작 공백 미처리 0)를 충족한다.
+
+**관찰(후속 판단, 일정 판단 밖):**
+- CLI `recover`는 원본이 손상돼도 outcome을 `io_or_transport`로 낸다(`commands.rs` 오류 매핑). exit 4는 일반 규칙(「원본 손상은 `invalid_data`/exit4」)과 같지만 outcome 이름이 다르다.
+- 읽기 전용 원격 명령(compare·check plan)도 Corrupt를 받으면 보수적으로 `posted_host_io: completion_unconfirmed`를 붙인다.
+- offline query의 payload 사전 검사 몇 곳은 blob을 읽기 전에 거르는 최적화일 뿐이다. 결과는 `Output::write` 상한이 결정한다.
 
 ## 2026-11-13 공백 시험 추가
 

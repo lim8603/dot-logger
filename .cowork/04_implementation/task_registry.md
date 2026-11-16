@@ -44,11 +44,11 @@
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | MS-008 | INT-001 | US-001·002·003 | AI | Done | 2026-11-13 | Done — S1~S3·REV-051 승인. S3d 이월 T4, Skipped 경로 시험은 TASK-033 | TASK-006·TASK-008·TASK-014·TASK-021 | [상세](tasks/TASK-027.md) | 4~6 |
 | TASK-028 | 예산 preset·사이징 도우미·장비 측정 auto preset | MS-008 | INT-001 | US-002·004·005 | AI | Done | 2026-11-13 | Done — S1·S2 승인, 측정 중 취소 시험 추가(EV-078) | TASK-027·TASK-017·TASK-023 | [상세](tasks/TASK-028.md) | 3~5 |
 | TASK-029 | 연결 레시피·문서·접점 회귀 가드 | MS-008 | INT-001 | US-001·003 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-027·TASK-028 | [상세](tasks/TASK-029.md) | 1~2 |
-| TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | In Progress | 2026-11-15 | S1 Done(EV-077, Foxglove 판독). 다음 S2 ADR(TASK-035 형식 포함) | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |
+| TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | In Progress | 2026-11-16 | S1 Done(EV-077), REV-055 export 조치 완료(EV-082). 다음 S2 저장 ADR(TASK-035·revision 회전 포함) | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |
 | TASK-031 | 원격 소비처 dot-logger-viewer와 시각화 bridge | MS-009 | INT-001 | US-003·004 | AI | Planned | 2026-11-04 | S1 — Foxglove WebSocket 프로토콜·SDK·Lichtblick 호환/라이선스 조사와 결정 | TASK-012·TASK-013·TASK-030 | [상세](tasks/TASK-031.md) | 2~3 |
 | TASK-032 | viewer 운영 대시보드 | MS-009 | INT-001 | US-004 | AI | Planned | 2026-11-04 | S1 — UI 방식(viewer 내장 웹·native·Foxglove 확장 패널) 결정 | TASK-031·TASK-016·TASK-017 | [상세](tasks/TASK-032.md) | 2~4 |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-15 | S3 Done(EV-079), S4 기준 1~3 충족(EV-080, 라인 93.56%). 판정은 TASK-034·035 뒤 | 없음 | [상세](tasks/TASK-033.md) | 3~5 |
-| TASK-034 | facade에 core 기능 노출(실행 중 level·샘플링, 이벤트 보존, 중요도) | MS-008 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-15 | S2·S3 Done(EV-081, 실행 중 변경은 TASK-030 S2 ADR 뒤). Human 결과 확인 대기 | TASK-027·TASK-029 | [상세](tasks/TASK-034.md) | 5~6 |
+| TASK-034 | facade에 core 기능 노출(실행 중 level·샘플링, 이벤트 보존, 중요도) | MS-008 | INT-001 | US-001·002·003·004 | AI | In Progress | 2026-11-16 | S2·S3 Done(EV-081·082, 실행 중 변경은 TASK-030 S2 ADR 뒤). Human 결과 확인 대기 | TASK-027·TASK-029 | [상세](tasks/TASK-034.md) | 5~6 |
 | TASK-035 | 손실 기록의 파일 내 표시와 채널별 손실 수 | MS-009 | INT-001 | US-002·003·004 | AI | Planned | 2026-11-15 | S1 — 형식안, TASK-030 S2 ADR과 함께 | TASK-030 | [상세](tasks/TASK-035.md) | 3~4 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.

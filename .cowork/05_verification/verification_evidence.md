@@ -1287,6 +1287,30 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **쓰기량:** 이벤트 시험 약 45 MiB, /tmp(tmpfs).
 - **미실행:** Miri(unsafe·원자 순서 변경 없음), native(T3).
 
+<a id="ev-082"></a>
+
+## EV-082 — REV-055 RV-136~140: export·이벤트 실패 경로 보강
+
+- **판정:** 로컬 **Pass**(2026-11-16). RV-136~140 전부 수용·조치·위임 수락, REV-055 **Closed**. 새 저장 형식·TASK-034 실행 중 변경·native 범위 승격 없음.
+- **대상:** 기준 `36e9f04`, 조치 소스 `5d7fe6a`. TASK-030 S1·TASK-034 S2c 후속. Ubuntu PC / Linux `7.0.0-43-generic` x86_64, `rustc 1.96.0 (ac68faa20)`·MSRV `1.85.0 (4d91de4e4)`. 제품 RT 경로·unsafe·원자 순서 변경 없음.
+- **수정:**
+  - RV-136: vendor `LinearReader`의 무압축 chunk 내부 길이/짧은 header/크기 불일치 방어, CRC 0도 완전한 chunk를 한도 내 선로드·레코드 파싱한 뒤 반출. 압축·해제 크기 상한. CLI `ExportCleanup`은 실패·취소·unwind에서 생성 출력을 정리하고 성공 때 해제.
+  - RV-137: 모든 출력에 전송·성공 전송 수만큼 응답 수거, rollback은 worker 실패 flag를 우회해 살아 있는 출력까지 전달. timeout/disconnect에도 `worse` 우선순위 유지. 실패 배출 진입 시 marks·대기 reply 제거.
+  - RV-138: 새 mark와 주기 batch 쓰기 전에 만료 정리. turn 시각 공유로 시간 역전 방지.
+  - RV-139: descriptor의 Envelope 참조/빈 이름/단독 이름 거절, 재등장 Channel 전체 일치 확인.
+  - RV-140: `SegmentLog`의 schema.name capacity 정리를 `SegmentWriter`와 정렬. 모든 export 오류의 출력 폐기·metadata map 합계 상한 한계를 명시.
+- **Red→Green:** 신규 **14개**(standard f13~f18 6개, facade f37 1개, logger 내부 5개, CLI unit 1개·통합 1개). 수정 전 standard 5개·logger 응답/rollback 3개 실패를 확인했다. host 만료 순서·실패 배출·mark 진입 만료·CLI 가드 생략 변이 4개도 의도한 assertion Red를 확인하고 원복했다. 손상 chunk 시험은 CRC 0/비영 × body 오류/길이 초과/짧은 header/물리적 잘림 8조건에서 앞의 완전한 chunk 1개만 반출하는지 확인한다. f18은 zstd CRC 유무 왕복과 해제 크기 상한을 확인한다.
+- **회귀 명령·결과(1.96.0·1.85.0):**
+  - `cargo +<version> test --workspace --all-features --locked`: 각 **639 passed·0 failed·5 ignored**(외부 DB 시험). RT allocator 19개 포함.
+  - `cargo +1.96.0 fmt --all --check`, vendor reader 별도 `rustfmt --check`: Pass.
+  - `cargo +<version> clippy --workspace --all-targets --all-features --locked -- -D warnings`: 두 버전 Pass.
+  - `RUSTDOCFLAGS='-D warnings' cargo +<version> doc --workspace --all-features --no-deps --locked` 및 `doc -p dot-logger --no-default-features --no-deps --locked`: 두 버전 Pass.
+  - `python3 scripts/check-feature-matrix.py --toolchain <version>`: 두 버전 각각 16 feature 조합 + calibrate 단독/전체(18구성) + 독립 consumer/allocator·예제 Pass.
+  - `python3 scripts/test_check_integration_surface.py`: 18개 Pass. `python3 scripts/check-integration-surface.py`: Pass, facade 이름 있는 항목 **34/60**, L1~L3 레시피 계수·README 일치, 공개 표면 변경 없음.
+- **vendor 검증:** cached crates.io 전체 `mcap` 패키지에 현 vendor `src/`를 덮고 `cargo +1.96.0 test --offline --lib --all-features`: **131 Pass**. 저장소 vendor manifest에 없는 dev 의존/fixture를 제품에 추가하지 않았다. 상류 통합 fixture 미포함 이슈는 기존 EV-068과 같고 이번에는 lib만 실행했다.
+- **F-11 소비자:** 정상 descriptor·schemaless·summary 반복·손상/잘림/CRC 0·한도 경계 export → tc_014_standard; CLI 신규 파일/충돌/실패 정리·손상 chunk/불일치 summary → CLI 통합 및 Drop 가드 unit; 이벤트 다중 출력/worker 실패/queued reply·만료/회전 → logger 내부·facade f32~f37; core 보존/복구·조회/재생 → tc_005_retention·fault_storage·tc_006_query/replay. 모두 위 workspace 회귀의 실제 파일·라우팅 경로로 확인했다.
+- **미실행·한계:** native/다른 OS(T3, TASK-024), 장기(TASK-024), 실앱(TASK-026)은 기존 이월. Miri는 unsafe·원자 순서 변경이 없어 이번에 재실행하지 않음. GUI·대용량 export 시간/최대 메모리는 TASK-030의 기존 미실행 범위. CRC 0은 checksum 없이 구조만 검증한다. 누적 metadata map의 새 합계 예산은 추가하지 않았다. 커버리지는 이번에 재측정하지 않았으며 EV-080의 93.56%는 TASK-034 이전 수치다. Task/MS Done·Gate4/5 승격 근거로 대신하지 않는다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

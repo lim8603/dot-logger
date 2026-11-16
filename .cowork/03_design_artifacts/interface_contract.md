@@ -1128,11 +1128,11 @@ TASK-029 문서 초안의 L1~L3 서술(L1 = tracing만, L3 = RT 원본)은 2026-
 
 [EV-077](../05_verification/verification_evidence.md#ev-077).
 
-- **라이브러리:** `dot_logger::storage::standard::{export, ExportLimits, ExportReport, ExportedChannel, ExportError, META_TOPIC}`. `export(input: Read, output: Write + Seek, ExportLimits::new(max_record_bytes), cancel: &AtomicBool)`. 입력은 `sans_io::LinearReader`로 앞에서부터 한 번 읽는다(파일 전체를 메모리에 올리지 않음). chunk는 CRC를 먼저 검증한 뒤 메시지를 내보낸다(`prevalidate_chunk_crcs`). 입력 header profile이 `dot-logger/1`이 아니거나 채널이 `dot_logger.Envelope`가 아니면 `NotDotLogger`.
+- **라이브러리:** `dot_logger::storage::standard::{export, ExportLimits, ExportReport, ExportedChannel, ExportError, META_TOPIC}`. `export(input: Read, output: Write + Seek, ExportLimits::new(max_record_bytes), cancel: &AtomicBool)`. 입력은 `sans_io::LinearReader`로 앞에서부터 한 번 읽는다(파일 전체를 메모리에 올리지 않음). chunk는 전체 길이·내부 레코드 파싱과 비영 CRC를 먼저 검증한 뒤 메시지를 내보낸다(`prevalidate_chunk_crcs`, REV-055 RV-136). CRC가 0이어도 전체 chunk를 선검증하며 checksum 무결성은 주장하지 않는다. 입력 header profile이 `dot-logger/1`이 아니거나 채널이 `dot_logger.Envelope`가 아니면 `NotDotLogger`.
 - **출력:** profile `""`, library `dot-logger/0.1.0 export --standard`, 무압축 chunk. 사용자 채널 = 같은 topic, message encoding = `payload_encoding`, schema = 저장된 descriptor(이름은 `payload_schema_name`, 없으면 저장 이름 `payload.<id>.v<n>`). descriptor가 없으면 schema 없는 채널(schema id 0). 채널 metadata는 `payload_schema_file_id`(입력 파일 내부 id)만 빼고 유지. 메시지 = payload 원문, `sequence` = 하위 32비트, `log_time` = `publish_time` = real.
 - **메타 채널:** topic `_dot_logger/meta`(`META_TOPIC`), schema `dot_logger.RecordMeta`(protobuf, `storage/record_meta.proto`·protoc FileDescriptorSet `record_meta.bin`). 사용자 메시지마다 바로 뒤에 같은 `log_time`·`sequence`로 1건: `channel`(출력 파일의 사용자 MCAP 채널 id)·`producer`·`sequence`(u64)·`mono`·`real`·`revision`·`level`(Trace 0~Error 4)·`importance`(0 Normal·1 Important)·`source{ticks, clock_domain}`. session·schema id/version은 채널 metadata에 있으므로 메시지마다 반복하지 않는다.
-- **오류·손실:** 잘린 파일·CRC 불일치 chunk·해석 불가 레코드를 만나면 그 앞의 검증된 chunk까지 내보내고 `ExportReport::truncated`에 이유를 남긴다(성공 반환). 한도 초과 레코드/chunk → `RecordTooLarge`, 사용자 topic이 `_dot_logger/meta` → `TopicConflict`, `cancel` → `Cancelled`(출력은 버려야 함). 입력의 MCAP metadata/attachment 레코드는 내보내지 않고 `skipped_records`로 센다(현재 writer는 쓰지 않음).
-- **CLI:** `dot-logger export --standard --input <dot-logger file> --output <new file> [--max-record-bytes 268435456]`. 출력은 새 파일만(있으면 exit 3 Conflict), 실패·취소 시 만든 출력을 지운다. `--standard` 없으면 exit 2. 입력 오류(`NotDotLogger`·`TopicConflict`) exit 2, 한도·취소 exit 3, 손상·IO exit 4. JSON 행 `export`(messages·channels·meta_topic·truncated·skipped_records). 공통 summary의 `records`는 출력한 `record` 줄 수라 export에서는 항상 0이다(2026-11-15 확인, 변환 메시지 수는 `export` 행 `messages`). 명시하지 않으면 timeout 1시간(일반 5초 기본값 대신, Ctrl-C 취소 유지).
+- **오류·손실:** 잘린 파일·CRC 불일치 chunk·해석 불가 레코드를 만나면 그 앞의 검증된 chunk까지 내보내고 `ExportReport::truncated`에 이유를 남긴다(성공 반환). 한도 초과 레코드/chunk → `RecordTooLarge`, 사용자 topic이 `_dot_logger/meta` → `TopicConflict`, `cancel` → `Cancelled`. **모든 `Err` 반환에서 출력에 일부 바이트가 있을 수 있으므로 폐기한다.** descriptor의 Envelope 자기참조·빈 이름·descriptor 없는 이름, 재등장 채널의 schema/topic/encoding/metadata 불일치는 `InvalidRecord`다. `ExportLimits`는 개별 record/chunk 상한이며 누적 schema/channel map의 합계 상한은 아니다. 입력의 MCAP metadata/attachment 레코드는 내보내지 않고 `skipped_records`로 센다(현재 writer는 쓰지 않음).
+- **CLI:** `dot-logger export --standard --input <dot-logger file> --output <new file> [--max-record-bytes 268435456]`. 출력은 새 파일만(있으면 exit 3 Conflict), 실패·취소·panic unwind 시 생성 출력의 Drop 가드가 파일을 지운다(정리 자체의 OS 오류는 강제로 복구하지 못함). `--standard` 없으면 exit 2. 입력 오류(`NotDotLogger`·`TopicConflict`) exit 2, 한도·취소 exit 3, 손상·IO exit 4. JSON 행 `export`(messages·channels·meta_topic·truncated·skipped_records). 공통 summary의 `records`는 출력한 `record` 줄 수라 export에서는 항상 0이다(2026-11-15 확인, 변환 메시지 수는 `export` 행 `messages`). 명시하지 않으면 timeout 1시간(일반 5초 기본값 대신, Ctrl-C 취소 유지).
 - **descriptor 없는 채널(2026-11-15 Human 「권고대로」):** export는 payload 원문과 사용자 `payload_encoding`을 그대로 둔다(변환·`application/octet-stream` 대체 없음). 표준 도구가 모르는 encoding이면 그 토픽만 판독 불가다 — Foxglove는 `Unsupported encoding <encoding>` 오류로 표시하고 다른 토픽은 영향 없다. 표준 도구 판독이 필요한 채널은 `Schema::descriptor`로 descriptor를 붙이거나 표준 encoding(protobuf·json 등)을 쓴다.
 - **저장 계층:** `PayloadSchema.name: Option<String>`(1~256 bytes) — writer가 `payload_schema_name` metadata로 쓰고 metadata 예산에 포함, 복구는 설정과 일치할 때만 수락(bit 128). CLI manifest descriptor에 선택 `name`.
 
@@ -1264,7 +1264,7 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 - **요청 경로(초안과 다름):** 초안은 host → IO thread였다. 구현은 `Logger`가 이벤트 출력마다 만든 요청 채널로 그 출력의 IO thread에 직접 보낸다.
   - host 루프는 응답을 기다리지 않으므로 dispatch가 멈추지 않는다. host를 거쳐도 IO thread의 응답을 받아야 해서 얻는 것이 없다.
   - IO thread는 매 회차 batch 쓰기와 sync 처리 뒤에 요청을 꺼낸다. 시각을 그때 새로 읽으므로 로그 시각이 거꾸로 가지 않는다(`TimeBackwards` 없음).
-  - IO thread가 끝나면 요청 수신단을 버린다. 그 뒤의 요청은 기다리지 않고 바로 `Closing`이 된다.
+  - IO thread가 끝나거나 패닉 뒤 실패 배출에 들어가면 즉시 요청 수신단과 대기 중인 reply를 버린다. 그 뒤의 요청은 기다리지 않고 바로 `Closing`이 된다.
 - **이벤트 시각(초안을 구체화):** `at`은 `mark_event`를 부른 thread에서 `Writer::now_ns`와 같은 시계로 한 번 읽는다. 모든 이벤트 출력이 같은 `at`을 쓴다.
   - IO thread는 `protect_event(min(at, now), at + post + hold, now)`를 부른다. `now`는 그 IO thread의 시계다.
   - 출력마다 다른 창이 생기지 않고, 사용자는 `EventMark::at_ns()`로 창 `[at − pre, at + post]`를 알 수 있다.
@@ -1272,14 +1272,14 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 - **mark 표현:** `EventMark`는 `Copy`이고 logger session, facade mark 번호, `at_ns`, 보호한 출력 수를 담는다. 공개 메서드는 `id()`·`at_ns()`·`outputs()`다.
   - 각 IO thread는 출력마다 「facade mark 번호 → core event id」 목록을 둔다. 크기는 `max_events`로 미리 잡는다.
   - 목록 항목은 core가 받아들인 경우에만 넣고, 만료 규칙도 core와 같다. 그래서 `max_events`를 넘지 않는다.
-- **되돌리기(rollback):** 한 출력이라도 실패하면 보호에 성공한 출력에서 바로 해제한다. 같은 채널의 요청은 순서대로 처리되므로, 기한 뒤 늦게 처리된 보호도 뒤이은 해제 요청이 푼다. 따라서 오류 뒤에 사용자가 모르는 보호는 남지 않는다.
+- **되돌리기(rollback):** 한 출력이라도 실패하면 worker 실패 flag·다른 출력의 전송 실패와 무관하게 모든 살아 있는 출력에 해제를 전송하고, 전송에 성공한 출력의 응답을 기한까지 수거한다(REV-055 RV-137). 같은 채널의 요청은 순서대로 처리되므로, 기한 뒤 늦게 처리된 보호도 뒤이은 해제 요청이 푼다. 따라서 오류 뒤에 사용자가 모르는 보호는 남지 않는다.
 - **오류:** 여러 출력의 결과가 다르면 `Failed` > `Closing` > `Quota` 순으로 하나를 돌려준다.
   - `NotConfigured`: 이벤트 출력이 없다.
   - `Quota`: core `EventQuota`(동시 창 수 또는 보호 바이트 초과).
   - `Closing`: worker 실패, 또는 IO thread가 끝나 요청을 받지 못했다.
   - `Failed`: 파일 오류, 응답 기한 초과, 다른 logger가 발급한 mark를 해제하려 했다.
 - **해제:** `release_event`도 같은 기한으로 모든 이벤트 출력의 응답을 기다린다. 이미 만료되었거나 해제된 mark는 `Ok`다.
-- **만료 주기:** 각 IO thread가 `sync_every`마다 이벤트 출력에 `expire_events(now)`를 부르고 목록도 같이 정리한다. 보호는 `at + post + hold` 뒤 최대 한 sync 주기 안에 풀린다.
+- **만료 주기:** 새 mark 보호 직전과 각 IO thread의 `sync_every` 주기 배치 쓰기 **전**에 `expire_events(now)`를 부르고 목록도 같이 정리한다(REV-055 RV-138). 주기 정리는 해당 turn 시작 시각을 써서 뒤따르는 배치 쓰기와 시계가 역전되지 않는다. 보호는 `at + post + hold` 뒤 최대 한 sync 주기 안에 풀린다.
 - **검증(`start()`와 `plan()`이 같음, 디스크에 아무것도 만들지 않음):**
   - hold가 없으면 `Missing::EventHold`, limits가 없으면 `Missing::EventLimits`다. 둘 다 없으면 둘 다 나열한다. 새 `Missing` variant 두 개를 더했다.
   - `continuous`에 `events`를 붙이면 `InvalidBudget`이다. 지우지 않는 출력에는 보호가 뜻이 없다.

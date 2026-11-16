@@ -9,7 +9,7 @@
 | ADR | ADR-012 Accepted(facade 소유 모델). 새 ADR 필요 여부는 S1에서 판단 |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-15 |
+| 마지막 갱신일 | 2026-11-16 |
 | 다음 액션 | Human 결과 확인 → TASK-030 S2 저장 ADR 승인 뒤 ① 실행 중 변경 마무리 |
 | 의존 | TASK-027·TASK-029(facade·표면 가드) |
 | 예상 소요 | S1 1 + S2 3~4 + S3 1 인일, 리뷰 대기 제외 |
@@ -40,3 +40,7 @@ API §18 표에 계획만 있고 구현되지 않은 `Writer::try_log_with(.., M
 - [ ] NFR-008 수치 안에 있거나 초과 시 Human 승인.
 - [ ] 대상 revision·환경·명령·결과를 EV로 기록.
 - [ ] Human 리뷰 완료.
+
+## REV-055 후속 조치 — 2026-11-16
+
+RV-137·138은 다중 출력 전송·rollback·오류 우선순위, 실패 배출의 queued reply 정리, 새 mark/주기 배치 쓰기 전 만료 정리로 조치했다. `tc_013_facade` f37과 logger 내부 5개 회귀 시험을 추가했다. [EV-082](../../05_verification/verification_evidence.md#ev-082). 실행 중 설정 변경의 ADR 의존과 기존 구현 결과 Human 확인 대기는 유지한다.

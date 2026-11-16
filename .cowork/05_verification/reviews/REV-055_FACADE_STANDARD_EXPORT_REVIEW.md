@@ -9,7 +9,8 @@
 | 대상 | REV-054 이후 누적 코드 커밋 `64e9d69..949a74e` (9개 코드 커밋: `04bf3aa`, `19e04d2`, `4158f08`, `4bd6d04`, `4559fc7`, `11f91a5`, `561f2c3`, `340c19c`, `949a74e`, WIP `36c1724` 제외) |
 | 범위 | TASK-030 S1 표준 MCAP export, TASK-033 S3/S4 시험 및 ring `2 × segment` 하한 수정, client `diagnostics` 이동, TASK-034 S2a~S2c(중요도·시작 시 최소 level·이벤트 보존) |
 | 종합 판정 | **Conditional — P1 1건·P2 3건·P3 1건 (`RV-136~140`)** |
-| 상태 | **Open** |
+| 상태 | **Closed** — 2026-11-16 RV-136~140 조치·검증·위임 수락 |
+| 조치 판정 | 로컬 **Pass**, 소스 `5d7fe6a`, [EV-082](../verification_evidence.md#ev-082) |
 
 전체 회귀(1.96.0 및 MSRV 1.85.0 각 625 passed·5 ignored), `clippy`, `fmt`, strict `rustdoc`, `--no-default-features` 빌드, NFR-008 표면/레시피 검사(`34/60` 항목), RT 무할당 시험(19개)은 모두 통과했다. 그러나 심층 검토 및 `/tmp/dot-logger-rev055` 재현 진단 결과:
 1. **P1 (`RV-136`):** 손상된 무압축 chunk를 `standard::export`로 읽을 때 `vendor/mcap` `LinearReader`에서 산술 언더플로 패닉(release에서는 `u64` wrap)과 CLI 실패 시 출력 파일 미삭제가 발생하고, `crc == 0` 또는 chunk 내부 레코드 파싱 실패 시 검증되지 않은 chunk의 부분 메시지가 출력에 포함되는 결함을 실제 재현했다.
@@ -44,11 +45,11 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-136 | P1 | `vendor/mcap-0.26.0/.../linear_reader.rs:672,745`, `storage/standard.rs:161-203`, `cli/src/commands.rs:919-936`, API §21.2 | 손상된 무압축 chunk 내부 레코드 길이 초과 시 언더플로 패닉(release wrap) 및 CLI 출력 파일 미삭제; `crc==0` 또는 chunk 내부 레코드 오류 시 미검증 chunk의 부분 메시지가 출력에 기록됨 | `LinearReader` 무압축 chunk 경계 검사 추가, chunk 단위 선검증(또는 `crc==0` 거절/선로드) 보장, CLI 출력 파일 정리 가드 보강 | 미정 | Open |
-| RV-137 | P2 | `logger/mod.rs:1106-1171`, `logger/host.rs:682-693,994-1021`, API §22.3·22.9 | 다중 이벤트 출력 롤백 시 `worker_failed`/첫 `Closing`에서 조기 반환해 후속 출력 해제 누락; `Disconnected` 시 `worse(result, Closing)` 미적용으로 `Failed` 덮어씀; `drain_failed`에서 `target.marks` 미정리로 `overdue` 전체 대기 | 롤백 전송을 전 출력 best-effort로 분리, `Disconnected`/`Timeout`에도 `worse()` 반영, `drain_failed` 진입 시 `target.marks = None` 처리 | 미정 | Open |
-| RV-138 | P2 | `logger/event.rs:135-159`, `logger/host.rs:715-740,777-784`, API §22.3·22.9 | `Marks::mark`가 `protect_event` 전에 만료를 정리하지 않아 `at + post + hold` 경과 후에도 다음 `sync_every` 전까지 `EventError::Quota` 발생; `io_loop`에서 `write_batch`가 `expire`보다 먼저 실행됨 | `Marks::mark` 진입 시 `self.expire(log, now)` 호출, `io_loop`에서 주기 만료를 `write_batch` 전에 수행 | 미정 | Open |
-| RV-139 | P2 | `storage/standard.rs:226-263`, API §21.1·21.2 | `payload_schema_file_id`가 `dot_logger.Envelope` 스키마를 가리켜도 허용되어 출력에 Envelope 스키마 노출; 동일 `c.id` 채널 재등장 시 `topic` 외 필드 불일치 미검사 | `payload_schema_file_id == c.schema_id`(및 빈 `payload_schema_name`) 거절, 재등장 채널의 `(schema_id, topic, message_encoding, metadata)` 일치 검증 | 미정 | Open |
-| RV-140 | P3 | `storage/retention.rs:313-321`, `storage/standard.rs:106-123,169-170` | `SegmentLog::new`에서 `schema.name` 초과 capacity 축소 누락(`writer.rs`와 비대칭); `standard::export` 실패 시 `output` 부분 기록 안내 및 메타 맵 상한 참고 | `retention.rs`에 `schema.name` shrink 추가, `export` 오류 시 `output` 폐기 조건 rustdoc 명시 | 미정 | Open |
+| RV-136 | P1 | `vendor/mcap-0.26.0/.../linear_reader.rs:672,745`, `storage/standard.rs:161-203`, `cli/src/commands.rs:919-936`, API §21.2 | 손상된 무압축 chunk 내부 레코드 길이 초과 시 언더플로 패닉(release wrap) 및 CLI 출력 파일 미삭제; `crc==0` 또는 chunk 내부 레코드 오류 시 미검증 chunk의 부분 메시지가 출력에 기록됨 | `LinearReader` 무압축 chunk 경계 검사 추가, chunk 단위 선검증(또는 `crc==0` 거절/선로드) 보장, CLI 출력 파일 정리 가드 보강 | 수용 | Closed |
+| RV-137 | P2 | `logger/mod.rs:1106-1171`, `logger/host.rs:682-693,994-1021`, API §22.3·22.9 | 다중 이벤트 출력 롤백 시 `worker_failed`/첫 `Closing`에서 조기 반환해 후속 출력 해제 누락; `Disconnected` 시 `worse(result, Closing)` 미적용으로 `Failed` 덮어씀; `drain_failed`에서 `target.marks` 미정리로 `overdue` 전체 대기 | 롤백 전송을 전 출력 best-effort로 분리, `Disconnected`/`Timeout`에도 `worse()` 반영, `drain_failed` 진입 시 `target.marks = None` 처리 | 수용 | Closed |
+| RV-138 | P2 | `logger/event.rs:135-159`, `logger/host.rs:715-740,777-784`, API §22.3·22.9 | `Marks::mark`가 `protect_event` 전에 만료를 정리하지 않아 `at + post + hold` 경과 후에도 다음 `sync_every` 전까지 `EventError::Quota` 발생; `io_loop`에서 `write_batch`가 `expire`보다 먼저 실행됨 | `Marks::mark` 진입 시 `self.expire(log, now)` 호출, `io_loop`에서 주기 만료를 `write_batch` 전에 수행 | 수용 | Closed |
+| RV-139 | P2 | `storage/standard.rs:226-263`, API §21.1·21.2 | `payload_schema_file_id`가 `dot_logger.Envelope` 스키마를 가리켜도 허용되어 출력에 Envelope 스키마 노출; 동일 `c.id` 채널 재등장 시 `topic` 외 필드 불일치 미검사 | `payload_schema_file_id == c.schema_id`(및 빈 `payload_schema_name`) 거절, 재등장 채널의 `(schema_id, topic, message_encoding, metadata)` 일치 검증 | 수용 | Closed |
+| RV-140 | P3 | `storage/retention.rs:313-321`, `storage/standard.rs:106-123,169-170` | `SegmentLog::new`에서 `schema.name` 초과 capacity 축소 누락(`writer.rs`와 비대칭); `standard::export` 실패 시 `output` 부분 기록 안내 및 메타 맵 상한 참고 | `retention.rs`에 `schema.name` shrink 추가, `export` 오류 시 `output` 폐기 조건 rustdoc 명시 | 수용 | Closed |
 
 ---
 
@@ -81,7 +82,9 @@
 
 #### [처리담당]
 
-- (개발 세션 처리 대기)
+- **판정:** 수용.
+- **처리:** `LinearReader`에 짧은 chunk header·무압축 크기 불일치·내부 record 경계 검사를 추가했다. `prevalidate_chunk_crcs`는 CRC 0도 전체 chunk를 한도 안에서 로드하고 내부 레코드를 파싱한 뒤 반출한다. 비영 CRC는 기존대로 검사한다. CLI `ExportCleanup`은 모든 오류와 unwind에서 새 출력만 정리하고 결과 반출까지 성공해야 해제된다.
+- **검증:** `tc_014_standard` f13~f15의 수정 전 Red(패닉·부분 반출·상한 우회) → Green, f18 압축/CRC 0 호환·크기 상한, 실제 CLI 손상 chunk/summary 통합, 정리 가드 오류·unwind·commit 시험 및 생략 변이 Red. vendor 전체 패키지 lib 131 Pass. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
 
 ---
 
@@ -104,7 +107,9 @@
 
 #### [처리담당]
 
-- (개발 세션 처리 대기)
+- **판정:** 수용.
+- **처리:** `ask_all`은 전송 실패에서 중단하지 않고 성공한 전송 수만큼 응답을 수거한다. mark 실패 뒤 rollback은 worker 실패 flag와 무관하게 `ask_all(Release)`를 호출한다. timeout/disconnect도 `worse`로 누적해 `Failed > Closing > Quota`를 유지한다. `drain_failed` 진입 시 모든 `target.marks`를 버려 대기 reply를 즉시 끊는다.
+- **검증:** 실제 Logger+모의 출력의 끊긴 첫 출력/worker 실패 rollback·Failed 뒤 Disconnected 시험 3건은 수정 전 모두 Red → Green. 실제 IO target+라우팅 guard의 queued reply 해제 시험은 수정 생략 변이로 Red 확인. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
 
 ---
 
@@ -126,7 +131,9 @@
 
 #### [처리담당]
 
-- (개발 세션 처리 대기)
+- **판정:** 수용.
+- **처리:** `Marks::mark` 시작에 만료 정리를 넣었다. `io_loop`는 주기 만료를 배치 쓰기 앞으로 옮기고 해당 turn 시작 시각을 공유해 시계 역전을 피한다. 요청 처리의 fresh clock은 유지한다.
+- **검증:** `tc_013_facade::f37`은 주기 sync(60초) 전에 만료된 1초 hold의 quota 재사용을 확인한다. host 시험은 1-record segment·2-file 한도·실제 라우팅 guard에서 만료된 보호가 회전을 막지 않는지 확인한다. 각 수정 생략 변이는 Quota/실패 record 1건으로 Red, 원복 후 Green. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
 
 ---
 
@@ -149,7 +156,9 @@
 
 #### [처리담당]
 
-- (개발 세션 처리 대기)
+- **판정:** 수용.
+- **처리:** payload descriptor가 채널 Envelope 스키마 자신 또는 다른 Envelope 스키마를 가리키는 경우를 거절한다. 유효 이름도 Envelope/빈 문자열은 거절하고 descriptor id 없는 이름도 거절한다. `Mapped.input`에 첫 Channel 전체를 보관해 재등장 시 id/schema/topic/encoding/metadata 전부 일치해야 한다.
+- **검증:** f16(자기참조·다른 Envelope·빈 이름·단독 이름·Envelope alias 5조건)·f17(채널 필드별 불일치 5조건)을 추가해 시험 함수 단위로 수정 전 Red → Green을 확인했다. 실제 CLI는 summary 채널 불일치를 exit 4 `invalid_data`로 보고하고 새 출력을 삭제한다. 정상 descriptor/schemaless·summary 반복은 기존 f1·f9·CLI 왕복이 검증한다. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
 
 ---
 
@@ -167,7 +176,9 @@
 
 #### [처리담당]
 
-- (개발 세션 처리 대기)
+- **판정:** 수용.
+- **처리:** `SegmentLog::new`의 `schema.name`을 `into_boxed_str().into_string()`으로 정리해 기존 `SegmentWriter::new`와 일치시켰다. `standard::export` rustdoc/API §21.2에 모든 `Err`에서 출력 폐기, 개별 record/chunk 상한과 누적 schema/channel map 한계의 차이를 명시했다.
+- **검증:** 두 생성자의 정규화 코드 대조, 전체 저장/보존·facade 회귀, rustdoc 검사. 누적 metadata 총량의 새 API/예산 정책은 이번 결함 조치에 추가하지 않았다. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
 
 ---
 
@@ -202,3 +213,13 @@
 
 - 재현 입력과 진단 스크립트 결과는 `/tmp/dot-logger-rev055`에 생성해 확인했으며, 핵심 재현 바이트 구성을 본 문서에 모두 기록했다.
 - 다음 개발 세션은 **TASK-030 S2 ADR보다 먼저** `RV-136`(P1) 및 `RV-137~139`(P2), `RV-140`(P3)에 대해 실패 재현 테스트(Red)를 저장소 시험으로 옮기고 최소 수정(Green) 및 회귀 검증을 수행한 뒤 `[처리담당]` 영역을 갱신한다.
+
+## 6. 개발 조치 마감 — 2026-11-16
+
+- **처리 결과:** RV-136~140 전부 수용, `Open` → `In Progress` → `Resolved`(재현·수정·회귀 완료) → `Closed`(2026-10-31 구현·검증·리뷰 마감 위임에 따른 AI 수락). 최초 리뷰의 Conditional 판정과 리뷰어 원문은 당시 기록으로 보존한다.
+- **대상 소스:** `5d7fe6a`. 전체 근거 [EV-082](../verification_evidence.md#ev-082).
+- **검증:** 1.96.0·MSRV 1.85.0 각각 workspace 639 Pass·0 Failed·5 ignored, 18 feature 구성·독립 consumer/RT allocator, clippy·strict rustdoc(core-only 포함)·fmt Pass. 표면 guard 자기 시험 18개와 NFR-008 guard 34/60 Pass. vendor full-package lib 131 Pass.
+- **파일 변경:** vendor reader·VENDORED/Cargo 주석, `storage/{standard,retention}.rs`, `logger/{mod,event,host,tests}.rs`, CLI `commands.rs`/통합 시험, `tc_013_facade`/`tc_014_standard`, API·ADR-010 결함 조치 보완·TC/EV·Task/목록·상태 문서. 세션 로그는 기존 ignore 규칙으로 로컬 보관한다.
+- **타입 변경:** 생성 `ExportCleanup`(실패 출력 Drop 정리); 수정 `Mapped`(첫 Channel 전체), `LinearReader`(경계/선검증)·`LinearReaderOptions`(기존 옵션 의미 문서), `Logger`(전체 출력 응답/rollback), `Marks`(보호 전 만료), `SegmentLog`(schema.name capacity 정리), 시험 `Temp`(host fixture 재사용 가시성). 공개 facade 항목 추가 없음.
+- **자가 검토:** 새 RT 할당·대기·IO 없음, 새 unsafe/원자 순서 변경 없음. 오류를 숨기지 않고 기존 오류 우선순위/출력 폐기 계약과 일치시켰다. F-11 소비자 종단 검증은 EV-082에 연결했다.
+- **후속:** TASK-034 기존 구현 결과 Human 확인 대기는 유지. 다음 개발 시작점은 TASK-030 S2 저장 ADR(native 표준 쓰기·TASK-035 손실 기록·revision 회전/다중 revision 조회·복구). native·장기·실앱 및 커버리지 재측정은 기존 소유 Task와 시점 유지, Gate4/5 승격 없음.

@@ -251,7 +251,7 @@ P3 최소60초 및 RAM2배 이상, 마지막 sync까지 시간 포함. P4 receiv
 ### TC-013 — 통합 접점·preset·레시피
 
 - 관련: MS-008 / FR-001·003·008·012·013·015(장비 측정)·016 / NFR-001·004·005·006·008
-- 상태: Partial(2026-11-07 facade F1~F18 로컬 Pass, F5 worker panic 포함; auto preset S2 미실행) / 최근 실행: 2026-11-07 / EV: [EV-047](verification_evidence.md#ev-047), [EV-048](verification_evidence.md#ev-048), [EV-049](verification_evidence.md#ev-049), [EV-050](verification_evidence.md#ev-050), [EV-052](verification_evidence.md#ev-052)
+- 상태: Partial — 기존 facade·auto preset·레시피 로컬 Pass([EV-071](verification_evidence.md#ev-071), [EV-075](verification_evidence.md#ev-075), [EV-081](verification_evidence.md#ev-081)). 최근 실행: 2026-11-16 REV-055 이벤트 rollback·만료·IO panic 하위 시험([EV-082](verification_evidence.md#ev-082)). TASK-034 실행 중 설정 변경은 저장 ADR 뒤, native·장기·실앱은 기존 이월.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -292,7 +292,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: In Progress / 최근 실행: 2026-11-12 S1 export 하위(F1~F6·CLI) 로컬 Pass / EV: [EV-077](verification_evidence.md#ev-077). 표준 모드 파일·viewer·대시보드·GUI 도구 판독 Not Run
+- 상태: In Progress / 최근 실행: 2026-11-16 S1 export 하위(f1~f18·CLI) 로컬 Pass([EV-082](verification_evidence.md#ev-082)). S1 Foxglove Topics 판독은 2026-11-15 Human 확인([TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15), EV-077). S2 표준 모드 파일·viewer·대시보드·Lichtblick 판독은 미실행.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

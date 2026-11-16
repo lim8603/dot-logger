@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress(재개) — TASK-034 facade 노출; MS-009 In Progress — 표준 호환·원격 시각화·TASK-035; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
-| 활성 Task | TASK-030 In Progress — S1 Done(EV-077·082), S2 A Done — native pair 쓰기/읽기·구형 경로 정리 로컬 Pass(EV-083), 다음 B revision 회전·source별 조회/복구·manifest v2; TASK-035 In Progress — S1 Done(2026-11-16 승인), S2는 TASK-030 S2 A/B 뒤; TASK-034 In Progress — S2·S3 Done(실행 중 변경 제외), 기존 결과 Human 확인 대기·실행 중 변경은 승인된 저장 구현 뒤; TASK-033 In Progress — S4 기준 1~3 충족, TASK-034·035 뒤 재측정 |
+| 활성 Task | TASK-030 In Progress(S1·S2 A Done, 다음 B); TASK-035 In Progress(S1 Done, A/B 뒤 S2); TASK-034 In Progress(기존 결과 확인 대기, runtime은 저장/손실 뒤); TASK-033 In Progress(목표 승인·기준1~3 충족, 034·035 뒤 재측정) |
 | 미처리 리뷰 | 없음. [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md) RV-141~144 수정·회귀·위임 수락으로 Closed(2026-11-16, EV-083). REV-055도 Closed |
 | 상태 | 로컬 회귀 Pass — 1.96.0/1.85.0 각 630 Pass·5 ignored(EV-083), REV-056 Closed. 라인 커버리지 93.56%(EV-080, TASK-034 전; 재측정 대기). Done 25/35 Task. native·장기·실사용처 Not Run(TASK-024·026), Gate4/5 미완료 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-16 / TASK-030 S2 A native 전환·EV-083·REV-056 마감 / AI |
-| 세션 상태 | TASK-030 S2 A Done(로컬 Pass·위임 수락). ADR-013 Accepted(2026-11-16 Human 「승인」), TASK-035 S1 Done. 다음: B revision 회전/조회·복구 → TASK-035 S2 → TASK-034 실행 중 변경. 기존 결과 확인 대기는 별도 유지 |
-| 최근 세션 | 2026-11-16 #001 — REV-055 조치 마감(EV-082, 각 639 Pass)·목록 정렬·ADR-013 초안/미배포 정정 뒤 D1~D3 Human 승인, TASK-030 S2 A Done(EV-083), 다음 B |
+| 갱신 | 2026-11-16 / 세션 종료·다음 B 인계·R1/R2 상태 정리 / AI |
+| 세션 상태 | 종료(2026-11-16 Human 요청). TASK-030 S2 A Done·REV-056 Closed. 다음 B revision 회전/조회·복구/manifest v2 → TASK-035 S2 → TASK-034 실행 중 변경 → TASK-033 재측정. 승인된 ADR-013 범위는 재승인 없이 재개 |
+| 최근 세션 | 2026-11-16 #001 종료 — REV-055 조치·목록 정렬·ADR-013 승인·TASK-030 S2 A Done(EV-083), 다음 B |
 
 ## 현재 결정과 제약
 
@@ -30,17 +30,17 @@
 - **2026-11-15 Human 결정 — TASK-033 S3 기능 공백(「모두 권고대로 진행하자」):** facade 노출 ①실행 중 level·샘플링 ②이벤트 전후 보존 trigger ③단순 경로 중요도 → [TASK-034](../04_implementation/tasks/TASK-034.md)(MS-008 재개). 파일 안 손실 기록·채널별 손실 수 → [TASK-035](../04_implementation/tasks/TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께). 나머지 기능 공백 → B1(범위 밖, 일정 판단 제외). client `diagnostics`(dot-probe 전용 `SnapshotCheck`+bridge) → `examples/support/dot_probe` 이동(`4bd6d04`).
 - **2026-11-15 Human 결정 — native·24h 일정 판단 제외·TASK-030 S1 권고안:** 「native·24h 장기 검증을 일정 판단에서 빼자. 나머지는 권고대로」. TASK-024도 TASK-026처럼 마지막 단계·일정 판단 밖, 일정 판단은 TASK-033만. descriptor 없는 채널은 export에서 원문·encoding 유지+한계 기록([API §21.2](../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12)). CLI summary `records:0`은 결함 아님(출력한 `record` 줄 수) — CLI README에 의미 추가. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15).
 - **2026-11-13 Human 결정 — 완료 기준 변경:** dot-logger는 범용 라이브러리이고 dot-probe는 첫 사용처다. 「실사용처 테스트는 마지막에 진행은 하겠지만, 일정 판단에 두지 말고, 일정 판단은 유닛테스트 케이스 커버리지, 실제 로깅 사용 사례 조사 등을 통해서 마무리」. 이에 따라 Task 22건 Done, native 잔여는 TASK-024, 실사용처는 TASK-026(MS-007, 마지막), 커버리지·사용 사례는 TASK-033. 커버리지 도구는 AI가 설치(Human 「필요한건 알아서 설치」). [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[EV-078](../05_verification/verification_evidence.md#ev-078).
-- **2026-11-12 Human 결정 — TASK-030 착수 4건 + 구현 중 2건(권고안):** facade `Schema::descriptor`(선택 descriptor), 타입 이름은 채널 metadata `payload_schema_name`. MCAP `sequence` = Envelope 하위 32비트, `log_time`·`publish_time` = real, mono·u64 sequence·producer·level·importance·revision·source는 보조 메타 채널 1개(protobuf `RecordMeta`), ROS 2 encoding T1 유지. [API §21.1](../03_design_artifacts/interface_contract.md#211-human-결정--2026-11-12).
+- **TASK-030 매핑:** 사용자 schema/encoding·real 시각·전체 receipt의 RecordMeta 보존은 native A에 반영(API §23.1). ROS 2 encoding은 T1 유지. [API §21](../03_design_artifacts/interface_contract.md#21-task-030-mcap-표준-호환--2026-11-12).
 - **2026-11-12 Human 결정 — TASK-029 S4 범위:** `dot_probe_pipeline`(InfluxDB·설정 비교)은 facade로 옮기지 않고 고급 경로 예제로 유지, facade 전용 `dot_probe_facade` 예제 추가. DB·설정 변경의 facade 편입은 TASK-026에서 판단([EV-075](../05_verification/verification_evidence.md#ev-075)).
 - **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
-- **2026-11-11 Human 결정 — TASK-028 S2(착수 3건 권고안·「승인」):** 짧은 측정 + 보수 추정(지속 = 순간 × 0.5, 수락 ≤ 1.2 × S3 S), JSON 프로필(feature `calibrate`), 흡수·메모리·부하 경고. 측정 도중 취소 시험 미실시. [API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071).
-- **완료된 Human 결정(11-07~11-11: TASK-023 S2·S3 마감·⑪·T5·CRC vendor·rustix·TASK-027 S3c/S3d·TASK-028 S1):** 원문은 [상태 아카이브](state_archive.md) #026, 계약은 API §18~19·ADR-010 개정 1·EV-054~069. T4 이월은 아래 백로그, T6는 native 전환으로 해소(EV-083).
+- **TASK-028 auto preset:** Done. JSON profile·측정/추정 구분과 사용자 값 우선 계약 유지. 측정 도중 취소는 미실행([API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071)).
+- **이전 완료 결정:** TASK-023·027·028 및 T5 상세는 API §18~19·EV-054~069를 따른다. T4는 이월, T6는 native A로 해소(EV-083).
 
 - **2026-11-05 Human 결정 — TASK-027 S1 facade 계약:** ADR-012 Accepted(공유 `CaptureCore`·소유 `Writer`·빌림 `Producer<'_>`, Writer Drop은 반납함 이동만), 손실 값 필수·성능 값 기본값, `Logger::drop` 기한 종료, NFR-008 수치(L1 ≤20줄·≤6개념 등), `writer.try_log(channel, &msg)`. [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05).
 
-- **2026-11-04 Human 결정 — MS-008/009:** 소비처 접점 경량화(TASK-027~029)와 MCAP 표준·viewer·대시보드(TASK-030~032) 등록, NFR-008 추가, FR-015는 auto preset만 TASK-028 S2로 부분 채택. **순서:** TASK-027 → TASK-028 S1 → TASK-023 S2/S3·RT 요청 → TASK-028 S2 → TASK-029 → MS-009 → probe 인계 → TASK-026. [MS-008](../04_implementation/milestones/MS-008.md)·[MS-009](../04_implementation/milestones/MS-009.md).
+- **MS-008/009:** TASK-027~029 Done, TASK-030~032·035와 TASK-034 재개는 각 Task/현재 순서를 따른다. FR-015 질문 프리셋은 별도 승인 범위다([MS-008](../04_implementation/milestones/MS-008.md)·[MS-009](../04_implementation/milestones/MS-009.md)).
 
-- **2026-11-03 Human 결정 — probe 연동 전 dot-logger 단독 작업 선행:** 「이 프로젝트에서 할 수 있는걸 다 마치고 probe쪽에서 logger를 연동하는 세션을 진행」. ① 원격 ApplyConfig/Compare 운영 backend·CLI runtime metrics 구현(기존 API§15 범위), ② TASK-023 합성 행(P0 기준선·10ms 제어 off/on·P1~P3·P5·계측 비용)을 TASK-026 전에 generic 커널에서 실행 — 실앱 행은 TASK-026 뒤 유지, ③ 합성 측정 뒤 RT 준비/재시작 요청서를 제출하고 승인 후 RT 행 실행, ④ probe 연동 인계 패키지 작성 후 dot-probe 저장소 세션에서 TASK-026 진행. 24h soak(TASK-024)는 연동 뒤. dot-probe 저장소는 이 세션에서 수정하지 않는다.
+- **probe 연동 순서:** dot-logger 자체 작업·TASK-025 인계 뒤 별도 dot-probe 세션에서 TASK-026을 진행한다. 원격 성능 잔여는 T7, native/장기는 TASK-024다. RT 재부팅은 ADR-011의 사전 승인·once/back 절차를 유지하며 이 세션에서 dot-probe 저장소를 수정하지 않는다.
 
 - **2026-10-31 Human 승인·권한 위임:** TASK-012 기존 로컬 구현 수락 및 REV-019 개선·검증 후 마감 → TASK-013 착수 승인. 앞으로 승인된 목표의 구현·검증·리뷰 마감/작업 전환 판단과 작업 단위별 커밋·푸시는 AI가 수행·보고한다. 같은 범위 재승인은 받지 않는다. [위임 기준](../01_cowork_protocol/decision_authority_matrix.md#프로젝트-오너의-권한-위임--2026-10-31). 미실행 검증·native 공개 후 조건은 유지한다.
 
@@ -78,15 +78,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 | ID | 범위 | 상태 | 현재 처리/후속 |
 |---|---|---|---|
-| REV-001~017 | 코어·파일·조회·재생 | Closed | 로컬 조치·Human 수락 완료, native/PC 실측 이월은 유지 |
-| REV-018~022 | 원격·client·CLI | Closed | EV-026까지 수락. RV-049→TASK-022, RV-053→TASK-020 |
-| REV-023~028 | 계측·리포트·설정변경 자가/독립 리뷰 | Closed | EV-027~031 로컬 수락 마감, 비용·오차·실앱/native 후속 |
-| REV-029~041 | 간편 점검·DB·tracing/화면 예제 | Closed | EV-031~042 로컬 수락, 실앱/환경 후속은 각 Task 참조 |
-| REV-042~050 | UPS·운영 backend·facade S2~S3·preset 자가/독립 리뷰 | Closed | EV-043~052 로컬 조치·마감(독립 REV-043·045 포함). 원문 [상태 아카이브](state_archive.md) #024 |
-| [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) | GAP-008·TASK-023 S1·TASK-027 S2~S3e·TASK-028 S1 누적 독립 코드리뷰 | Closed | Conditional Pass 8건(P1 1·P2 5·P3 2) 전부 수용·조치 [EV-053](../05_verification/verification_evidence.md#ev-053) `60ea9bb`, 2026-11-07 Human 「승인」 |
-| [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) | REV-051 조치·TASK-023 S2a/S2b 누적 독립 코드리뷰(`49df7d3..93db6e3`) | Closed | Conditional, P1 2·P2 1(RV-128~130) 전부 수용·조치 [EV-056](../05_verification/verification_evidence.md#ev-056) `97e2b12`·`f8f2859`, 정정 `b2899a3`(EV-057). 2026-11-08 Human 「승인」 |
-| [REV-053](../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) | REV-052 조치·TASK-023 S2/S3·T5·RT harness·TASK-028 S2 누적 리뷰(`93db6e3..8dbd999`) | Closed | Conditional, P1 1·P2 1·P3 1(RV-131~133) 전부 수용·조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `aa62e04` — 훑기 단일 소유 claim, 비 Linux 대체 경로·시험 분리, core-only rustdoc CI. 2026-11-12 Human 「승인」 |
-| [REV-054](../05_verification/reviews/REV-054_INTEGRATION_GUARD_REVIEW.md) | REV-053 조치·TASK-029 S1~S4 누적 리뷰(`8dbd999..2fe4e49`) | Closed | Conditional, P2 2건(RV-134~135) 수용·조치 [EV-076](../05_verification/verification_evidence.md#ev-076) `64e9d69` — snapshot 계약 조건(trait 제약·연관 항목 타입·impl 대상/제약) 직렬화, 개념 계수 import 해석·glob/미해석 실패. 2026-11-12 Human 「승인」 |
+| REV-001~054 | 완료된 core·파일·조회·운영·facade·preset·통합 가드 리뷰 | Closed | 회차별 근거는 [리뷰 문서](../05_verification/reviews/). native·실앱·성능 이월은 각 Task에 유지 |
 | [REV-055](../05_verification/reviews/REV-055_FACADE_STANDARD_EXPORT_REVIEW.md) | TASK-030 S1 export·TASK-033 S3/S4 시험·ring 결함 수정·client diagnostics 이동·TASK-034 facade 중요도/최소 level/이벤트 보존 누적 리뷰(`64e9d69..949a74e`) | Closed | RV-136~140 전부 수용·조치, [EV-082](../05_verification/verification_evidence.md#ev-082) `5d7fe6a`. 2026-11-16 위임 수락 |
 | [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md) | TASK-030 S2 A native 단일 형식 개발·자가검토 | Closed | RV-141~144 전부 수용·수정, [EV-083](../05_verification/verification_evidence.md#ev-083) `048cdf3`. 두 Rust 각630 Pass·각18 feature, 2026-11-16 위임 수락 |
 
@@ -131,7 +123,7 @@ REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
- **T5 → 해소(2026-11-11, EV-066~068): 원인 규명, ⑫ 조치 `234ea62`, 무압축 chunk CRC 1회 `942eecf`, 잔여 개선은 T6.** **T6 → 해소(2026-11-16, EV-083): native 사용자 payload 직접 쓰기로 Envelope scratch 복사를 제거. 정량 효과는 재측정하지 않음.** 트리거 ①은 EV-065에서 재현되지 않음. T1~T4는 미도래(T4: 복사 p50 21 ns = 시계 오버헤드). T4 입력: S2b smoke(측정 아님)에서 256B `try_log` p50 143 ns 중 복사 p50 21 ns(시계 오버헤드와 같은 수준) — 정식 판정은 TASK-023 S3. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
+**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 T4의 복사 p50 21ns는 시계 오버헤드와 같은 수준이었다. T7은 viewer 실시간 설계 시 확인한다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -149,9 +141,8 @@ REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence
 
 ## 최근 작업·이력
 
-- 2026-11-16 #001 후속: TASK-030 S2 A native writer/reader·단일 revision query/recovery·구형 codec/export 제거, RV-141~144 수정, 두 Rust 각630 Pass·각18 feature([EV-083](../05_verification/verification_evidence.md#ev-083)). 다음 B, T6 구현 원인 해소.
-- 2026-11-16 #001: REV-055 5건 조치·Closed([EV-082](../05_verification/verification_evidence.md#ev-082), 각 639 Pass)·목록 상태 정렬 뒤 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) 저장 수정안 D1~D3 Human 승인([세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
-- 2026-11-15 #001: TASK-030 S1 Done·사용 사례 31개·커버리지 93.56%·목표치 승인·TASK-034 중요도/시작 level/이벤트 보존 구현, 실행 중 변경은 저장 ADR 뒤로 이월([세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
-- 2026-11-13 #001: 범용 라이브러리 완료 기준 변경·기능 Task 22건 Done·TASK-033 등록·커버리지 도구/기준선 준비([EV-078](../05_verification/verification_evidence.md#ev-078), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-13_001.md)).
+- 2026-11-16 #001: REV-055 조치·목록 정렬·ADR-013 승인·TASK-030 S2 A 완료·REV-056 Closed([EV-082](../05_verification/verification_evidence.md#ev-082)·[EV-083](../05_verification/verification_evidence.md#ev-083), 두 Rust 각630 Pass), 다음 B로 세션 종료([로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
+- 2026-11-15 #001: TASK-030 S1 Done·사용 사례31개·목표치 승인·TASK-034 중요도/시작 level/이벤트 보존 구현, runtime은 저장 ADR 뒤([로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
+- 2026-11-13 #001: 범용 라이브러리 완료 기준 변경·Task22건 Done·TASK-033 등록·커버리지 기준선 준비([EV-078](../05_verification/verification_evidence.md#ev-078), [로그](../members/lim8603/workspace/session_logs/session_2026-11-13_001.md)).
 
-이전 이력과 상세 원문은 [상태 아카이브](state_archive.md)의 #027·#026·#025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.
+이전 이력과 상세 원문은 [상태 아카이브](state_archive.md)의 #028·#027·#026·#025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.

@@ -35,9 +35,9 @@
 | ADR-008 | 제한된 소유권·예약·완료와 실패 계약 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-008_bounded_ownership_completion.md) | Human 기준선 채택·추가 AC 승인, 구현/장비 검증 전 |
 | ADR-009 | 파일·외부 연동·도구체인 권고 | Accepted | 2026-10-26 | INT-001 | MS-001 | [상세](adrs/ADR-009_storage_transport_toolchain.md) | MCAP 계열만 ADR-010으로 대체, 나머지 기술 기준선 유지 |
 | ADR-010 | 압축 의존성 보안 수정에 따른 MCAP 0.26 채택 | Accepted | 2026-10-26 | INT-001 | MS-002 | [상세](adrs/ADR-010_mcap_security_update.md) | Human 승인, MCAP 0.26.0·선택 zstd 보안 의존성 수정 |
-
 | ADR-011 | 현재 PC 실측·UPS 시뮬레이션 수락과 공개 후 native 검증 | Accepted | 2026-10-31 | INT-001 | MS-002~007 | [상세](adrs/ADR-011_local_pc_simulated_ups_verification.md) | Human 승인, 장비/UPS 수락 방법·native 시점 갱신 |
 | ADR-012 | facade 소유 모델: 공유 core + 소유 endpoint 핸들 + 빌림 뷰 | Accepted | 2026-11-05 | INT-001 | MS-008 | [상세](adrs/ADR-012_facade_owned_writer_handles.md) | Human 승인(리뷰 포인트 5개 권고안). ADR-008 borrowed core 유지 |
+| ADR-013 | native 표준 MCAP·손실 기록·revision별 파일 회전 | Proposed | 2026-11-16 | INT-001 | MS-008·009 | [상세](adrs/ADR-013_native_standard_loss_revision_storage.md) | TASK-030 S2·TASK-035 S1 설계안. D1 facade 기본 native·D2 누적 손실·D3 교차 revision 회전, Human 승인 대기 |
 
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`

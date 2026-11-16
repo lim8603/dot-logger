@@ -10,16 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress(재개) — TASK-034 facade 노출; MS-009 In Progress — 표준 호환·원격 시각화·TASK-035; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
-| 활성 Task | TASK-030 In Progress — S1 Done(2026-11-15), 다음 S2 ADR; TASK-033 In Progress — S3 Done(EV-079, 라인 92.40%), S4 기준 1~3 충족(EV-080, 라인 93.56%), 판정은 TASK-034·035 뒤; TASK-034 In Progress — S2·S3 Done(EV-081·082, 실행 중 변경 제외), Human 결과 확인 대기; ① 실행 중 변경은 TASK-030 S2 ADR 뒤; TASK-035 Planned |
+| 활성 Task | TASK-030 In Progress — S1 Done(EV-077·082), S2 ADR-013 Proposed·Human 승인 대기; TASK-035 In Progress — S1 형식안 작성·같은 ADR 승인 대기, S2 미착수; TASK-034 In Progress — S2·S3 Done(EV-081·082, 실행 중 변경 제외), 기존 결과 Human 확인 대기·실행 중 변경은 ADR-013 승인/저장 구현 뒤; TASK-033 In Progress — S4 기준 1~3 충족(EV-080), TASK-034·035 뒤 재측정 |
 | 미처리 리뷰 | 없음 — [REV-055](../05_verification/reviews/REV-055_FACADE_STANDARD_EXPORT_REVIEW.md) RV-136~140 조치·검증·위임 수락으로 Closed(2026-11-16, EV-082) |
 | 상태 | 로컬 회귀 Pass — 1.96.0/1.85.0 각 639 Pass(EV-082), REV-055 Closed. 라인 커버리지 93.56%(EV-080, TASK-034 전; 재측정 대기). Done 25/35 Task. native·장기·실사용처 Not Run(TASK-024·026), Gate4/5 미완료 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-16 / REV-055 조치 마감 / AI |
-| 세션 상태 | REV-055 RV-136~140 조치·회귀·위임 수락 완료. Human 확인 대기: TASK-034 결과(EV-081·082). 다음: TASK-030 S2 저장 ADR 초안(native 표준 모드 + TASK-035 손실 기록 + revision 변경 시 파일 회전·다중 revision 조회/복구) → 승인 → 구현 → TASK-034 실행 중 변경 마무리(WIP `36c1724`) |
-| 최근 세션 | 2026-11-16 #001 — REV-055 5건 조치, 회귀 각 639 Pass·18 feature 구성·guard Pass(EV-082), 목록의 기존 승인 상태 정렬 |
+| 갱신 | 2026-11-16 / TASK-030 S2·TASK-035 S1 ADR-013 초안 작성 / AI |
+| 세션 상태 | ADR-013 Proposed 작성·연결 문서 검토 완료, D1~D3 Human 승인 대기. 다음: 승인 → TASK-030 S2 저장 구현·TASK-035 → TASK-034 실행 중 변경 WIP `36c1724` 통합. TASK-034 기존 결과(EV-081·082) 확인 대기는 별도 유지 |
+| 최근 세션 | 2026-11-16 #001 — REV-055 조치 마감(EV-082, 각 639 Pass) 뒤 ADR-013 초안(native 기본 facade·누적 손실·교차 revision 회전) 작성, Human 승인 대기 |
 
 ## 현재 결정과 제약
+
+- **2026-11-16 ADR-013 Proposed — 미승인 제안:** D1 별도 native profile·**신규 facade 기본 native 전환**(legacy 생성/구형 판독 유지), D2 native 누적 손실 checkpoint(시도·assignment·skip·Unknown 분리, legacy loss Unavailable), D3 단일 active writer의 교차 revision 회전·source별 조회/복구. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3 Human 승인 전 제품 기본값·형식·API는 변경하지 않는다.
 
 - **2026-11-15 Human 「권고대로」 — TASK-034 ① 범위 조정(API §22.8):** core 저장이 파일당 단일 revision이라 facade 실행 중 설정 변경은 파일 회전 설계가 필요하다. 시작 시 level(`ChannelOptions::minimum`)만 TASK-034에서 구현하고, 실행 중 변경은 TASK-030 S2 저장 ADR에 회전·다중 revision 조회를 포함해 승인받은 뒤 WIP 브랜치 `wip/task-034-s2b-runtime-config`(`36c1724`, 로컬)로 끝낸다.
 - **2026-11-15 Human 합의 — 일정 목표:** 다음 주(2026-11-16 주) 목표는 핵심 범위 완료와 MS-007 일정 판정이다. 대상은 TASK-034, TASK-030 S2 + TASK-035, TASK-033 최종 재측정, TASK-025다. viewer·대시보드(TASK-031·032)는 그다음 주로 둔다(Human 「뷰어는 그렇게 해도 돼」). 인일은 추정이며 납기 확정이 아니다. 병목은 승인 지점 세 곳이다(TASK-034 결과, TASK-030 S2 ADR, 판정).
@@ -62,10 +64,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-15 | S1 Done(Foxglove 판독 Human 확인, blob 한계 수락). 다음 S2 native 표준 모드 ADR |
+| TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-16 | S1 Done(EV-077·082). S2 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed, D1~D3 Human 승인 대기·구현 미착수 |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-15 | S2 [UC 31개](imported_context/research_2026-11-15_logging_use_cases.md)·S3 대응표·공백 시험 16+1·작은 ring 결함 수정([EV-079](../05_verification/verification_evidence.md#ev-079)), 결정 4건 반영, S3 Done(라인 92.40%). S4 목표치 승인·기준 1~3 충족, TASK-034·035 뒤 최종 재측정 대기 |
-| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-15 | S1 [API §22](../03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15) 승인. S2·S3 Done([EV-081](../05_verification/verification_evidence.md#ev-081)) — 중요도·시작 시 level·이벤트 보존. Human 결과 확인 대기. 실행 중 변경은 TASK-030 S2 ADR 뒤(§22.8) |
-| TASK-035 | 손실 기록의 파일 내 표시 | AI | Planned | 2026-11-15 | S1 형식안 — TASK-030 S2 ADR과 함께 |
+| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-16 | S1 승인·S2/S3 Done(실행 중 변경 제외, EV-081·082). 기존 결과 Human 확인 대기. 실행 중 변경은 ADR-013 승인·저장 구현 뒤 |
+| TASK-035 | 손실 기록의 파일 내 표시 | AI | In Progress | 2026-11-16 | S1 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) 형식안 작성·Human 승인 대기, S2 구현 미착수 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
@@ -91,9 +93,9 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence.md#ev-082)). Human 확인 대기는 TASK-034 기존 구현 결과(EV-081·082)다.
+REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence.md#ev-082)). 별도 Human 확인 대기는 TASK-034 기존 구현 결과(EV-081·082)다.
 
-1. **TASK-030 S2:** 저장 ADR 하나에 ① native 표준 쓰기 모드 ② TASK-035 파일 안 손실 기록·채널별 손실 수 ③ TASK-034 실행 중 설정 변경을 위한 revision 변경 시 파일 회전·여러 revision 조회/복구(API §22.8)를 담아 채번·초안 → Human 승인 → 구현한다. 그 뒤 로컬 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)로 실행 중 변경을 마무리한다.
+1. **ADR-013 승인 대기:** [설계안](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1(새 native profile·facade 기본값)·D2(손실 계수/파일 checkpoint)·D3(revision마다 회전·여러 revision 조회/복구)를 Human이 검토한다. 승인 뒤 TASK-030 S2 A/B(공통 reader/native pair·revision 저장) → TASK-035 S2 → TASK-034 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 마무리한다. 기존 Task-030 S1은 Done이고 TASK-035 S1은 초안 작성/승인 대기, 제품 구현은 아직 없다.
 2. **TASK-033 S4:** 승인 목표치 기준 1~3 충족(EV-080). TASK-034·035 뒤 최종 재측정(기준 4)으로 MS-007 일정 판단을 마무리한다.
 3. **2026-11-16 주 목표:** TASK-034·TASK-030 S2·TASK-035 → TASK-033 판정 → TASK-025 문서·인수 정리. 납기 확정이 아닌 합의 목표다.
 4. **2026-11-23 주 계획:** TASK-031 viewer → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7 트리거를 확인한다.
@@ -147,7 +149,7 @@ REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence
 
 ## 최근 작업·이력
 
-- 2026-11-16 #001: REV-055 RV-136~140 전부 조치·Closed, 신규 시험 14개와 변이 Red 확인·두 Rust 각 639 Pass·18 feature 구성·표면 guard Pass([EV-082](../05_verification/verification_evidence.md#ev-082)), 기존 승인과 어긋난 MS 목록·TASK-033/TC 문구 정렬([세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
+- 2026-11-16 #001: REV-055 5건 조치·Closed([EV-082](../05_verification/verification_evidence.md#ev-082), 각 639 Pass)·목록 상태 정렬 뒤 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) 저장 초안 작성·Human 승인 대기([세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
 - 2026-11-15 #001: TASK-030 S1 Done·사용 사례 31개·커버리지 93.56%·목표치 승인·TASK-034 중요도/시작 level/이벤트 보존 구현, 실행 중 변경은 저장 ADR 뒤로 이월([세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
 - 2026-11-13 #001: 범용 라이브러리 완료 기준 변경·기능 Task 22건 Done·TASK-033 등록·커버리지 도구/기준선 준비([EV-078](../05_verification/verification_evidence.md#ev-078), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-13_001.md)).
 

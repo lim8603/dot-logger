@@ -6,11 +6,11 @@
 | Story | US-003·005 |
 | 요구사항 | FR-003 FR-005 FR-010 NFR-004 NFR-007 NFR-008 |
 | 설계 | [데이터](../../03_design_artifacts/data_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) |
-| ADR | ADR-009·010 Accepted. 표준 저장 모드 ADR 후보(S2 전 채번) |
+| ADR | ADR-009·010 Accepted. [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed — S2 native·손실·revision 저장 계약 승인 대기 |
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | S2 native 표준 모드 ADR 채번·승인(S1 Done 2026-11-15) |
+| 다음 액션 | S2 ADR-013 D1~D3 Human 승인 → 구현(S1 Done, S2 설계안 작성 완료·승인 대기) |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 쓰기 모드 | ADR 승인 후 writer 옵션으로 표준 모드 기록, 복구·조회·재생이 두 형식 모두 지원, 기존 `dot-logger/1` 파일 판독 유지. **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | Planned |
+| S2 | native 표준 쓰기 모드 | ADR 승인 후 writer 옵션으로 표준 모드 기록, 복구·조회·재생이 두 형식 모두 지원, 기존 `dot-logger/1` 파일 판독 유지. **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — 설계안 ADR-013 Proposed(2026-11-16), Human 승인 대기. 제품 구현 미착수** |
 
 ## 변경 대상과 첫 검증
 
@@ -57,3 +57,7 @@
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). S1 구현·검증은 EV-077, 후속 REV-055 RV-136·139·140 조치는 EV-082에 기록한다.
+
+## S2 저장 설계안 — 2026-11-16
+
+[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed. D1은 새 native profile·**facade 기본 형식 전환**과 legacy 호환 경로, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 기본값 전환은 새 승인 항목이며 현재 구현에는 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.

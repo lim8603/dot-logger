@@ -1294,3 +1294,16 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
   - 구현을 일부러 망가뜨려 확인했다. 보호를 빼면 f32·f33·f34 두 개가 실패하고, 해제를 빼면 f33·f34 두 개가 실패하고, 되돌리기를 빼면 f34(되돌리기)가 실패하고, output 예산에서 event slot을 빼면 f36이 실패한다.
 - **공개 표면:** 이름 있는 항목은 `EventWindow`·`EventMark`·`EventError` 세 개가 늘어 31 → 34 / 60이다. §22.5의 35는 `ConfigError`까지 더한 수치이고, `ConfigError`는 §22.8에 따라 보류했다. 레시피 수치는 바뀌지 않았다(D4).
 - **시험 쓰기량:** f32~f36 합계 약 45 MiB이고 모두 tmpfs(`/tmp`)에 쓴다.
+
+
+## 23. TASK-030 S2·TASK-035 저장 계약 제안 — 2026-11-16
+
+**Proposed / 구현 전 Human 승인 대기.** 상세 설계의 기준은 [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md)이며, §21·§22.8의 기존 승인 내용을 현재 구현 변경으로 소급하지 않는다.
+
+| 승인 항목 | 제안 계약 |
+|---|---|
+| D1 저장 형식 | `dot-logger/standard/1`, 사용자 payload + 같은 chunk의 인접 RecordMeta pair. 신규 facade 기본 native 전환, 명시 legacy 쓰기/기존 core 생성자와 구형 파일 판독 보존. 새 예약 topic 2개와 형식별 예산 검증 |
+| D2 파일 손실 | native `_dot_logger/loss`의 session 누적 checkpoint. 거절은 시도, 출력은 assignment, skip/acquire/Unknown 분리. 채널 미귀속 presence, 관측 구간/포화/part/미확인 꼬리, sync_every 보고. legacy loss는 Unavailable이며 0으로 대체하지 않음 |
+| D3 revision | 출력당 active writer 1개. delivery revision 경계마다 회전해 r1→r2→r1도 허용. per-producer sequence·catalog/event/pin·파일별 sync 채무 유지. source별 revision Snapshot/recovery와 manifest v2, v1 wrapper 보존 |
+
+후보 공개 항목은 `StorageFormat` 재수출 1개(34/60 → 예상 35/60), 명시 형식 선택/고급 loss 수집·multi-source 읽기 메서드다. 실제 시그니처·예약 레이아웃은 승인 방향 안에서 구현하고 snapshot·TDD·두 Rust 회귀로 확인한다. 현재 제품 API/파일 기본값은 아직 바뀌지 않았다.

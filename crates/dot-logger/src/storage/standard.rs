@@ -148,10 +148,15 @@ impl From<mcap::McapError> for ExportError {
 struct Mapped {
     out: u16,
     report: usize,
+    input: mcap::records::Channel,
 }
 
 /// Export one `dot-logger/1` file to a standard MCAP file. `cancel` is
 /// checked before every input read and every exported message.
+///
+/// On any `Err`, `output` may already contain bytes and must be discarded.
+/// `ExportLimits` bounds individual records/chunks, not the aggregate size of
+/// the schema/channel maps; use trusted input or impose an input-size bound.
 pub fn export<R: Read, W: Write + Seek>(
     mut input: R,
     output: W,
@@ -225,8 +230,7 @@ pub fn export<R: Read, W: Write + Seek>(
             }
             Record::Channel(c) => {
                 if let Some(old) = channels.get(&c.id) {
-                    let known = &report.channels[old.report];
-                    if known.topic != c.topic {
+                    if old.input != c {
                         return Err(ExportError::InvalidRecord);
                     }
                     continue;
@@ -246,12 +250,21 @@ pub fn export<R: Read, W: Write + Seek>(
                     .ok_or(ExportError::InvalidRecord)?
                     .clone();
                 let payload_schema = match c.metadata.get("payload_schema_file_id") {
+                    None if c.metadata.contains_key("payload_schema_name") => {
+                        return Err(ExportError::InvalidRecord);
+                    }
                     None => None,
                     Some(id) => {
                         let id: u16 = id.parse().map_err(|_| ExportError::InvalidRecord)?;
                         let (name, schema_encoding, data) =
                             schemas.get(&id).ok_or(ExportError::InvalidRecord)?;
+                        if id == c.schema_id || name == ENVELOPE_SCHEMA {
+                            return Err(ExportError::InvalidRecord);
+                        }
                         let name = c.metadata.get("payload_schema_name").unwrap_or(name);
+                        if name.is_empty() || name == ENVELOPE_SCHEMA {
+                            return Err(ExportError::InvalidRecord);
+                        }
                         Some((name.clone(), schema_encoding.clone(), data.clone()))
                     }
                 };
@@ -272,6 +285,7 @@ pub fn export<R: Read, W: Write + Seek>(
                     Mapped {
                         out,
                         report: report.channels.len(),
+                        input: c.clone(),
                     },
                 );
                 report.channels.push(ExportedChannel {

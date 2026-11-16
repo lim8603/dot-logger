@@ -899,8 +899,21 @@ fn calibrate(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     Ok(json!({"profile": output.to_string_lossy()}))
 }
 
-/// TASK-030 S1 (API §21): `export --standard`. The output is created new and
-/// removed again if the export fails or is cancelled.
+/// Remove a newly created output on error or unwind; commit only after success.
+struct ExportCleanup<'a> {
+    target: &'a Path,
+    committed: bool,
+}
+
+impl Drop for ExportCleanup<'_> {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = std::fs::remove_file(self.target);
+        }
+    }
+}
+
+/// TASK-030 S1 (API §21): create a new file, removing it on any failure.
 fn export_standard(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     use dot_logger::storage::standard::{ExportError, ExportLimits, export};
     let input = File::open(ctx.text("input")?)?;
@@ -916,6 +929,10 @@ fn export_standard(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                 Failure::Io
             }
         })?;
+    let mut cleanup = ExportCleanup {
+        target,
+        committed: false,
+    };
     let result = export(
         std::io::BufReader::new(input),
         std::io::BufWriter::new(file),
@@ -925,7 +942,6 @@ fn export_standard(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     let report = match result {
         Ok(report) => report,
         Err(e) => {
-            let _ = std::fs::remove_file(target);
             return Err(match e {
                 ExportError::NotDotLogger | ExportError::TopicConflict => Failure::Input,
                 ExportError::RecordTooLarge => Failure::Limit,
@@ -957,5 +973,55 @@ fn export_standard(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
             "skipped_records": report.skipped_records,
         }),
     )?;
+    cleanup.committed = true;
     Ok(json!({"output": target.to_string_lossy()}))
+}
+
+#[cfg(test)]
+mod export_cleanup_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn failed_or_unwinding_exports_remove_only_the_new_output() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "dot-logger-export-cleanup-{}-{}.mcap",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        for unwind in [false, true] {
+            let result = std::panic::catch_unwind(|| {
+                let file = OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                    .unwrap();
+                let _cleanup = ExportCleanup {
+                    target: &path,
+                    committed: false,
+                };
+                drop(file);
+                if unwind {
+                    panic!("injected export panic");
+                }
+            });
+            assert_eq!(result.is_err(), unwind);
+            assert!(!path.exists(), "failed export left its output behind");
+        }
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        let cleanup = ExportCleanup {
+            target: &path,
+            committed: true,
+        };
+        drop(file);
+        drop(cleanup);
+        assert!(path.exists(), "committed export must survive");
+        std::fs::remove_file(path).unwrap();
+    }
 }

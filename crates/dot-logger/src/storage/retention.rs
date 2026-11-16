@@ -311,6 +311,7 @@ impl<S: SegmentStore> SegmentLog<S> {
                 c.topic = c.topic.into_boxed_str().into_string();
                 c.payload_encoding = c.payload_encoding.into_boxed_str().into_string();
                 if let Some(schema) = c.schema.as_mut() {
+                    schema.name = schema.name.take().map(|n| n.into_boxed_str().into_string());
                     schema.encoding = std::mem::take(&mut schema.encoding)
                         .into_boxed_str()
                         .into_string();

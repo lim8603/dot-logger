@@ -708,6 +708,15 @@ fn io_loop(
             panic!("injected IO panic");
         }
         let mut busy = false;
+        // Free expired protection before a batch needs to rotate/delete a
+        // segment. Use this turn's clock so write_batch never moves it back.
+        let expire = now.saturating_duration_since(expired) >= tuning.sync_every;
+        if expire {
+            expired = now;
+            for target in targets.iter_mut() {
+                expire_events(target, ns(origin, now), flags);
+            }
+        }
         while let Ok(next) = work.try_recv() {
             syncs.push(next);
             busy = true;
@@ -774,13 +783,8 @@ fn io_loop(
             }
             busy = true;
         }
-        // Expiry runs at least once per sync period (API §22.3).
-        let expire = expired.elapsed() >= tuning.sync_every;
-        if expire {
-            expired = Instant::now();
-        }
         for target in targets.iter_mut() {
-            busy |= serve_events(target, expire, origin, flags);
+            busy |= serve_events(target, origin, flags);
         }
         // Read `stop` before `finish`: the host stores `finish` before it
         // releases `stop`, so a seen stop implies a seen finish. Reading them
@@ -823,16 +827,23 @@ impl IoTarget<'_, '_> {
     }
 }
 
-/// Expire due windows, then answer every queued mark and release request of
+fn expire_events(target: &mut IoTarget<'_, '_>, now: u64, flags: &Shared) {
+    let Some(marks) = target.marks.as_mut() else {
+        return;
+    };
+    if let Err(error) = marks.expire(target.log, now) {
+        if failure(&error) == FailureReason::IoFailure {
+            flags.io_failed.store(true, Ordering::Release);
+            target.status.fail();
+        }
+    }
+}
+
+/// Answer every queued mark and release request of
 /// one output. Each step reads the clock afresh, after the batch writes of
 /// this turn, so the log's time never goes backwards. Returns whether a
 /// request was served.
-fn serve_events(
-    target: &mut IoTarget<'_, '_>,
-    expire: bool,
-    origin: Instant,
-    flags: &Shared,
-) -> bool {
+fn serve_events(target: &mut IoTarget<'_, '_>, origin: Instant, flags: &Shared) -> bool {
     let Some(marks) = target.marks.as_mut() else {
         return false;
     };
@@ -842,11 +853,6 @@ fn serve_events(
             target.status.fail();
         }
     };
-    if expire {
-        if let Err(error) = marks.expire(target.log, ns(origin, Instant::now())) {
-            failed(&error);
-        }
-    }
     let mut served = false;
     while let Ok(work) = marks.work.try_recv() {
         served = true;
@@ -997,6 +1003,11 @@ fn drain_failed(
     tuning: Tuning,
     flags: &Shared,
 ) {
+    // Drop queued replies before draining; their callers must see Closing
+    // immediately instead of waiting for the full event response deadline.
+    for target in targets.iter_mut() {
+        target.marks = None;
+    }
     loop {
         let now = Instant::now();
         for target in targets.iter_mut() {
@@ -1018,5 +1029,155 @@ fn drain_failed(
         if flags.stop.load(Ordering::Acquire) || flags.finish.load(Ordering::Acquire) {
             return;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use crate::capture::{CaptureOwner, ChannelConfig, Importance, Level, RecordMetadata};
+    use crate::config::SessionBuilder;
+    use crate::logger::{Budget, EventWindow, Retention, WriterQuota};
+
+    /// Real routing guards and a one-record-per-segment event log, without
+    /// starting worker threads. Times and the expiry sweep are deterministic.
+    fn with_target(test: impl FnOnce(&mut IoTarget<'_, '_>, Tuning, &Shared)) {
+        let temp = super::super::tests::Temp::new();
+        let channel = ChannelConfig::new(1, 7, 1);
+        let channels = vec![StorageChannel {
+            channel,
+            topic: "blob".into(),
+            payload_encoding: "opaque".into(),
+            schema: None,
+        }];
+        let budget = Budget::new()
+            .memory_bytes(64 << 20)
+            .sync_every(Duration::from_millis(20))
+            .drop_deadline(Duration::from_secs(3))
+            .writer_quota(WriterQuota::small(64, 64));
+        let mut d = budget::derive(
+            &budget,
+            &[None],
+            &channels,
+            &[vec![1]],
+            &[Retention::ring(32 << 20).events(
+                EventWindow::new(Duration::ZERO, Duration::ZERO)
+                    .hold(Duration::from_nanos(100))
+                    .limits(1, 16 << 20),
+            )],
+            budget::Extra::default(),
+        )
+        .unwrap();
+        d.writer.max_records = 1;
+        d.retention[0].max_segments = 2;
+        let plan = SessionBuilder::new(d.session)
+            .validate(&d.platform)
+            .unwrap();
+        let mut owner =
+            CaptureOwner::new_tracked(&plan, 42, 1, &[channel], &d.routing, d.completion).unwrap();
+        owner.scope(|mut scope| {
+            let (mut producer, input) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![input], d.routing).unwrap();
+            let budget = router.writer_budget(1).unwrap();
+            let probe: Probe = Box::new(|| Ok(u64::MAX));
+            let store = FileStore::new(&temp.0, &budget, probe).unwrap();
+            let mut log =
+                SegmentLog::new(budget, d.writer, channels, d.retention[0], store, 0).unwrap();
+            let flags = Shared::new(1, false);
+            router.scope(|mut dispatch, mut outputs| {
+                let now = Instant::now();
+                let metadata = RecordMetadata {
+                    channel_id: 1,
+                    schema_id: 7,
+                    schema_version: 1,
+                    mono_ns: 0,
+                    real_ns: 0,
+                    source_time: None,
+                    level: Level::Info,
+                    importance: Some(Importance::Normal),
+                };
+                for _ in 0..3 {
+                    producer.try_record_small(metadata, &[1]).unwrap();
+                }
+                dispatch.turn(now, &mut [None; 16]).unwrap();
+                let (_send, receive) = mpsc::channel();
+                let mut target = IoTarget {
+                    id: 1,
+                    status: &flags.outputs[0],
+                    tap: None,
+                    consumer: outputs.remove(0),
+                    log: &mut log,
+                    marks: Some(Marks::new(d.events[0].unwrap(), receive)),
+                    batch: Vec::new(),
+                    held_since: None,
+                };
+                // Leave the third delivery queued for io_loop's first turn.
+                for _ in 0..2 {
+                    target
+                        .batch
+                        .push(target.consumer.try_next(now).unwrap().unwrap());
+                }
+                write_batch(&mut target, 0, &flags);
+                target
+                    .marks
+                    .as_mut()
+                    .unwrap()
+                    .mark(target.log, 1, 0, 0)
+                    .unwrap();
+                test(&mut target, d.tuning, &flags);
+            });
+        });
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn panic_drain_disconnects_queued_event_replies_before_shutdown() {
+        with_target(|target, tuning, flags| {
+            let (send, receive) = mpsc::channel();
+            target.marks = Some(Marks::new(
+                super::super::event::EventSpec {
+                    post_ns: 0,
+                    hold_ns: 100,
+                    max_events: 1,
+                },
+                receive,
+            ));
+            let (reply, answer) = mpsc::channel();
+            send.send(EventWork::Release { id: 1, reply }).unwrap();
+            let (_sync, work) = mpsc::channel();
+            flags.stop.store(true, Ordering::Release);
+            drain_failed(std::slice::from_mut(target), &work, tuning, flags);
+            assert!(
+                matches!(answer.try_recv(), Err(mpsc::TryRecvError::Disconnected)),
+                "panic drain retained a queued event reply"
+            );
+            assert!(target.marks.is_none());
+        });
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn expired_protection_is_released_before_a_batch_rotates() {
+        with_target(|target, mut tuning, flags| {
+            tuning.sync_every = Duration::ZERO;
+            tuning.batch_records = 1;
+            let (_sync, work) = mpsc::channel();
+            flags.finish.store(true, Ordering::Release);
+            io_loop(
+                std::slice::from_mut(target),
+                &work,
+                tuning,
+                flags,
+                Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
+            );
+            let health = flags.health(0, Duration::from_secs(1));
+            assert_eq!(
+                health.outputs[0].failed_records, 0,
+                "expired protection blocked rotation"
+            );
+            let sequences: Vec<_> = target.log.segments().iter().map(|s| s.sequence).collect();
+            assert_eq!(sequences, [1, 2]);
+        });
     }
 }

@@ -64,7 +64,8 @@ pub enum EventError {
     /// An output already holds `max_events` windows, or protecting this one
     /// would exceed its `protected_bytes`. Release a mark or wait for expiry.
     Quota,
-    /// The default worker is stopping or has stopped; nothing was changed.
+    /// The default worker is stopping or has stopped, or an output no longer
+    /// accepts event requests. Other outputs may already have answered.
     Closing,
     /// An output could not protect the window (a file fault, or the answer
     /// did not arrive within `4 × sync_every + 1 s`), or the mark was issued
@@ -139,6 +140,8 @@ impl Marks {
         at: u64,
         now: u64,
     ) -> Result<(), (EventError, Option<RetentionError>)> {
+        self.expire(log, now)
+            .map_err(|error| (EventError::Failed, Some(error)))?;
         // The handle read the clock before sending; never ahead of `now`.
         let at = at.min(now);
         let expires = at

@@ -40,9 +40,9 @@ unsafe_code = "forbid"
 unwrap_used = "warn"
 expect_used = "warn"
 
-# ADR-010 amendment (2026-11-11, EV-068): MCAP 0.26.0 with one patch — an
-# uncompressed chunk is hashed once and that CRC serves the data section too
-# (upstream hashes the same bytes twice). File bytes are unchanged. See
-# vendor/mcap-0.26.0/VENDORED.md.
+# ADR-010 amendment (EV-068): hash uncompressed chunks once, preserving bytes.
+# REV-055 RV-136 (EV-082): reject malformed chunk boundaries and prevalidate
+# complete chunks before export, including when their CRC is absent.
+# See vendor/mcap-0.26.0/VENDORED.md.
 [patch.crates-io]
 mcap = { path = "vendor/mcap-0.26.0" }

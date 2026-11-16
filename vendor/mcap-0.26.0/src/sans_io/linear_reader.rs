@@ -188,8 +188,9 @@ pub struct LinearReaderOptions {
     pub emit_chunks: bool,
     /// Enables chunk CRC validation. Ignored if `prevalidate_chunk_crcs: true`.
     pub validate_chunk_crcs: bool,
-    /// Enables chunk CRC validation before yielding any messages from the chunk. Implies
-    /// `validate_chunk_crcs: true`.
+    /// Buffers and validates the whole chunk before yielding any records, including record
+    /// boundaries and parsing. A zero CRC skips only the checksum, not this validation.
+    /// Implies `validate_chunk_crcs: true`.
     pub prevalidate_chunk_crcs: bool,
     /// Enables data section CRC validation.
     pub validate_data_section_crc: bool,
@@ -605,6 +606,9 @@ impl LinearReader {
                                                        + 4  // compression string length
                                                        + 8; // compressed size
 
+                    if len < MIN_CHUNK_HEADER_SIZE as u64 {
+                        return Some(Err(McapError::UnexpectedEoc));
+                    }
                     let min_header_buf = load!(MIN_CHUNK_HEADER_SIZE);
                     let compression_len =
                         u32::from_le_bytes(min_header_buf[28..32].try_into().unwrap());
@@ -622,6 +626,23 @@ impl LinearReader {
                             .ok_or(McapError::ChunkTooLarge(header_len)));
                     let header_buf = consume!(header_len);
                     let header: ChunkHeader = check!(std::io::Cursor::new(header_buf).read_le());
+
+                    if header.compression.is_empty()
+                        && header.compressed_size != header.uncompressed_size
+                    {
+                        return Some(Err(McapError::UnexpectedEoc));
+                    }
+                    if self.options.prevalidate_chunk_crcs {
+                        check!(
+                            check_len(header.compressed_size, self.options.record_length_limit)
+                                .ok_or(McapError::ChunkTooLarge(header.compressed_size))
+                        );
+                        check!(check_len(
+                            header.uncompressed_size,
+                            self.options.record_length_limit
+                        )
+                        .ok_or(McapError::ChunkTooLarge(header.uncompressed_size)));
+                    }
 
                     // Length checks run before the decompressor is taken out of the map. An error
                     // here must leave the decoder in place for a later chunk.
@@ -669,7 +690,7 @@ impl LinearReader {
                     } else {
                         None
                     };
-                    if self.options.prevalidate_chunk_crcs && state.crc != 0 {
+                    if self.options.prevalidate_chunk_crcs {
                         self.currently_reading = ValidatingChunkCrc;
                     } else {
                         self.currently_reading = ChunkRecord;
@@ -693,9 +714,13 @@ impl LinearReader {
                             let records = load!(to_load);
                             let calculated = crc32fast::hash(records);
                             let saved = state.crc;
-                            if calculated != saved {
+                            if saved != 0 && calculated != saved {
                                 return Some(Err(McapError::BadChunkCrc { saved, calculated }));
                             }
+                            check!(validate_chunk_records(
+                                records,
+                                self.options.record_length_limit
+                            ));
                             self.currently_reading = ChunkRecord;
                         }
                         Some(decompressor) => {
@@ -711,9 +736,13 @@ impl LinearReader {
                                 let calculated =
                                     crc32fast::hash(self.decompressed_content.unread());
                                 let saved = state.crc;
-                                if calculated != saved {
+                                if saved != 0 && calculated != saved {
                                     return Some(Err(McapError::BadChunkCrc { saved, calculated }));
                                 }
+                                check!(validate_chunk_records(
+                                    self.decompressed_content.unread(),
+                                    self.options.record_length_limit
+                                ));
                                 self.currently_reading = ChunkRecord;
                                 continue;
                             }
@@ -732,9 +761,15 @@ impl LinearReader {
                                 self.currently_reading = PaddingAfterChunk;
                                 continue;
                             }
+                            if state.compressed_remaining < OPCODE_LEN_SIZE as u64 {
+                                return Some(Err(McapError::UnexpectedEoc));
+                            }
                             let opcode_len_buf = load!(OPCODE_LEN_SIZE);
                             let opcode = opcode_len_buf[0];
                             let len = u64::from_le_bytes(opcode_len_buf[1..].try_into().unwrap());
+                            if len > state.compressed_remaining - OPCODE_LEN_SIZE as u64 {
+                                return Some(Err(McapError::UnexpectedEoc));
+                            }
                             let len = check!(check_len(len, self.options.record_length_limit)
                                 .ok_or(McapError::RecordTooLarge { opcode, len }));
                             let opcode_len_data = consume!(OPCODE_LEN_SIZE + len);
@@ -982,6 +1017,27 @@ fn decompress_inner(
         *compressed_remaining -= res.consumed as u64;
         *uncompressed_remaining -= res.wrote as u64;
     }
+}
+
+// The caller already buffered at most record_length_limit bytes. Check every
+// record before exposing any part of the chunk; CRC-valid bytes may still
+// contain malformed record bodies. Parsing here borrows payload data.
+fn validate_chunk_records(mut data: &[u8], limit: Option<usize>) -> McapResult<()> {
+    while !data.is_empty() {
+        if data.len() < OPCODE_LEN_SIZE {
+            return Err(McapError::UnexpectedEoc);
+        }
+        let opcode = data[0];
+        let len = u64::from_le_bytes(data[1..OPCODE_LEN_SIZE].try_into().unwrap());
+        if len > (data.len() - OPCODE_LEN_SIZE) as u64 {
+            return Err(McapError::UnexpectedEoc);
+        }
+        let len = check_len(len, limit).ok_or(McapError::RecordTooLarge { opcode, len })?;
+        let end = OPCODE_LEN_SIZE + len;
+        crate::parse_record(opcode, &data[OPCODE_LEN_SIZE..end])?;
+        data = &data[end..];
+    }
+    Ok(())
 }
 
 #[cfg(test)]

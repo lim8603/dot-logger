@@ -12,9 +12,9 @@ use super::{
 
 const MIB: usize = 1024 * 1024;
 
-struct Temp(PathBuf);
+pub(super) struct Temp(pub(super) PathBuf);
 impl Temp {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -338,4 +338,101 @@ fn health_reports_overdue_sync_telemetry_age_and_remote_placement() {
         shared.placed(Some(true));
         assert_eq!(shared.health(12 * S, overdue).affinity, Some(false));
     }
+}
+
+/// RV-137: a dead output must not stop rollback on later live outputs.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn event_rollback_reaches_live_outputs_after_a_disconnected_output() {
+    use super::EventError;
+    use super::event::EventWork;
+    use std::sync::mpsc;
+    let temp = Temp::new();
+    let mut logger = start(&temp);
+    logger.overdue = Duration::from_millis(200);
+    let (dead, gone) = mpsc::channel();
+    drop(gone);
+    let (live, requests) = mpsc::channel();
+    logger.events = vec![dead, live];
+    let worker = std::thread::spawn(move || {
+        let mut marks = Vec::new();
+        while let Ok(request) = requests.recv_timeout(Duration::from_secs(1)) {
+            match request {
+                EventWork::Mark { reply, .. } => {
+                    marks.push("mark");
+                    let _ = reply.send(Ok(()));
+                }
+                EventWork::Release { reply, .. } => {
+                    marks.push("release");
+                    let _ = reply.send(Ok(()));
+                    break;
+                }
+            }
+        }
+        marks
+    });
+    assert_eq!(logger.mark_event(), Err(EventError::Closing));
+    assert_eq!(worker.join().unwrap(), ["mark", "release"]);
+}
+
+/// A failure reported before a dropped reply outranks Closing.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn event_failed_answer_outranks_a_disconnected_reply() {
+    use super::EventError;
+    use super::event::EventWork;
+    use std::sync::mpsc;
+    let temp = Temp::new();
+    let mut logger = start(&temp);
+    let (a, first) = mpsc::channel();
+    let (b, second) = mpsc::channel();
+    logger.events = vec![a, b];
+    let worker = std::thread::spawn(move || {
+        if let EventWork::Mark { reply, .. } = first.recv().unwrap() {
+            reply.send(Err(EventError::Failed)).unwrap();
+        }
+        drop(second.recv().unwrap());
+    });
+    assert_eq!(
+        logger.ask(|reply| EventWork::Mark {
+            id: 1,
+            at: 0,
+            reply
+        }),
+        Err(EventError::Failed)
+    );
+    worker.join().unwrap();
+}
+
+/// Rollback is cleanup and must run even after a worker failure is observed.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn event_rollback_still_runs_after_the_worker_failed_flag() {
+    use super::EventError;
+    use super::event::EventWork;
+    use std::sync::mpsc;
+    let temp = Temp::new();
+    let mut logger = start(&temp);
+    logger.overdue = Duration::from_millis(200);
+    let (sender, requests) = mpsc::channel();
+    logger.events = vec![sender];
+    let shared = logger.shared.clone();
+    let worker = std::thread::spawn(move || {
+        if let EventWork::Mark { reply, .. } = requests.recv().unwrap() {
+            shared.worker_failed.store(true, Ordering::Release);
+            reply.send(Err(EventError::Quota)).unwrap();
+        }
+        match requests.recv_timeout(Duration::from_secs(1)) {
+            Ok(EventWork::Release { reply, .. }) => {
+                let _ = reply.send(Ok(()));
+                true
+            }
+            _ => false,
+        }
+    });
+    assert_eq!(logger.mark_event(), Err(EventError::Quota));
+    assert!(
+        worker.join().unwrap(),
+        "rollback skipped after worker failure"
+    );
 }

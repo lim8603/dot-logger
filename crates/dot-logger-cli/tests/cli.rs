@@ -2372,3 +2372,69 @@ fn unreachable_host_is_transport_failure_without_posted_notice() {
     assert_eq!(result.1.len(), 1);
     assert_eq!(result.1[0]["data"]["posted_host_io"], Value::Null);
 }
+
+/// REV-055 RV-136/139: the real CLI handles a chunk boundary overrun without
+/// unwinding and discards output if a repeated summary channel is inconsistent.
+#[test]
+fn export_damaged_chunk_and_invalid_summary_follow_the_output_contract() {
+    let f = fixture([10, 20]);
+    let original = std::fs::read(&f.source).unwrap();
+    let target = f.dir.join("exported.mcap");
+    let input = f.dir.join("corrupt.mcap");
+    let export = || {
+        run([
+            "export".as_ref(),
+            "--standard".as_ref(),
+            "--input".as_ref(),
+            input.as_os_str(),
+            "--output".as_ref(),
+            target.as_os_str(),
+        ])
+    };
+    let mut offset = mcap::MAGIC.len();
+    while original[offset] != mcap::records::op::CHUNK {
+        let len = u64::from_le_bytes(original[offset + 1..offset + 9].try_into().unwrap()) as usize;
+        offset += 9 + len;
+    }
+    let mut damaged = original[..offset].to_vec();
+    damaged.push(mcap::records::op::CHUNK);
+    damaged.extend_from_slice(&50u64.to_le_bytes());
+    damaged.extend_from_slice(&[0; 16]);
+    damaged.extend_from_slice(&10u64.to_le_bytes()); // uncompressed bytes
+    damaged.extend_from_slice(&0u32.to_le_bytes()); // no CRC
+    damaged.extend_from_slice(&0u32.to_le_bytes()); // no compression
+    damaged.extend_from_slice(&10u64.to_le_bytes());
+    damaged.push(mcap::records::op::MESSAGE);
+    damaged.extend_from_slice(&10u64.to_le_bytes()); // crosses the chunk boundary
+    damaged.push(0);
+    damaged.extend_from_slice(&[0; 64]);
+    std::fs::write(&input, damaged).unwrap();
+    let result = export();
+    assert_outcome(&result, 0, "complete");
+    assert_eq!(result.1[0]["data"]["messages"], 0);
+    assert!(result.1[0]["data"]["truncated"].is_string());
+    let bytes = std::fs::read(&target).unwrap();
+    assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 0);
+    std::fs::remove_file(&target).unwrap();
+
+    let mut damaged = original;
+    let mut offset = mcap::MAGIC.len();
+    while offset + 9 <= damaged.len() {
+        let opcode = damaged[offset];
+        let len = u64::from_le_bytes(damaged[offset + 1..offset + 9].try_into().unwrap()) as usize;
+        if opcode == mcap::records::op::CHANNEL {
+            // The outer Channel is the summary copy; the first is in a chunk.
+            damaged[offset + 11..offset + 13].fill(0);
+            break;
+        }
+        offset += 9 + len;
+    }
+    assert!(
+        offset + 9 <= damaged.len(),
+        "fixture must contain a summary channel"
+    );
+    std::fs::write(&input, damaged).unwrap();
+    let result = export();
+    assert_outcome(&result, 4, "invalid_data");
+    assert!(!target.exists(), "invalid channel left a partial export");
+}

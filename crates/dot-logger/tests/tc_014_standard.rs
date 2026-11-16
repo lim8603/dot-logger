@@ -499,13 +499,32 @@ mod raw {
     }
     /// A channel with the `payload_encoding` metadata the export requires.
     pub fn channel(out: &mut Vec<u8>, id: u16, schema_id: u16, topic: &str, encoding: &str) {
+        channel_metadata(
+            out,
+            id,
+            schema_id,
+            topic,
+            encoding,
+            &[("payload_encoding", "json")],
+        );
+    }
+    pub fn channel_metadata(
+        out: &mut Vec<u8>,
+        id: u16,
+        schema_id: u16,
+        topic: &str,
+        encoding: &str,
+        metadata: &[(&str, &str)],
+    ) {
         let mut body = id.to_le_bytes().to_vec();
         body.extend_from_slice(&schema_id.to_le_bytes());
         string(&mut body, topic);
         string(&mut body, encoding);
         let mut map = Vec::new();
-        string(&mut map, "payload_encoding");
-        string(&mut map, "json");
+        for (key, value) in metadata {
+            string(&mut map, key);
+            string(&mut map, value);
+        }
         body.extend_from_slice(&(map.len() as u32).to_le_bytes());
         body.extend_from_slice(&map);
         record(out, mcap::records::op::CHANNEL, &body);
@@ -513,6 +532,31 @@ mod raw {
     /// A schema record whose body is too short to parse.
     pub fn broken_schema(out: &mut Vec<u8>) {
         record(out, mcap::records::op::SCHEMA, &[1]);
+    }
+    pub fn message(out: &mut Vec<u8>, data: &[u8]) {
+        let mut body = 1u16.to_le_bytes().to_vec();
+        body.extend_from_slice(&1u32.to_le_bytes());
+        body.extend_from_slice(&1u64.to_le_bytes());
+        body.extend_from_slice(&1u64.to_le_bytes());
+        body.extend_from_slice(data);
+        record(out, mcap::records::op::MESSAGE, &body);
+    }
+    pub fn chunk(out: &mut Vec<u8>, records: &[u8], crc: bool) {
+        let mut body = vec![0; 16];
+        body.extend_from_slice(&(records.len() as u64).to_le_bytes());
+        // Independent bitwise CRC-32, for fixtures with deliberately bad records.
+        let mut hash = !0u32;
+        for b in records {
+            hash ^= u32::from(*b);
+            for _ in 0..8 {
+                hash = (hash >> 1) ^ (0xedb8_8320 & 0u32.wrapping_sub(hash & 1));
+            }
+        }
+        body.extend_from_slice(&(if crc { !hash } else { 0 }).to_le_bytes());
+        string(&mut body, "");
+        body.extend_from_slice(&(records.len() as u64).to_le_bytes());
+        body.extend_from_slice(records);
+        record(out, mcap::records::op::CHUNK, &body);
     }
 }
 
@@ -628,4 +672,219 @@ fn f12_metadata_and_attachments_are_skipped_and_counted() {
     let summary = mcap::Summary::read(&output).unwrap().unwrap();
     assert!(summary.attachment_indexes.is_empty());
     assert!(summary.metadata_indexes.is_empty());
+}
+
+/// REV-055 RV-136: no message from a damaged chunk may escape, even when
+/// the CRC is absent or correct and a later record cannot be parsed.
+#[test]
+fn f13_damaged_chunks_export_only_the_preceding_complete_chunk() {
+    let temp = Temp::new();
+    let files = record_file(&temp, 1, 0, 16);
+    let bytes = std::fs::read(&files[0]).unwrap();
+    let envelope = mcap::MessageStream::new(&bytes)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .data
+        .into_owned();
+    let mut good = Vec::new();
+    raw::message(&mut good, &envelope);
+    for crc in [false, true] {
+        for damage in ["record body", "record length", "short header", "truncated"] {
+            let mut input = raw::file();
+            raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+            raw::channel(&mut input, 1, 1, "robot/a", "protobuf");
+            raw::chunk(&mut input, &good, true);
+            let mut bad = good.clone();
+            match damage {
+                "record body" => raw::broken_schema(&mut bad),
+                "record length" => {
+                    bad.push(mcap::records::op::MESSAGE);
+                    bad.extend_from_slice(&10u64.to_le_bytes());
+                    bad.push(0);
+                }
+                "short header" => bad.push(mcap::records::op::MESSAGE),
+                "truncated" => bad.extend_from_slice(&good),
+                _ => unreachable!(),
+            }
+            raw::chunk(&mut input, &bad, crc);
+            if damage == "truncated" {
+                input.truncate(input.len() - 10);
+            } else {
+                // Enough bytes after the chunk to expose boundary overreads.
+                input.extend_from_slice(&[0; 64]);
+            }
+            let (out, report) = export_bytes(&input);
+            assert!(report.truncated.is_some(), "{crc} {damage}: {report:?}");
+            assert_eq!(report.messages, 1, "{crc} {damage}: {report:?}");
+            assert_eq!(mcap::MessageStream::new(&out).unwrap().count(), 2);
+        }
+    }
+}
+
+/// RV-136: streaming readers must reject a record that crosses an
+/// uncompressed chunk boundary, including a partial opcode/length header.
+#[test]
+fn f14_streaming_reader_rejects_uncompressed_chunk_boundary_overreads() {
+    use mcap::sans_io::linear_reader::{LinearReadEvent, LinearReader};
+    for remaining in [1, 8, 10] {
+        let mut body = vec![mcap::records::op::MESSAGE];
+        body.extend_from_slice(&10u64.to_le_bytes());
+        body.resize(remaining, 0);
+        let mut input = raw::file();
+        raw::chunk(&mut input, &body, false);
+        input.extend_from_slice(&[0; 64]);
+        let mut input = &input[..];
+        let mut reader = LinearReader::new();
+        let mut rejected = false;
+        while let Some(event) = reader.next_event() {
+            match event {
+                Ok(LinearReadEvent::ReadRequest(n)) => {
+                    let len = n.min(input.len());
+                    reader.insert(n)[..len].copy_from_slice(&input[..len]);
+                    reader.notify_read(len);
+                    input = &input[len..];
+                }
+                Ok(LinearReadEvent::Record { opcode, .. }) => {
+                    assert_ne!(opcode, mcap::records::op::MESSAGE)
+                }
+                Err(mcap::McapError::UnexpectedEoc) => {
+                    rejected = true;
+                    break;
+                }
+                Err(e) => panic!("wrong boundary error: {e:?}"),
+            }
+        }
+        assert!(rejected);
+    }
+}
+
+#[test]
+fn f15_crc_absent_chunks_still_obey_the_chunk_buffer_limit() {
+    let mut input = raw::file();
+    raw::chunk(&mut input, &[0; 2048], false);
+    let result = export(
+        &input[..],
+        &mut Cursor::new(Vec::new()),
+        ExportLimits::new(1024),
+        &AtomicBool::new(false),
+    );
+    assert!(
+        matches!(result, Err(ExportError::RecordTooLarge)),
+        "{result:?}"
+    );
+}
+
+/// RV-139: descriptor references cannot resolve to the product Envelope,
+/// and a descriptor name must be nonempty and accompanied by a descriptor.
+#[test]
+fn f16_invalid_payload_schema_references_are_rejected() {
+    for metadata in [
+        vec![
+            ("payload_encoding", "protobuf"),
+            ("payload_schema_file_id", "1"),
+        ],
+        vec![
+            ("payload_encoding", "protobuf"),
+            ("payload_schema_file_id", "2"),
+        ],
+        vec![
+            ("payload_encoding", "protobuf"),
+            ("payload_schema_file_id", "3"),
+            ("payload_schema_name", ""),
+        ],
+        vec![
+            ("payload_encoding", "protobuf"),
+            ("payload_schema_name", "test.Pose"),
+        ],
+        vec![
+            ("payload_encoding", "protobuf"),
+            ("payload_schema_file_id", "3"),
+            ("payload_schema_name", raw::ENVELOPE),
+        ],
+    ] {
+        let mut input = raw::file();
+        raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+        raw::schema(&mut input, 2, raw::ENVELOPE, "protobuf", b"a");
+        raw::schema(&mut input, 3, "test.Pose", "protobuf", POSE_FDS);
+        raw::channel_metadata(&mut input, 1, 1, "robot/a", "protobuf", &metadata);
+        let err = export_err(&input);
+        assert!(
+            matches!(err, ExportError::InvalidRecord),
+            "{metadata:?}: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn f17_repeated_channel_definitions_must_match_every_field() {
+    for (schema, topic, encoding, metadata) in [
+        (0, "robot/a", "protobuf", vec![("payload_encoding", "json")]),
+        (1, "robot/b", "protobuf", vec![("payload_encoding", "json")]),
+        (1, "robot/a", "json", vec![("payload_encoding", "json")]),
+        (1, "robot/a", "protobuf", vec![("payload_encoding", "cbor")]),
+        (
+            1,
+            "robot/a",
+            "protobuf",
+            vec![("payload_encoding", "json"), ("extra", "changed")],
+        ),
+    ] {
+        let mut input = raw::file();
+        raw::schema(&mut input, 1, raw::ENVELOPE, "protobuf", b"a");
+        raw::channel(&mut input, 1, 1, "robot/a", "protobuf");
+        raw::channel_metadata(&mut input, 1, schema, topic, encoding, &metadata);
+        let err = export_err(&input);
+        assert!(
+            matches!(err, ExportError::InvalidRecord),
+            "{schema} {topic} {encoding}: {err:?}"
+        );
+    }
+}
+
+/// The prevalidation fix also accepts compressed chunks with and without
+/// CRCs and still enforces the decompressed-size limit before allocation.
+#[test]
+#[cfg(feature = "compression-zstd")]
+fn f18_compressed_chunks_remain_readable_and_bounded() {
+    let temp = Temp::new();
+    let files = record_file(&temp, 0, 2, 4096);
+    let original = std::fs::read(&files[0]).unwrap();
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut writer = mcap::WriteOptions::new()
+            .profile("dot-logger/1")
+            .compression(Some(mcap::Compression::Zstd))
+            .create(&mut buffer)
+            .unwrap();
+        for message in mcap::MessageStream::new(&original).unwrap() {
+            writer.write(&message.unwrap()).unwrap();
+        }
+        writer.finish().unwrap();
+    }
+    let mut bytes = buffer.into_inner();
+    let mut offset = mcap::MAGIC.len();
+    while bytes[offset] != mcap::records::op::CHUNK {
+        let len = u64::from_le_bytes(bytes[offset + 1..offset + 9].try_into().unwrap()) as usize;
+        offset += 9 + len;
+    }
+    for crc in [true, false] {
+        if !crc {
+            bytes[offset + 9 + 24..offset + 9 + 28].fill(0);
+        }
+        let (_, report) = export_bytes(&bytes);
+        assert_eq!(report.messages, 2);
+        assert!(report.truncated.is_none(), "{report:?}");
+        let result = export(
+            &bytes[..],
+            &mut Cursor::new(Vec::new()),
+            ExportLimits::new(1024),
+            &AtomicBool::new(false),
+        );
+        assert!(
+            matches!(result, Err(ExportError::RecordTooLarge)),
+            "{result:?}"
+        );
+    }
 }

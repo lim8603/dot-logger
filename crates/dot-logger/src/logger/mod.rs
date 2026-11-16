@@ -1115,7 +1115,7 @@ impl Logger {
             Err(error) => {
                 // Requests are served in order, so this also releases a
                 // late protection of an output that did not answer in time.
-                let _ = self.ask(|reply| event::EventWork::Release { id, reply });
+                let _ = self.ask_all(|reply| event::EventWork::Release { id, reply });
                 Err(error)
             }
         }
@@ -1148,23 +1148,33 @@ impl Logger {
         if self.worker_failed() {
             return Err(EventError::Closing);
         }
+        self.ask_all(request)
+    }
+
+    /// Cleanup must reach every live output even after another worker failed.
+    fn ask_all(
+        &self,
+        request: impl Fn(event::Reply) -> event::EventWork,
+    ) -> Result<(), EventError> {
         let (reply, answers) = mpsc::channel();
+        let mut sent = 0;
+        let mut result = Ok(());
         for output in &self.events {
-            output
-                .send(request(reply.clone()))
-                .map_err(|_| EventError::Closing)?;
+            match output.send(request(reply.clone())) {
+                Ok(()) => sent += 1,
+                Err(_) => result = worse(result, EventError::Closing),
+            }
         }
         drop(reply);
         let deadline = budget::later(Instant::now(), self.overdue);
-        let mut result = Ok(());
-        for _ in 0..self.events.len() {
+        for _ in 0..sent {
             let wait = deadline.saturating_duration_since(Instant::now());
             match answers.recv_timeout(wait) {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => result = worse(result, error),
-                Err(RecvTimeoutError::Timeout) => return Err(EventError::Failed),
+                Err(RecvTimeoutError::Timeout) => return worse(result, EventError::Failed),
                 // An IO thread ended with the request unanswered.
-                Err(RecvTimeoutError::Disconnected) => return Err(EventError::Closing),
+                Err(RecvTimeoutError::Disconnected) => return worse(result, EventError::Closing),
             }
         }
         result

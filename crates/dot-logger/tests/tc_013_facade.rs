@@ -1760,3 +1760,45 @@ fn f36_memory_requirement_with_event_windows_is_exact() {
         );
     }
 }
+
+/// REV-055 RV-138: expired marks free their quota before a new mark,
+/// without waiting for the periodic sweep (deliberately sixty seconds away).
+#[test]
+fn f37_a_new_mark_reclaims_expired_quota_before_periodic_sync() {
+    use dot_logger::logger::EventWindow;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(
+            Budget::new()
+                .memory_bytes(64 * MIB)
+                .sync_every(Duration::from_secs(60))
+                .drop_deadline(Duration::from_secs(3))
+                .writer_quota(WriterQuota::small(64, 64)),
+        )
+        .file_output(
+            &temp.0,
+            Retention::ring(32 * MIB as u64).events(
+                EventWindow::new(Duration::from_nanos(1), Duration::ZERO)
+                    .hold(Duration::from_secs(1))
+                    .limits(1, 16 * MIB as u64),
+            ),
+        )
+        .channel::<Pose>("pose")
+        .writer("control")
+        .start()
+        .unwrap();
+    let mark = logger.mark_event().unwrap();
+    std::thread::sleep(Duration::from_millis(1100));
+    let next = logger
+        .mark_event()
+        .expect("expired slot must be reusable immediately");
+    assert_ne!(mark.id(), next.id());
+    logger.release_event(mark).unwrap();
+    logger.release_event(next).unwrap();
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(5))
+            .unwrap()
+            .is_success()
+    );
+}

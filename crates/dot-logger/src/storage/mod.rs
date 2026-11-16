@@ -46,8 +46,8 @@
 //! independent empty sink. The caller supplies the original session, revision and
 //! channel registrations, `RecoveryOptions` (input size, record/chunk limits,
 //! output `WriterConfig`) and a cancel flag. It targets the product's uncompressed
-//! `dot-logger/1` format with nonzero chunk CRC and copies a complete chunk only
-//! after its length, CRC, references, envelopes and producer sequences all check.
+//! `dot-logger/standard/1` format with nonzero chunk CRC and copies a complete chunk only
+//! after its length, CRC, references, user/meta pairs and producer sequences all check.
 //! It does not resynchronize after damage: `RecoveryReport` names the verified
 //! prefix, the excluded suffix and the cause. Original and opaque payloads are
 //! kept under a new standard summary and auxiliary indexes, and the new file is
@@ -62,19 +62,20 @@
 //! unchanged during recovery and links per-target IO errors to the existing
 //! completion failure reports.
 mod catalog;
-mod codec;
+pub(crate) mod codec;
 mod index;
+mod read;
 pub(crate) mod recovery;
 mod retention;
-pub mod standard;
 pub(crate) use retention::{log_required, smallest_rotated_segment};
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};
 pub(crate) use catalog::ReadPermit;
 pub use catalog::{EventReport, ReadPin, RetentionConfig, RetentionMode, SegmentInfo};
-pub use codec::{StoredRecord, decode_record, encode_record};
+pub use codec::StoredRecord;
 pub use index::ChunkIndexEntry;
+pub use read::{FileInfo, NativeReader};
 pub use recovery::{
     RecoveredSegment, RecoveryConfig, RecoveryError, RecoveryOptions, RecoveryReport, RecoveryStop,
     recover_segment, recover_to_store,
@@ -279,7 +280,7 @@ pub struct StorageChannel {
     pub channel: ChannelConfig,
     /// Bounded display topic, not a filesystem path.
     pub topic: String,
-    /// User payload encoding inside the product envelope.
+    /// MCAP message encoding of the original application payload.
     pub payload_encoding: String,
     /// Optional descriptor repeated within each segment.
     pub schema: Option<PayloadSchema>,
@@ -287,17 +288,18 @@ pub struct StorageChannel {
 /// Explicit per-segment limits; no disk retention or capacity defaults are inferred.
 #[derive(Clone, Copy, Debug)]
 pub struct WriterConfig {
-    /// Largest payload, separate from envelope overhead.
+    /// Largest payload, separate from metadata pair overhead.
     pub max_payload_bytes: usize,
     /// Explicit management-path write buffer capacity; zero selects direct IO.
     pub write_buffer_bytes: usize,
     /// Chunk target; a single larger permitted record uses its own chunk.
     pub chunk_target_bytes: usize,
-    /// Hard segment message count; reaching it requires a new segment.
+    /// Hard logical user-record count; each record writes two MCAP messages.
     pub max_records: usize,
     /// Hard chunk/index count, including a metadata-only flushed chunk.
     pub max_chunks: usize,
-    /// Total input topic/encoding/descriptor metadata bytes.
+    /// Total caller topic/encoding/descriptor bytes. Native control metadata
+    /// is included separately in the fixed portion of the reservation.
     pub max_metadata_bytes: usize,
 }
 /// Progress retained when a batch cannot finish. Never append its accepted prefix again.
@@ -343,14 +345,14 @@ impl std::error::Error for SyncWorkError<'_, '_> {}
 /// Fixed storage failure categories, retaining ordinary OS IO errors.
 #[derive(Debug)]
 pub enum StorageError {
+    /// The file profile is not the native product format.
+    UnsupportedFormat,
     /// Invalid, overflowing or unsupported startup limits.
     InvalidConfig,
     /// Record/session/channel/schema/time/length does not match the frozen contract.
     InvalidRecord,
-    /// Encoded envelope is malformed or exceeds decoder limits.
+    /// Native framing or metadata is malformed or exceeds decoder limits.
     CorruptData,
-    /// The envelope major version is unsupported.
-    UnsupportedVersion(u32),
     /// Finite writer or index capacity requires rotation before accepting a record.
     NeedRotation,
     /// Shared startup reservation is being changed; retry on the general path.

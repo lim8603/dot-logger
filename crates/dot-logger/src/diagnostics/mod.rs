@@ -27,7 +27,7 @@ pub struct CheckBudgets {
     /// Maximum elapsed session-monotonic nanoseconds for new load admission.
     /// In-flight OS IO and final drain/sync may outlast this admission deadline.
     pub duration_ns: u64,
-    /// Maximum physical output bytes, including envelopes/index/footer overhead.
+    /// Maximum physical output bytes, including metadata pairs/index/footer overhead.
     /// Payload bytes alone must not be supplied as physical write accounting.
     pub write_bytes: u64,
     /// Total declared check memory allowance, including buffers/stacks/metadata.

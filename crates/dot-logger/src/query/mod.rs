@@ -2,7 +2,7 @@
 use crate::capture::{CapturedRecord, Level};
 use crate::config::ValidatedConfig;
 use crate::storage::{
-    ReadPermit, StorageChannel, decode_record,
+    ReadPermit, StorageChannel,
     recovery::{Fields, Validation, crc_update, read_frame},
 };
 use std::cell::Cell;
@@ -358,7 +358,7 @@ impl QueryConfig {
 }
 impl<R: Read + Seek> Snapshot<R> {
     /// Validate and index the frozen source ranges. Sources must be independently
-    /// opened, uncompressed dot-logger/1 files with the supplied original registrations.
+    /// opened, uncompressed dot-logger/standard/1 files with the supplied original registrations.
     /// Large payloads are decoded only in bounded scan scratch, then referenced on disk.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -466,7 +466,7 @@ impl<R: Read + Seek> Snapshot<R> {
             .map_err(scan_stop)?;
         let mut f = Fields(&buffer[..len]);
         if op != 1
-            || f.string().map_err(invalid)? != b"dot-logger/1"
+            || f.string().map_err(invalid)? != crate::storage::codec::PROFILE.as_bytes()
             || std::str::from_utf8(f.string().map_err(invalid)?).is_err()
             || !f.0.is_empty()
         {
@@ -474,16 +474,13 @@ impl<R: Read + Seek> Snapshot<R> {
         }
         let mut crc = crc_update(crc_update(!0, &magic), &header);
         crc = crc_update(crc, &buffer[..len]);
-        let mut validation = Validation {
-            session: identity.0,
-            revision: identity.1,
-            channels,
-            envelope: None,
-            payload_schemas: vec![None; channels.len()],
-            seen: vec![false; channels.len()],
-            last: vec![0; self.config.producers],
-            max_payload: self.config.max_payload_bytes,
-        };
+        let mut validation = Validation::new(
+            identity.0,
+            identity.1,
+            std::borrow::Cow::Borrowed(channels),
+            self.config.producers,
+            self.config.max_payload_bytes,
+        );
         while position < end {
             check(now, self.deadline, cancel)?;
             let start = position;
@@ -492,6 +489,7 @@ impl<R: Read + Seek> Snapshot<R> {
                 .map_err(scan_stop)?;
             let body = &buffer[..len];
             match op {
+                12 => validation.metadata(body).map_err(invalid)?,
                 3 => validation.schema(body).map_err(invalid)?,
                 4 => validation.channel(body).map_err(invalid)?,
                 6 => {
@@ -512,20 +510,15 @@ impl<R: Read + Seek> Snapshot<R> {
                         if self.rows.len() == self.config.max_records {
                             return Err(QueryError::Limit);
                         }
-                        let envelope = record.get(22..).ok_or(QueryError::CorruptData)?;
-                        let stored = decode_record(envelope, self.config.max_payload_bytes)
-                            .map_err(invalid)?;
-                        let (payload_start, payload_len) = payload_range(envelope)?;
-                        if envelope.get(payload_start..payload_start + payload_len)
-                            != Some(stored.payload.as_slice())
-                        {
+                        let (op, meta) = nested.record().map_err(invalid)?;
+                        if op != 5 {
                             return Err(QueryError::CorruptData);
                         }
+                        let stored = validation.pair(record, meta).map_err(invalid)?;
                         let absolute = start
                             .checked_add(9)
                             .and_then(|n| n.checked_add(at as u64))
                             .and_then(|n| n.checked_add(9 + 22))
-                            .and_then(|n| n.checked_add(payload_start as u64))
                             .ok_or(QueryError::CorruptData)?;
                         self.rows.push(Row {
                             record: stored.record,
@@ -773,55 +766,4 @@ fn timestamp(row: &Row, basis: TimeBasis) -> Result<i128, QueryError> {
             t.ticks as i128
         }
     })
-}
-// Locate the exact on-disk protobuf bytes field after the bounded full decoder has
-// validated the envelope. Reject unsupported group wire types and duplicate payloads
-// rather than guessing a contiguous blob location for an ambiguous envelope.
-fn payload_range(bytes: &[u8]) -> Result<(usize, usize), QueryError> {
-    fn varint(bytes: &[u8], at: &mut usize) -> Result<u64, QueryError> {
-        let mut n = 0;
-        for shift in (0..70).step_by(7) {
-            let b = *bytes.get(*at).ok_or(QueryError::CorruptData)?;
-            *at += 1;
-            if shift == 63 && b > 1 {
-                return Err(QueryError::CorruptData);
-            }
-            n |= u64::from(b & 127) << shift;
-            if b & 128 == 0 {
-                return Ok(n);
-            }
-        }
-        Err(QueryError::CorruptData)
-    }
-    let mut at = 0;
-    let mut payload = None;
-    while at < bytes.len() {
-        let key = varint(bytes, &mut at)?;
-        if key >> 3 == 0 {
-            return Err(QueryError::CorruptData);
-        }
-        let size = match key & 7 {
-            0 => {
-                varint(bytes, &mut at)?;
-                continue;
-            }
-            1 => 8,
-            2 => usize::try_from(varint(bytes, &mut at)?).map_err(invalid)?,
-            5 => 4,
-            _ => return Err(QueryError::CorruptData),
-        };
-        let end = at
-            .checked_add(size)
-            .filter(|end| *end <= bytes.len())
-            .ok_or(QueryError::CorruptData)?;
-        if key >> 3 == 20 {
-            if key & 7 != 2 || payload.is_some() {
-                return Err(QueryError::CorruptData);
-            }
-            payload = Some((at, size));
-        }
-        at = end;
-    }
-    // A protobuf empty bytes field may be absent; it still has a valid empty range.
-    Ok(payload.unwrap_or((bytes.len(), 0)))
 }

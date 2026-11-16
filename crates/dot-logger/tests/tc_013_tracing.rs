@@ -4,7 +4,7 @@
 
 use dot_logger::capture::Level;
 use dot_logger::logger::{Budget, Logger, LookupError, Retention, Shutdown, WriterQuota};
-use dot_logger::storage::decode_record;
+use dot_logger::storage::NativeReader;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -63,8 +63,8 @@ fn stored(dir: &Path) -> Vec<(Level, String)> {
     let mut out = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let record = decode_record(&message.unwrap().data, 4096).unwrap();
+        for message in NativeReader::new(&bytes, 4096, 4096).unwrap() {
+            let record = message.unwrap();
             out.push((
                 record.record.metadata.level,
                 String::from_utf8(record.payload.to_vec()).unwrap(),

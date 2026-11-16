@@ -214,7 +214,6 @@ pub struct SegmentLog<S: SegmentStore> {
     base: Box<[u64]>,
     /// Appended records not yet covered by a sync of their file.
     dirty: bool,
-    scratch: Vec<u8>,
     now: u64,
     next: u64,
     poisoned: bool,
@@ -335,7 +334,6 @@ impl<S: SegmentStore> SegmentLog<S> {
             last: vec![0; producers].into_boxed_slice(),
             base: budget.target_state.files.base(),
             dirty: false,
-            scratch: Vec::with_capacity(config.max_payload_bytes + codec::OVERHEAD),
             now,
             next: 0,
             poisoned: false,
@@ -348,7 +346,7 @@ impl<S: SegmentStore> SegmentLog<S> {
     }
     fn base_bound(config: WriterConfig, channels: usize) -> Result<u64, RetentionError> {
         16384u64
-            .checked_add(include_bytes!("envelope.bin").len() as u64 * 2)
+            .checked_add(include_bytes!("record_meta.bin").len() as u64 * 2)
             .and_then(|n| n.checked_add((config.max_metadata_bytes as u64).checked_mul(4)?))
             .and_then(|n| n.checked_add((channels as u64).checked_mul(1024)?))
             .ok_or(RetentionError::InvalidConfig)
@@ -458,6 +456,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             sink,
             self.target.clone(),
             false,
+            sequence,
         )?;
         self.writer = Some(writer);
         self.active = Some(Active {
@@ -505,12 +504,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         {
             return Err(RetentionError::InvalidRecord);
         }
-        encode_record(
-            record,
-            payload,
-            &mut self.scratch,
-            self.config.max_payload_bytes,
-        )?;
+        codec::validate_record(record, payload, self.config.max_payload_bytes)?;
         let charge = Self::record_bound(payload.len())?;
         let a = self.active.as_ref().ok_or(RetentionError::Poisoned)?;
         let mut rotated = if a.records >= self.config.max_records {

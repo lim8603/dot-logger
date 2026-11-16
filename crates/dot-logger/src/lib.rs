@@ -58,7 +58,7 @@ pub mod completion;
 /// Explicit synchronization and deadline-based normal shutdown coordination.
 pub mod control;
 
-/// Bounded general-path MCAP envelopes, file writers and chunk indexes.
+/// Bounded general-path MCAP pairs, file writers and chunk indexes.
 pub mod storage;
 
 /// Frozen complete-chunk snapshots, bounded query pages and original blob reads.

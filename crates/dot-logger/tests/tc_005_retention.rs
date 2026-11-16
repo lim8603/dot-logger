@@ -189,7 +189,7 @@ fn record_rotation_syncs_footer_renames_and_syncs_directory_before_publication()
                 ["create:0", "sync:0", "rename:0", "dir", "create:1"]
             );
             let bytes = state.borrow().files[&0].clone();
-            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 4);
         },
     );
 }
@@ -219,7 +219,7 @@ fn rotating_append_avoids_a_redundant_host_probe_and_later_appends_still_check_r
             log.append(record(4, 4), &[4], 4).unwrap();
             log.finish(5).unwrap();
             let bytes = state.borrow().files[&1].clone();
-            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 4);
         },
     );
 }
@@ -360,7 +360,7 @@ fn bytes_time_and_index_limits_rotate_without_losing_the_trigger_record() {
                 .borrow()
                 .files
                 .values()
-                .map(|b| mcap::MessageStream::new(b).unwrap().count())
+                .map(|b| NativeReader::new(b, 16, 4096).unwrap().count())
                 .sum();
             assert_eq!(
                 total,
@@ -837,14 +837,8 @@ fn filesystem_store_rotates_into_independently_readable_files_and_refuses_reuse(
             );
             let summary = mcap::Summary::read(&bytes).unwrap().unwrap();
             assert!(!summary.chunk_indexes.is_empty());
-            for message in mcap::MessageStream::new(&bytes).unwrap() {
-                sequences.push(
-                    decode_record(&message.unwrap().data, 16)
-                        .unwrap()
-                        .record
-                        .receipt
-                        .accepted_seq,
-                );
+            for message in NativeReader::new(&bytes, 16, 4096).unwrap() {
+                sequences.push(message.unwrap().record.receipt.accepted_seq);
             }
         }
         assert_eq!(sequences, vec![1, 2, 3, 4, 5, 6, 7]);
@@ -876,7 +870,7 @@ fn deletion_directory_failure_removes_unlinked_files_from_the_live_catalog() {
 #[test]
 fn index_byte_budget_rotates_before_the_message_count_or_chunk_count_limit() {
     let mut cfg = retention(RetentionMode::Continuous);
-    cfg.max_index_bytes = 1088;
+    cfg.max_index_bytes = 1152;
     let mut limits = writer();
     limits.max_records = 64;
     limits.max_chunks = 64;
@@ -1173,5 +1167,34 @@ fn active_query_pin_survives_rotation_and_is_reclaimed_after_source_drop() {
         assert!(matches!(log.rotate(21), Err(RetentionError::Capacity)));
         drop(source);
         log.rotate(22).unwrap();
+    });
+}
+
+#[test]
+fn index_budget_below_one_native_pair_is_rejected_before_creating_a_file() {
+    let plan = support::plan();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    owner.scope(|scope| {
+        let router =
+            Router::new(&plan, scope.map(|(_, r)| r).collect(), support::routing()).unwrap();
+        let state = Rc::new(RefCell::new(State {
+            free: u64::MAX,
+            ..State::default()
+        }));
+        let mut config = retention(RetentionMode::Continuous);
+        config.max_index_bytes = 1151; // 128 (two messages) + 512 (chunk) + 512 (channel/chunk).
+        let result = SegmentLog::new(
+            router.writer_budget(10).unwrap(),
+            writer(),
+            channels(),
+            config,
+            Store(state.clone()),
+            0,
+        );
+        assert!(matches!(result, Err(RetentionError::InvalidConfig)));
+        assert!(
+            state.borrow().ops.is_empty(),
+            "invalid native budget created a file"
+        );
     });
 }

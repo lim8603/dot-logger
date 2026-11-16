@@ -105,11 +105,11 @@ impl CheckRuntime for Runtime {
         // Observe the actual complete-chunk prefix before cleanup.
         if let Some(dir) = &self.inspect {
             let bytes = fs::read(dir.join("check.mcap"))?;
-            self.messages = mcap::MessageStream::new(&bytes)
+            self.messages = dot_logger::storage::NativeReader::new(&bytes, 64, 4096)
                 .map_err(io::Error::other)?
                 .filter_map(Result::ok)
                 .inspect(|m| {
-                    let decoded = dot_logger::storage::decode_record(&m.data, 64).unwrap();
+                    let decoded = m;
                     assert_eq!(decoded.payload, vec![17; 64]);
                     assert_eq!(decoded.record.revision, 7);
                 })
@@ -441,7 +441,7 @@ fn replaced_output_identity_is_preserved_and_never_claimed_synced() {
     );
     let bytes = fs::read(temp.0.join("check/moved.mcap")).unwrap();
     assert_eq!(
-        mcap::MessageStream::new(&bytes)
+        dot_logger::storage::NativeReader::new(&bytes, 64, 4096)
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap()

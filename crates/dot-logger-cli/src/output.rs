@@ -218,3 +218,16 @@ pub fn hex(bytes: &[u8]) -> String {
 pub fn record(r: dot_logger::capture::CapturedRecord, payload: Option<&[u8]>) -> Value {
     json!({"receipt":{"session":format!("{:032x}",r.receipt.session_id),"producer":r.receipt.producer_id,"sequence":r.receipt.accepted_seq.to_string()},"channel":r.metadata.channel_id,"schema":format!("{:032x}",r.metadata.schema_id),"schema_version":r.metadata.schema_version,"revision":r.revision.to_string(),"mono_ns":r.metadata.mono_ns.to_string(),"real_ns":r.metadata.real_ns.to_string(),"source_time":r.metadata.source_time.map(|s|json!({"ticks":s.ticks.to_string(),"clock_domain":s.clock_domain.to_string()})),"level":format!("{:?}",r.metadata.level),"importance":r.metadata.importance.map(|v|format!("{v:?}")),"payload_bytes":r.payload_len,"data_hex":payload.map(hex)})
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn terminal_summary_beyond_the_output_cap_is_exit_four() {
+        let mut output = Output::new(true, "status".into(), 1024);
+        assert_eq!(
+            output.finish(Ok(json!({"report":"x".repeat(2048)})), false),
+            4
+        );
+    }
+}

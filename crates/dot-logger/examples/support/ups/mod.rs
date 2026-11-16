@@ -207,9 +207,9 @@ pub fn process_crash(
                 if fs::read(&source_path)? != before {
                     return Err(invalid("child recovery changed read-only source"));
                 }
-                for message in mcap::MessageStream::new(&fs::read(temp.file(target, true))?)? {
-                    let message = message?;
-                    let stored = decode_record(&message.data, 1024)?;
+                let recovered_bytes = fs::read(temp.file(target, true))?;
+                for message in NativeReader::new(&recovered_bytes, 1024, 4096)? {
+                    let stored = message?;
                     let seq = stored.record.receipt.accepted_seq;
                     if !(1..=8).contains(&seq)
                         || stored.record.receipt.session_id != 42
@@ -695,9 +695,8 @@ fn run_inner(
             }
             let bytes = fs::read(temp.file(target, true))?;
             let mut seen = Vec::new();
-            for message in mcap::MessageStream::new(&bytes)? {
-                let message = message?;
-                let stored = decode_record(&message.data, block)?;
+            for message in NativeReader::new(&bytes, block, 4096)? {
+                let stored = message?;
                 let expected = oracle
                     .iter()
                     .find(|r| r.receipt == stored.record.receipt)

@@ -1,8 +1,16 @@
-use super::*;
-use crate::capture::CapturedRecord;
-use crate::capture::{CaptureReceipt, Importance, Level, RecordMetadata, SourceTime};
+//! Native pair metadata. Application bytes are never wrapped in a product envelope.
+use super::{StorageChannel, StorageError};
+use crate::capture::{
+    CaptureReceipt, CapturedRecord, Importance, Level, RecordMetadata, SourceTime,
+};
 use prost::Message;
+
 pub(super) const OVERHEAD: usize = 512;
+pub(crate) const PROFILE: &str = "dot-logger/standard/1";
+pub(crate) const META_TOPIC: &str = "_dot_logger/meta";
+pub(crate) const LOSS_TOPIC: &str = "_dot_logger/loss";
+pub(crate) const META_SCHEMA: &str = "dot_logger.RecordMeta";
+pub(crate) const META_DESCRIPTOR: &[u8] = include_bytes!("record_meta.bin");
 #[derive(Clone, PartialEq, Message)]
 struct Source {
     #[prost(sint64, tag = "1")]
@@ -11,133 +19,87 @@ struct Source {
     clock_domain: u64,
 }
 #[derive(Clone, PartialEq, Message)]
-struct Envelope {
+struct Meta {
     #[prost(uint32, tag = "1")]
-    major: u32,
-    #[prost(bytes = "vec", tag = "2")]
-    session: Vec<u8>,
-    #[prost(uint32, tag = "3")]
-    producer: u32,
-    #[prost(uint64, tag = "4")]
-    sequence: u64,
-    #[prost(uint32, tag = "5")]
     channel: u32,
-    #[prost(bytes = "vec", tag = "6")]
-    schema: Vec<u8>,
-    #[prost(uint32, tag = "7")]
-    schema_version: u32,
-    #[prost(uint64, tag = "8")]
-    revision: u64,
-    #[prost(uint64, tag = "9")]
+    #[prost(uint32, tag = "2")]
+    producer: u32,
+    #[prost(uint64, tag = "3")]
+    sequence: u64,
+    #[prost(uint64, tag = "4")]
     mono: u64,
-    #[prost(sint64, tag = "10")]
+    #[prost(sint64, tag = "5")]
     real: i64,
-    #[prost(message, optional, tag = "11")]
-    source: Option<Source>,
-    #[prost(uint32, tag = "12")]
+    #[prost(uint64, tag = "6")]
+    revision: u64,
+    #[prost(uint32, tag = "7")]
     level: u32,
-    #[prost(uint32, tag = "13")]
+    #[prost(uint32, tag = "8")]
     importance: u32,
-    #[prost(uint64, tag = "14")]
-    payload_length: u64,
-    #[prost(bytes = "vec", tag = "20")]
-    payload: Vec<u8>,
+    #[prost(message, optional, tag = "9")]
+    source: Option<Source>,
 }
-/// Decoded product identity and opaque payload; no schema conversion is implied.
+/// One native logical record. The application payload borrows the source bytes.
 #[derive(Debug)]
-pub struct StoredRecord {
-    /// Original accepted metadata and full-width receipt.
+pub struct StoredRecord<'a> {
+    /// Original product identity and clocks reconstructed from file/channel/meta.
     pub record: CapturedRecord,
-    /// Opaque application bytes.
-    pub payload: Vec<u8>,
+    /// Original application bytes, without any container or product header.
+    pub payload: &'a [u8],
 }
-/// Encode one versioned product envelope into caller-owned scratch storage.
-pub fn encode_record(
-    record: CapturedRecord,
+pub(crate) fn validate_record(
+    r: CapturedRecord,
     payload: &[u8],
-    out: &mut Vec<u8>,
     max: usize,
 ) -> Result<(), StorageError> {
-    let m = record.metadata;
-    if payload.len() != record.payload_len
+    if r.payload_len != payload.len()
         || payload.len() > max
-        || m.real_ns < 0
-        || record.receipt.accepted_seq == 0
+        || r.metadata.real_ns < 0
+        || r.receipt.accepted_seq == 0
+        || r.metadata.importance.is_none()
     {
         return Err(StorageError::InvalidRecord);
     }
-    let importance = match m.importance {
-        Some(Importance::Normal) => 0,
-        Some(Importance::Important) => 1,
-        None => return Err(StorageError::InvalidRecord),
-    };
-    let header = Envelope {
-        major: 1,
-        session: record.receipt.session_id.to_le_bytes().to_vec(),
-        producer: record.receipt.producer_id,
-        sequence: record.receipt.accepted_seq,
-        channel: m.channel_id,
-        schema: m.schema_id.to_le_bytes().to_vec(),
-        schema_version: m.schema_version,
-        revision: record.revision,
-        mono: m.mono_ns,
-        real: m.real_ns,
-        source: m.source_time.map(|s| Source {
+    Ok(())
+}
+pub(crate) fn encode_meta(
+    r: CapturedRecord,
+    channel: u16,
+    out: &mut Vec<u8>,
+) -> Result<(), StorageError> {
+    out.clear();
+    Meta {
+        channel: u32::from(channel),
+        producer: r.receipt.producer_id,
+        sequence: r.receipt.accepted_seq,
+        mono: r.metadata.mono_ns,
+        real: r.metadata.real_ns,
+        revision: r.revision,
+        level: r.metadata.level as u32,
+        importance: u32::from(r.metadata.importance == Some(Importance::Important)),
+        source: r.metadata.source_time.map(|s| Source {
             ticks: s.ticks,
             clock_domain: s.clock_domain,
         }),
-        level: m.level as u32,
-        importance,
-        payload_length: payload.len() as u64,
-        payload: Vec::new(),
-    };
-    let size = payload
-        .len()
-        .checked_add(OVERHEAD)
-        .filter(|n| *n <= isize::MAX as usize)
-        .ok_or(StorageError::InvalidRecord)?;
-    out.clear();
-    if out.capacity() < size {
-        out.try_reserve_exact(size)
-            .map_err(|_| StorageError::InvalidConfig)?;
     }
-    header
-        .encode(&mut *out)
-        .map_err(|_| StorageError::InvalidRecord)?;
-    // Append the bytes field directly, avoiding a second owned copy of an 8 MiB loan.
-    out.extend_from_slice(&[0xa2, 0x01]);
-    let mut length = payload.len() as u64;
-    while length >= 128 {
-        out.push((length as u8 & 127) | 128);
-        length >>= 7;
-    }
-    out.push(length as u8);
-    out.extend_from_slice(payload);
-    Ok(())
+    .encode(out)
+    .map_err(|_| StorageError::InvalidRecord)
 }
-/// Decode a bounded versioned envelope, preserving unknown user payload bytes.
-pub fn decode_record(bytes: &[u8], max: usize) -> Result<StoredRecord, StorageError> {
-    if bytes.len() > max.checked_add(OVERHEAD).ok_or(StorageError::CorruptData)? {
+pub(crate) fn decode_meta(
+    bytes: &[u8],
+    session: u128,
+    channel: u16,
+    c: &StorageChannel,
+    len: usize,
+) -> Result<CapturedRecord, StorageError> {
+    if bytes.len() > OVERHEAD {
         return Err(StorageError::CorruptData);
     }
-    let w = Envelope::decode(bytes).map_err(|_| StorageError::CorruptData)?;
-    if w.major != 1 {
-        return Err(StorageError::UnsupportedVersion(w.major));
-    }
-    if w.sequence == 0
-        || w.real < 0
-        || w.payload.len() > max
-        || w.payload_length != w.payload.len() as u64
-    {
+    let m = Meta::decode(bytes).map_err(|_| StorageError::CorruptData)?;
+    if m.channel != u32::from(channel) || m.sequence == 0 || m.real < 0 {
         return Err(StorageError::CorruptData);
     }
-    let session = u128::from_le_bytes(
-        w.session
-            .try_into()
-            .map_err(|_| StorageError::CorruptData)?,
-    );
-    let schema = u128::from_le_bytes(w.schema.try_into().map_err(|_| StorageError::CorruptData)?);
-    let level = match w.level {
+    let level = match m.level {
         0 => Level::Trace,
         1 => Level::Debug,
         2 => Level::Info,
@@ -146,35 +108,31 @@ pub fn decode_record(bytes: &[u8], max: usize) -> Result<StoredRecord, StorageEr
         5 => Level::Fatal,
         _ => return Err(StorageError::CorruptData),
     };
-    let importance = match w.importance {
+    let importance = match m.importance {
         0 => Importance::Normal,
         1 => Importance::Important,
         _ => return Err(StorageError::CorruptData),
     };
-    let record = CapturedRecord {
+    Ok(CapturedRecord {
         receipt: CaptureReceipt {
             session_id: session,
-            producer_id: w.producer,
-            accepted_seq: w.sequence,
+            producer_id: m.producer,
+            accepted_seq: m.sequence,
         },
         metadata: RecordMetadata {
-            channel_id: w.channel,
-            schema_id: schema,
-            schema_version: w.schema_version,
-            mono_ns: w.mono,
-            real_ns: w.real,
-            source_time: w.source.map(|s| SourceTime {
+            channel_id: c.channel.channel_id,
+            schema_id: c.channel.schema_id,
+            schema_version: c.channel.schema_version,
+            mono_ns: m.mono,
+            real_ns: m.real,
+            source_time: m.source.map(|s| SourceTime {
                 ticks: s.ticks,
                 clock_domain: s.clock_domain,
             }),
             level,
             importance: Some(importance),
         },
-        revision: w.revision,
-        payload_len: w.payload.len(),
-    };
-    Ok(StoredRecord {
-        record,
-        payload: w.payload,
+        revision: m.revision,
+        payload_len: len,
     })
 }

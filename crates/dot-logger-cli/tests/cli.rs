@@ -1298,72 +1298,6 @@ fn calibrate_on_other_platforms_fails_without_writing() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// TASK-030 S1 (API §21): `export --standard` writes a new standard MCAP file
-/// (user channel + meta channel), refuses to overwrite, and rejects inputs
-/// that are not `dot-logger/1` without leaving an output behind.
-#[test]
-fn export_standard_writes_a_new_file_and_never_overwrites() {
-    let fx = fixture([10, 20]);
-    let target = fx.dir.join("standard.mcap");
-    let run = |input: &std::path::Path| {
-        command()
-            .args(["export", "--standard", "--json", "--input"])
-            .arg(input)
-            .arg("--output")
-            .arg(&target)
-            .output()
-            .unwrap()
-    };
-    let output = run(&fx.source);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
-    let rows = lines(&output.stdout);
-    assert_eq!(rows[0]["kind"], "export");
-    assert_eq!(rows[0]["data"]["messages"], 2);
-    assert_eq!(rows[0]["data"]["truncated"], Value::Null);
-    assert_eq!(rows[0]["data"]["channels"][0]["topic"], "raw");
-    assert_eq!(rows[0]["data"]["channels"][0]["message_encoding"], "opaque");
-    assert_eq!(rows[0]["data"]["channels"][0]["schema_name"], Value::Null);
-    assert_eq!(rows.last().unwrap()["kind"], "summary");
-    let bytes = std::fs::read(&target).unwrap();
-    let topics: Vec<_> = mcap::MessageStream::new(&bytes)
-        .unwrap()
-        .map(|m| m.unwrap().channel.topic.clone())
-        .collect();
-    assert_eq!(
-        topics,
-        ["raw", "_dot_logger/meta", "raw", "_dot_logger/meta"]
-    );
-
-    let output = run(&fx.source);
-    assert_eq!(
-        output.status.code(),
-        Some(3),
-        "existing output is a conflict"
-    );
-    assert_eq!(std::fs::read(&target).unwrap(), bytes);
-
-    std::fs::remove_file(&target).unwrap();
-    let plain = fx.dir.join("plain.mcap");
-    std::fs::write(&plain, b"not an mcap file").unwrap();
-    let output = run(&plain);
-    assert_eq!(output.status.code(), Some(2), "not a dot-logger file");
-    assert!(!target.exists(), "a failed export leaves no output");
-
-    let output = command()
-        .args(["export", "--json", "--input"])
-        .arg(&fx.source)
-        .arg("--output")
-        .arg(&target)
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2), "--standard is required");
-}
-
 /// TASK-033 S3 (UC-31): the CLI passes `--channel`, `--level` and `--basis`
 /// into the query. The fixture holds two Info records on channel 7 at mono
 /// 10/20 and real 2; each flag must select or exclude them, and invalid
@@ -1601,7 +1535,7 @@ fn offline_source_failures_map_to_stable_exit_codes() {
         m["sources"][0]["path"] = json!("broken.mcap")
     });
     assert_outcome(&query(&broken), 4, "invalid_data");
-    // A valid MCAP header whose profile is not `dot-logger/1`.
+    // A valid MCAP header whose profile is not `dot-logger/standard/1`.
     let mut foreign = b"\x89MCAP0\r\n\x01".to_vec();
     foreign.extend_from_slice(&9u64.to_le_bytes());
     foreign.extend_from_slice(&1u32.to_le_bytes());
@@ -1915,59 +1849,6 @@ fn calibrate_failures_map_to_stable_exit_codes_and_write_no_profile() {
     );
     assert_outcome(&result, 4, "io_or_transport");
     assert_eq!(result.1[0]["kind"], "calibration");
-}
-
-/// `export --standard` failures leave no output: a missing output directory
-/// or input is IO (4) and a record above `--max-record-bytes` is a limit (3).
-/// A chunk with a bad CRC is not an error: the export stops there and says so.
-#[test]
-fn export_failures_map_to_stable_exit_codes_and_leave_no_output() {
-    let f = fixture([10, 20]);
-    let target = f.dir.join("standard.mcap");
-    let export = |input: &std::path::Path, output: &std::path::Path, extra: &[&str]| {
-        run([
-            std::ffi::OsStr::new("export"),
-            "--standard".as_ref(),
-            "--input".as_ref(),
-            input.as_os_str(),
-            "--output".as_ref(),
-            output.as_os_str(),
-        ]
-        .into_iter()
-        .chain(extra.iter().map(std::ffi::OsStr::new)))
-    };
-    assert_outcome(
-        &export(&f.source, &f.dir.join("missing").join("out.mcap"), &[]),
-        4,
-        "io_or_transport",
-    );
-    assert_outcome(
-        &export(&f.source, &target, &["--max-record-bytes", "16"]),
-        3,
-        "limit",
-    );
-    assert!(!target.exists());
-    assert_outcome(
-        &export(&f.dir.join("missing.mcap"), &target, &[]),
-        4,
-        "io_or_transport",
-    );
-    assert!(!target.exists());
-    let mut damaged = std::fs::read(&f.source).unwrap();
-    for b in &mut damaged[200..208] {
-        *b ^= 0xff;
-    }
-    let path = f.dir.join("damaged.mcap");
-    std::fs::write(&path, &damaged).unwrap();
-    let result = export(&path, &target, &[]);
-    assert_outcome(&result, 0, "complete");
-    assert_eq!(result.1[0]["data"]["messages"], 0);
-    assert!(
-        result.1[0]["data"]["truncated"]
-            .as_str()
-            .unwrap()
-            .contains("CRC")
-    );
 }
 
 /// Serves `reply` from a loopback host with a Manage token and runs `body`
@@ -2322,41 +2203,6 @@ fn remote_tail_reports_overflow_gaps_or_disconnects() {
     );
 }
 
-/// A terminal summary that no longer fits the output cap is not cut short:
-/// nothing more is written and the exit is 4, although the export finished.
-/// The output path (over 800 bytes) makes the summary larger than the rest.
-#[test]
-fn terminal_summary_beyond_the_output_cap_is_exit_four() {
-    let f = fixture([10, 20]);
-    let deep = f
-        .dir
-        .join("d".repeat(200))
-        .join("e".repeat(200))
-        .join("f".repeat(200))
-        .join("g".repeat(200));
-    std::fs::create_dir_all(&deep).unwrap();
-    let target = deep.join("standard.mcap");
-    let output = command()
-        .args([
-            "export",
-            "--standard",
-            "--json",
-            "--max-output-bytes",
-            "1024",
-            "--input",
-        ])
-        .arg(&f.source)
-        .arg("--output")
-        .arg(&target)
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(4));
-    let rows = lines(&output.stdout);
-    assert_eq!(rows.len(), 1, "{rows:?}");
-    assert_eq!(rows[0]["kind"], "export");
-    assert!(target.exists());
-}
-
 /// An unreachable host is a transport failure (exit 4). Nothing was posted,
 /// so no `posted_host_io` notice is added.
 #[test]
@@ -2373,68 +2219,19 @@ fn unreachable_host_is_transport_failure_without_posted_notice() {
     assert_eq!(result.1[0]["data"]["posted_host_io"], Value::Null);
 }
 
-/// REV-055 RV-136/139: the real CLI handles a chunk boundary overrun without
-/// unwinding and discards output if a repeated summary channel is inconsistent.
 #[test]
-fn export_damaged_chunk_and_invalid_summary_follow_the_output_contract() {
+fn obsolete_export_command_is_rejected_without_creating_a_file() {
     let f = fixture([10, 20]);
-    let original = std::fs::read(&f.source).unwrap();
-    let target = f.dir.join("exported.mcap");
-    let input = f.dir.join("corrupt.mcap");
-    let export = || {
-        run([
-            "export".as_ref(),
-            "--standard".as_ref(),
-            "--input".as_ref(),
-            input.as_os_str(),
-            "--output".as_ref(),
-            target.as_os_str(),
-        ])
-    };
-    let mut offset = mcap::MAGIC.len();
-    while original[offset] != mcap::records::op::CHUNK {
-        let len = u64::from_le_bytes(original[offset + 1..offset + 9].try_into().unwrap()) as usize;
-        offset += 9 + len;
-    }
-    let mut damaged = original[..offset].to_vec();
-    damaged.push(mcap::records::op::CHUNK);
-    damaged.extend_from_slice(&50u64.to_le_bytes());
-    damaged.extend_from_slice(&[0; 16]);
-    damaged.extend_from_slice(&10u64.to_le_bytes()); // uncompressed bytes
-    damaged.extend_from_slice(&0u32.to_le_bytes()); // no CRC
-    damaged.extend_from_slice(&0u32.to_le_bytes()); // no compression
-    damaged.extend_from_slice(&10u64.to_le_bytes());
-    damaged.push(mcap::records::op::MESSAGE);
-    damaged.extend_from_slice(&10u64.to_le_bytes()); // crosses the chunk boundary
-    damaged.push(0);
-    damaged.extend_from_slice(&[0; 64]);
-    std::fs::write(&input, damaged).unwrap();
-    let result = export();
-    assert_outcome(&result, 0, "complete");
-    assert_eq!(result.1[0]["data"]["messages"], 0);
-    assert!(result.1[0]["data"]["truncated"].is_string());
-    let bytes = std::fs::read(&target).unwrap();
-    assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 0);
-    std::fs::remove_file(&target).unwrap();
-
-    let mut damaged = original;
-    let mut offset = mcap::MAGIC.len();
-    while offset + 9 <= damaged.len() {
-        let opcode = damaged[offset];
-        let len = u64::from_le_bytes(damaged[offset + 1..offset + 9].try_into().unwrap()) as usize;
-        if opcode == mcap::records::op::CHANNEL {
-            // The outer Channel is the summary copy; the first is in a chunk.
-            damaged[offset + 11..offset + 13].fill(0);
-            break;
-        }
-        offset += 9 + len;
-    }
-    assert!(
-        offset + 9 <= damaged.len(),
-        "fixture must contain a summary channel"
-    );
-    std::fs::write(&input, damaged).unwrap();
-    let result = export();
-    assert_outcome(&result, 4, "invalid_data");
-    assert!(!target.exists(), "invalid channel left a partial export");
+    let output = f.dir.join("out.mcap");
+    let before = std::fs::read(&f.source).unwrap();
+    let result = command()
+        .args(["export", "--standard", "--input"])
+        .arg(&f.source)
+        .arg("--output")
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert_eq!(result.status.code(), Some(2));
+    assert!(!output.exists());
+    assert_eq!(std::fs::read(&f.source).unwrap(), before);
 }

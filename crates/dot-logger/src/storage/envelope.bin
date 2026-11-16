@@ -1,26 +1,0 @@
-
-œ
-envelope.proto
-dot_logger"A
-Source
-ticks (Rticks!
-clock_domain (RclockDomain"²
-Envelope
-major (Rmajor
-session (Rsession
-producer (Rproducer
-sequence (Rsequence
-channel (Rchannel
-schema (Rschema%
-schema_version (RschemaVersion
-revision (Rrevision
-mono	 (Rmono
-real
- (Rreal*
-source (2.dot_logger.SourceRsource
-level (Rlevel
-
-importance (R
-importance%
-payload_length (RpayloadLength
-payload (Rpayloadbproto3

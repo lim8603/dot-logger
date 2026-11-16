@@ -766,7 +766,9 @@ fn logger_all_large_run_uses_only_raw_producers() {
         every: 1,
         streams: 2,
     });
-    let load = mixed_load(2);
+    let mut load = mixed_load(2);
+    // Native user/meta pairs keep two MCAP message index entries.
+    load.memory_bytes = 80 << 20;
     let dir = RunDir::create(&std::env::temp_dir()).unwrap();
     let run = write_logger(dir.path(), w, &load, 0, &Gate::new(load.producers, 0)).unwrap();
     assert!(run.storage.stopped.is_none(), "{}", run.report);

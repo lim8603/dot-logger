@@ -7,7 +7,7 @@ use dot_logger::logger::{
 };
 // Tests compare stored importance; facade users only call methods.
 use dot_logger::capture::Importance;
-use dot_logger::storage::decode_record;
+use dot_logger::storage::NativeReader;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -96,8 +96,8 @@ fn stored_poses(dir: &Path) -> Vec<Pose> {
     let mut poses = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let stored = decode_record(&message.unwrap().data, 64).unwrap();
+        for message in NativeReader::new(&bytes, 64, 4096).unwrap() {
+            let stored = message.unwrap();
             assert_eq!(stored.record.metadata.schema_id, Pose::SCHEMA.id());
             let p = &stored.payload;
             poses.push(Pose {
@@ -724,8 +724,8 @@ fn f19_raw_loans_through_the_producer_view_use_the_channel_metadata() {
     let mut stored = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let record = decode_record(&message.unwrap().data, MIB).unwrap();
+        for message in NativeReader::new(&bytes, MIB, 4096).unwrap() {
+            let record = message.unwrap();
             assert_eq!(record.record.metadata.channel_id, 2);
             stored.push(record.payload.to_vec());
         }
@@ -852,11 +852,9 @@ fn f22_try_log_at_stores_the_caller_supplied_times() {
     let mut stored = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let message = message.unwrap();
-            let record = decode_record(&message.data, 64).unwrap();
+        for message in NativeReader::new(&bytes, 64, 4096).unwrap() {
+            let record = message.unwrap();
             let m = record.record.metadata;
-            assert_eq!(message.log_time, m.real_ns as u64);
             stored.push((m.mono_ns, m.real_ns));
         }
     }
@@ -959,8 +957,8 @@ fn stored_importance(dir: &Path) -> Vec<(i32, Level, Option<Importance>)> {
     let mut stored = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let record = decode_record(&message.unwrap().data, 64).unwrap();
+        for message in NativeReader::new(&bytes, 64, 4096).unwrap() {
+            let record = message.unwrap();
             let m = record.record.metadata;
             let x = i32::from_le_bytes(record.payload[..4].try_into().unwrap());
             stored.push((x, m.level, m.importance));

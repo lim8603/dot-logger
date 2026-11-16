@@ -19,7 +19,7 @@ use dot_logger::logger::{
 };
 use dot_logger::platform::Requirement;
 use dot_logger::pool::RawRecordOutcome;
-use dot_logger::storage::decode_record;
+use dot_logger::storage::NativeReader;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -559,10 +559,8 @@ pub fn verify_logger(run: &LoggerRun) -> Result<LoggerVerified, Error> {
             let bytes = fs::read(path)?;
             v.largest_file = v.largest_file.max(bytes.len() as u64);
             let mut in_file = 0_u64;
-            for message in mcap::MessageStream::new(&bytes)? {
-                let message = message?;
-                let stored = decode_record(&message.data, w.max_payload())
-                    .map_err(|e| format!("decode: {e:?}"))?;
+            for message in NativeReader::new(&bytes, w.max_payload(), 4096)? {
+                let stored = message.map_err(|e| format!("decode: {e:?}"))?;
                 let payload = &stored.payload;
                 let seq = payload_sequence(payload).ok_or(invalid("short payload"))?;
                 let channel = stored.record.metadata.channel_id as usize;

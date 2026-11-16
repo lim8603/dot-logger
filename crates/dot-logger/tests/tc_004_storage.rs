@@ -1,13 +1,11 @@
-//! TC-004: product envelopes, bounded file writers and independent container checks.
+//! TC-004: native pairs, bounded file writers and independent container checks.
 #![allow(clippy::unwrap_used)]
 mod support;
 use dot_logger::capture::{
     CaptureOwner, CaptureReceipt, CapturedRecord, ChannelConfig, Importance, SourceTime,
 };
 use dot_logger::routing::Router;
-use dot_logger::storage::{
-    SegmentWriter, StorageChannel, WriterConfig, decode_record, encode_record,
-};
+use dot_logger::storage::{NativeReader, SegmentWriter, StorageChannel, WriterConfig};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -121,7 +119,7 @@ fn delivery_batch_flushes_one_chunk_and_reports_every_written_record() {
             drop(deliveries);
             drop(writer.finish().unwrap());
             let bytes = fs::read(&path.0).unwrap();
-            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(4));
+            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(8));
             assert_eq!(
                 mcap::Summary::read(&bytes)
                     .unwrap()
@@ -251,7 +249,7 @@ fn partial_batch_rejection_exposes_the_appended_prefix_for_explicit_flush_and_re
             drop(delivery);
             drop(writer.finish().unwrap());
             let bytes = fs::read(&path.0).unwrap();
-            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(1));
+            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(2));
         });
     });
 }
@@ -454,7 +452,7 @@ fn bounded_write_buffer_reduces_file_calls_and_preserves_bytes_with_short_writes
             assert_eq!(fs::metadata(&path.0).unwrap().len(), safe);
             drop(writer.finish().unwrap());
             let bytes = fs::read(&path.0).unwrap();
-            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(128));
+            assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(256));
             results.push((calls.load(Ordering::Relaxed), bytes));
         }
         println!(
@@ -613,16 +611,6 @@ fn channels() -> Vec<StorageChannel> {
 }
 
 #[test]
-fn product_envelope_preserves_full_receipt_clocks_and_unknown_payload() {
-    let expected = record(u64::MAX, u64::MAX, 100, 3);
-    let mut bytes = Vec::new();
-    encode_record(expected, &[0, 128, 255], &mut bytes, 3).unwrap();
-    let decoded = decode_record(&bytes, 3).unwrap();
-    assert_eq!(decoded.record, expected);
-    assert_eq!(decoded.payload, [0, 128, 255]);
-}
-
-#[test]
 fn file_writer_preserves_large_records_wall_reversal_and_safe_chunks() {
     use dot_logger::config::SessionBuilder;
     use dot_logger::platform::PlatformCapabilities;
@@ -665,9 +653,13 @@ fn file_writer_preserves_large_records_wall_reversal_and_safe_chunks() {
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert_eq!(messages.len(), 2);
-        assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(2));
-        let first = decode_record(&messages[0].data, payload.len()).unwrap();
+        assert_eq!(messages.len(), 4);
+        assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(4));
+        let first = NativeReader::new(&bytes, payload.len(), 4096)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
         assert_eq!(first.record.receipt.accepted_seq, u64::from(u32::MAX) + 7);
         assert_eq!(first.payload, payload);
         let summary = mcap::Summary::read(&bytes).unwrap().unwrap();
@@ -1200,37 +1192,6 @@ fn independent_messages(bytes: &[u8], end: usize) -> Option<usize> {
 }
 
 #[test]
-fn envelope_golden_and_invalid_lengths_versions_are_checked() {
-    use dot_logger::storage::StorageError;
-    let golden = include_bytes!("fixtures/envelope_v1.bin");
-    let expected = record(u64::MAX, u64::MAX, 100, 3);
-    assert_eq!(decode_record(golden, 3).unwrap().record, expected);
-    let mut encoded = Vec::new();
-    encode_record(expected, &[0, 128, 255], &mut encoded, 3).unwrap();
-    assert_eq!(encoded, golden);
-    encoded.extend_from_slice(&[0x98, 0x06, 1]);
-    assert_eq!(decode_record(&encoded, 3).unwrap().record, expected);
-    let mut future = golden.to_vec();
-    future[1] = 2;
-    assert!(matches!(
-        decode_record(&future, 3),
-        Err(StorageError::UnsupportedVersion(2))
-    ));
-    let mut bad = golden.to_vec();
-    bad.extend_from_slice(&[0x70, 127]);
-    assert!(matches!(
-        decode_record(&bad, 3),
-        Err(StorageError::CorruptData)
-    ));
-    assert!(decode_record(golden, 2).is_err());
-    assert!(decode_record(&golden[..golden.len() - 1], 3).is_err());
-    let mut negative = expected;
-    negative.metadata.real_ns = -1;
-    assert!(encode_record(negative, &[0, 128, 255], &mut encoded, 3).is_err());
-    assert_eq!(crc32(b"123456789"), 0xcbf43926);
-}
-
-#[test]
 fn bounded_indexes_minmax_rejections_and_drop_do_not_publish_extra_data() {
     use dot_logger::storage::StorageError;
     let plan = support::plan();
@@ -1270,11 +1231,11 @@ fn bounded_indexes_minmax_rejections_and_drop_do_not_publish_extra_data() {
             (20, 50, 100, 900, 2)
         );
         let bytes = fs::read(&path.0).unwrap();
-        assert_eq!(independent_messages(&bytes, safe as usize), Some(2));
+        assert_eq!(independent_messages(&bytes, safe as usize), Some(4));
         let mut corrupt = bytes.clone();
         let at = corrupt.len() - 20;
         corrupt[at] ^= 1;
-        assert_ne!(independent_messages(&corrupt, safe as usize), Some(2));
+        assert_ne!(independent_messages(&corrupt, safe as usize), Some(4));
         drop(writer);
         assert_eq!(fs::read(&path.0).unwrap(), bytes);
         assert_eq!(budget.used_bytes(), 0);
@@ -1371,13 +1332,21 @@ fn schema_versions_and_wide_channel_ids_use_distinct_file_local_ids() {
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-        assert_ne!(messages[0].channel.id, messages[1].channel.id);
+        assert_ne!(messages[0].channel.id, messages[2].channel.id);
         assert_eq!(
             mcap::Summary::read(&bytes).unwrap().unwrap().schemas.len(),
             3
         );
-        assert_eq!(decode_record(&messages[1].data, 256).unwrap().record, v2);
-        assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(2));
+        assert_eq!(
+            NativeReader::new(&bytes, 256, 4096)
+                .unwrap()
+                .nth(1)
+                .unwrap()
+                .unwrap()
+                .record,
+            v2
+        );
+        assert_eq!(independent_messages(&bytes, bytes.len() - 8), Some(4));
     });
 }
 
@@ -1613,7 +1582,7 @@ fn expired_completion_after_a_successful_write_remains_distinct_from_invalid_inp
             drop(next);
             drop(writer.finish().unwrap());
             let bytes = fs::read(&path.0).unwrap();
-            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+            assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 4);
         });
     });
 }
@@ -1676,7 +1645,11 @@ fn live_revision_uses_explicit_separate_writer_metadata_and_roundtrips() {
         let bytes = fs::read(&path.0).unwrap();
         let mut messages = mcap::MessageStream::new(&bytes).unwrap();
         let message = messages.next().unwrap().unwrap();
-        let decoded = decode_record(&message.data, 64).unwrap();
+        let decoded = NativeReader::new(&bytes, 64, 4096)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
         assert_eq!(decoded.record.revision, 2);
         assert_eq!(decoded.record.receipt, receipt);
         assert_eq!(decoded.payload, &[4, 5]);

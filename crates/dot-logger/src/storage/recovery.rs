@@ -1,4 +1,4 @@
-//! Bounded management-path recovery of an immutable dot-logger/1 segment.
+//! Bounded management-path recovery of an immutable dot-logger/standard/1 segment.
 use super::*;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,7 +32,7 @@ pub enum RecoveryStop {
     Truncated,
     /// A required nonzero chunk CRC did not match, or was absent.
     Checksum,
-    /// A record, schema/channel reference, envelope or sequence was invalid.
+    /// A record, schema/channel reference, metadata pair or sequence was invalid.
     InvalidRecord,
     /// Only the product's uncompressed writer format is supported.
     UnsupportedCompression,
@@ -246,7 +246,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
     let (op, len, header_bytes) = header.map_err(|_| Some(StorageError::CorruptData))?;
     let mut fields = Fields(&buffer[..len]);
     if op != 1
-        || fields.string() != Ok(b"dot-logger/1".as_slice())
+        || fields.string() != Ok(super::codec::PROFILE.as_bytes())
         || !fields
             .string()
             .is_ok_and(|s| std::str::from_utf8(s).is_ok())
@@ -272,16 +272,13 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
             c
         })
         .collect();
-    let mut state = Validation {
-        session: budget.session,
-        revision: budget.revision,
-        channels: &channels,
-        envelope: None,
-        payload_schemas: vec![None; channels.len()],
-        seen: vec![false; channels.len()],
-        last: vec![0; budget.producers],
-        max_payload: options.writer.max_payload_bytes,
-    };
+    let mut state = Validation::new(
+        budget.session,
+        budget.revision,
+        std::borrow::Cow::Borrowed(&channels),
+        budget.producers,
+        options.writer.max_payload_bytes,
+    );
     let mut writer = SegmentWriter::new(budget, options.writer, channels.clone(), sink)?;
     loop {
         cancelled(cancel, report)?;
@@ -300,6 +297,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         };
         let body = &buffer[..len];
         let result = match op {
+            12 => state.metadata(body),
             3 => state.schema(body),
             4 => state.channel(body),
             6 => {
@@ -317,11 +315,16 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                                 .record()
                                 .map_err(|_| Some(StorageError::CorruptData))?;
                             if opcode == 5 {
-                                let payload =
-                                    record.get(22..).ok_or(Some(StorageError::CorruptData))?;
-                                let stored =
-                                    decode_record(payload, options.writer.max_payload_bytes)?;
-                                writer.append(stored.record, &stored.payload)?;
+                                let (op, meta) = nested
+                                    .record()
+                                    .map_err(|_| Some(StorageError::CorruptData))?;
+                                if op != 5 {
+                                    return Err(Some(StorageError::CorruptData));
+                                }
+                                let stored = state
+                                    .pair(record, meta)
+                                    .map_err(|_| Some(StorageError::CorruptData))?;
+                                writer.append(stored.record, stored.payload)?;
                             }
                         }
                         writer.flush_chunk()?;
@@ -434,23 +437,63 @@ impl<'a> Fields<'a> {
 pub(crate) struct Validation<'a> {
     pub(crate) session: u128,
     pub(crate) revision: u64,
-    pub(crate) channels: &'a [StorageChannel],
-    pub(crate) envelope: Option<u16>,
-    pub(crate) payload_schemas: Vec<Option<u16>>,
-    pub(crate) seen: Vec<bool>,
-    pub(crate) last: Vec<u64>,
-    pub(crate) max_payload: usize,
+    pub(crate) channels: std::borrow::Cow<'a, [StorageChannel]>,
+    meta_schema: Option<u16>,
+    meta_seen: bool,
+    payload_schemas: Vec<Option<u16>>,
+    seen: Vec<bool>,
+    last: Vec<u64>,
+    max_payload: usize,
+    file: Option<super::FileInfo>,
 }
-// The longest expected value is payload.<32 hex digits>.v<u32> (52 bytes).
-// Use the same canonical formatting as the writer without allocating per comparison.
 fn matches_text(actual: &[u8], expected: std::fmt::Arguments<'_>) -> bool {
-    let mut buffer = [0; 64];
+    let mut buffer = [0; 256];
     let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
     std::io::Write::write_fmt(&mut cursor, expected).is_ok()
         && actual == &cursor.get_ref()[..cursor.position() as usize]
 }
-impl Validation<'_> {
+impl<'a> Validation<'a> {
+    pub(crate) fn new(
+        session: u128,
+        revision: u64,
+        channels: std::borrow::Cow<'a, [StorageChannel]>,
+        producers: usize,
+        max_payload: usize,
+    ) -> Self {
+        let n = channels.len();
+        Self {
+            session,
+            revision,
+            channels,
+            meta_schema: None,
+            meta_seen: false,
+            payload_schemas: vec![None; n],
+            seen: vec![false; n],
+            last: vec![0; producers],
+            max_payload,
+            file: None,
+        }
+    }
+    pub(crate) fn metadata(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+        let file = super::FileInfo::parse(body).map_err(|_| RecoveryStop::InvalidRecord)?;
+        if self.file.is_some()
+            || self.meta_schema.is_some()
+            || self.payload_schemas.iter().any(Option::is_some)
+            || file.session != self.session
+            || file.revision != self.revision
+            || file.producers != self.last.len()
+            || file.channels != self.channels.len()
+        {
+            return Err(RecoveryStop::InvalidRecord);
+        }
+        self.file = Some(file);
+        Ok(())
+    }
     pub(crate) fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+        use super::codec::{META_DESCRIPTOR, META_SCHEMA};
+        if self.file.is_none() {
+            return Err(RecoveryStop::InvalidRecord);
+        }
         let mut f = Fields(body);
         let id = f.u16()?;
         let name = f.string()?;
@@ -459,32 +502,32 @@ impl Validation<'_> {
         if id == 0 || !f.0.is_empty() {
             return Err(RecoveryStop::InvalidRecord);
         }
-        if name == b"dot_logger.Envelope"
-            && encoding == b"protobuf"
-            && data == include_bytes!("envelope.bin")
-        {
-            if self.envelope.is_some_and(|old| old != id)
+        if name == META_SCHEMA.as_bytes() && encoding == b"protobuf" && data == META_DESCRIPTOR {
+            if self.meta_schema.is_some_and(|old| old != id)
                 || self.payload_schemas.contains(&Some(id))
             {
                 return Err(RecoveryStop::InvalidRecord);
             }
-            self.envelope = Some(id);
+            self.meta_schema = Some(id);
             return Ok(());
         }
-        if self.envelope == Some(id) {
+        if self.meta_schema == Some(id) {
             return Err(RecoveryStop::InvalidRecord);
         }
         let mut found = false;
         for (i, c) in self.channels.iter().enumerate() {
             let matches = c.schema.as_ref().is_some_and(|s| {
-                matches_text(
-                    name,
-                    format_args!(
-                        "payload.{:032x}.v{}",
-                        c.channel.schema_id, c.channel.schema_version
+                let named = match &s.name {
+                    Some(n) => name == n.as_bytes(),
+                    None => matches_text(
+                        name,
+                        format_args!(
+                            "payload.{:032x}.v{}",
+                            c.channel.schema_id, c.channel.schema_version
+                        ),
                     ),
-                ) && encoding == s.encoding.as_bytes()
-                    && data == s.descriptor
+                };
+                named && encoding == s.encoding.as_bytes() && data == s.descriptor
             });
             if self.payload_schemas[i] == Some(id) && !matches {
                 return Err(RecoveryStop::InvalidRecord);
@@ -507,13 +550,30 @@ impl Validation<'_> {
         let mut f = Fields(body);
         let id = f.u16()?;
         let schema = f.u16()?;
+        if usize::from(id) == self.channels.len() + 1 {
+            if Some(schema) != self.meta_schema
+                || f.string()? != super::codec::META_TOPIC.as_bytes()
+                || f.string()? != b"protobuf"
+                || !f.string()?.is_empty()
+                || !f.0.is_empty()
+            {
+                return Err(RecoveryStop::InvalidRecord);
+            }
+            self.meta_seen = true;
+            return Ok(());
+        }
         let i = usize::from(id)
             .checked_sub(1)
             .ok_or(RecoveryStop::InvalidRecord)?;
         let c = self.channels.get(i).ok_or(RecoveryStop::InvalidRecord)?;
-        if Some(schema) != self.envelope
+        let expected_schema = if c.schema.is_some() {
+            self.payload_schemas[i].ok_or(RecoveryStop::InvalidRecord)?
+        } else {
+            0
+        };
+        if schema != expected_schema
             || f.string()? != c.topic.as_bytes()
-            || f.string()? != b"protobuf"
+            || f.string()? != c.payload_encoding.as_bytes()
         {
             return Err(RecoveryStop::InvalidRecord);
         }
@@ -542,16 +602,6 @@ impl Validation<'_> {
                     matches_text(value, format_args!("{}", c.channel.schema_version)),
                 ),
                 b"payload_encoding" => (32, value == c.payload_encoding.as_bytes()),
-                b"payload_schema_file_id" if c.schema.is_some() => (
-                    64,
-                    matches_text(
-                        value,
-                        format_args!(
-                            "{}",
-                            self.payload_schemas[i].ok_or(RecoveryStop::InvalidRecord)?
-                        ),
-                    ),
-                ),
                 b"payload_schema_name" if named.is_some() => {
                     (128, Some(value) == named.map(str::as_bytes))
                 }
@@ -562,69 +612,59 @@ impl Validation<'_> {
             }
             seen |= bit;
         }
-        let expected = match (&c.schema, named) {
-            (None, _) => 63,
-            (Some(_), None) => 127,
-            (Some(_), Some(_)) => 255,
-        };
-        if seen != expected || !f.0.is_empty() {
+        if seen != (63 | if named.is_some() { 128 } else { 0 }) || !f.0.is_empty() {
             return Err(RecoveryStop::InvalidRecord);
         }
         self.seen[i] = true;
         Ok(())
     }
-    fn message(&mut self, body: &[u8]) -> Result<u64, RecoveryStop> {
-        let mut f = Fields(body);
-        let id = f.u16()?;
-        let sequence = f.u32()?;
-        let log = f.u64()?;
-        let publish = f.u64()?;
+    pub(crate) fn pair<'b>(
+        &self,
+        user: &'b [u8],
+        meta: &[u8],
+    ) -> Result<super::StoredRecord<'b>, RecoveryStop> {
+        if self.file.is_none() || !self.meta_seen {
+            return Err(RecoveryStop::InvalidRecord);
+        }
+        let mut u = Fields(user);
+        let id = u.u16()?;
+        let seq = u.u32()?;
+        let log = u.u64()?;
+        let publish = u.u64()?;
         let i = usize::from(id)
             .checked_sub(1)
             .ok_or(RecoveryStop::InvalidRecord)?;
         let c = self.channels.get(i).ok_or(RecoveryStop::InvalidRecord)?;
-        if !self.seen[i] || sequence != 0 {
+        if !self.seen[i] || u.0.len() > self.max_payload {
             return Err(RecoveryStop::InvalidRecord);
         }
-        let stored =
-            decode_record(f.0, self.max_payload).map_err(|_| RecoveryStop::InvalidRecord)?;
-        let r = stored.record;
-        let p = r.receipt.producer_id as usize;
-        if r.receipt.session_id != self.session
-            || r.revision != self.revision
-            || r.metadata.channel_id != c.channel.channel_id
-            || r.metadata.schema_id != c.channel.schema_id
-            || r.metadata.schema_version != c.channel.schema_version
-            || log != r.metadata.real_ns as u64
+        let mut m = Fields(meta);
+        if usize::from(m.u16()?) != self.channels.len() + 1
+            || m.u32()? != seq
+            || m.u64() != Ok(log)
+            || m.u64() != Ok(log)
             || publish != log
-            || p >= self.last.len()
-            || r.receipt.accepted_seq <= self.last[p]
         {
             return Err(RecoveryStop::InvalidRecord);
         }
-        self.last[p] = r.receipt.accepted_seq;
-        Ok(log)
-    }
-    pub(crate) fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
-        if body.len() < 40 {
-            return Err(RecoveryStop::Truncated);
-        }
-        let mut f = Fields(body);
-        let start = f.u64()?;
-        let end = f.u64()?;
-        let size = f.u64()?;
-        let crc = f.u32()?;
-        if !f.string()?.is_empty() {
-            return Err(RecoveryStop::UnsupportedCompression);
-        }
-        let stored = f.u64()?;
-        if size != stored || stored != f.0.len() as u64 {
+        let r = super::codec::decode_meta(m.0, self.session, id, c, u.0.len())
+            .map_err(|_| RecoveryStop::InvalidRecord)?;
+        if r.revision != self.revision
+            || r.receipt.producer_id as usize >= self.last.len()
+            || r.metadata.real_ns as u64 != log
+            || r.receipt.accepted_seq as u32 != seq
+        {
             return Err(RecoveryStop::InvalidRecord);
         }
-        if crc == 0 || !crc_update(!0, f.0) != crc {
-            return Err(RecoveryStop::Checksum);
-        }
-        let mut count = 0usize;
+        Ok(super::StoredRecord {
+            record: r,
+            payload: u.0,
+        })
+    }
+    pub(crate) fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
+        let data = chunk_data(body)?;
+        let mut f = Fields(data);
+        let mut count = 0;
         let mut range: Option<(u64, u64)> = None;
         while !f.0.is_empty() {
             let (op, body) = f.record()?;
@@ -632,18 +672,50 @@ impl Validation<'_> {
                 3 => self.schema(body)?,
                 4 => self.channel(body)?,
                 5 => {
-                    let time = self.message(body)?;
-                    count += 1;
+                    let (op, meta) = f.record()?;
+                    if op != 5 {
+                        return Err(RecoveryStop::InvalidRecord);
+                    }
+                    let r = self.pair(body, meta)?.record;
+                    let p = r.receipt.producer_id as usize;
+                    if r.receipt.accepted_seq <= self.last[p] {
+                        return Err(RecoveryStop::InvalidRecord);
+                    }
+                    self.last[p] = r.receipt.accepted_seq;
+                    let time = r.metadata.real_ns as u64;
                     range = Some(range.map_or((time, time), |(a, b)| (a.min(time), b.max(time))));
+                    count += 1;
                 }
                 _ => return Err(RecoveryStop::InvalidRecord),
             }
         }
-        if range.unwrap_or((0, 0)) != (start, end) {
+        let mut h = Fields(body);
+        if range.unwrap_or((0, 0)) != (h.u64()?, h.u64()?) {
             return Err(RecoveryStop::InvalidRecord);
         }
         Ok(count)
     }
+}
+pub(crate) fn chunk_data(body: &[u8]) -> Result<&[u8], RecoveryStop> {
+    if body.len() < 40 {
+        return Err(RecoveryStop::Truncated);
+    }
+    let mut f = Fields(body);
+    f.u64()?;
+    f.u64()?;
+    let size = f.u64()?;
+    let crc = f.u32()?;
+    if !f.string()?.is_empty() {
+        return Err(RecoveryStop::UnsupportedCompression);
+    }
+    let stored = f.u64()?;
+    if size != stored || stored != f.0.len() as u64 {
+        return Err(RecoveryStop::InvalidRecord);
+    }
+    if crc == 0 || !crc_update(!0, f.0) != crc {
+        return Err(RecoveryStop::Checksum);
+    }
+    Ok(f.0)
 }
 // IEEE CRC-32, also used by the pinned MCAP writer. A fixed table keeps large
 // management-path scans linear without a per-byte eight-step interpreter loop.

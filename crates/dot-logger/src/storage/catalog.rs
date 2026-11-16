@@ -53,7 +53,7 @@ impl RetentionConfig {
         if self.max_segments == 0
             || self.max_segment_bytes == 0
             || self.max_segment_ns == 0
-            || self.max_index_bytes < 1088
+            || self.max_index_bytes < super::writer::MIN_INDEX_BYTES
             || self.max_age_ns == 0
             || self.disk_bytes < self.max_segment_bytes
             || self
@@ -80,7 +80,7 @@ pub struct SegmentInfo {
     pub opened_ns: u64,
     /// Host monotonic publication time.
     pub closed_ns: u64,
-    /// Stored message count.
+    /// Stored logical user-record count (each writes a native pair).
     pub records: usize,
     /// Session monotonic record timestamp bounds; None for an empty file.
     pub mono_range: Option<(u64, u64)>,

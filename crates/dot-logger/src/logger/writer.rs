@@ -32,7 +32,7 @@ impl Schema {
         }
     }
     /// Attach the payload's schema descriptor so standard MCAP tools can
-    /// decode it after `dot-logger export --standard` (API §21): `name` is the
+    /// decode it directly from native MCAP files (ADR-013): `name` is the
     /// type the tools resolve (for protobuf the fully-qualified message name,
     /// `data` a serialized `FileDescriptorSet` with imports), `encoding` the
     /// MCAP schema encoding (`"protobuf"`, `"jsonschema"`, ...). Stored once

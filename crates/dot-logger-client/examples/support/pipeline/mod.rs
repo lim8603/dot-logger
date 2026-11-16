@@ -432,9 +432,8 @@ fn verify_file(path: &Path, expected: &[(CapturedRecord, Vec<u8>)]) -> Result<us
         return Err(invalid("example file grew"));
     }
     let mut count = 0;
-    for message in mcap::MessageStream::new(&bytes)? {
-        let message = message?;
-        let decoded = decode_record(&message.data, 512)?;
+    for message in NativeReader::new(&bytes, 512, 4096)? {
+        let decoded = message?;
         let original = expected
             .get(count)
             .ok_or_else(|| invalid("extra file record"))?;

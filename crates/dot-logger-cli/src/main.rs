@@ -41,10 +41,7 @@ fn run() -> i32 {
     // `calibrate` runs for its own time limit plus the final sync and cleanup;
     // the general 5 s default would cancel it. An explicit value still wins.
     let default_timeout = matches.value_source("timeout-ms") == Some(ValueSource::DefaultValue);
-    let timeout = if command == "export" && default_timeout {
-        // A file export reads the whole input once; Ctrl-C still cancels it.
-        Some(3_600_000)
-    } else if command == "calibrate" && default_timeout {
+    let timeout = if command == "calibrate" && default_timeout {
         matches
             .get_one::<String>("time-limit-ms")
             .and_then(|s| s.parse::<u64>().ok())

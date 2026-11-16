@@ -117,6 +117,61 @@ pub(super) fn report_written(delivery: &Delivery<'_>) -> Result<(), StorageError
             _ => StorageError::Completion(e),
         })
 }
+// Shared by the native reader and writer so self-described registrations cannot
+// bypass reserved names, product identity uniqueness or descriptor consistency.
+pub(super) fn registration_bytes(channels: &[StorageChannel]) -> Result<usize, StorageError> {
+    let mut metadata = 0usize;
+    for (i, c) in channels.iter().enumerate() {
+        if c.topic.len() > 256
+            || c.payload_encoding.len() > 64
+            || c.topic.is_empty()
+            || matches!(c.topic.as_str(), codec::META_TOPIC | codec::LOSS_TOPIC)
+            || c.payload_encoding.is_empty()
+            || channels[..i]
+                .iter()
+                .any(|p| p.channel.channel_id == c.channel.channel_id)
+        {
+            return Err(StorageError::InvalidConfig);
+        }
+        if c.schema.as_ref().is_some_and(|s| {
+            s.name
+                .as_deref()
+                .is_some_and(|n| matches!(n, codec::META_SCHEMA | "dot_logger.LossReport"))
+                || s.encoding.is_empty()
+                || s.encoding.len() > 64
+                || s.name
+                    .as_ref()
+                    .is_some_and(|n| n.is_empty() || n.len() > 256)
+        }) {
+            return Err(StorageError::InvalidConfig);
+        }
+        if channels[..i].iter().any(|p| {
+            p.channel.schema_id == c.channel.schema_id
+                && p.channel.schema_version == c.channel.schema_version
+                && p.schema != c.schema
+        }) {
+            return Err(StorageError::InvalidConfig);
+        }
+        for bytes in [
+            c.topic.len(),
+            c.payload_encoding.len(),
+            c.schema.as_ref().map_or(0, |s| s.encoding.len()),
+            c.schema.as_ref().map_or(0, |s| s.descriptor.len()),
+            c.schema
+                .as_ref()
+                .and_then(|s| s.name.as_ref())
+                .map_or(0, String::len),
+        ] {
+            metadata = metadata
+                .checked_add(bytes)
+                .ok_or(StorageError::InvalidConfig)?;
+        }
+    }
+    Ok(metadata)
+}
+// The smallest nonempty native file needs two message indexes, one chunk,
+// and one application-channel/chunk auxiliary entry in the conservative model.
+pub(super) const MIN_INDEX_BYTES: usize = 128 + 512 + 512;
 impl WriterConfig {
     fn index_entries(&self, channels: usize) -> usize {
         // Each nonempty channel/chunk pair requires at least one message.
@@ -146,48 +201,7 @@ impl WriterConfig {
         {
             return Err(StorageError::InvalidConfig);
         }
-        let mut metadata = 0usize;
-        for (i, c) in channels.iter().enumerate() {
-            if c.topic.len() > 256
-                || c.payload_encoding.len() > 64
-                || c.topic.is_empty()
-                || channels[..i]
-                    .iter()
-                    .any(|p| p.channel.channel_id == c.channel.channel_id)
-            {
-                return Err(StorageError::InvalidConfig);
-            }
-            if c.schema.as_ref().is_some_and(|s| {
-                s.encoding.is_empty()
-                    || s.encoding.len() > 64
-                    || s.name
-                        .as_ref()
-                        .is_some_and(|n| n.is_empty() || n.len() > 256)
-            }) {
-                return Err(StorageError::InvalidConfig);
-            }
-            if channels[..i].iter().any(|p| {
-                p.channel.schema_id == c.channel.schema_id
-                    && p.channel.schema_version == c.channel.schema_version
-                    && p.schema != c.schema
-            }) {
-                return Err(StorageError::InvalidConfig);
-            }
-            for bytes in [
-                c.topic.len(),
-                c.payload_encoding.len(),
-                c.schema.as_ref().map_or(0, |s| s.encoding.len()),
-                c.schema.as_ref().map_or(0, |s| s.descriptor.len()),
-                c.schema
-                    .as_ref()
-                    .and_then(|s| s.name.as_ref())
-                    .map_or(0, String::len),
-            ] {
-                metadata = metadata
-                    .checked_add(bytes)
-                    .ok_or(StorageError::InvalidConfig)?;
-            }
-        }
+        let metadata = registration_bytes(channels)?;
         if metadata > self.max_metadata_bytes {
             return Err(StorageError::InvalidConfig);
         }
@@ -201,10 +215,10 @@ impl WriterConfig {
         for (n, size) in [
             (2, max),
             (self.write_buffer_bytes, 1),
-            (self.max_records, 64),
+            (self.max_records, 128),
             (self.max_chunks, 512),
             (self.index_entries(channels.len()), 512),
-            (channels.len(), 8192),
+            (channels.len() + 1, 8192),
             (self.max_metadata_bytes, 16),
             (producers, 64),
         ] {
@@ -236,6 +250,7 @@ pub struct SegmentWriter<W: SyncSink> {
     /// Owns its target claim; a SegmentLog accounts for its own files.
     standalone: bool,
     encoder: Vec<u8>,
+    meta_channel: u16,
     records: usize,
     chunks: usize,
     pending_records: usize,
@@ -333,7 +348,7 @@ impl<W: SyncSink> SegmentWriter<W> {
     ) -> Result<Self, StorageError> {
         config.reservation(&channels, budget.producers)?;
         let target_lease = TargetLease::enter(&budget)?;
-        Self::with_target(budget, config, channels, sink, target_lease, true)
+        Self::with_target(budget, config, channels, sink, target_lease, true, 0)
     }
     /// `standalone` writers record their unsynced records in the target's
     /// file ledger when released; a SegmentLog does that for its own files.
@@ -344,6 +359,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         mut sink: W,
         target_lease: TargetLease,
         standalone: bool,
+        sequence: u64,
     ) -> Result<Self, StorageError> {
         let bytes = config.reservation(&channels, budget.producers)?;
         let lease = budget.reserve(bytes)?;
@@ -379,7 +395,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             .compression(None)
             .disable_seeking(false)
             .chunk_size(None)
-            .profile("dot-logger/1")
+            .profile(codec::PROFILE)
             .library("dot-logger/0.1.0")
             .calculate_chunk_crcs(true)
             .calculate_data_section_crc(true)
@@ -392,11 +408,27 @@ impl<W: SyncSink> SegmentWriter<W> {
                 sent: 0,
                 signals: Arc::clone(&signals),
             })?;
+        writer.write_metadata(
+            &super::FileInfo {
+                session: budget.session,
+                revision: budget.revision,
+                target: budget.target,
+                sequence,
+                producers: budget.producers,
+                channels: channels.len(),
+            }
+            .metadata(),
+        )?;
         let chunk_start = signals.position.load(Ordering::Acquire);
-        let schema = writer.add_schema(
-            "dot_logger.Envelope",
+        let meta_schema =
+            writer.add_schema(codec::META_SCHEMA, "protobuf", codec::META_DESCRIPTOR)?;
+        let meta_channel = (channels.len() + 1) as u16;
+        writer.add_channel_with_id(
+            meta_channel,
+            meta_schema,
+            codec::META_TOPIC,
             "protobuf",
-            include_bytes!("envelope.bin"),
+            &BTreeMap::new(),
         )?;
         for (i, c) in channels.iter().enumerate() {
             let mut metadata = BTreeMap::from([
@@ -413,21 +445,29 @@ impl<W: SyncSink> SegmentWriter<W> {
                 ),
                 ("payload_encoding".into(), c.payload_encoding.clone()),
             ]);
-            if let Some(s) = &c.schema {
-                let id = writer.add_schema(
-                    &format!(
-                        "payload.{:032x}.v{}",
-                        c.channel.schema_id, c.channel.schema_version
-                    ),
-                    &s.encoding,
-                    &s.descriptor,
-                )?;
-                metadata.insert("payload_schema_file_id".into(), id.to_string());
-                if let Some(name) = &s.name {
+            let schema = if let Some(d) = &c.schema {
+                let fallback = format!(
+                    "payload.{:032x}.v{}",
+                    c.channel.schema_id, c.channel.schema_version
+                );
+                if let Some(name) = &d.name {
                     metadata.insert("payload_schema_name".into(), name.clone());
                 }
-            }
-            writer.add_channel_with_id((i + 1) as u16, schema, &c.topic, "protobuf", &metadata)?;
+                writer.add_schema(
+                    d.name.as_deref().unwrap_or(&fallback),
+                    &d.encoding,
+                    &d.descriptor,
+                )?
+            } else {
+                0
+            };
+            writer.add_channel_with_id(
+                (i + 1) as u16,
+                schema,
+                &c.topic,
+                &c.payload_encoding,
+                &metadata,
+            )?;
         }
         let count = channels.len();
         Ok(Self {
@@ -442,7 +482,8 @@ impl<W: SyncSink> SegmentWriter<W> {
             base: budget.target_state.files.base(),
             dirty: false,
             standalone,
-            encoder: Vec::with_capacity(config.max_payload_bytes + codec::OVERHEAD),
+            encoder: Vec::with_capacity(codec::OVERHEAD),
+            meta_channel,
             records: 0,
             chunks: 0,
             pending_records: 0,
@@ -487,13 +528,9 @@ impl<W: SyncSink> SegmentWriter<W> {
         {
             return Err(StorageError::NeedRotation);
         }
-        encode_record(
-            record,
-            payload,
-            &mut self.encoder,
-            self.config.max_payload_bytes,
-        )?;
-        let bytes = self.encoder.len() + 31;
+        codec::validate_record(record, payload, self.config.max_payload_bytes)?;
+        codec::encode_meta(record, (channel + 1) as u16, &mut self.encoder)?;
+        let bytes = payload.len() + self.encoder.len() + 62;
         let split = self.pending_records > 0
             && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
         if split && self.chunks + 1 >= self.config.max_chunks {
@@ -507,15 +544,22 @@ impl<W: SyncSink> SegmentWriter<W> {
         }
         let header = mcap::records::MessageHeader {
             channel_id: (channel + 1) as u16,
-            sequence: 0,
+            sequence: record.receipt.accepted_seq as u32,
             log_time: record.metadata.real_ns as u64,
             publish_time: record.metadata.real_ns as u64,
         };
-        let result = self
-            .writer
-            .as_mut()
-            .ok_or(StorageError::Poisoned)?
-            .write_to_known_channel(&header, &self.encoder);
+        let writer = self.writer.as_mut().ok_or(StorageError::Poisoned)?;
+        let result = writer
+            .write_to_known_channel(&header, payload)
+            .and_then(|()| {
+                writer.write_to_known_channel(
+                    &mcap::records::MessageHeader {
+                        channel_id: self.meta_channel,
+                        ..header
+                    },
+                    &self.encoder,
+                )
+            });
         if let Err(e) = result {
             self.poisoned = true;
             return Err(e.into());
@@ -588,9 +632,9 @@ impl<W: SyncSink> SegmentWriter<W> {
     ) -> usize {
         let bytes = payload_len
             .saturating_add(codec::OVERHEAD)
-            .saturating_add(31);
-        // Use the maximum envelope width, so a possible split is counted even
-        // when the actual envelope would fit the current chunk.
+            .saturating_add(62);
+        // Use the maximum metadata width, so a possible split is counted even
+        // when the actual pair would fit the current chunk.
         let split = self.pending_records > 0
             && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
         let new_pair = split
@@ -606,7 +650,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             .saturating_add(usize::from(new_pair));
         self.records
             .saturating_add(1)
-            .saturating_mul(64)
+            .saturating_mul(128)
             .saturating_add(
                 self.chunks
                     .saturating_add(1 + usize::from(split))

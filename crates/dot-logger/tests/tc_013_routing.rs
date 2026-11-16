@@ -5,7 +5,7 @@
 use dot_logger::logger::{
     Budget, ChannelOptions, Logger, LoggerBuilder, Retention, Shutdown, StartError, WriterQuota,
 };
-use dot_logger::storage::decode_record;
+use dot_logger::storage::NativeReader;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -61,8 +61,8 @@ fn stored(dir: &Path) -> Vec<(u32, Vec<u8>)> {
     let mut records = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
-        for message in mcap::MessageStream::new(&bytes).unwrap() {
-            let stored = decode_record(&message.unwrap().data, 64).unwrap();
+        for message in NativeReader::new(&bytes, 64, 4096).unwrap() {
+            let stored = message.unwrap();
             records.push((stored.record.metadata.channel_id, stored.payload.to_vec()));
         }
     }

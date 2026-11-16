@@ -79,7 +79,7 @@ offline replay는 start와 실제 caller clock을 지원한다. 실행 중 제�
 
 ## 출력·취소·한도
 
-`--json`은 각 줄이 독립 객체인 NDJSON이다. 공통 필드는 `schema_version:1`, `command`, `kind`, `data`다. record/gap/status 등 뒤에 summary 또는 error가 온다. 128-bit ID는 32자리 hex, 손실 없는 u64/i128 시각·sequence/revision/handle은 문자열이다. `data_hex`는 명시 payload 출력에서만 제공한다. summary·error의 `records`는 이 명령이 stdout에 낸 `record` 줄 수, `acknowledged`는 그중 ACK한 수다 — `record` 줄을 내지 않는 명령(`export`·`calibrate`·`config` 등)은 항상 0이다. `export --standard`가 변환한 메시지 수는 `export` 줄의 `messages`다. 임의 payload나 credential을 오류 메시지에 포함하지 않는다.
+`--json`은 각 줄이 독립 객체인 NDJSON이다. 공통 필드는 `schema_version:1`, `command`, `kind`, `data`다. record/gap/status 등 뒤에 summary 또는 error가 온다. 128-bit ID는 32자리 hex, 손실 없는 u64/i128 시각·sequence/revision/handle은 문자열이다. `data_hex`는 명시 payload 출력에서만 제공한다. summary·error의 `records`는 이 명령이 stdout에 낸 `record` 줄 수, `acknowledged`는 그중 ACK한 수다 — `record` 줄을 내지 않는 명령(`calibrate`·`config` 등)은 항상 0이다. 임의 payload나 credential을 오류 메시지에 포함하지 않는다.
 
 | 종료 코드 | 의미 |
 |---|---|
@@ -97,3 +97,5 @@ Ctrl-C/기한 초과가 이미 게시한 host 명령/IO를 취소하거나 미�
 REV-022 보강: `tail`의 전체 입력/예약 검증은 연결 전에 수행한다. local replay는 정확히 limit개로 선택 범위가 끝나면 정상 완료하고 추가 기록이 있을 때만 부분 완료(exit3)다. `--limit` 이후 추가 기록은 출력하지 않는다. tail은 계속 전체 `--timeout-ms`에 제한되며, SDK의 로컬 next 대기 재시도와 무관하게 전체 기한을 자동 연장하지 않는다. `--age-ms`는 기록 수명 및 서버 idle lease 요청을 겸한다. 서버 lease 종료/새 구독 사이 누락은 Gap으로 보장되지 않으므로 별도 구독을 연속 수신이라고 해석하지 않는다.
 
 만료/세대 폐기로 handoff가 사전 거절되면 `gone_or_expired`/exit3이고 ACK는 없다. 원본 손상은 `invalid_data`/exit4, 메시지 크기 상한은 `limit`/exit3이다. 원격 config apply/check run/replay의 Gone도 이미 게시된 호스트 작업의 완료를 증명하지 않으므로 `posted_host_io: completion_unconfirmed`를 표시한다. 읽기 전용 capability Gone과 Unsupported 응답의 기존 분류는 유지한다.
+
+저장 파일은 `dot-logger/standard/1` native MCAP이며 사용자 payload와 schema를 직접 담는다. `_dot_logger/meta`가 원래 receipt·시계·설정 정보를 보존한다. 별도 `export --standard` 변환은 제공하지 않는다. 구형 파일은 지원하지 않는다.

@@ -195,7 +195,7 @@ fn storage_written_busy_retries_reports_without_appending_again() {
                 );
                 drop((first, second));
                 let bytes = writer.finish().unwrap().into_inner().0.into_inner();
-                assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 2);
+                assert_eq!(mcap::MessageStream::new(&bytes).unwrap().count(), 4);
             });
         });
     }

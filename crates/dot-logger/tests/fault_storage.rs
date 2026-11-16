@@ -193,15 +193,9 @@ fn fix_crc(bytes: &mut [u8], chunk: (usize, usize)) {
 }
 fn receipts(bytes: &[u8]) -> Vec<u64> {
     assert!(mcap::Summary::read(bytes).unwrap().is_some());
-    mcap::MessageStream::new(bytes)
+    NativeReader::new(bytes, 64, 4096)
         .unwrap()
-        .map(|m| {
-            decode_record(&m.unwrap().data, 64)
-                .unwrap()
-                .record
-                .receipt
-                .accepted_seq
-        })
+        .map(|m| m.unwrap().record.receipt.accepted_seq)
         .collect()
 }
 #[test]
@@ -345,6 +339,7 @@ fn source_record_and_chunk_limits_bound_work_without_partial_chunk_admission() {
         .unwrap();
         assert_eq!(r.report.records, 2);
         assert_eq!(r.report.stop, RecoveryStop::Limit);
+        drop(r); // Release the finished output index before the next recovery.
         opt = options();
         opt.limits.max_record_bytes = 64;
         let output = Buffer::default();

@@ -59,7 +59,7 @@
 
 - **위치:**
   - [linear_reader.rs:672-676, 730-746](../../../vendor/mcap-0.26.0/src/sans_io/linear_reader.rs#L672-L746)
-  - [standard.rs:13-17, 161-203, 284-330](../../../crates/dot-logger/src/storage/standard.rs#L161-L203)
+  - [standard.rs:13-17, 161-203, 284-330](https://github.com/lim8603/dot-logger/blob/949a74e/crates/dot-logger/src/storage/standard.rs#L161-L203)
   - [commands.rs:904-937](../../../crates/dot-logger-cli/src/commands.rs#L904-L937)
   - 계약: API §21.2 ("잘린 파일·CRC 불일치 chunk·해석 불가 레코드를 만나면 그 앞의 검증된 chunk까지 내보내고 `ExportReport::truncated`에 이유를 남긴다... 실패·취소 시 만든 출력을 지운다"), `standard.rs:16-17` ("a chunk is checked before any of its messages is written").
 - **원인:**
@@ -141,7 +141,7 @@
 
 #### [리뷰어]
 
-- **위치:** [standard.rs:226-263](../../../crates/dot-logger/src/storage/standard.rs#L226-L263) (`04bf3aa`).
+- **위치:** [standard.rs:226-263](https://github.com/lim8603/dot-logger/blob/04bf3aa/crates/dot-logger/src/storage/standard.rs#L226-L263) (`04bf3aa`).
 - **원인:**
   1. `standard::export`는 입력 MCAP의 `dot_logger.Envelope` 스키마와 사용자 페이로드 descriptor 스키마를 동일한 `schemas: HashMap<u16, (String, String, Vec<u8>)>`에 저장한다. `Record::Channel(c)`에서 `payload_schema_file_id`를 조회할 때 `id == c.schema_id`이거나 조회된 스키마 이름이 `dot_logger.Envelope`(`ENVELOPE_SCHEMA`)인 경우를 걸러내지 않으며, `payload_schema_name`이 빈 문자열(`""`)이거나 `payload_schema_file_id` 없이 단독으로 존재하는 경우도 검사하지 않는다(`recovery.rs:545-558`은 이를 엄격히 거절함).
   2. 동일 `c.id`의 `Record::Channel`이 Summary 섹션 등에서 다시 등장할 때 `known.topic != c.topic`만 검사하고 `c.schema_id`, `c.message_encoding`, `c.metadata`가 첫 선언과 같은지 확인하지 않는다(`Record::Schema`는 재등장 시 `(name, encoding, data)` 전체 일치를 검사하는 것과 비대칭).
@@ -169,7 +169,7 @@
 - **위치:**
   - [retention.rs:313-321](../../../crates/dot-logger/src/storage/retention.rs#L313-L321)
   - [writer.rs:362-370](../../../crates/dot-logger/src/storage/writer.rs#L362-L370)
-  - [standard.rs:106-123, 153-160](../../../crates/dot-logger/src/storage/standard.rs#L106-L160)
+  - [standard.rs:106-123, 153-160](https://github.com/lim8603/dot-logger/blob/949a74e/crates/dot-logger/src/storage/standard.rs#L106-L160)
 - **내용:**
   1. `04bf3aa`에서 `PayloadSchema::name: Option<String>`을 추가하면서 `SegmentWriter::new`(`writer.rs:369`)에는 `s.name = s.name.take().map(|n| n.into_boxed_str().into_string());`를 넣어 `String`의 초과 capacity가 output 메모리 예산을 넘지 않도록 축소했으나, 같은 역할을 하는 `SegmentLog::new`(`retention.rs:313-321`)에는 `schema.name` 축소가 빠졌다.
   2. `standard::export`는 첫 `Record::Header`를 읽은 직후 `output: W`에 MCAP Magic·Header·`_dot_logger/meta` 채널을 기록한다. 따라서 `ExportError::Cancelled`뿐 아니라 이후 레코드에서 `NotDotLogger`·`TopicConflict`·`RecordTooLarge`·`InvalidRecord`가 반환될 때도 `output`에는 이미 바이트가 쓰여 있다. 현재는 `ExportError::Cancelled`에만 "the output is incomplete and must be discarded"라고 적혀 있으므로, `export` 함수 또는 `ExportError` 문서에 모든 `Err` 반환 시 `output`을 폐기해야 함을 명시하는 것이 명확하다(참고로 다수의 작은 `Schema`/`Channel` 레코드 반복 시 `schemas`/`channels` 맵 엔트리 수 상한 여부도 향후 필요 시 검토).

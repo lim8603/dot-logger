@@ -30,15 +30,15 @@ erDiagram
     EVENT_WINDOW }o--o{ SEGMENT : protects
 ```
 
-MCAP의 file-local channel/schema ID와 제품 ID를 구분한다. MCAP 필드 폭에 맞춰 매핑하고 소진 전에 회전한다. 제품의 u64 accepted_seq를 MCAP의 u32 sequence에 축소해 유일 키로 사용하지 않는다. 전체 receipt는 메시지 봉투에 보존한다.
+MCAP의 file-local channel/schema ID와 제품 ID를 구분한다. MCAP 필드 폭에 맞춰 매핑하고 소진 전에 회전한다. 제품의 u64 accepted_seq를 MCAP의 u32 sequence에 축소해 유일 키로 사용하지 않는다. 전체 receipt는 native 사용자 Message에 인접한 RecordMeta와 파일/채널 등록에서 복원한다(ADR-013, API §23.1).
 
 ## 2. 파일 표현과 시간
 
 파일은 `session/target/segment_seq.mcap`이며 active 파일은 `.active` 상태로 관리한다. 각 세그먼트에 schema·channel·세션/clock metadata를 반복해 다른 파일 없이 읽을 수 있게 한다. 원본·소형 데이터 모두 Message로 저장하고 시간 탐색이 필요한 원본을 단순 Attachment로 숨기지 않는다.
 
-제품 메시지 봉투는 버전 있는 Protobuf로 하고 payload는 등록한 encoding의 bytes다. 인코딩은 writer에서 수행한다. 소형 입력은 사전 직렬화된 bytes 또는 고정 필드 타입, 원본은 loan을 받는다. 파일 인코딩 과정의 복사도 예산/성능에 포함하며 protobuf bytes에 넣는다고 zero-copy라고 주장하지 않는다. 원본 8 MiB 시험에 대해 최대 단일 레코드/인코더 임시 메모리를 제한한다.
+현재 파일 profile은 **`dot-logger/standard/1` 단일 형식**이다(ADR-013). 사용자 payload를 원문 Message로 저장하고, 같은 chunk의 바로 다음 `_dot_logger/meta` protobuf `RecordMeta`가 producer/u64 sequence/mono/real/revision/level/importance/source를 보존한다. 파일 Metadata `dot_logger.file`과 사용자 Channel은 session·target·segment sequence·revision·등록 identity를 보존한다. 구형 Envelope codec/descriptor/export와 호환 판독은 제품에서 제거했다. 사용자 descriptor가 없으면 schema 0·기존 encoding을 쓴다.
 
-MCAP log_time은 real_ns의 유효 Unix 시간, publish_time은 동일 UTC 기준으로 변환 가능한 source_time 또는 real_ns다. mono_ns·원래 source_time·domain·변환 오차는 봉투에 별도 저장한다. 벽시계 점프를 단조시간으로 잘못 변환하지 않는다. 음수/범위 밖 real time은 입력 오류 또는 명시된 변환 정책으로 처리하고 unsigned wrap을 금지한다. 기본 재생은 세션 mono 기준이다. MCAP 기본 log_time 인덱스만으로 mono 탐색이 된다고 가정하지 않고 보조 인덱스를 둔다.
+MCAP log_time/publish_time은 유효한 비음수 real_ns이며 MCAP sequence는 accepted_seq 하위32비트다. source time은 원 도메인으로 RecordMeta에 보존한다. 기본 재생은 session mono, 보조 chunk index는 mono/real min/max다. 한 chunk의 길이·비영 CRC·모든 pair·등록·순서 검증이 끝나기 전 어느 pair도 반출하지 않는다. `NativeReader` payload는 입력 bytes를 빌리고 writer는 payload를 Envelope scratch에 복사하지 않는다. 고정 메타 scratch·두 물리 Message index·등록·summary clone·버퍼를 보수 예약에 포함한다. 단계 A의 loss 수집은 `unavailable`이며 관측 손실 0이 아니다. 상세 [API §23.1](interface_contract.md#231-native-단일-형식-a-구현--2026-11-16).
 
 ## 3. 인덱스·동시 읽기·회전
 
@@ -50,7 +50,9 @@ active writer는 **완전한 chunk와 필수 schema/channel을 OS 쓰기 경계�
 
 회전 순서는 chunk 마감 → footer/summary 작성 → 파일 sync → 이름 확정 → 필요한 directory metadata sync → catalog 공개다. OS별 보장 차이는 capability로 나타내고 지원되지 않는 directory 내구성을 자동 성공 처리하지 않는다. 조회가 파일을 pin하면 유지 기한/읽기 bytes를 제한하고 삭제는 마지막 핀 이후 수행한다. 디스크 한계까지 삭제가 불가하면 쓰기를 멈추고 실패를 보고한다.
 
-### TASK-007 로컬 구현 — 2026-10-29
+### TASK-007 로컬 구현 이력 — 2026-10-29
+
+아래는 구형 형식의 당시 구현 이력이며 현재 native 형식은 §2·API §23.1이 우선한다.
 
 `storage` 모듈의 버전1 Protobuf 봉투는 session/schema128·sequence64·producer/channel/revision·mono/real/source/domain·level/importance·payload 길이를 보존한다. `envelope.proto`와 protoc 생성 FileDescriptorSet(`envelope.bin`)을 고정했고 payload는 별도 복제 Vec 없이 encoder scratch에 한 번 복사한다. 음수 real time·잘못된 길이/major/식별자·초과 payload는 거절한다. source time은 원본 도메인으로 보존하고 UTC 변환 계약이 없어 publish_time은 real time을 사용한다.
 
@@ -94,7 +96,7 @@ HTTP 성공은 DB API 확인 경계이며 SSD 영속 완료나 조회 결과 검
 
 ## 6. 호환성·보안·변경
 
-- 파일 container 버전, envelope 버전, 사용자 schema 버전, wire API 버전을 분리한다.
+- 파일 container/profile 버전, RecordMeta schema 버전, 사용자 schema 버전, wire API 버전을 분리한다.
 - 알 수 없는 선택 필드는 건너뛰고 unknown payload는 opaque bytes로 반환한다. 모든 임의 encoding에 자동 schema migration을 약속하지 않는다.
 - 외부 배포 이후 기준 golden file과 OS 간 교환으로 읽기 호환성을 검증한다. 현재 배포 전 개발 파일에는 영구 호환 의무를 두지 않으며 ADR-013 승인안은 native 단일 형식 전환이다. 미지원 profile/major는 명시 오류다.
 - 입력 길이/압축 해제 크기/레코드 수/파일 offset 산술을 검증한다. 경로 traversal·과도한 압축 확장·무한 스캔을 막는 읽기 예산을 둔다.
@@ -126,7 +128,7 @@ Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page
 
 ### TASK-016 revision 전환과 비교 — 2026-11-01
 
-Completion RecordSlot은 accepted record의 revision과 target 선택을 보존한다. posted revision과 producer별 applied revision은 분리하며, 두 bank 외의 무제한 plan 이력을 만들지 않는다. Sample은 안정 revision 또는 RevisionTransition 미가용 상태를 보존하고 서로 다른 session/revision/epoch의 구간을 합치지 않는다. Snapshot은 원래 Report/profile provenance·application_input_id·Window와 선택 Resources(동일 Window/measurement_scope_id)를 보존한다. Comparison의 signed-magnitude RateChange는 after-before의 정확한 u128 유리수이며 intentional skip·거절·출력 실패/폐기/Unknown은 구분한다. MCAP 봉투/파일의 단일 revision은 유지하고 새 revision은 명시 budget/별도 writer로 기록한다.
+Completion RecordSlot은 accepted record의 revision과 target 선택을 보존한다. posted revision과 producer별 applied revision은 분리하며, 두 bank 외의 무제한 plan 이력을 만들지 않는다. Sample은 안정 revision 또는 RevisionTransition 미가용 상태를 보존하고 서로 다른 session/revision/epoch의 구간을 합치지 않는다. Snapshot은 원래 Report/profile provenance·application_input_id·Window와 선택 Resources(동일 Window/measurement_scope_id)를 보존한다. Comparison의 signed-magnitude RateChange는 after-before의 정확한 u128 유리수이며 intentional skip·거절·출력 실패/폐기/Unknown은 구분한다. MCAP 사용자 pair/파일의 단일 revision은 유지하고 새 revision은 명시 budget/별도 writer로 기록한다.
 
 
 ## TASK-030 S2·TASK-035 저장 모델 — 2026-11-16

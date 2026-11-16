@@ -1306,4 +1306,15 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 | D2 파일 손실 | native `_dot_logger/loss`의 session 누적 checkpoint. 거절은 시도, 출력은 assignment, skip/acquire/Unknown 분리. 채널 미귀속 presence, 관측 구간/포화/part/미확인 꼬리, sync_every 보고. 미수집/미관측 loss는 Unavailable이며 0으로 대체하지 않음 |
 | D3 revision | 출력당 active writer 1개. delivery revision 경계마다 회전해 r1→r2→r1도 허용. per-producer sequence·catalog/event/pin·파일별 sync 채무 유지. source별 revision Snapshot/recovery와 manifest v2 단일 경로, 과거 v1 adapter 제외 |
 
-Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 메서드·legacy decoder/writer 보존 계획을 제거했다. 이 변경 자체로 facade 항목은 늘지 않는다(현 34/60). 필요한 API/예산 구조는 직접 정리하고 저장소 호출자·fixture·예제를 함께 갱신한다. 실제 시그니처/예약 레이아웃은 승인 방향 안에서 TDD·표면 가드로 확인한다. 현재 제품 코드/파일은 아직 전환하지 않았다.
+Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 메서드·legacy decoder/writer 보존 계획을 제거했다. 이 변경 자체로 facade 항목은 늘지 않는다(현 34/60). 필요한 API/예산 구조는 직접 정리하고 저장소 호출자·fixture·예제를 함께 갱신한다. 실제 시그니처/예약 레이아웃은 승인 방향 안에서 TDD·표면 가드로 확인한다. TASK-030 S2 A에서 제품 코드/파일을 native 단일 경로로 전환했다. 단계별 구현 범위는 아래 §23.1과 EV-083을 따른다.
+
+
+### 23.1 native 단일 형식 A 구현 — 2026-11-16
+
+- `SegmentWriter::new`·`SegmentLog::new`는 `dot-logger/standard/1`만 기록한다. 사용자 Message는 원 payload/encoding/FDS, 다음 Message는 `_dot_logger/meta`의 기존 `RecordMeta`(태그 1~9)다. MCAP sequence는 하위 32비트, 두 Message의 log/publish는 real, 전체 receipt·mono·importance·source는 메타와 파일/채널 등록에서 복원한다. 파일 Metadata `dot_logger.file`은 version/session/revision/target/segment_sequence/producers/channels/loss_tracking 8개 키다. 자체 body 한도1KiB와 최대8개 borrowed key/value로 고정 제어 예약을 제한한다. schema/channel의 문자열·descriptor·map 길이도 owned 파싱 전에 실제 body와 대조한다.
+- `storage::{NativeReader,FileInfo,StoredRecord}`: `NativeReader::new(&bytes,max_payload_bytes,max_producers)`는 caller 소유 bytes에서 payload를 빌린다. 등록은 prefix/input·u16 ID 폭, producer 상태는 caller 한도로 제한하며 할당 크기 overflow를 먼저 거절한다. writer와 같은 등록 제약을 적용한다. chunk 전체의 비영 CRC·인접 pair·참조·header·revision·producer 순서를 검증한 뒤 첫 논리 기록을 노출한다. suffix 손상은 오류 한 번 뒤 종료하며 앞의 완전한 chunk만 유효하다. footer/OS durability는 추정하지 않는다.
+- query/recovery는 같은 native 검증을 사용하고 user payload의 직접 파일 offset을 사용한다. 기존 active safe offset·source 원본 보존·손상 후 재동기화 금지·sync 채무·event/pin·완료 의미는 유지한다. 이 단계의 조회/복구는 여전히 호출자가 지정한 단일 revision이며 source별 revision/manifest v2는 B다.
+- `WriterConfig.max_records`·보조 index·회복 records는 논리 사용자 수, MCAP Statistics는 물리 Message 수(현재 pair 2건)다. pair 단위 사전 chunk 분할, metadata 쓰기 실패 시 poison, flush 성공 전 safe offset/Written 비공개를 적용한다. 물리 Message index 예약은 사용자당 128B의 보수 한도와 chunk/채널 예약으로 계산한다. RetentionConfig의 최소 max_index_bytes는1152B(128+512+512)이며 이보다 작으면 파일 생성 전에 거절한다. `max_metadata_bytes`는 caller 등록 한도이며 고정 native Metadata/descriptor는 별도 고정 예약에 포함한다.
+- §21.2는 **S1 당시 이력**이다. 제품의 `storage::standard::export`·CLI `export --standard`·Envelope codec/schema/fixture는 제거했다. 구형 profile은 판독 대상이 아니며 `NativeReader`는 `UnsupportedFormat`으로 거절한다. 과거 signature를 위한 wrapper/형식 선택 API는 없다. 일반 출력 cap의 terminal summary 검사 등 형식과 무관한 검증은 유지했다.
+- 단계 A의 모든 writer는 `loss_tracking=unavailable`이다. 손실 0을 뜻하지 않는다. `_dot_logger/loss` 충돌은 지금 거절하고, 실제 collector/체크포인트/손실 조회는 TASK-035 S2(C)에서 구현한다. runtime WIP는 병합하지 않았다.
+- 검증: [EV-083](../05_verification/verification_evidence.md#ev-083), 개발 자가검토 [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md). GUI/native·장기·실앱·재측정 성능/커버리지는 이번 결과에 포함하지 않는다.

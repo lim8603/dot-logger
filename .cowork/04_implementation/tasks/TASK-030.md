@@ -10,30 +10,30 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | S2 단계 A — native pair 쓰기/읽기·구형 경로 정리의 첫 실패 시험(S1 Done, ADR-013 승인 완료) |
+| 다음 액션 | S2 단계 B — revision 경계 회전·source별 조회/복구·manifest v2(A Done, EV-083) |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
 ## 목표
 
-현재 모든 채널이 `dot_logger.Envelope` protobuf로 저장되어([writer.rs](../../../crates/dot-logger/src/storage/writer.rs)) 표준 MCAP 도구가 사용자 payload를 디코딩하지 못한다. 사용자 schema·encoding 그대로 판독되는 파일을 제공한다.
+사용자 schema·encoding 그대로 판독되는 native 표준 MCAP 파일을 제공한다. 이전 Envelope 저장은 S2 A에서 제거했으며 S1 export 성과는 이력으로 유지한다.
 
 ## 작업 단계 (Step, S)
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 쓰기 모드 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), 다음 단계 A 첫 실패 시험. 제품 구현 미착수** |
+| S2 | native 표준 단일 경로 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), A Done(EV-083), 다음 B revision 회전/조회·복구/manifest v2** |
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger/src/storage/`, `crates/dot-logger-cli`. 아직 생성된 코드 경로가 아니다.
+구현 경로: `crates/dot-logger/src/storage/`·`query/`, `crates/dot-logger-cli` 및 예제/소비 시험.
 
 첫 실패/리뷰 조건: **표준 모드/export 파일에서 독립 reader가 사용자 schema로 payload를 원문 일치 디코딩하고, Envelope 고유 필드(producer·u64 sequence·level·importance·revision·mono/real)는 보존 위치 또는 손실을 명시**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-014`의 표준 판독 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 최소 구현 후 관련 `TC-014`의 표준 판독 하위 시나리오를 통과시킨다.
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## Human 결정 — 2026-11-12
 
@@ -53,13 +53,28 @@
 
 - [ ] S1 완료 이력 보존·S2 native 단일 경로 검증, fixture/예제/consumer 갱신 및 구형 profile 명시 거절(ADR-013 수정안).
 - [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 손상/부분 파일·복구·예산 경계를 두 형식에서 검증한다.
+- [ ] native 손상/부분 파일·복구·예산 경계와 구형 profile 거절을 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). S1 구현·검증은 EV-077, 후속 REV-055 RV-136·139·140 조치는 EV-082에 기록한다.
 
 ## S2 저장 설계안 — 2026-11-16
 
-[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 「승인」). D1은 배포 전 native 단일 형식 전환·legacy 보존/선택 API 제외, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 단일 형식 전환의 설계는 승인됐고 현재 구현에는 아직 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
+[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 「승인」). D1은 배포 전 native 단일 형식 전환·legacy 보존/선택 API 제외, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 단일 형식 전환은 S2 A에서 구현했으며 다중 revision·손실은 후속 단계다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
 
 2026-11-16 Human의 미배포 지적을 반영해 초안의 기존 파일/명시 legacy 쓰기 호환 전제를 제거했다. 과거 S1 성과와 EV는 이력으로 유지하며, ADR 전체는 이어진 Human 「승인」으로 Accepted가 됐고 제품 구현을 진행할 수 있다.
+
+
+## S2 A 구현·검증 — 2026-11-16
+
+[EV-083](../../05_verification/verification_evidence.md#ev-083)·[REV-056](../../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md). native writer·borrowed reader·단일 revision query/recovery·예제/fixture/소비 경로 정렬, 구형 Envelope/export API·CLI 제거. 신규 TC-015 11개와 TC-014의 독립 protobuf 사용자/RecordMeta 검사를 실행한다. 구형 converter 전용 23개 시험을 제거하고 native 11개·최소 보존예산1개·CLI 2개(미지원 export·일반 terminal summary cap)로 대체/이관했다. 전체 시험 수 차이는 기능 미지원 결정에 따른 것으로 구형 시험 성공을 새 형식 근거로 재사용하지 않는다. 손상/복구·query/blob/replay·보존·RT allocator 회귀는 유지한다.
+
+| 승인 후 단계 | 상태/다음 조건 |
+|---|---|
+| A native 쓰기/읽기·구형 경로 제거 | Done — EV-083, 두 Rust 각630 Pass·각18 feature·REV-056 Closed |
+| B revision 경계 회전·source별 조회/복구·manifest v2 | 다음 작업, 미착수 |
+| C 손실 collector/체크포인트/조회 | TASK-035 S2, B 뒤 |
+| D runtime facade 설정 변경 | TASK-034 WIP, C 뒤 |
+| E 통합·커버리지·일정 판단 | TASK-033 재측정, 전체 저장 변경 뒤 |
+
+현재 모든 파일은 `loss_tracking=unavailable`, 단일 revision 조회/복구다. native GUI 재판독·정량 성능/커버리지 재측정·다른 OS·24h·실사용처는 미실행이다.

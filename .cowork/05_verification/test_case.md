@@ -292,12 +292,12 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: In Progress / 최근 실행: 2026-11-16 S1 export 하위(f1~f18·CLI) 로컬 Pass([EV-082](verification_evidence.md#ev-082)). S1 Foxglove Topics 판독은 2026-11-15 Human 확인([TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15), EV-077). S2 표준 모드 파일·viewer·대시보드·Lichtblick 판독은 미실행.
+- 상태: In Progress / 최근 실행: 2026-11-16 S2 A native pair/독립 protobuf·reader 손상/예산·query/recovery 하위([EV-083](verification_evidence.md#ev-083)); S1 export 하위 이력은 EV-082. S1 Foxglove Topics 판독은 2026-11-15 Human 확인([TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15), EV-077). S2 B 이후·native GUI 재판독·viewer·대시보드·Lichtblick 판독은 미실행.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
-| 1 | 기존 `dot-logger/1` 파일·표준 모드 파일·사용자 schema(protobuf 등), 원격 서버 loopback/TLS 설정 | 재현 가능한 설정/입력 기록 |
-| 2 | export/표준 모드 파일을 독립 MCAP reader·Foxglove 계열 도구로 판독, viewer 실시간 구독(느린 소비자·Gap·서버 종료·재연결)·Query/Replay, 대시보드 status/report/compare(연결 끊김·권한 없음) | 사용자 payload 원문 일치 디코딩·Envelope 필드 보존 위치/손실 명시, Gap/Unknown 표시, Unavailable/Stale을 0·정상으로 표시하지 않음, 로봇 프로세스 무변경 |
+| 1 | native `dot-logger/standard/1` 파일·구형 profile 거절·사용자 schema(protobuf 등), 원격 서버 loopback/TLS 설정 | 재현 가능한 설정/입력 기록 |
+| 2 | native 파일을 독립 MCAP reader·Foxglove 계열 도구로 판독, viewer 실시간 구독(느린 소비자·Gap·서버 종료·재연결)·Query/Replay, 대시보드 status/report/compare(연결 끊김·권한 없음) | 사용자 payload 원문 일치 디코딩·Envelope 필드 보존 위치/손실 명시, Gap/Unknown 표시, Unavailable/Stale을 0·정상으로 표시하지 않음, 로봇 프로세스 무변경 |
 | 3 | viewer 종료·정리·카운터 대조 | 원격 구독 자원 실제 해제, 유한 자원, 미확인 범위 명시 |
 
 ## 3. 요구사항–설계–구현–테스트 추적 체크리스트

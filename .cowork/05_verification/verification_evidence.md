@@ -1311,6 +1311,30 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **F-11 소비자:** 정상 descriptor·schemaless·summary 반복·손상/잘림/CRC 0·한도 경계 export → tc_014_standard; CLI 신규 파일/충돌/실패 정리·손상 chunk/불일치 summary → CLI 통합 및 Drop 가드 unit; 이벤트 다중 출력/worker 실패/queued reply·만료/회전 → logger 내부·facade f32~f37; core 보존/복구·조회/재생 → tc_005_retention·fault_storage·tc_006_query/replay. 모두 위 workspace 회귀의 실제 파일·라우팅 경로로 확인했다.
 - **미실행·한계:** native/다른 OS(T3, TASK-024), 장기(TASK-024), 실앱(TASK-026)은 기존 이월. Miri는 unsafe·원자 순서 변경이 없어 이번에 재실행하지 않음. GUI·대용량 export 시간/최대 메모리는 TASK-030의 기존 미실행 범위. CRC 0은 checksum 없이 구조만 검증한다. 누적 metadata map의 새 합계 예산은 추가하지 않았다. 커버리지는 이번에 재측정하지 않았으며 EV-080의 93.56%는 TASK-034 이전 수치다. Task/MS Done·Gate4/5 승격 근거로 대신하지 않는다.
 
+<a id="ev-083"></a>
+### EV-083 — TASK-030 S2 A native 단일 형식 전환
+
+- **판정:** 로컬 **Pass** / 2026-11-16. A 구현·회귀·위임 수락 완료, REV-056 **Closed**. TASK-030 S2 전체 Done은 아니다. A native writer/reader·같은 revision query/recovery·구형 경로 정리 범위다. REV-056 개발 자가검토.
+- **대상:** 기준 `3a78494`, 제품 소스 `048cdf3`. Ubuntu PC / Linux `7.0.0-43-generic` x86_64, 개발 Rust 1.96.0·MSRV 1.85.0 고정. RT 수집·unsafe·원자 순서·vendor·dependency 변경 없음.
+- **구현:** profile `dot-logger/standard/1`, 원문 payload/user schema + 같은 chunk의 인접 RecordMeta pair. dot_logger.file에 session/revision/target/실제 log sequence/producer·channel 수와 loss unavailable. native borrowed reader, query 직접 payload offset, 공통 chunk 선검증·recover 재작성, 사용자당 물리 Message index 예약64→128B. Envelope codec/proto/FDS/golden 및 S1 converter/API/CLI 삭제, 구형 판독·선택 API·wrapper 없음. 기록·보존·복구·조회·재생·성능/UPS·client pipeline 소비 경로를 전환했다.
+- **TDD/회귀 보강:**
+  - 첫 TC-015 2개가 수정 전 profile `dot-logger/1`·chunk당 Message 1건으로 assertion Red → native 쓰기 후 Green.
+  - RV-141: 파일 producer 수가 usize::MAX이고 caller bound도 클 때 `capacity overflow` 패닉 재현 → Vec 할당 전에 isize byte 폭 거절 → Green.
+  - RV-142: file channel 두 개의 product ID 중복을 통과시키는 파일 재현 → writer/reader가 등록 제약을 공유하도록 수정 → Green.
+  - RV-143: 물리 index 예약을 늘렸지만 RetentionConfig 생성 최소 한도가 구형1088B로 남아 첫 append가 빈 파일 회전과 예산 초과를 만들 수 있었다. 1151B(새 최소1152B−1) 생성 거절 시험에서 Red → 공통 native 최소값으로 검사 → Green.
+  - RV-144: dot_logger.file의8개 고정 필드인데 generic MCAP map 임시 할당 전 자체 크기 제한이 없었다. 긴 숫자 표현을 수락하는 Red를 확인하고 body≤1KiB·최대8개 borrowed key/value로 파싱한다. schema/channel의 조작된 u32 길이를 먼저 borrowed Fields로 검사해 file-controlled 대용량 할당을 막는다. 다량 unknown map key의 임시 메모리도 고정 제어 예약 안에 제한한다.
+  - TC-015 총11개: independent MCAP 물리 payload/인접성·oversize pair 분리 금지·두 번째 물리 쓰기 실패에서 Written/safe offset 비노출·Drop 무IO, 같은 low32 sequence/시각의 다른 producer·전체 u64/importance/source, borrowed payload/파일 identity, caller limits/구형 profile, 마지막 pair의 metadata channel/seq/log/publish/참조 손상(비영 CRC 재계산), zero CRC/불일치/누락 pair/잘린 suffix, extreme length·producer sequence 역전, root duplicate/1KiB 고정 크기/할당 폭, 예약 topic/schema·중복 product channel.
+  - TC-014 native facade 2개: user `test.Pose`를 독립 prost 모델로 100건 기대값과 디코딩 대조, schemaless blob10건 원문, FDS/encoding, 메타 전 필드·중요도/source 보존. 보존/복구·query/blob/replay·완료 Busy/expiry·DB/file·facade event·tracing·remote 등 기존 통합 시험은 새 판독으로 유지.
+  - 전체 개수 639 → 630: 구형 전용23개(Envelope2·export core16·CLI4·cleanup unit1) 제거, native11·보존 최소예산1·미지원 export CLI1·일반 terminal summary cap unit1 추가/이관. 기능 자체를 제거한 converter의 보안 시험은 이력(EV-082)이며 새 경로 성공으로 재사용하지 않는다. 원본 snapshot/recipe 표면을 바꾸지 않았다. 마지막 인덱스 최소값 수정과 IO 실패 시험 보강 뒤 두 Rust workspace/clippy/docs/18구성을 최종 재실행해 모두 Pass.
+- **최종 검증 명령·결과(모두 Pass):**
+  - `cargo +<1.96.0|1.85.0> test --workspace --all-features --locked`: 각 **630** passed·0 failed·5 ignored(외부 DB), RT allocator19 포함.
+  - `cargo +1.96.0 fmt --all --check`, 두 Rust `clippy --workspace --all-targets --all-features --locked -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo +<version> doc --workspace --all-features --no-deps --locked` 및 core-only rustdoc. workspace doc는 Cargo의 lib/bin 동일 출력명 충돌로 첫 병렬 실행이 IO 오류였으며 `--jobs 1` 직렬 재실행 Pass(Cargo 경고에 명시된 issue6313, 제품 소스 변경 없음).
+  - `python3 scripts/check-feature-matrix.py --toolchain <version>`: 각16 feature 조합 + calibrate 단독/전체(18구성), 독립 consumer/RT allocator·예제.
+  - 전체 feature matrix는 두 Rust 각18구성 Pass다. 이후 마지막 Metadata 크기·borrowed 길이 검사를 보강한 최종 소스에서 두 Rust workspace/clippy/docs와 TC-015(11개)를 각각18구성 모두 재실행해 Pass. 이 마지막 변경은 read.rs와 해당 시험뿐이며 feature별 분기는 없다.
+  - `python3 scripts/test_check_integration_surface.py`, `python3 scripts/check-integration-surface.py`: self-test18 Pass, facade34/60·표면 snapshot·L1~L3 레시피 Pass. 제품 소스/fixture160개 SHA-256이 최종 검증 시작/종료에서 동일하다. 저장소 PRIVATE를 gh로 확인해 T3 미도래, 게시 커밋은 [skip ci]로 native CI를 실행하지 않는다.
+- **자가검토/한계:** native product metadata/descriptor는 고정 예약, caller metadata는 max_metadata_bytes로 분리, 입력 prefix와 u16 channel 수로 제한된 NativeReader 등록과 명시 producer bound를 문서화했다. loss는 모든 파일에서 unavailable이며 0을 만들지 않는다. B revision 회전/source별 query/recovery/manifest v2, C loss(TASK-035), D runtime WIP(TASK-034), E 커버리지/일정 판정이 남는다. 현재 단일 revision query/recovery와 manifest v1은 B에서 직접 갱신한다.
+- **미실행:** native/다른 OS(T3, TASK-024)·24h/전원 차단(TASK-024)·실앱(TASK-026), native 파일 GUI 재판독·정량 성능/커버리지 재측정. Miri는 unsafe·원자 변경 없어 미재실행. source-copy 제거로 T6의 구현 원인은 해소했지만 과거 +37~45% 추정 달성이나 새 처리량을 주장하지 않는다. max-payload 여유분 등 일부 보수 예약은 유지한다. 큰 raw 성능 smoke의 명시 memory 64→80MiB는 늘어난 두 MCAP index 예약을 수용하기 위한 fixture 변경이며 64MiB에서 수락한다고 주장하지 않는다. Gate4/5·Task/MS 전체 수락 조건은 변경하지 않았다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

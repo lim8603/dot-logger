@@ -9,19 +9,19 @@
 
 파일에 남는 장기 호환 형식, 메모리·인덱스 비용, 설정 전환과 장애 복구 의미가 함께 바뀐다. native 단일 형식으로의 전환은 H/J 결정이며 2026-11-16 Human이 수정안 D1~D3를 명시 승인했다. 기존 위임만으로 승인된 것으로 간주한 결정이 아니다.
 
-## 맥락과 코드 관측
+## 승인 전 맥락과 코드 관측 (`3a78494` 이전)
 
 | 현재 사실 | 근거 | 필요한 변화 |
 |---|---|---|
-| 모든 사용자 메시지를 Envelope로 저장 | [SegmentWriter](../../../crates/dot-logger/src/storage/writer.rs)의 `with_target`·`append`, [codec](../../../crates/dot-logger/src/storage/codec.rs) | 사용자 schema/encoding으로 직접 저장하는 선택지 |
-| S1 export는 사용자 payload와 메시지별 RecordMeta를 분리 | [standard.rs](../../../crates/dot-logger/src/storage/standard.rs), [record_meta.proto](../../../crates/dot-logger/src/storage/record_meta.proto), API §21 | 승인된 매핑을 native 쓰기에 재사용 |
+| 모든 사용자 메시지를 Envelope로 저장 | [SegmentWriter](../../../crates/dot-logger/src/storage/writer.rs)의 `with_target`·`append`, [codec](../../../crates/dot-logger/src/storage/codec.rs) | 사용자 schema/encoding으로 직접 저장 |
+| S1 export는 사용자 payload와 메시지별 RecordMeta를 분리 | `storage/standard.rs`(당시 구현, A에서 제거), [record_meta.proto](../../../crates/dot-logger/src/storage/record_meta.proto), API §21 | 승인된 매핑을 native 쓰기에 재사용 |
 | writer/log는 budget revision과 다른 record를 거절 | [SegmentLog::append](../../../crates/dot-logger/src/storage/retention.rs), `Router::writer_budget_for_revision` | 다음 delivery의 revision이 달라지면 별도 파일 |
 | 두 revision bank, producer별 적용 경계·이전 guard 소멸 뒤 재사용 | [config_update.rs](../../../crates/dot-logger/src/control/config_update.rs)의 `boundary`·`ready` | 파일 순서의 revision 단조 증가를 가정하지 않음 |
 | Snapshot은 모든 source에 같은 revision을 요구 | [Snapshot::new/scan](../../../crates/dot-logger/src/query/mod.rs) | source별 revision 검증과 하나의 논리 snapshot |
 | query/recovery의 기존 형식은 알 수 없는 opcode를 거절 | [recovery.rs](../../../crates/dot-logger/src/storage/recovery.rs), query `scan` | 기존 profile에 손실 Metadata를 추가하는 우회는 사용하지 않음 |
 | CaptureCounts는 producer별 제출/대여 **시도 수** | [counters.rs](../../../crates/dot-logger/src/telemetry/counters.rs), capture `try_record_small/raw` | 채널별 계수, 재시도·필터·출력별 결과의 단위 구분 |
 | facade encode 오류는 core 진입 전에 발생, DispatchEvent에는 channel 없음 | [Writer::try_log_at](../../../crates/dot-logger/src/logger/writer.rs), [routing/types.rs](../../../crates/dot-logger/src/routing/types.rs) | 단순 기존 telemetry/DispatchEvent 합산만으로 구현하지 않음 |
-| CLI manifest v1에는 전역 revision 하나, 알 수 없는 필드 거절 | [model.rs](../../../crates/dot-logger-cli/src/model.rs) | v1 유지 + 명시적 v2 source별 revision |
+| CLI manifest v1에는 전역 revision 하나, 알 수 없는 필드 거절 | [model.rs](../../../crates/dot-logger-cli/src/model.rs) | 명시적 v2 source별 revision, v1 adapter 제외 |
 
 ## 결정 요인
 
@@ -205,3 +205,8 @@ flowchart LR
 ## 승인 기록 — 2026-11-16
 
 Human 「승인, 다음 할일은?」로 legacy 보존을 제거한 D1~D3 수정안을 승인했다. 다음 작업은 TASK-030 S2 단계 A의 native pair 쓰기/읽기·구형 경로 정리이며 첫 실패 시험부터 시작한다. 구현/성능/호환 시험을 이 승인만으로 Pass로 바꾸지 않는다.
+
+
+## 구현 진행 기록 — 2026-11-16
+
+A native writer/reader·단일 revision query/recovery·구형 경로 제거를 구현·검증·위임 수락을 마쳤다(A Done)([EV-083](../../05_verification/verification_evidence.md#ev-083)). 현재 파일 loss_tracking은 unavailable, B revision/source/manifest v2·C loss·D runtime WIP·E 통합/커버리지는 후속이다. 위 승인 전 관측과 §초안 검토는 당시 기록으로 유지하며 현재 구현은 API §23.1을 따른다.

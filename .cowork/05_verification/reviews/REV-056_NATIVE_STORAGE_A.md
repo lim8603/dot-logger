@@ -57,8 +57,8 @@
 |---|---|---|
 | 생성 | NativeReader, FileInfo | file/등록 정보, bounded producer 상태, borrowed 논리 record iterator |
 | 수정 | StoredRecord<'a> | payload Vec → source bytes borrow |
-| 수정 | SegmentWriter, SegmentLog, Validation, RetentionConfig | meta channel·파일 sequence·pair 검증/논리 수·최소 index 예산, legacy payload scratch 제거 |
-| 생성/수정 | Meta, Source(비공개) | 기존 RecordMeta 태그1~9; 외부 wire 타입 공개 없음 |
+| 수정 | SegmentWriter, SegmentLog, Validation, WriterConfig, RetentionConfig | meta channel·파일 sequence·pair 검증/논리 수·최소 index 예산, legacy payload scratch 제거 |
+| 생성 | Meta(비공개) | 기존 Source를 재사용하여 RecordMeta 태그1~9를 구현; 외부 wire 타입 공개 없음 |
 | 수정/삭제 | StorageError, Envelope, Export* | UnsupportedFormat, 구형 UnsupportedVersion·Envelope·변환 전용 타입 제거 |
 
 ## 검토 포인트와 마감

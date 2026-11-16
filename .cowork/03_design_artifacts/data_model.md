@@ -96,7 +96,7 @@ HTTP 성공은 DB API 확인 경계이며 SSD 영속 완료나 조회 결과 검
 
 - 파일 container 버전, envelope 버전, 사용자 schema 버전, wire API 버전을 분리한다.
 - 알 수 없는 선택 필드는 건너뛰고 unknown payload는 opaque bytes로 반환한다. 모든 임의 encoding에 자동 schema migration을 약속하지 않는다.
-- 외부 배포 이후 기준 golden file과 OS 간 교환으로 읽기 호환성을 검증한다. 현재 배포 전 개발 파일에는 영구 호환 의무를 두지 않으며 ADR-013 수정안은 native 단일 형식 전환이다. 미지원 profile/major는 명시 오류다.
+- 외부 배포 이후 기준 golden file과 OS 간 교환으로 읽기 호환성을 검증한다. 현재 배포 전 개발 파일에는 영구 호환 의무를 두지 않으며 ADR-013 승인안은 native 단일 형식 전환이다. 미지원 profile/major는 명시 오류다.
 - 입력 길이/압축 해제 크기/레코드 수/파일 offset 산술을 검증한다. 경로 traversal·과도한 압축 확장·무한 스캔을 막는 읽기 예산을 둔다.
 - DB token·TLS key는 설정 참조로만 연결하고 파일 metadata·CLI JSON·리포트에 저장하지 않는다.
 
@@ -129,6 +129,6 @@ Replay는 frozen Snapshot의 원 receipt/mono 정렬 index와 사전 예약 page
 Completion RecordSlot은 accepted record의 revision과 target 선택을 보존한다. posted revision과 producer별 applied revision은 분리하며, 두 bank 외의 무제한 plan 이력을 만들지 않는다. Sample은 안정 revision 또는 RevisionTransition 미가용 상태를 보존하고 서로 다른 session/revision/epoch의 구간을 합치지 않는다. Snapshot은 원래 Report/profile provenance·application_input_id·Window와 선택 Resources(동일 Window/measurement_scope_id)를 보존한다. Comparison의 signed-magnitude RateChange는 after-before의 정확한 u128 유리수이며 intentional skip·거절·출력 실패/폐기/Unknown은 구분한다. MCAP 봉투/파일의 단일 revision은 유지하고 새 revision은 명시 budget/별도 writer로 기록한다.
 
 
-## TASK-030 S2·TASK-035 저장 모델 제안 — 2026-11-16
+## TASK-030 S2·TASK-035 저장 모델 — 2026-11-16
 
-**Proposed — [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3 Human 승인 대기.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 제안했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 현재 구현 사실/이력으로 유지하고, 승인 전 새 형식·기본값·메모리 예약이 구현된 것으로 해석하지 않는다.
+**Accepted — 2026-11-16 Human 「승인」, [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 채택했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 현재 구현 사실/이력으로 유지하고, 설계 승인만으로 새 형식·메모리 예약이 구현된 것으로 해석하지 않는다.

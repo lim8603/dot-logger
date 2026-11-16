@@ -6,11 +6,11 @@
 | Story | US-001·002·003·004 |
 | 요구사항 | FR-007 FR-009 FR-011 FR-017 NFR-008 |
 | 설계 | [인터페이스 §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05) |
-| ADR | ADR-012 Accepted(facade 소유 모델). 실행 중 변경의 저장 계약은 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed |
+| ADR | ADR-012 Accepted(facade 소유 모델). 실행 중 변경의 저장 계약은 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 승인) |
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | 기존 결과 Human 확인 + ADR-013 D1~D3 승인 → TASK-030 S2 저장 구현 뒤 ① 실행 중 변경 마무리 |
+| 다음 액션 | 기존 결과 Human 확인 대기. ADR-013 승인 완료 → TASK-030 S2 저장 구현 뒤 ① 실행 중 변경 마무리 |
 | 의존 | TASK-027·TASK-029(facade·표면 가드) |
 | 예상 소요 | S1 1 + S2 3~4 + S3 1 인일, 리뷰 대기 제외 |
 
@@ -45,4 +45,4 @@ API §18 표에 계획만 있고 구현되지 않은 `Writer::try_log_with(.., M
 
 RV-137·138은 다중 출력 전송·rollback·오류 우선순위, 실패 배출의 queued reply 정리, 새 mark/주기 배치 쓰기 전 만료 정리로 조치했다. `tc_013_facade` f37과 logger 내부 5개 회귀 시험을 추가했다. [EV-082](../../05_verification/verification_evidence.md#ev-082). 실행 중 설정 변경의 ADR 의존과 기존 구현 결과 Human 확인 대기는 유지한다.
 
-실행 중 변경의 저장 선행 설계는 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed(2026-11-16)로 구체화했다. 기존 S1/S2(실행 중 변경 제외)/S3 완료와 Human 결과 확인 대기는 유지하며 WIP를 병합하지 않았다.
+실행 중 변경의 저장 선행 설계는 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 승인)로 확정했다. 기존 S1/S2(실행 중 변경 제외)/S3 완료와 Human 결과 확인 대기는 유지하며 WIP를 병합하지 않았다.

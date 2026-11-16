@@ -1,13 +1,13 @@
 # ADR-013 — native 표준 MCAP·손실 기록·revision별 파일 회전
 
-- **상태:** Proposed — Human 설계 승인 대기. 이 문서는 구현 완료·승인된 기본값 변경의 근거가 아니다.
+- **상태:** Accepted — 2026-11-16 Human 「승인, 다음 할일은?」. 미배포 정정안 D1~D3 승인. 제품 구현·검증은 별도다.
 - **날짜:** 2026-11-16
 - **대상 기준:** `ff4fd5d`(제품 소스 `5d7fe6a`), 로컬 WIP `36c1724`는 설계 조사만 참조하고 병합하지 않음.
 - **관계:** ADR-008의 RT·소유권·완료 계약, ADR-010의 MCAP 0.26.0, ADR-012의 facade 소유 모델을 유지한다. API §21·§22.8의 다음 저장 결정을 제안한다.
 
 ## ADR 필요성 판단
 
-파일에 남는 장기 호환 형식, 메모리·인덱스 비용, 설정 전환과 장애 복구 의미가 함께 바뀐다. native 단일 형식으로의 전환은 H/J 결정이며, 기존 구현·검증 위임으로 승인된 것으로 간주하지 않는다.
+파일에 남는 장기 호환 형식, 메모리·인덱스 비용, 설정 전환과 장애 복구 의미가 함께 바뀐다. native 단일 형식으로의 전환은 H/J 결정이며 2026-11-16 Human이 수정안 D1~D3를 명시 승인했다. 기존 위임만으로 승인된 것으로 간주한 결정이 아니다.
 
 ## 맥락과 코드 관측
 
@@ -36,24 +36,24 @@
 
 | 선택 | 장점 | 비용·판정 |
 |---|---|---|
-| **배포 전 native 단일 형식으로 전환** | writer/reader/recovery·예약·시험이 한 형식으로 통일, legacy 선택 API 불필요 | 과거 개발 fixture/예제/manifest를 함께 갱신 — 수정 권고안 |
+| **배포 전 native 단일 형식으로 전환** | writer/reader/recovery·예약·시험이 한 형식으로 통일, legacy 선택 API 불필요 | 과거 개발 fixture/예제/manifest를 함께 갱신 — 채택 |
 | 구형 판독·명시 legacy 쓰기 병행 | 배포된 소비처/보존 의무 데이터가 있다면 전환 비용 감소 | 현재 미배포라는 Human 지적에 비해 두 codec·API·예산·검증을 유지하는 부담이 큼 — 초안의 보존 전제 철회 |
 | 기존 `dot-logger/1`에 보조 채널/Metadata 추가 | Envelope encoder 재사용 | 현재 strict reader와 새 형식의 의미가 충돌. 배포 전이라도 식별되지 않는 혼합 형식은 만들지 않음 — 비채택 |
 | 파일 하나에 revision 혼합 | 회전 횟수 감소 | 합의한 파일 단일 revision과 복구/등록 모델까지 바꿈 — 비채택 |
 | revision별 동시 writer 2개 | 교차 arrival의 회전 감소 | TargetLease·파일 sync·상주 writer 예산 변경. 단일 active writer를 우선 유지 |
 | 모든 producer 전환까지 새 revision IO 정지 | revision 순서 단순 | 쉬는 writer 때문에 배출·큐가 막힘. 기존 부분 적용 계약과 맞지 않음 — 비채택 |
 
-## 권고 결정 — 승인 항목
+## 승인된 결정
 
-| ID | 권고안 | 사용자에게 보이는 영향 |
+| ID | 승인 계약 | 사용자에게 보이는 영향 |
 |---|---|---|
 | **D1** | facade·core·조회·복구를 **`dot-logger/standard/1` 단일 형식**으로 전환. 구형 판독·legacy 쓰기·형식 선택 API와 호환 wrapper는 제품 범위에서 제외 | 과거 개발 파일/manifest는 명시적으로 미지원. fixture·예제·소비 코드는 새 형식으로 갱신. 필요한 과거 기록이 특정되면 별도 일회성 변환만 판단 |
 | **D2** | native 파일에 `_dot_logger/loss` protobuf 누적 체크포인트. 제출 거절은 시도 수, 출력 실패는 assignment 수, Unknown·의도적 skip·원본 대여 실패는 별도 분류. 보고 주기는 기존 `sync_every` 사용 | 채널별 관측값·구간·사유를 파일과 CLI에서 확인. 고유 메시지 손실/정확 시각/확인되지 않은 종료 꼬리를 0으로 표시하지 않음 |
 | **D3** | 출력당 active writer 1개, 다음 delivery의 revision이 다를 때마다 회전. source별 revision 조회/복구 및 manifest v2 | r1→r2→r1 순서도 정상. 전역 적용 barrier를 추가하지 않음. 용량·IO 실패는 기존 완료 실패 의미로 보고 |
 
-D1~D3는 함께 검토할 저장 설계다. **2026-11-16 Human의 「아직 배포된것도 아닌데?」 지적을 반영해 D1의 legacy 보존 전제를 철회**했다. 현재 native 단일 형식으로 정리한 수정안이며 ADR 전체는 Proposed다. 과거 계획의 호환 조건을 배포 후 유지 의무로 확대하지 않는다.
+D1~D3는 함께 검토할 저장 설계다. **2026-11-16 Human의 「아직 배포된것도 아닌데?」 지적을 반영해 D1의 legacy 보존 전제를 철회**했다. 이후 Human이 native 단일 형식으로 정리한 수정안 D1~D3를 승인해 ADR 전체를 Accepted로 전환했다. 과거 계획의 호환 조건을 배포 후 유지 의무로 확대하지 않는다.
 
-## 1. 형식과 사용자 API 제안
+## 1. 형식과 사용자 API 계약
 
 - facade와 core는 native 단일 형식을 쓴다. `StorageFormat::{LegacyV1, StandardV1}`·`storage_format(..)`·`new_with_format`은 추가하지 않는다. 기존 `SegmentWriter::new`·`SegmentLog::new`를 새 구현으로 전환한다.
 - 필요한 범위에서 저장/조회 API·manifest·등록/예산 구조를 직접 정리하고 저장소 안의 호출자·예제·시험을 함께 수정한다. 과거 Rust signature/struct literal을 보존하기 위한 wrapper는 추가하지 않는다. 기능과 무관한 API 변경을 위한 작업은 하지 않는다.
@@ -115,7 +115,7 @@ D1~D3는 함께 검토할 저장 설계다. **2026-11-16 Human의 「아직 배�
 - 제출 counter는 각 producer가 단독으로 갱신하고, output counter는 terminal 상태 전이 소유 경로에서 갱신한다. relaxed 관측의 비동시성을 문서화하고 quiescent 최종값을 대조한다. atomic saturation은 wrap 대신 u64::MAX와 overflow 표시다.
 - output counter에는 여러 report 경로가 동시에 접근할 수 있음을 전제로 한다. producer counter의 단일 writer load/store를 그대로 재사용하지 않고, 일반 출력 경로의 원자적 포화 갱신 또는 사전 예약한 소유자별 shard 합계로 중복·유실을 막는다. RT 수집 경로에는 이 경합/retry를 넣지 않는다.
 - control 메모리: 카운터 행 수 `N`을 등록 수와 enum 수로 checked 산출하고 `N × size_of(cell)`·정렬·scratch·대기 report를 모두 예약한다. 두 revision bank/무제한 revision 이력에 loss counter를 곱하지 않는다.
-- native output 예약에는 사용자 pair의 추가 Message/인덱스, descriptor 2개, control report의 **수·바이트 상한**, 각 파일 baseline/final report 여유를 포함한다. 제안 상한은 `K=ceil(N / report당 행 상한)`, 파일 control 수 `L=max(max_records, 2K)`로 두어 baseline/final 두 그룹을 담고, 물리 Message 수를 `2×max_records+L` 이하로 예약한다. 계산 overflow·최소 report/단일 pair가 segment에 들어가지 않으면 시작 전 거절한다. 실제 상수/레이아웃은 구현의 예약 함수로 확정하고 1바이트 경계 시험으로 확인한다.
+- native output 예약에는 사용자 pair의 추가 Message/인덱스, descriptor 2개, control report의 **수·바이트 상한**, 각 파일 baseline/final report 여유를 포함한다. 승인된 상한 산정 방향은 `K=ceil(N / report당 행 상한)`, 파일 control 수 `L=max(max_records, 2K)`로 두어 baseline/final 두 그룹을 담고, 물리 Message 수를 `2×max_records+L` 이하로 예약한다. 계산 overflow·최소 report/단일 pair가 segment에 들어가지 않으면 시작 전 거절한다. 실제 상수/레이아웃은 구현의 예약 함수로 확정하고 1바이트 경계 시험으로 확인한다.
 - 주기는 이미 필수 입력인 `sync_every`를 재사용한다. IO 경로가 사용자 batch를 처리한 뒤 해당 sync 전 report를 반영한다. 별도 RT 손실 report queue를 만들지 않으며 management는 한 turn의 스캔/직렬화 작업량을 제한한다. 파일 회전/정상 종료에도 강제 checkpoint를 시도한다.
 - 대기 공간이 모자라면 같은 키의 누적 최신값으로 coalesce하며 관측 구간이 넓어졌음을 표시한다. 성공적으로 기록하기 전 watermark를 버리거나 report 실패를 다시 loss report로 재귀 기록하지 않는다. control 한도로 회전할 수 없으면 지연/미완료 상태를 드러내고 사용자 기록·retention의 기존 유한 예산을 넘지 않는다.
 - 한 파일 출력이 고장나면 살아 있는 파일 출력에 origin target이 명시된 관측값을 남길 수 있다. 모든 파일 출력 고장·강제 종료 뒤의 RAM 값은 복원할 수 없다. header/마지막 checkpoint/종료 coverage로 **미확인 꼬리**를 나타내며, 파일이 없거나 report가 없다는 사실을 0손실 증거로 쓰지 않는다.
@@ -164,7 +164,7 @@ flowchart LR
 - deterministic 정렬은 기존 mono/real/source·producer·accepted sequence·segment sequence·파일 offset tie 정책을 유지한다. 시간 역전이 있는 real time을 revision 정렬로 대체하지 않는다.
 - 파일 profile과 manifest version은 과거 개발 자료를 새 형식으로 오인하지 않게 구분한다. 정식 외부 배포 이후의 version/호환 정책은 그때 확정하며, 현재 개발 파일에 영구 호환 의무를 소급하지 않는다.
 
-## 6. 구현 순서와 검증 계획 — 승인 후
+## 6. 승인된 구현 순서와 검증 계획
 
 | 단계 | 소유 Task | 첫 실패/수락 검증 |
 |---|---|---|
@@ -201,3 +201,7 @@ flowchart LR
 ## 초안 검토 결과 — 2026-11-16
 
 제품 코드·protobuf·snapshot은 변경하지 않았다. 현재 코드의 revision/shape/strict-reader/카운터 단위를 대조하고 문서 연결·상태·D1~D3의 미승인 표시를 점검했다. 설계안과 실제 구현을 구분했고, Human 지적 뒤 legacy 보존·선택 타입·wrapper·이중 형식 시험 계획을 제거했다. 구현/회귀/표준 GUI 판독은 위 승인 후 계획이며, 이 초안 작성으로 Pass를 선언하지 않는다.
+
+## 승인 기록 — 2026-11-16
+
+Human 「승인, 다음 할일은?」로 legacy 보존을 제거한 D1~D3 수정안을 승인했다. 다음 작업은 TASK-030 S2 단계 A의 native pair 쓰기/읽기·구형 경로 정리이며 첫 실패 시험부터 시작한다. 구현/성능/호환 시험을 이 승인만으로 Pass로 바꾸지 않는다.

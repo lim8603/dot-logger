@@ -1296,14 +1296,14 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 - **시험 쓰기량:** f32~f36 합계 약 45 MiB이고 모두 tmpfs(`/tmp`)에 쓴다.
 
 
-## 23. TASK-030 S2·TASK-035 저장 계약 제안 — 2026-11-16
+## 23. TASK-030 S2·TASK-035 저장 계약 — 2026-11-16
 
-**Proposed / 구현 전 Human 승인 대기.** 상세 설계의 기준은 [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md)이며, §21·§22.8의 기존 승인 내용을 현재 구현 변경으로 소급하지 않는다.
+**Accepted / 2026-11-16 Human 「승인」.** 상세 설계는 [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md)의 미배포 정정안 D1~D3다. §21·§22.8을 이 범위에서 갱신하며, 설계 승인과 제품 구현·검증을 구분한다.
 
-| 승인 항목 | 제안 계약 |
+| 승인 항목 | 승인 계약 |
 |---|---|
 | D1 저장 형식 | `dot-logger/standard/1`, 사용자 payload + 같은 chunk의 인접 RecordMeta pair. facade/core native 단일 형식으로 전환. 미배포 단계의 legacy 쓰기/판독·형식 선택 API·호환 wrapper 제외, fixture/호출자 갱신. 새 예약 topic 2개와 native 예산 검증 |
 | D2 파일 손실 | native `_dot_logger/loss`의 session 누적 checkpoint. 거절은 시도, 출력은 assignment, skip/acquire/Unknown 분리. 채널 미귀속 presence, 관측 구간/포화/part/미확인 꼬리, sync_every 보고. 미수집/미관측 loss는 Unavailable이며 0으로 대체하지 않음 |
 | D3 revision | 출력당 active writer 1개. delivery revision 경계마다 회전해 r1→r2→r1도 허용. per-producer sequence·catalog/event/pin·파일별 sync 채무 유지. source별 revision Snapshot/recovery와 manifest v2 단일 경로, 과거 v1 adapter 제외 |
 
-Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 메서드·legacy decoder/writer 보존 계획을 제거했다. 이 변경 자체로 facade 항목은 늘지 않는다(현 34/60). 필요한 API/예산 구조는 직접 정리하고 저장소 호출자·fixture·예제를 함께 갱신한다. 실제 시그니처/예약 레이아웃은 승인 뒤 TDD·표면 가드로 확인한다. 현재 제품 코드/파일은 아직 전환하지 않았다.
+Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 메서드·legacy decoder/writer 보존 계획을 제거했다. 이 변경 자체로 facade 항목은 늘지 않는다(현 34/60). 필요한 API/예산 구조는 직접 정리하고 저장소 호출자·fixture·예제를 함께 갱신한다. 실제 시그니처/예약 레이아웃은 승인 방향 안에서 TDD·표면 가드로 확인한다. 현재 제품 코드/파일은 아직 전환하지 않았다.

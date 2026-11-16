@@ -6,11 +6,11 @@
 | Story | US-003·005 |
 | 요구사항 | FR-003 FR-005 FR-010 NFR-004 NFR-007 NFR-008 |
 | 설계 | [데이터](../../03_design_artifacts/data_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) |
-| ADR | ADR-009·010 Accepted. [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed — S2 native·손실·revision 저장 계약 승인 대기 |
+| ADR | ADR-009·010 Accepted. [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted — S2 native 단일 형식·손실·revision 저장 계약 승인(2026-11-16) |
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | S2 ADR-013 D1~D3 Human 승인 → 구현(S1 Done, S2 설계안 작성 완료·승인 대기) |
+| 다음 액션 | S2 단계 A — native pair 쓰기/읽기·구형 경로 정리의 첫 실패 시험(S1 Done, ADR-013 승인 완료) |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 쓰기 모드 | ADR 수정안 승인 후 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — 설계안 ADR-013 Proposed(2026-11-16), Human 승인 대기. 제품 구현 미착수** |
+| S2 | native 표준 쓰기 모드 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), 다음 단계 A 첫 실패 시험. 제품 구현 미착수** |
 
 ## 변경 대상과 첫 검증
 
@@ -60,6 +60,6 @@
 
 ## S2 저장 설계안 — 2026-11-16
 
-[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed. D1은 배포 전 native 단일 형식 전환·legacy 보존/선택 API 제외, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 단일 형식 전환의 상세는 승인 항목이며 현재 구현에는 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
+[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 「승인」). D1은 배포 전 native 단일 형식 전환·legacy 보존/선택 API 제외, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 단일 형식 전환의 설계는 승인됐고 현재 구현에는 아직 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
 
-2026-11-16 Human의 미배포 지적을 반영해 초안의 기존 파일/명시 legacy 쓰기 호환 전제를 제거했다. 과거 S1 성과와 EV는 이력으로 유지하며, 제품 구현은 ADR 전체 승인 뒤 진행한다.
+2026-11-16 Human의 미배포 지적을 반영해 초안의 기존 파일/명시 legacy 쓰기 호환 전제를 제거했다. 과거 S1 성과와 EV는 이력으로 유지하며, ADR 전체는 이어진 Human 「승인」으로 Accepted가 됐고 제품 구현을 진행할 수 있다.

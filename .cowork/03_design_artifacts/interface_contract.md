@@ -1302,8 +1302,8 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 
 | 승인 항목 | 제안 계약 |
 |---|---|
-| D1 저장 형식 | `dot-logger/standard/1`, 사용자 payload + 같은 chunk의 인접 RecordMeta pair. 신규 facade 기본 native 전환, 명시 legacy 쓰기/기존 core 생성자와 구형 파일 판독 보존. 새 예약 topic 2개와 형식별 예산 검증 |
-| D2 파일 손실 | native `_dot_logger/loss`의 session 누적 checkpoint. 거절은 시도, 출력은 assignment, skip/acquire/Unknown 분리. 채널 미귀속 presence, 관측 구간/포화/part/미확인 꼬리, sync_every 보고. legacy loss는 Unavailable이며 0으로 대체하지 않음 |
-| D3 revision | 출력당 active writer 1개. delivery revision 경계마다 회전해 r1→r2→r1도 허용. per-producer sequence·catalog/event/pin·파일별 sync 채무 유지. source별 revision Snapshot/recovery와 manifest v2, v1 wrapper 보존 |
+| D1 저장 형식 | `dot-logger/standard/1`, 사용자 payload + 같은 chunk의 인접 RecordMeta pair. facade/core native 단일 형식으로 전환. 미배포 단계의 legacy 쓰기/판독·형식 선택 API·호환 wrapper 제외, fixture/호출자 갱신. 새 예약 topic 2개와 native 예산 검증 |
+| D2 파일 손실 | native `_dot_logger/loss`의 session 누적 checkpoint. 거절은 시도, 출력은 assignment, skip/acquire/Unknown 분리. 채널 미귀속 presence, 관측 구간/포화/part/미확인 꼬리, sync_every 보고. 미수집/미관측 loss는 Unavailable이며 0으로 대체하지 않음 |
+| D3 revision | 출력당 active writer 1개. delivery revision 경계마다 회전해 r1→r2→r1도 허용. per-producer sequence·catalog/event/pin·파일별 sync 채무 유지. source별 revision Snapshot/recovery와 manifest v2 단일 경로, 과거 v1 adapter 제외 |
 
-후보 공개 항목은 `StorageFormat` 재수출 1개(34/60 → 예상 35/60), 명시 형식 선택/고급 loss 수집·multi-source 읽기 메서드다. 실제 시그니처·예약 레이아웃은 승인 방향 안에서 구현하고 snapshot·TDD·두 Rust 회귀로 확인한다. 현재 제품 API/파일 기본값은 아직 바뀌지 않았다.
+Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 메서드·legacy decoder/writer 보존 계획을 제거했다. 이 변경 자체로 facade 항목은 늘지 않는다(현 34/60). 필요한 API/예산 구조는 직접 정리하고 저장소 호출자·fixture·예제를 함께 갱신한다. 실제 시그니처/예약 레이아웃은 승인 뒤 TDD·표면 가드로 확인한다. 현재 제품 코드/파일은 아직 전환하지 않았다.

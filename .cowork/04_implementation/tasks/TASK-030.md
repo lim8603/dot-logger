@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 쓰기 모드 | ADR 승인 후 writer 옵션으로 표준 모드 기록, 복구·조회·재생이 두 형식 모두 지원, 기존 `dot-logger/1` 파일 판독 유지. **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — 설계안 ADR-013 Proposed(2026-11-16), Human 승인 대기. 제품 구현 미착수** |
+| S2 | native 표준 쓰기 모드 | ADR 수정안 승인 후 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — 설계안 ADR-013 Proposed(2026-11-16), Human 승인 대기. 제품 구현 미착수** |
 
 ## 변경 대상과 첫 검증
 
@@ -51,7 +51,7 @@
 
 ## 완료 기준
 
-- [ ] S1 export·S2 native 모드와 기존 형식 호환.
+- [ ] S1 완료 이력 보존·S2 native 단일 경로 검증, fixture/예제/consumer 갱신 및 구형 profile 명시 거절(ADR-013 수정안).
 - [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
 - [ ] 손상/부분 파일·복구·예산 경계를 두 형식에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
@@ -60,4 +60,6 @@
 
 ## S2 저장 설계안 — 2026-11-16
 
-[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed. D1은 새 native profile·**facade 기본 형식 전환**과 legacy 호환 경로, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 기본값 전환은 새 승인 항목이며 현재 구현에는 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
+[ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Proposed. D1은 배포 전 native 단일 형식 전환·legacy 보존/선택 API 제외, D2는 TASK-035 누적 계수/미확인 상태, D3는 r1→r2→r1도 허용하는 단일 active writer 회전·source별 revision 조회/복구다. 단일 형식 전환의 상세는 승인 항목이며 현재 구현에는 반영하지 않았다. 세부 형식·예산·실패/검증 계획은 ADR 본문을 따른다.
+
+2026-11-16 Human의 미배포 지적을 반영해 초안의 기존 파일/명시 legacy 쓰기 호환 전제를 제거했다. 과거 S1 성과와 EV는 이력으로 유지하며, 제품 구현은 ADR 전체 승인 뒤 진행한다.

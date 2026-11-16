@@ -16,12 +16,12 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-16 / TASK-030 S2·TASK-035 S1 ADR-013 초안 작성 / AI |
-| 세션 상태 | ADR-013 Proposed 작성·연결 문서 검토 완료, D1~D3 Human 승인 대기. 다음: 승인 → TASK-030 S2 저장 구현·TASK-035 → TASK-034 실행 중 변경 WIP `36c1724` 통합. TASK-034 기존 결과(EV-081·082) 확인 대기는 별도 유지 |
-| 최근 세션 | 2026-11-16 #001 — REV-055 조치 마감(EV-082, 각 639 Pass) 뒤 ADR-013 초안(native 기본 facade·누적 손실·교차 revision 회전) 작성, Human 승인 대기 |
+| 세션 상태 | ADR-013 Proposed를 미배포 지적에 맞춰 native 단일 형식으로 정정, D1~D3 Human 승인 대기. 다음: 승인 → TASK-030 S2 저장 구현·TASK-035 → TASK-034 실행 중 변경 WIP `36c1724` 통합. TASK-034 기존 결과(EV-081·082) 확인 대기는 별도 유지 |
+| 최근 세션 | 2026-11-16 #001 — REV-055 조치 마감(EV-082, 각 639 Pass) 뒤 ADR-013 초안(native 단일 형식·누적 손실·교차 revision 회전, 미배포 지적 반영) 작성, Human 승인 대기 |
 
 ## 현재 결정과 제약
 
-- **2026-11-16 ADR-013 Proposed — 미승인 제안:** D1 별도 native profile·**신규 facade 기본 native 전환**(legacy 생성/구형 판독 유지), D2 native 누적 손실 checkpoint(시도·assignment·skip·Unknown 분리, legacy loss Unavailable), D3 단일 active writer의 교차 revision 회전·source별 조회/복구. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3 Human 승인 전 제품 기본값·형식·API는 변경하지 않는다.
+- **2026-11-16 ADR-013 Proposed — 미승인 제안:** D1 미배포 지적을 반영한 **native 단일 형식 전환**(legacy 쓰기/판독·선택 API·호환 wrapper 제외), D2 native 누적 손실 checkpoint(시도·assignment·skip·Unknown·미관측 분리), D3 단일 active writer의 교차 revision 회전·source별 조회/복구. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3 Human 승인 전 제품 기본값·형식·API는 변경하지 않는다.
 
 - **2026-11-15 Human 「권고대로」 — TASK-034 ① 범위 조정(API §22.8):** core 저장이 파일당 단일 revision이라 facade 실행 중 설정 변경은 파일 회전 설계가 필요하다. 시작 시 level(`ChannelOptions::minimum`)만 TASK-034에서 구현하고, 실행 중 변경은 TASK-030 S2 저장 ADR에 회전·다중 revision 조회를 포함해 승인받은 뒤 WIP 브랜치 `wip/task-034-s2b-runtime-config`(`36c1724`, 로컬)로 끝낸다.
 - **2026-11-15 Human 합의 — 일정 목표:** 다음 주(2026-11-16 주) 목표는 핵심 범위 완료와 MS-007 일정 판정이다. 대상은 TASK-034, TASK-030 S2 + TASK-035, TASK-033 최종 재측정, TASK-025다. viewer·대시보드(TASK-031·032)는 그다음 주로 둔다(Human 「뷰어는 그렇게 해도 돼」). 인일은 추정이며 납기 확정이 아니다. 병목은 승인 지점 세 곳이다(TASK-034 결과, TASK-030 S2 ADR, 판정).
@@ -95,7 +95,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence.md#ev-082)). 별도 Human 확인 대기는 TASK-034 기존 구현 결과(EV-081·082)다.
 
-1. **ADR-013 승인 대기:** [설계안](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1(새 native profile·facade 기본값)·D2(손실 계수/파일 checkpoint)·D3(revision마다 회전·여러 revision 조회/복구)를 Human이 검토한다. 승인 뒤 TASK-030 S2 A/B(공통 reader/native pair·revision 저장) → TASK-035 S2 → TASK-034 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 마무리한다. 기존 Task-030 S1은 Done이고 TASK-035 S1은 초안 작성/승인 대기, 제품 구현은 아직 없다.
+1. **ADR-013 승인 대기:** [설계안](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) D1(배포 전 native 단일 형식·legacy 보존 제외)·D2(손실 계수/파일 checkpoint)·D3(revision마다 회전·여러 revision 조회/복구)를 Human이 검토한다. 승인 뒤 TASK-030 S2 A/B(공통 reader/native pair·revision 저장) → TASK-035 S2 → TASK-034 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 마무리한다. 기존 Task-030 S1은 Done이고 TASK-035 S1은 초안 작성/승인 대기, 제품 구현은 아직 없다.
 2. **TASK-033 S4:** 승인 목표치 기준 1~3 충족(EV-080). TASK-034·035 뒤 최종 재측정(기준 4)으로 MS-007 일정 판단을 마무리한다.
 3. **2026-11-16 주 목표:** TASK-034·TASK-030 S2·TASK-035 → TASK-033 판정 → TASK-025 문서·인수 정리. 납기 확정이 아닌 합의 목표다.
 4. **2026-11-23 주 계획:** TASK-031 viewer → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7 트리거를 확인한다.

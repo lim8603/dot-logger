@@ -2447,6 +2447,22 @@ fn multi_file_recovery_bounds_the_job_and_keeps_the_completed_prefix_on_later_da
             f.dir.join(name).as_os_str(),
         ])
     };
+    let file_limit = manifest_with(&f, "limited-files.json", |m| {
+        m["limits"]["max_segments"] = json!(1)
+    });
+    assert_outcome(
+        &invoke(&file_limit, "limited-files-output"),
+        2,
+        "invalid_input",
+    );
+    assert!(!f.dir.join("limited-files-output").exists());
+    let record_limit = manifest_with(&f, "limited-records.json", |m| {
+        m["limits"]["max_records"] = json!(1)
+    });
+    assert_outcome(&invoke(&record_limit, "limited-records-output"), 3, "limit");
+    let prefix = std::fs::read(f.dir.join("limited-records-output/0.mcap")).unwrap();
+    assert_eq!(NativeReader::new(&prefix, 8192, 2).unwrap().count(), 1);
+    assert!(!f.dir.join("limited-records-output/1.mcap").exists());
     let limited = manifest_with(&f, "limited-job.json", |m| {
         m["limits"]["read_bytes"] = json!(1)
     });

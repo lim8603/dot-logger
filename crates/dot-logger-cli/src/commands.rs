@@ -257,7 +257,7 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
         return Ok(json!({"scope":"offline_session_declaration"}));
     }
     if command == "status" {
-        out.emit("status",json!({"session":manifest.session,"revision":manifest.revision.to_string(),"availability":"Observed","metrics":{"state":"Unavailable","reason":"no_runtime_metrics_backend"}}))?;
+        out.emit("status",json!({"session":manifest.session,"sources":manifest.sources.iter().map(|s|json!({"sequence":s.sequence.to_string(),"revision":s.revision.to_string()})).collect::<Vec<_>>(),"availability":"Observed","metrics":{"state":"Unavailable","reason":"no_runtime_metrics_backend"}}))?;
         return Ok(json!({}));
     }
     if command == "recover" {
@@ -415,11 +415,90 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     }
 }
 fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result<Value, Failure> {
-    use dot_logger::routing::{Router, RoutingConfig, Schedule, TargetConfig};
-    if m.sources.len() != 1 {
-        return Err(Failure::Input);
+    let sources = m.sources(path);
+    // Bound the whole job before creating outputs; per-source checks are repeated
+    // on the actual descriptors because the host must keep inputs immutable.
+    let mut total = 0u64;
+    let mut paths = Vec::with_capacity(sources.len());
+    for source in &sources {
+        let metadata = std::fs::metadata(&source.path)?;
+        if !metadata.is_file() {
+            return Err(Failure::Input);
+        }
+        if source
+            .safe_offset
+            .is_some_and(|safe| safe != metadata.len())
+        {
+            return Err(Failure::Unsupported);
+        }
+        if metadata.len() > m.limits().max_source_bytes {
+            return Err(Failure::Limit);
+        }
+        total = total.checked_add(metadata.len()).ok_or(Failure::Limit)?;
+        if total > m.limits().read_bytes {
+            return Err(Failure::Limit);
+        }
+        let canonical = std::fs::canonicalize(&source.path)?;
+        if paths.contains(&canonical) {
+            return Err(Failure::Input);
+        }
+        paths.push(canonical);
     }
-    let source = m.sources(path).remove(0);
+    let output = Path::new(ctx.text("output")?);
+    let multiple = sources.len() > 1;
+    if ctx.cancel.is_cancelled() {
+        return Err(Failure::Cancelled);
+    }
+    if multiple {
+        std::fs::create_dir(output)?;
+    }
+    let mut remaining = m.limits().max_records;
+    let mut remaining_bytes = m.limits().read_bytes;
+    let mut recovered_files = 0;
+    for source in sources {
+        if ctx.cancel.is_cancelled() {
+            return Err(Failure::Cancelled);
+        }
+        if ctx.now() >= ctx.deadline_ns {
+            return Err(Failure::Deadline);
+        }
+        if remaining == 0 {
+            return Err(Failure::Limit);
+        }
+        let destination = if multiple {
+            output.join(format!("{}.mcap", source.sequence))
+        } else {
+            output.to_path_buf()
+        };
+        let report = recover_one(
+            ctx,
+            out,
+            m,
+            source,
+            &destination,
+            remaining,
+            remaining_bytes,
+        )?;
+        remaining_bytes = remaining_bytes
+            .checked_sub(report.source_bytes)
+            .ok_or(Failure::Limit)?;
+        remaining = remaining
+            .checked_sub(report.records)
+            .ok_or(Failure::Limit)?;
+        recovered_files += 1;
+    }
+    Ok(json!({"files":recovered_files,"file_synced":true,"namespace_synced":false}))
+}
+fn recover_one(
+    ctx: &Context,
+    out: &mut Output,
+    m: &Manifest,
+    source: dot_logger_client::OfflineSource,
+    output_path: &Path,
+    remaining_records: usize,
+    remaining_bytes: u64,
+) -> Result<RecoveryReport, Failure> {
+    use dot_logger::routing::{Router, RoutingConfig, Schedule, TargetConfig};
     let metadata = std::fs::metadata(&source.path)?;
     if !metadata.is_file() {
         return Err(Failure::Input);
@@ -441,42 +520,76 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
     {
         return Err(Failure::Unsupported);
     }
+    if metadata.len() > remaining_bytes || metadata.len() > m.limits().max_source_bytes {
+        return Err(Failure::Limit);
+    }
     // create_new prevents overwriting the source or an existing output; failures
     // preserve the independent partial file for investigation, without retries.
     let output = OpenOptions::new()
         .read(true)
         .write(true)
         .create_new(true)
-        .open(ctx.text("output")?)?;
+        .open(output_path)?;
     let plan = m.plan(128 * 1024 * 1024)?;
     let channels = m.channels()?;
     let mut owner = CaptureOwner::new(
         &plan,
         model::id(&m.session)?,
-        m.revision,
+        source.revision,
         &channels.iter().map(|c| c.channel).collect::<Vec<_>>(),
     )
     .map_err(|_| Failure::Input)?;
-    let report=owner.scope(|s|->Result<RecoveryReport,Failure> {
-        let router=Router::new(&plan,s.map(|(_,r)|r).collect(),RoutingConfig {targets:vec![TargetConfig {id:1,required:true,queue_slots:1,pending_slots:0,retained_bytes:1,max_attempts:1,max_age:Duration::from_secs(1)}],routes:channels.iter().map(|c|dot_logger::routing::Route {channel_id:c.channel.channel_id,targets:vec![1]}).collect(),shared_records:1,small_copy_bytes:1,schedule:Schedule {record_quantum:1,byte_quantum:1,records_per_turn:1,bytes_per_turn:1,retries_per_target:1,reclaim_slots_per_producer:1}}).map_err(|_|Failure::Input)?;
-        let limits=m.limits();
-        let options=RecoveryOptions {writer:WriterConfig {max_payload_bytes:limits.max_payload_bytes,write_buffer_bytes:0,chunk_target_bytes:limits.max_record_bytes,max_records:limits.max_records,max_chunks:1024,max_metadata_bytes:limits.max_metadata_bytes},limits:RecoveryConfig {max_source_bytes:limits.max_source_bytes,max_record_bytes:limits.max_record_bytes,max_chunks:1024}};
-        match recover_segment(&mut file,router.writer_budget(1).map_err(|_|Failure::Input)?,channels,options,output,ctx.cancel.as_atomic()) {
-            Ok(segment)=>Ok(segment.report),
-            Err(error)=>{
-                let r=error.report;out.emit("recovery",json!({"records":r.records,"chunks":r.chunks,"verified_end":r.verified_end,"excluded_from":r.excluded.0,"excluded_to":r.excluded.1,"stop":format!("{:?}",r.stop),"published":false}))?;
-                Err(if r.stop==RecoveryStop::Cancelled{Failure::Cancelled}else{Failure::Io})
+    let report = owner.scope(|scope| -> Result<RecoveryReport, Failure> {
+        let router = Router::new(&plan, scope.map(|(_, reader)| reader).collect(), RoutingConfig {
+            targets: vec![TargetConfig {
+                id: 1, required: true, queue_slots: 1, pending_slots: 0,
+                retained_bytes: 1, max_attempts: 1, max_age: Duration::from_secs(1),
+            }],
+            routes: channels.iter().map(|channel| dot_logger::routing::Route {
+                channel_id: channel.channel.channel_id, targets: vec![1],
+            }).collect(),
+            shared_records: 1, small_copy_bytes: 1,
+            schedule: Schedule {
+                record_quantum: 1, byte_quantum: 1, records_per_turn: 1,
+                bytes_per_turn: 1, retries_per_target: 1, reclaim_slots_per_producer: 1,
+            },
+        }).map_err(|_| Failure::Input)?;
+        let limits = m.limits();
+        let options = RecoveryOptions {
+            source_sequence: source.sequence,
+            writer: WriterConfig {
+                max_payload_bytes: limits.max_payload_bytes, write_buffer_bytes: 0,
+                chunk_target_bytes: limits.max_record_bytes, max_records: remaining_records,
+                max_chunks: 1024, max_metadata_bytes: limits.max_metadata_bytes,
+            },
+            limits: RecoveryConfig {
+                max_source_bytes: limits.max_source_bytes.min(remaining_bytes),
+                max_record_bytes: limits.max_record_bytes, max_chunks: 1024,
+            },
+        };
+        match recover_segment(&mut file, router.writer_budget(1).map_err(|_| Failure::Input)?,
+            channels, options, output, ctx.cancel.as_atomic()) {
+            Ok(segment) => Ok(segment.report),
+            Err(error) => {
+                let report = error.report;
+                out.emit("recovery", json!({
+                    "sequence": source.sequence.to_string(), "revision": source.revision.to_string(),
+                    "records": report.records, "chunks": report.chunks,
+                    "verified_end": report.verified_end, "excluded_from": report.excluded.0,
+                    "excluded_to": report.excluded.1, "stop": format!("{:?}", report.stop), "published": false,
+                }))?;
+                Err(if report.stop == RecoveryStop::Cancelled { Failure::Cancelled } else { Failure::Io })
             }
         }
     })?;
-    out.emit("recovery",json!({"records":report.records,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
+    out.emit("recovery",json!({"sequence":source.sequence.to_string(),"revision":source.revision.to_string(),"records":report.records,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
     if !matches!(
         report.stop,
         RecoveryStop::DataEnd | RecoveryStop::EndOfInput
     ) {
         return Err(Failure::Limit);
     }
-    Ok(json!({"file_synced":true,"namespace_synced":false}))
+    Ok(report)
 }
 async fn remote_config(ctx: &Context) -> Result<RemoteConfig, Failure> {
     let mut config = RemoteConfig::new(ctx.text("endpoint")?);

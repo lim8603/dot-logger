@@ -20,8 +20,11 @@
 //!
 //! # Rotation and retention
 //!
-//! `SegmentLog` rotates on bytes, monotonic time, message count and index
-//! bytes/chunk limits. `RetentionConfig` states continuous, ring or event mode and
+//! `SegmentLog` rotates on bytes, monotonic time, message count, index
+//! bytes/chunk limits and delivery revision boundaries. `append_with_budget`
+//! explicitly selects a retained budget of the same router/target; `write_batch`
+//! derives it from the live delivery guard. Files remain single-revision, while
+//! sequence, receipt watermarks, events, pins and sync debt survive rotations. `RetentionConfig` states continuous, ring or event mode and
 //! the file/disk/protection/query-pin budgets. Rotation publishes the closed
 //! catalog only after footer → file sync → final name → directory sync.
 //! Overlapping events do not charge protected bytes twice and report the real
@@ -99,6 +102,14 @@ pub struct WriterBudget {
     pub(crate) target_state: Arc<TargetLedger>,
 }
 impl WriterBudget {
+    pub(crate) fn same_target(&self, other: &Self) -> bool {
+        self.session == other.session
+            && self.target == other.target
+            && self.producers == other.producers
+            && Arc::ptr_eq(&self.ledger, &other.ledger)
+            && Arc::ptr_eq(&self.target_state, &other.target_state)
+    }
+
     /// All currently live writer reservations from this router.
     pub fn used_bytes(&self) -> usize {
         self.ledger.storage_used.load(Ordering::Acquire)

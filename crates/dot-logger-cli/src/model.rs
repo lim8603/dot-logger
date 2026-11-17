@@ -53,7 +53,6 @@ fn unhex(s: &str) -> Result<Vec<u8>, Failure> {
 pub struct Manifest {
     pub schema_version: u32,
     pub session: String,
-    pub revision: u64,
     pub producers: usize,
     pub external_bytes: usize,
     pub channels: Vec<Channel>,
@@ -83,6 +82,7 @@ struct Descriptor {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
+    pub revision: u64,
     pub path: PathBuf,
     pub sequence: u64,
     #[serde(default)]
@@ -150,7 +150,7 @@ impl Manifest {
         }
     }
     pub fn validate(&self) -> Result<usize, Failure> {
-        if self.schema_version != 1
+        if self.schema_version != 2
             || self.producers == 0
             || self.producers > 1024
             || self.channels.is_empty()
@@ -250,6 +250,7 @@ impl Manifest {
         self.sources
             .iter()
             .map(|s| OfflineSource {
+                revision: s.revision,
                 path: if s.path.is_absolute() {
                     s.path.clone()
                 } else {
@@ -272,7 +273,6 @@ impl Manifest {
             &budget,
             OfflineConfig {
                 session: id(&self.session)?,
-                revision: self.revision,
                 channels: self.channels()?,
                 limits: self.limits(),
                 deadline_ns: deadline,

@@ -151,9 +151,8 @@ fn snapshot_on(
     Snapshot::new(
         &budget(),
         42,
-        1,
         storage,
-        vec![QuerySource::active(file, 1, safe)],
+        vec![QuerySource::active(file, 0, 1, safe)],
         c,
         0,
         100,
@@ -407,9 +406,8 @@ fn malformed_or_over_limit_sources_do_not_produce_partial_snapshots() {
             let r = Snapshot::new(
                 &budget(),
                 42,
-                1,
                 channels(),
-                vec![QuerySource::active(f.clone(), 1, end)],
+                vec![QuerySource::active(f.clone(), 0, 1, end)],
                 cfg(),
                 0,
                 100,
@@ -423,9 +421,8 @@ fn malformed_or_over_limit_sources_do_not_produce_partial_snapshots() {
             Snapshot::new(
                 &budget(),
                 42,
-                1,
                 channels(),
-                vec![QuerySource::active(f.clone(), 1, safe)],
+                vec![QuerySource::active(f.clone(), 0, 1, safe)],
                 body_limit,
                 0,
                 100,
@@ -441,9 +438,8 @@ fn malformed_or_over_limit_sources_do_not_produce_partial_snapshots() {
             Snapshot::new(
                 &budget(),
                 42,
-                1,
                 channels(),
-                vec![QuerySource::active(f, 1, w.safe_offset())],
+                vec![QuerySource::active(f, 0, 1, w.safe_offset())],
                 c,
                 0,
                 100,
@@ -454,40 +450,25 @@ fn malformed_or_over_limit_sources_do_not_produce_partial_snapshots() {
     });
 }
 #[test]
-fn closed_and_active_segments_merge_and_shared_reservations_return() {
+fn relabelled_source_sequence_is_rejected_and_shared_reservations_return() {
     with_writer(|mut w, f| {
         w.append(record(1, 20, 100), &[1, 2, 3]).unwrap();
-        w.flush_chunk().unwrap();
-        let old = f.0.lock().unwrap().get_ref().clone();
-        w.append(record(2, 10, 90), &[1, 2, 3]).unwrap();
         let finished = w.finish().unwrap();
-        let bound = finished.safe_offset();
         let budget = budget();
         let no = AtomicBool::new(false);
-        let mut s = Snapshot::new(
-            &budget,
-            42,
-            1,
-            channels(),
-            vec![
-                QuerySource::active(
-                    File(Arc::new(Mutex::new(IoCursor::new(old.clone()))), 0),
-                    1,
-                    old.len() as u64,
-                ),
-                QuerySource::active(f, 2, bound),
-            ],
-            cfg(),
-            0,
-            100,
-            &no,
-        )
-        .unwrap();
-        assert!(budget.used_bytes() > 0);
-        let c = s.start(query(), 1, &no).unwrap();
-        let p = s.page(&c, 1, &no).unwrap();
-        assert_eq!(p.records[0].record.metadata.mono_ns, 10);
-        drop(s);
+        assert!(matches!(
+            Snapshot::new(
+                &budget,
+                42,
+                channels(),
+                vec![QuerySource::active(f, 2, 1, finished.safe_offset())],
+                cfg(),
+                0,
+                100,
+                &no
+            ),
+            Err(QueryError::CorruptData)
+        ));
         assert_eq!(budget.used_bytes(), 0);
     });
 }
@@ -508,11 +489,11 @@ fn byte_read_and_shared_memory_limits_reject_without_leaking_reservations() {
                 .validate(&PlatformCapabilities::default())
                 .unwrap(),
         );
-        let source = || vec![QuerySource::active(f.clone(), 1, w.safe_offset())];
-        let s = Snapshot::new(&budget, 42, 1, channels(), source(), c, 0, 100, &no).unwrap();
+        let source = || vec![QuerySource::active(f.clone(), 0, 1, w.safe_offset())];
+        let s = Snapshot::new(&budget, 42, channels(), source(), c, 0, 100, &no).unwrap();
         assert_eq!(budget.used_bytes(), needed);
         assert!(matches!(
-            Snapshot::new(&budget, 42, 1, channels(), source(), c, 0, 100, &no),
+            Snapshot::new(&budget, 42, channels(), source(), c, 0, 100, &no),
             Err(QueryError::Limit)
         ));
         drop(s);
@@ -520,7 +501,7 @@ fn byte_read_and_shared_memory_limits_reject_without_leaking_reservations() {
         let mut c = cfg();
         c.read_bytes = w.safe_offset() - 1;
         assert!(matches!(
-            Snapshot::new(&budget, 42, 1, channels(), source(), c, 0, 100, &no),
+            Snapshot::new(&budget, 42, channels(), source(), c, 0, 100, &no),
             Err(QueryError::Limit)
         ));
         assert_eq!(budget.used_bytes(), 0);
@@ -544,9 +525,8 @@ fn a_corrupt_complete_chunk_is_rejected_and_keeps_source_bytes_intact() {
             Snapshot::new(
                 &budget(),
                 42,
-                1,
                 channels(),
-                vec![QuerySource::active(bad.clone(), 1, safe)],
+                vec![QuerySource::active(bad.clone(), 0, 1, safe)],
                 cfg(),
                 0,
                 100,

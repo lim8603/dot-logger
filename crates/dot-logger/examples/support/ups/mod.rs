@@ -190,6 +190,7 @@ pub fn process_crash(
                     router.writer_budget(target)?,
                     channels(),
                     RecoveryOptions {
+                        source_sequence: 0,
                         writer: writer_config(1024),
                         limits: RecoveryConfig {
                             max_source_bytes: before.len() as u64,
@@ -676,6 +677,7 @@ fn run_inner(
                 router.writer_budget(target)?,
                 channels(),
                 RecoveryOptions {
+                    source_sequence: 0,
                     writer: writer_config(block),
                     limits: RecoveryConfig {
                         max_source_bytes: source_len,

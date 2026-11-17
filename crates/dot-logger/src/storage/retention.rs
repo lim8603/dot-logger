@@ -158,7 +158,7 @@ pub struct RetentionBatchError {
     pub error: RetentionError,
     /// Accepted prefix, possibly spanning already closed files.
     pub appended: usize,
-    /// Prefix guaranteed by the successful final batch flush; zero on earlier failure.
+    /// Prefix flushed or durably published before the failure, including earlier rotations.
     pub written: usize,
     /// Prefix with successful Written completion reports.
     pub reported: usize,
@@ -172,6 +172,8 @@ impl std::error::Error for RetentionBatchError {}
 /// Limit responsible for rotating before accepting the next message.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RotationReason {
+    /// Next delivery belongs to another user configuration revision.
+    Revision,
     /// Conservative encoded bytes including summary/footer.
     Bytes,
     /// Host monotonic segment age.
@@ -214,6 +216,8 @@ pub struct SegmentLog<S: SegmentStore> {
     base: Box<[u64]>,
     /// Appended records not yet covered by a sync of their file.
     dirty: bool,
+    appended_records: u64,
+    published_records: u64,
     now: u64,
     next: u64,
     poisoned: bool,
@@ -334,6 +338,8 @@ impl<S: SegmentStore> SegmentLog<S> {
             last: vec![0; producers].into_boxed_slice(),
             base: budget.target_state.files.base(),
             dirty: false,
+            appended_records: 0,
+            published_records: 0,
             now,
             next: 0,
             poisoned: false,
@@ -487,8 +493,27 @@ impl<S: SegmentStore> SegmentLog<S> {
         payload: &[u8],
         now: u64,
     ) -> Result<AppendReport, RetentionError> {
+        self.append_with_budget(self.budget.clone(), record, payload, now)
+    }
+    /// Append using an explicitly retained budget from this same router/target.
+    /// A changed revision rotates before accepting the record; capacity rejection
+    /// preserves the old active file. Foreign budgets/records are rejected before IO.
+    pub fn append_with_budget(
+        &mut self,
+        budget: WriterBudget,
+        record: CapturedRecord,
+        payload: &[u8],
+        now: u64,
+    ) -> Result<AppendReport, RetentionError> {
         self.healthy()?;
+        if !self.budget.same_target(&budget) {
+            return Err(RetentionError::InvalidRecord);
+        }
         self.clock(now)?;
+        let next_count = self
+            .appended_records
+            .checked_add(1)
+            .ok_or(RetentionError::Capacity)?;
         let p = record.receipt.producer_id as usize;
         let channel = self
             .channels
@@ -496,7 +521,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             .find(|c| c.channel.channel_id == record.metadata.channel_id)
             .ok_or(RetentionError::InvalidRecord)?;
         if record.receipt.session_id != self.budget.session
-            || record.revision != self.budget.revision
+            || record.revision != budget.revision
             || p >= self.last.len()
             || record.receipt.accepted_seq <= self.last[p]
             || record.metadata.schema_id != channel.channel.schema_id
@@ -507,7 +532,9 @@ impl<S: SegmentStore> SegmentLog<S> {
         codec::validate_record(record, payload, self.config.max_payload_bytes)?;
         let charge = Self::record_bound(payload.len())?;
         let a = self.active.as_ref().ok_or(RetentionError::Poisoned)?;
-        let mut rotated = if a.records >= self.config.max_records {
+        let mut rotated = if record.revision != self.budget.revision {
+            Some(RotationReason::Revision)
+        } else if a.records >= self.config.max_records {
             Some(RotationReason::Records)
         } else if a.records > 0 && now - a.opened >= self.catalog.config.max_segment_ns {
             Some(RotationReason::Time)
@@ -529,7 +556,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             None
         };
         if rotated.is_some() {
-            self.rotate(now)?;
+            self.rotate_to(budget, now)?;
         } else {
             self.room(now, false)?;
         }
@@ -573,6 +600,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         }
         self.last[p] = record.receipt.accepted_seq;
         self.dirty = true;
+        self.appended_records = next_count;
         Ok(AppendReport {
             segment: a.sequence,
             rotated,
@@ -609,6 +637,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         self.store.finalize(a.sequence)?;
         self.store.sync_directory()?;
         self.catalog.closed.push(SegmentInfo {
+            revision: self.budget.revision,
             sequence: a.sequence,
             bytes,
             opened_ns: a.opened,
@@ -616,6 +645,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             records: a.records,
             mono_range: a.range,
         });
+        self.published_records = self.appended_records;
         self.active = None;
         // Earlier files were synced at their own publication.
         self.dirty = false;
@@ -624,10 +654,14 @@ impl<S: SegmentStore> SegmentLog<S> {
     }
     /// Explicit rotation. Capacity rejection preserves the current active writer.
     pub fn rotate(&mut self, now: u64) -> Result<(), RetentionError> {
+        self.rotate_to(self.budget.clone(), now)
+    }
+    fn rotate_to(&mut self, budget: WriterBudget, now: u64) -> Result<(), RetentionError> {
         self.healthy()?;
         self.clock(now)?;
         self.room(now, true)?;
         self.publish(now)?;
+        self.budget = budget;
         if let Err(e) = self.open(now) {
             self.poisoned = true;
             return Err(e);
@@ -713,6 +747,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         Ok(crate::query::QuerySource::pinned(
             reader,
             sequence,
+            self.budget.revision,
             safe,
             super::ReadPermit::new(pin, bytes, deadline),
         ))
@@ -730,17 +765,17 @@ impl<S: SegmentStore> SegmentLog<S> {
         deadline: u64,
     ) -> Result<crate::query::QuerySource<R>, RetentionError> {
         let pin = self.pin(seq, bytes, now, deadline)?;
-        let safe = self
+        let segment = self
             .catalog
             .closed
             .iter()
             .find(|s| s.sequence == seq)
-            .map(|s| s.bytes)
             .ok_or(RetentionError::UnknownToken)?;
         Ok(crate::query::QuerySource::pinned(
             reader,
             seq,
-            safe,
+            segment.revision,
+            segment.bytes,
             super::ReadPermit::new(pin, bytes, deadline),
         ))
     }
@@ -813,12 +848,23 @@ impl<S: SegmentStore> SegmentLog<S> {
             written: 0,
             reported: 0,
         };
+        let start = self.appended_records;
         for delivery in deliveries {
-            if delivery.target_id() != self.budget.target {
-                return Err(progress);
-            }
-            if let Err(error) = self.append(delivery.record(), delivery.payload(), now) {
+            let result = match delivery.writer_budget(&self.budget) {
+                Some(budget) => {
+                    self.append_with_budget(budget, delivery.record(), delivery.payload(), now)
+                }
+                None => Err(RetentionError::InvalidRecord),
+            };
+            if let Err(error) = result {
                 progress.error = error;
+                progress.written = self
+                    .published_records
+                    .saturating_sub(start)
+                    .min(progress.appended as u64) as usize;
+                // Preserve the primary append failure even if a completion report
+                // is Busy. The caller can retry only the unreported prefix.
+                let _ = Self::report_prefix(deliveries, &mut progress);
                 return Err(progress);
             }
             progress.appended += 1;
@@ -828,14 +874,26 @@ impl<S: SegmentStore> SegmentLog<S> {
         }
         if let Err(error) = self.flush() {
             progress.error = error;
+            progress.written = self
+                .published_records
+                .saturating_sub(start)
+                .min(progress.appended as u64) as usize;
+            let _ = Self::report_prefix(deliveries, &mut progress);
             return Err(progress);
         }
         progress.written = deliveries.len();
-        for delivery in deliveries {
-            if let Err(e) = super::writer::report_written(delivery) {
-                progress.error = RetentionError::Storage(e);
-                return Err(progress);
-            }
+        if let Err(error) = Self::report_prefix(deliveries, &mut progress) {
+            progress.error = RetentionError::Storage(error);
+            return Err(progress);
+        }
+        Ok(())
+    }
+    fn report_prefix(
+        deliveries: &[&Delivery<'_>],
+        progress: &mut RetentionBatchError,
+    ) -> Result<(), StorageError> {
+        for delivery in &deliveries[progress.reported..progress.written] {
+            super::writer::report_written(delivery)?;
             progress.reported += 1;
         }
         Ok(())

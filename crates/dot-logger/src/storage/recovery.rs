@@ -16,6 +16,9 @@ pub struct RecoveryConfig {
 /// Frozen output configuration and finite source bounds.
 #[derive(Clone, Copy, Debug)]
 pub struct RecoveryOptions {
+    /// Expected original file sequence. Independent sink recovery preserves it;
+    /// `recover_to_store` instead names its output with the supplied new sequence.
+    pub source_sequence: u64,
     /// Original session's registered output format and capacities.
     pub writer: WriterConfig,
     /// Source-side bounds, supplied explicitly by the caller.
@@ -96,8 +99,35 @@ pub fn recover_segment<R: Read + Seek, W: SyncSink>(
     sink: W,
     cancel: &AtomicBool,
 ) -> Result<RecoveredSegment<W>, RecoveryError> {
+    recover_at(
+        source,
+        budget,
+        channels,
+        options,
+        sink,
+        cancel,
+        options.source_sequence,
+    )
+}
+fn recover_at<R: Read + Seek, W: SyncSink>(
+    source: &mut R,
+    budget: WriterBudget,
+    channels: Vec<StorageChannel>,
+    options: RecoveryOptions,
+    sink: W,
+    cancel: &AtomicBool,
+    output_sequence: u64,
+) -> Result<RecoveredSegment<W>, RecoveryError> {
     let mut report = RecoveryReport::empty();
-    let result = recover_inner(source, budget, channels, options, sink, cancel, &mut report);
+    let result = recover_inner(
+        source,
+        budget,
+        channels,
+        (options, output_sequence),
+        sink,
+        cancel,
+        &mut report,
+    );
     result
         .map(|segment| RecoveredSegment { segment, report })
         .map_err(|error| {
@@ -145,7 +175,7 @@ pub fn recover_to_store<R: Read + Seek, T: SegmentStore>(
     let sink = store
         .create(sequence)
         .map_err(|e| fail(StorageError::Io(e)))?;
-    let recovered = recover_segment(source, budget, channels, options, sink, cancel)?;
+    let recovered = recover_at(source, budget, channels, options, sink, cancel, sequence)?;
     report = recovered.report;
     // Close the file before rename; do not rely on platform-specific open-file rename.
     drop(recovered.segment.into_inner());
@@ -218,11 +248,12 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
     source: &mut R,
     budget: WriterBudget,
     channels: Vec<StorageChannel>,
-    options: RecoveryOptions,
+    setup: (RecoveryOptions, u64),
     sink: W,
     cancel: &AtomicBool,
     report: &mut RecoveryReport,
 ) -> Result<FinishedSegment<W>, Option<StorageError>> {
+    let (options, output_sequence) = setup;
     cancelled(cancel, report)?;
     let extra = options.reservation(&channels, budget.producers)?;
     // Declared before all recovery allocations so it outlives their deallocation.
@@ -279,7 +310,16 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         budget.producers,
         options.writer.max_payload_bytes,
     );
-    let mut writer = SegmentWriter::new(budget, options.writer, channels.clone(), sink)?;
+    let target = TargetLease::enter(&budget)?;
+    let mut writer = SegmentWriter::with_target(
+        budget,
+        options.writer,
+        channels.clone(),
+        sink,
+        target,
+        true,
+        output_sequence,
+    )?;
     loop {
         cancelled(cancel, report)?;
         if position == report.source_bytes {
@@ -297,7 +337,13 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         };
         let body = &buffer[..len];
         let result = match op {
-            12 => state.metadata(body),
+            12 => state.metadata(body).and_then(|()| {
+                if state.file_sequence() == Some(options.source_sequence) {
+                    Ok(())
+                } else {
+                    Err(RecoveryStop::InvalidRecord)
+                }
+            }),
             3 => state.schema(body),
             4 => state.channel(body),
             6 => {
@@ -355,6 +401,13 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
             break;
         }
         data_crc = crc_update(crc_update(data_crc, &header), body);
+    }
+    if matches!(
+        report.stop,
+        RecoveryStop::EndOfInput | RecoveryStop::DataEnd
+    ) && state.file_sequence() != Some(options.source_sequence)
+    {
+        report.stop = RecoveryStop::InvalidRecord;
     }
     cancelled(cancel, report)?;
     let mut finished = writer.finish()?;
@@ -473,6 +526,9 @@ impl<'a> Validation<'a> {
             max_payload,
             file: None,
         }
+    }
+    pub(crate) fn file_sequence(&self) -> Option<u64> {
+        self.file.map(|file| file.sequence)
     }
     pub(crate) fn metadata(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         let file = super::FileInfo::parse(body).map_err(|_| RecoveryStop::InvalidRecord)?;

@@ -81,9 +81,9 @@ fn fixture(times: [u64; 2]) -> Fixture {
         }
         drop(writer.finish().unwrap());
     });
-    let data = json!({"schema_version":1,"session":"0000000000000000000000000000002a","revision":1,"producers":2,"external_bytes":8388608,
+    let data = json!({"schema_version":2,"session":"0000000000000000000000000000002a","producers":2,"external_bytes":8388608,
         "channels":[{"id":7,"schema":"00000000000000000000000000000063","version":1,"topic":"raw","encoding":"opaque"}],
-        "sources":[{"path":source,"sequence":1}],"limits":{"max_segments":4,"max_records":32,"max_record_bytes":16384,"max_source_bytes":1000000,"max_payload_bytes":8192,"max_metadata_bytes":1024,"page_records":2,"page_bytes":1024,"inline_bytes":16,"blob_read_bytes":32,"read_bytes":1000000}});
+        "sources":[{"path":source,"sequence":0,"revision":1}],"limits":{"max_segments":4,"max_records":32,"max_record_bytes":16384,"max_source_bytes":1000000,"max_payload_bytes":8192,"max_metadata_bytes":1024,"page_records":2,"page_bytes":1024,"inline_bytes":16,"blob_read_bytes":32,"read_bytes":1000000}});
     std::fs::write(&manifest, serde_json::to_vec(&data).unwrap()).unwrap();
     Fixture {
         dir,
@@ -489,7 +489,6 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
             &budget,
             OfflineConfig {
                 session: 42,
-                revision: 1,
                 channels: vec![StorageChannel {
                     channel: ChannelConfig::new(7, 99, 1),
                     topic: "raw".into(),
@@ -500,8 +499,9 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
                 deadline_ns: 10_000_000_000,
             },
             vec![OfflineSource {
+                revision: 1,
                 path: f.source.clone(),
-                sequence: 1,
+                sequence: 0,
                 safe_offset: None,
             }],
             0,
@@ -1430,7 +1430,7 @@ fn offline_manifest_declaration_errors_are_input_errors() {
     let cases: Vec<(&str, Change)> = vec![
         (
             "schema_version",
-            Box::new(|m| m["schema_version"] = json!(2)),
+            Box::new(|m| m["schema_version"] = json!(1)),
         ),
         ("unknown field", Box::new(|m| m["extra"] = json!(1))),
         (
@@ -1674,7 +1674,9 @@ fn commands_outside_their_mode_are_unsupported() {
 #[test]
 fn config_diff_reports_only_whether_declarations_changed() {
     let f = fixture([10, 20]);
-    let changed = manifest_with(&f, "changed.json", |m| m["revision"] = json!(77));
+    let changed = manifest_with(&f, "changed.json", |m| {
+        m["sources"][0]["revision"] = json!(77)
+    });
     for (after, expected) in [(&f.manifest, false), (&changed, true)] {
         let output = command()
             .args(["config", "diff", "--json", "--before"])
@@ -1728,7 +1730,7 @@ fn offline_status_and_human_text_output() {
         result.1[0]["data"]["session"],
         "0000000000000000000000000000002a"
     );
-    assert_eq!(result.1[0]["data"]["revision"], "1");
+    assert_eq!(result.1[0]["data"]["sources"][0]["revision"], "1");
     assert_eq!(result.1[0]["data"]["metrics"]["state"], "Unavailable");
     let output = command()
         .args(["status", "--manifest"])
@@ -1744,7 +1746,7 @@ fn offline_status_and_human_text_output() {
     assert!(serde_json::from_str::<Value>(text[0]).is_err());
 }
 
-/// `recover` takes exactly one complete regular source. A broken source
+/// `recover` requires complete regular sources. A broken source
 /// reports the unpublished recovery and keeps the partial output (exit 4); a
 /// truncated source recovers its verified prefix but is partial (exit 3).
 #[test]
@@ -1765,7 +1767,7 @@ fn recover_rejects_unsupported_sources_and_reports_partial_recovery() {
         other["path"] = json!("other.mcap");
         m["sources"].as_array_mut().unwrap().push(other);
     });
-    assert_outcome(&recover(&two, "two.mcap"), 2, "invalid_input");
+    assert_outcome(&recover(&two, "two.mcap"), 4, "io_or_transport");
     let directory = manifest_with(&f, "directory.json", |m| {
         m["sources"][0]["path"] = json!(".")
     });
@@ -2234,4 +2236,266 @@ fn obsolete_export_command_is_rejected_without_creating_a_file() {
     assert_eq!(result.status.code(), Some(2));
     assert!(!output.exists());
     assert_eq!(std::fs::read(&f.source).unwrap(), before);
+}
+
+#[cfg(unix)]
+fn mixed_revision_fixture() -> Fixture {
+    let mut f = fixture([10, 20]);
+    let mut config = support::plan().config().clone();
+    config.memory.output_bytes = 8 * 1024 * 1024;
+    config.memory.total_bytes += 8 * 1024 * 1024;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let routes = support::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routes,
+        support::tracking(8),
+    )
+    .unwrap();
+    owner.enable_config_updates(&routes).unwrap();
+    let mut sources = Vec::new();
+    owner.scope(|scope| {
+        scope
+            .config_updates()
+            .unwrap()
+            .apply_config(
+                1,
+                &dot_logger::control::config_update::ConfigPatch {
+                    channels: vec![dot_logger::control::config_update::ChannelPatch {
+                        channel_id: 7,
+                        minimum_level: Level::Debug,
+                        sample_every: 1,
+                    }],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), routes).unwrap();
+        let old = router.writer_budget(10).unwrap();
+        let new = router.writer_budget_for_revision(10, 2).unwrap();
+        let store = FileStore::new(&f.dir, &old, || Ok(u64::MAX)).unwrap();
+        let directory = store.directory().to_path_buf();
+        let mut log = SegmentLog::new(
+            old,
+            WriterConfig {
+                max_payload_bytes: 8192,
+                write_buffer_bytes: 0,
+                chunk_target_bytes: 16384,
+                max_records: 32,
+                max_chunks: 16,
+                max_metadata_bytes: 1024,
+            },
+            vec![StorageChannel {
+                channel: ChannelConfig::new(7, 99, 1),
+                topic: "raw".into(),
+                payload_encoding: "opaque".into(),
+                schema: None,
+            }],
+            RetentionConfig {
+                mode: RetentionMode::Continuous,
+                disk_bytes: 1000000,
+                disk_reserve_bytes: 0,
+                max_age_ns: 1000,
+                max_segment_bytes: 100000,
+                max_segment_ns: 100,
+                max_index_bytes: 32768,
+                protected_bytes: 0,
+                pre_ns: 0,
+                post_ns: 0,
+                max_segments: 4,
+                max_events: 0,
+                max_pins: 0,
+                max_pin_bytes: 0,
+                max_pin_ns: 0,
+            },
+            store,
+            0,
+        )
+        .unwrap();
+        for seq in 1..=2 {
+            let mut metadata = support::meta();
+            metadata.mono_ns = seq * 10;
+            metadata.importance = Some(Importance::Normal);
+            let record = CapturedRecord {
+                receipt: CaptureReceipt {
+                    session_id: 42,
+                    producer_id: 0,
+                    accepted_seq: seq,
+                },
+                metadata,
+                revision: seq,
+                payload_len: 3,
+            };
+            if seq == 1 {
+                log.append(record, &[1, 2, 3], 1).unwrap();
+            } else {
+                log.append_with_budget(new.clone(), record, &[4, 5, 6], 2)
+                    .unwrap();
+            }
+        }
+        log.finish(3).unwrap();
+        for segment in log.segments() {
+            let path = directory.join(format!("{}.mcap", segment.sequence));
+            sources
+                .push(json!({"path":path,"sequence":segment.sequence,"revision":segment.revision}));
+        }
+    });
+    let mut manifest: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+    manifest["sources"] = json!(sources);
+    manifest["limits"]["inline_bytes"] = json!(0);
+    f.source = std::path::PathBuf::from(manifest["sources"][0]["path"].as_str().unwrap());
+    std::fs::write(&f.manifest, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    f
+}
+#[cfg(unix)]
+#[test]
+fn manifest_v2_queries_and_replays_multiple_revisions_and_rejects_wrong_identity() {
+    let f = mixed_revision_fixture();
+    for action in ["query", "replay"] {
+        let result = run([
+            std::ffi::OsStr::new(action),
+            "--manifest".as_ref(),
+            f.manifest.as_os_str(),
+            "--include-payload".as_ref(),
+        ]);
+        assert_outcome(&result, 0, "complete");
+        let rows = records(&result.1);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["data"]["revision"], "1");
+        assert_eq!(rows[1]["data"]["revision"], "2");
+    }
+    for (name, change) in [
+        ("wrong_revision", 0),
+        ("wrong_sequence", 1),
+        ("legacy", 2),
+        ("duplicate_path", 3),
+    ] {
+        let path = manifest_with(&f, &format!("{name}.json"), |m| match change {
+            0 => m["sources"][1]["revision"] = json!(1),
+            1 => m["sources"][1]["sequence"] = json!(7),
+            2 => {
+                m["schema_version"] = json!(1);
+                m["revision"] = json!(1);
+            }
+            _ => m["sources"][1]["path"] = m["sources"][0]["path"].clone(),
+        });
+        let result = run([
+            std::ffi::OsStr::new("query"),
+            "--manifest".as_ref(),
+            path.as_os_str(),
+        ]);
+        assert_eq!(
+            result.0,
+            Some(if change < 2 { 4 } else { 2 }),
+            "{name}: {:?}",
+            result.1
+        );
+        assert!(records(&result.1).is_empty());
+    }
+}
+#[cfg(unix)]
+#[test]
+fn recovery_v2_keeps_each_source_revision_in_separate_new_files() {
+    let f = mixed_revision_fixture();
+    let output = f.dir.join("recovered");
+    let result = run([
+        std::ffi::OsStr::new("recover"),
+        "--manifest".as_ref(),
+        f.manifest.as_os_str(),
+        "--output".as_ref(),
+        output.as_os_str(),
+    ]);
+    assert_outcome(&result, 0, "complete");
+    for (sequence, revision) in [(0, 1), (1, 2)] {
+        let bytes = std::fs::read(output.join(format!("{sequence}.mcap"))).unwrap();
+        let mut reader = NativeReader::new(&bytes, 8192, 2).unwrap();
+        assert_eq!(reader.info().revision, revision);
+        assert_eq!(reader.info().sequence, sequence);
+        assert_eq!(
+            reader.next().unwrap().unwrap().record.receipt.accepted_seq,
+            revision
+        );
+        assert!(reader.next().is_none());
+    }
+    let before = std::fs::read(output.join("0.mcap")).unwrap();
+    let again = run([
+        std::ffi::OsStr::new("recover"),
+        "--manifest".as_ref(),
+        f.manifest.as_os_str(),
+        "--output".as_ref(),
+        output.as_os_str(),
+    ]);
+    assert_eq!(again.0, Some(4));
+    assert_eq!(std::fs::read(output.join("0.mcap")).unwrap(), before);
+}
+
+#[cfg(unix)]
+#[test]
+fn multi_file_recovery_bounds_the_job_and_keeps_the_completed_prefix_on_later_damage() {
+    let f = mixed_revision_fixture();
+    let invoke = |manifest: &std::path::Path, name: &str| {
+        run([
+            std::ffi::OsStr::new("recover"),
+            "--manifest".as_ref(),
+            manifest.as_os_str(),
+            "--output".as_ref(),
+            f.dir.join(name).as_os_str(),
+        ])
+    };
+    let limited = manifest_with(&f, "limited-job.json", |m| {
+        m["limits"]["read_bytes"] = json!(1)
+    });
+    assert_outcome(&invoke(&limited, "limited-output"), 3, "limit");
+    assert!(!f.dir.join("limited-output").exists());
+    let damaged = manifest_with(&f, "damaged-job.json", |m| {
+        m["sources"][1]["revision"] = json!(1)
+    });
+    let result = invoke(&damaged, "partial-output");
+    assert_outcome(&result, 3, "limit");
+    let rows: Vec<_> = result
+        .1
+        .iter()
+        .filter(|r| r["kind"] == "recovery")
+        .collect();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["data"]["records"], 1);
+    assert_eq!(rows[1]["data"]["records"], 0);
+    assert_eq!(rows[1]["data"]["stop"], "InvalidRecord");
+    let bytes = std::fs::read(f.dir.join("partial-output/0.mcap")).unwrap();
+    assert_eq!(NativeReader::new(&bytes, 8192, 2).unwrap().count(), 1);
+}
+
+#[test]
+fn native_header_without_file_identity_cannot_be_accepted_as_an_empty_snapshot() {
+    let f = fixture([10, 20]);
+    let bytes = std::fs::read(&f.source).unwrap();
+    let header_end = 17 + u64::from_le_bytes(bytes[9..17].try_into().unwrap()) as usize;
+    let manifest = manifest_with(&f, "header-only.json", |m| {
+        m["sources"][0]["safe_offset"] = json!(header_end)
+    });
+    let result = run([
+        std::ffi::OsStr::new("query"),
+        "--manifest".as_ref(),
+        manifest.as_os_str(),
+    ]);
+    assert_outcome(&result, 4, "invalid_data");
+    assert!(records(&result.1).is_empty());
+    std::fs::write(f.dir.join("header-only.mcap"), &bytes[..header_end]).unwrap();
+    let manifest = manifest_with(&f, "header-recovery.json", |m| {
+        m["sources"][0]["path"] = json!("header-only.mcap")
+    });
+    let result = run([
+        std::ffi::OsStr::new("recover"),
+        "--manifest".as_ref(),
+        manifest.as_os_str(),
+        "--output".as_ref(),
+        f.dir.join("header-out.mcap").as_os_str(),
+    ]);
+    assert_outcome(&result, 3, "limit");
+    assert_eq!(result.1[0]["data"]["stop"], "InvalidRecord");
 }

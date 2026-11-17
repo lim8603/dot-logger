@@ -148,6 +148,23 @@ impl Delivery<'_> {
     pub fn record(&self) -> CapturedRecord {
         self.shared.record
     }
+    // Derive only from a live delivery of this exact router/target. Its payload
+    // owns the plan guard until IO and completion reporting have ended.
+    pub(crate) fn writer_budget(
+        &self,
+        base: &crate::storage::WriterBudget,
+    ) -> Option<crate::storage::WriterBudget> {
+        if self.target_id != base.target
+            || self.record().receipt.session_id != base.session
+            || !Arc::ptr_eq(&self._permit.ledger, &base.target_state)
+            || !Arc::ptr_eq(&self.shared._permit.ledger, &base.ledger)
+        {
+            return None;
+        }
+        let mut budget = base.clone();
+        budget.revision = self.record().revision;
+        Some(budget)
+    }
     /// Whether the payload is a zero-copy original (raw) rather than a small copy.
     #[cfg(feature = "remote")]
     pub(crate) fn is_raw(&self) -> bool {

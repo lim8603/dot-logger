@@ -958,7 +958,7 @@ fn batch_capacity_failure_preserves_accepted_prefix_and_retention_cause() {
                 .write_batch(&deliveries.iter().collect::<Vec<_>>(), 1)
                 .unwrap_err();
             assert!(matches!(error.error, RetentionError::Capacity));
-            assert_eq!((error.appended, error.written, error.reported), (2, 0, 0));
+            assert_eq!((error.appended, error.written, error.reported), (2, 1, 1));
             log.flush().unwrap();
             for delivery in &deliveries[..error.appended] {
                 delivery
@@ -1049,7 +1049,6 @@ fn query_owned_pin_waits_for_reader_close_on_error_cancel_and_expiry() {
             let mut snapshot = Snapshot::new(
                 &budget,
                 42,
-                1,
                 channels(),
                 vec![source],
                 QueryConfig {

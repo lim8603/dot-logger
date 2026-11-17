@@ -163,24 +163,34 @@ pub struct QuerySource<R> {
     // Reader must close before the permit advertises that actual reads ended.
     reader: R,
     sequence: u64,
+    revision: u64,
     safe_offset: u64,
     permit: Option<ReadPermit>,
 }
 impl<R> QuerySource<R> {
     /// Freeze an active source at a writer-published complete-chunk offset.
+    /// Sequence and revision are checked against the original file metadata.
     /// The host prevents truncation/replacement and deletion for this reader's lifetime.
-    pub fn active(reader: R, sequence: u64, safe_offset: u64) -> Self {
+    pub fn active(reader: R, sequence: u64, revision: u64, safe_offset: u64) -> Self {
         Self {
             reader,
             sequence,
+            revision,
             safe_offset,
             permit: None,
         }
     }
-    pub(crate) fn pinned(reader: R, sequence: u64, safe_offset: u64, permit: ReadPermit) -> Self {
+    pub(crate) fn pinned(
+        reader: R,
+        sequence: u64,
+        revision: u64,
+        safe_offset: u64,
+        permit: ReadPermit,
+    ) -> Self {
         Self {
             reader,
             sequence,
+            revision,
             safe_offset,
             permit: Some(permit),
         }
@@ -359,12 +369,13 @@ impl QueryConfig {
 impl<R: Read + Seek> Snapshot<R> {
     /// Validate and index the frozen source ranges. Sources must be independently
     /// opened, uncompressed dot-logger/standard/1 files with the supplied original registrations.
+    /// Each source declares its own revision and sequence; receipts must be unique
+    /// across the entire session snapshot, even across different revisions.
     /// Large payloads are decoded only in bounded scan scratch, then referenced on disk.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         budget: &QueryBudget,
         session: u128,
-        revision: u64,
         channels: Vec<StorageChannel>,
         sources: Vec<QuerySource<R>>,
         config: QueryConfig,
@@ -416,13 +427,28 @@ impl<R: Read + Seek> Snapshot<R> {
         for source in 0..snapshot.sources.len() {
             snapshot.scan(
                 source,
-                (session, revision),
+                (session, snapshot.sources[source].revision),
                 &channels,
                 &mut buffer,
                 now,
                 cancel,
             )?;
         }
+        // Reuse the already reserved ordering buffer. Receipt identity is session
+        // scoped, so a second source/revision may not relabel the same capture.
+        snapshot.order.extend(0..snapshot.rows.len());
+        snapshot.order.sort_unstable_by_key(|i| {
+            let receipt = snapshot.rows[*i].record.receipt;
+            (receipt.producer_id, receipt.accepted_seq)
+        });
+        if snapshot
+            .order
+            .windows(2)
+            .any(|w| snapshot.rows[w[0]].record.receipt == snapshot.rows[w[1]].record.receipt)
+        {
+            return Err(QueryError::CorruptData);
+        }
+        snapshot.order.clear();
         check(now, deadline, cancel)?;
         Ok(snapshot)
     }
@@ -442,6 +468,7 @@ impl<R: Read + Seek> Snapshot<R> {
         cancel: &AtomicBool,
     ) -> Result<(), QueryError> {
         let end = self.sources[index].safe_offset;
+        let sequence = self.sources[index].sequence;
         if end == 0 {
             return Ok(());
         }
@@ -489,7 +516,12 @@ impl<R: Read + Seek> Snapshot<R> {
                 .map_err(scan_stop)?;
             let body = &buffer[..len];
             match op {
-                12 => validation.metadata(body).map_err(invalid)?,
+                12 => {
+                    validation.metadata(body).map_err(invalid)?;
+                    if validation.file_sequence() != Some(sequence) {
+                        return Err(QueryError::CorruptData);
+                    }
+                }
                 3 => validation.schema(body).map_err(invalid)?,
                 4 => validation.channel(body).map_err(invalid)?,
                 6 => {
@@ -537,6 +569,9 @@ impl<R: Read + Seek> Snapshot<R> {
                 _ => return Err(QueryError::CorruptData),
             }
             crc = crc_update(crc_update(crc, &header), body);
+        }
+        if validation.file_sequence() != Some(sequence) {
+            return Err(QueryError::CorruptData);
         }
         Ok(())
     }

@@ -23,7 +23,7 @@ cargo run -p dot-logger-cli -- query --endpoint http://127.0.0.1:50051 --from 0 
 | `config apply` | Manage 권한으로 `--base-revision --patch FILE`(`dot_logger.config_patch.v1`)을 host에 게시 |
 | `check plan`, `check run` | `--plan ID`로 등록된 host 계획을 무부하 조회/명시 실행 |
 | `compare` | `--before ID --after ID`로 host가 등록한 snapshot을 비교한 `dot_logger.compare.v1` 결과 |
-| `recover` | 원래 manifest와 `--output NEW_FILE`로 독립 새 파일 복구. 기존 경로 덮어쓰기 없음 |
+| `recover` | manifest의 파일별 revision으로 독립 복구. 단일 source는 `--output NEW_FILE`, 여러 source는 `--output NEW_DIRECTORY` 아래 `<sequence>.mcap`. 기존 경로 덮어쓰기 없음 |
 
 간편 점검은 호스트가 `diagnostics::CheckHost`에 전용 경로/입력/예산을 등록하고 일반 worker에서 Command를 명시 처리해야 한다. CLI는 등록 ID만 받는다. `check plan`은 경로 생성·실제 capability probe 없이 예산/입력/출처를 보여주며, `check run`은 Manage token이 필요하고 ID를 한 번만 소비한다. 호스트에 backend가 없거나 구 서버의 PlanCheck 미지원이면 Unsupported이며 실행으로 fallback하지 않는다.
 
@@ -62,7 +62,7 @@ Query 결과의 snapshot을 Replay handle로 전달한다. 제어 요청에는 �
 
 ## 오프라인 파일
 
-[offline_session.json](examples/offline_session.json)을 원본 session/revision·생산자 수·원래 채널 등록 순서·파일 sequence/경로와 예산으로 수정한다. schema/descriptor가 있으면 channel의 `descriptor: {"encoding": "...", "data_hex": "..."}`를 원래 값으로 지정한다. 예제 값은 사용 예이며 제품/장비 기본값이 아니다.
+[offline_session.json](examples/offline_session.json)을 원본 session·생산자 수·원래 채널 등록 순서·각 source의 revision/sequence/경로와 예산으로 수정한다. schema/descriptor가 있으면 channel의 `descriptor: {"encoding": "...", "data_hex": "..."}`를 원래 값으로 지정한다. 예제 값은 사용 예이며 제품/장비 기본값이 아니다.
 
 ```sh
 cargo run -p dot-logger-cli -- config validate --manifest session.json --json
@@ -71,7 +71,11 @@ cargo run -p dot-logger-cli -- replay --manifest session.json --speed 2/1 --json
 cargo run -p dot-logger-cli -- recover --manifest session.json --output recovered.mcap --json
 ```
 
-manifest의 상대 source 경로는 manifest가 위치한 디렉터리 기준이다. 원본 파일은 읽기 전용이며 사용 중 불변 prefix를 유지해야 한다. active 파일은 명시적인 완전 chunk `safe_offset`이 필요하다. 단독 offline CLI의 cursor/blob는 프로세스의 Snapshot 수명에 한정된다. 기본 결과는 metadata/descriptor이며 실제 bytes는 `--include-payload`로 명시한다. 대형 원본 읽기는 개별/누적 blob 예산과 출력 예산을 함께 소비한다.
+manifest는 `schema_version: 2`이고 전역 revision 대신 각 `sources[]`에 `revision`을 필수로 둔다. v1과 전역 `revision`·형식 선택 필드는 지원하지 않는다. 파일 Metadata의 session/revision/sequence와 등록을 대조하며, 중복 sequence/경로·동일 receipt의 재등장을 거절한다. standalone `SegmentWriter`의 sequence는 0이고, 회전 파일은 catalog의 실제 sequence를 사용한다. offline status는 `sources` 배열에 파일별 sequence/revision을 표시한다.
+
+manifest의 상대 source 경로는 manifest가 위치한 디렉터리 기준이다. 원본 파일은 읽기 전용이며 사용 중 불변 prefix를 유지해야 한다. active 파일은 명시적인 완전 chunk `safe_offset`이 필요하다. 여러 파일 복구는 manifest 순서로 진행하고 source마다 recovery 행에 sequence/revision·복구/제외 범위를 보고한다. `max_segments`는 파일 수, `max_source_bytes`는 개별 파일, `read_bytes`는 전체 원본 길이 합계, `max_records`는 전체 복구 사용자 기록 수를 제한한다. 뒤 파일 실패 시 이미 완료한 앞 파일과 실패 파일의 부분 출력은 유지하며 재시도·합치기·덮어쓰기는 하지 않는다. file sync와 namespace sync는 구분하며 CLI 복구는 `namespace_synced:false`다. 정상 완료에도 과거 프로세스의 Written/Synced를 복원했다고 주장하지 않는다.
+
+단독 offline CLI의 cursor/blob는 프로세스의 Snapshot 수명에 한정된다. 기본 결과는 metadata/descriptor이며 실제 bytes는 `--include-payload`로 명시한다. 대형 원본 읽기는 개별/누적 blob 예산과 출력 예산을 함께 소비한다.
 
 offline replay는 start와 실제 caller clock을 지원한다. 실행 중 제어/화면은 Rust Replay API, 프로세스 간 제어는 remote replay를 사용한다. Ctrl-C는 협력 취소 후 실제 reader/진행 IO 정리를 기다려 부분 결과를 반환한다. 진행 중 OS IO의 강제 취소나 정확한 종료 시간은 보장하지 않는다.
 

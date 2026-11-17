@@ -97,6 +97,7 @@ fn config() -> WriterConfig {
 }
 fn options() -> RecoveryOptions {
     RecoveryOptions {
+        source_sequence: 0,
         writer: config(),
         limits: RecoveryConfig {
             max_source_bytes: 128_000,

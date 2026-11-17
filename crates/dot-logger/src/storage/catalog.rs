@@ -72,6 +72,8 @@ impl RetentionConfig {
 /// A catalog entry published only after file and directory synchronization.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SegmentInfo {
+    /// User configuration revision shared by every record in this file.
+    pub revision: u64,
     /// System-generated file sequence within the session/target.
     pub sequence: u64,
     /// Physical closed-file length including footer/summary.

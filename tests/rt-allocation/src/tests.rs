@@ -920,7 +920,7 @@ fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations()
             writer.flush_chunk().unwrap();drop(writer);
             let mut source=std::fs::File::open(&source_path).unwrap();
             let output=std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&output_path).unwrap();
-            let options=RecoveryOptions{writer:config,limits:RecoveryConfig{max_source_bytes:(max+65536) as u64,max_record_bytes:max+8192,max_chunks:2}};
+            let options=RecoveryOptions{source_sequence:0,writer:config,limits:RecoveryConfig{max_source_bytes:(max+65536) as u64,max_record_bytes:max+8192,max_chunks:2}};
             let mut concrete=0;let mut returned=None;
             let (remaining,peak)=allocator::observe_memory(||{
                 let channels=channels();
@@ -1087,9 +1087,8 @@ fn query_and_replay_pages_and_large_blobs_stay_inside_external_reservation() {
                 let mut snapshot = Snapshot::new(
                     &budget,
                     42,
-                    1,
                     registrations,
-                    vec![QuerySource::active(source, 1, safe)],
+                    vec![QuerySource::active(source, 0, 1, safe)],
                     config,
                     0,
                     100,

@@ -1,13 +1,24 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "session": "0000000000000000000000000000002a",
-  "revision": 1,
   "producers": 1,
   "external_bytes": 134217728,
   "channels": [
-    { "id": 7, "schema": "00000000000000000000000000000063", "version": 1, "topic": "raw", "encoding": "opaque" }
+    {
+      "id": 7,
+      "schema": "00000000000000000000000000000063",
+      "version": 1,
+      "topic": "raw",
+      "encoding": "opaque"
+    }
   ],
-  "sources": [{ "path": "recording.mcap", "sequence": 1 }],
+  "sources": [
+    {
+      "path": "recording.mcap",
+      "sequence": 0,
+      "revision": 1
+    }
+  ],
   "limits": {
     "max_segments": 4,
     "max_records": 10000,

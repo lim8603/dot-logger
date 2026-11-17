@@ -218,7 +218,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut snapshot = dot_logger::query::Snapshot::new(
                     &query_budget,
                     1,
-                    1,
                     vec![StorageChannel {
                         channel: ChannelConfig::new(7, 99, 1),
                         topic: "example".into(),
@@ -228,6 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     vec![dot_logger::query::QuerySource::active(
                         std::fs::File::open(&path.0)?,
                         0,
+                        1,
                         finished.safe_offset(),
                     )],
                     dot_logger::query::QueryConfig {

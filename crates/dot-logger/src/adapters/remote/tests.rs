@@ -924,10 +924,10 @@ mod sockets {
                         let snapshot = Snapshot::new(
                             &b,
                             42,
-                            1,
                             channels,
                             vec![QuerySource::active(
                                 std::fs::File::open(&path.0).unwrap(),
+                                0,
                                 1,
                                 safe,
                             )],
@@ -964,7 +964,6 @@ mod sockets {
                         let mut query_snapshot = Snapshot::new(
                             &b,
                             42,
-                            1,
                             vec![StorageChannel {
                                 channel: ChannelConfig::new(7, 99, 1),
                                 topic: "remote-fixture".into(),
@@ -973,6 +972,7 @@ mod sockets {
                             }],
                             vec![QuerySource::active(
                                 std::fs::File::open(&path.0).unwrap(),
+                                0,
                                 1,
                                 safe,
                             )],

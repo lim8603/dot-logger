@@ -10,8 +10,6 @@ use std::{fs::File, path::PathBuf};
 pub struct OfflineConfig {
     /// Original capture session identity.
     pub session: u128,
-    /// Original configuration revision.
-    pub revision: u64,
     /// Original channels in their registration order, including schema metadata.
     pub channels: Vec<StorageChannel>,
     /// Source/index/page/blob/cumulative-read bounds.
@@ -21,6 +19,8 @@ pub struct OfflineConfig {
 }
 /// One immutable read-only file and its published complete prefix.
 pub struct OfflineSource {
+    /// Expected original user configuration revision of this file.
+    pub revision: u64,
     /// Existing source file; opened read-only without modifying the original.
     pub path: PathBuf,
     /// Original distinct segment sequence.
@@ -44,6 +44,7 @@ pub fn open_snapshot(
         return Err(QueryError::Limit);
     }
     let mut readers = Vec::with_capacity(sources.len());
+    let mut paths = Vec::with_capacity(sources.len());
     for source in sources {
         if cancel.is_cancelled() {
             return Err(QueryError::Cancelled);
@@ -56,6 +57,11 @@ pub fn open_snapshot(
         {
             return Err(QueryError::InvalidInput);
         }
+        let canonical = std::fs::canonicalize(&source.path).map_err(QueryError::Io)?;
+        if paths.contains(&canonical) {
+            return Err(QueryError::InvalidInput);
+        }
+        paths.push(canonical);
         let file = File::open(source.path).map_err(QueryError::Io)?;
         let metadata = file.metadata().map_err(QueryError::Io)?;
         let safe = source.safe_offset.unwrap_or(metadata.len());
@@ -65,12 +71,16 @@ pub fn open_snapshot(
         if safe > metadata.len() || safe > config.limits.max_source_bytes {
             return Err(QueryError::Limit);
         }
-        readers.push(QuerySource::active(file, source.sequence, safe));
+        readers.push(QuerySource::active(
+            file,
+            source.sequence,
+            source.revision,
+            safe,
+        ));
     }
     Snapshot::new(
         budget,
         config.session,
-        config.revision,
         config.channels,
         readers,
         config.limits,

@@ -347,6 +347,7 @@ impl CheckPlan {
         .try_fold(0usize, |a, b| a.checked_add(b))
         .ok_or(CheckStartError::InvalidWorkload)?;
         let config = WriterConfig {
+            max_loss_reports: 0,
             max_payload_bytes: w.payload_bytes,
             write_buffer_bytes: 0,
             chunk_target_bytes: w.payload_bytes,

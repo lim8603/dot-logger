@@ -13,6 +13,7 @@ cargo run -p dot-logger-cli -- query --endpoint http://127.0.0.1:50051 --from 0 
 | 명령 | 용도 |
 |---|---|
 | `status` | session/revision과 host의 `dot_logger.status.v1` 지표. 지표 backend가 없는 host는 Unavailable |
+| `loss` | offline native 손실 누적 watermark·nullable 차분·미관측 상태. 관측 구간/채널 필터, 사용자 record/replay와 별도 |
 | `query` | `[from,to)`·mono/real/source·channel/level 필터와 유한 페이지 |
 | `blob` | `--snapshot --blob --offset --length`로 원격 capability 범위 읽기 |
 | `replay` | remote `--handle --action start/pause/resume/seek/stop/speed --generation --speed N/D`; offline timed playback |
@@ -71,9 +72,9 @@ cargo run -p dot-logger-cli -- replay --manifest session.json --speed 2/1 --json
 cargo run -p dot-logger-cli -- recover --manifest session.json --output recovered.mcap --json
 ```
 
-manifest는 `schema_version: 2`이고 전역 revision 대신 각 `sources[]`에 `revision`을 필수로 둔다. v1과 전역 `revision`·형식 선택 필드는 지원하지 않는다. 파일 Metadata의 session/revision/sequence와 등록을 대조하며, 중복 sequence/경로·동일 receipt의 재등장을 거절한다. standalone `SegmentWriter`의 sequence는 0이고, 회전 파일은 catalog의 실제 sequence를 사용한다. offline status는 `sources` 배열에 파일별 sequence/revision을 표시한다.
+manifest는 `schema_version: 2`이고 전역 revision 대신 각 `sources[]`에 `revision`을 필수로 둔다. v1과 전역 `revision`·형식 선택 필드는 지원하지 않는다. 파일 Metadata의 session/revision/sequence와 등록을 대조하며, 중복 경로·같은 target/sequence·동일 receipt의 재등장을 거절한다. 서로 다른 출력의 같은 sequence는 각각 `sources[].target`을 명시해야 하며 실제 파일 target과 대조한다. loss-only 조회는 사용자 fanout receipt를 replay/index하지 않는다. standalone `SegmentWriter`의 sequence는 0이고, 회전 파일은 catalog의 실제 sequence를 사용한다. offline status는 `sources` 배열에 파일별 sequence/revision을 표시한다.
 
-manifest의 상대 source 경로는 manifest가 위치한 디렉터리 기준이다. 원본 파일은 읽기 전용이며 사용 중 불변 prefix를 유지해야 한다. active 파일은 명시적인 완전 chunk `safe_offset`이 필요하다. 여러 파일 복구는 manifest 순서로 진행하고 source마다 recovery 행에 sequence/revision·복구/제외 범위를 보고한다. `max_segments`는 파일 수, `max_source_bytes`는 개별 파일, `read_bytes`는 전체 원본 길이 합계, `max_records`는 전체 복구 사용자 기록 수를 제한한다. 뒤 파일 실패 시 이미 완료한 앞 파일과 실패 파일의 부분 출력은 유지하며 재시도·합치기·덮어쓰기는 하지 않는다. file sync와 namespace sync는 구분하며 CLI 복구는 `namespace_synced:false`다. 정상 완료에도 과거 프로세스의 Written/Synced를 복원했다고 주장하지 않는다.
+manifest의 상대 source 경로는 manifest가 위치한 디렉터리 기준이다. 원본 파일은 읽기 전용이며 사용 중 불변 prefix를 유지해야 한다. active 파일은 명시적인 완전 chunk `safe_offset`이 필요하다. 여러 파일 복구는 manifest 순서로 진행하고 source마다 recovery 행에 sequence/revision·복구/제외 범위를 보고한다. `max_segments`는 파일 수, `max_source_bytes`는 개별 파일, `read_bytes`는 전체 원본 길이 합계, `max_records`는 전체 복구 사용자 기록 수, `limits.max_loss_reports`는 전체 복구 loss report part 수를 제한한다. sequence가 겹치는 다중 출력 복구 파일명은 `<target>-<sequence>.mcap`이다. 뒤 파일 실패 시 이미 완료한 앞 파일과 실패 파일의 부분 출력은 유지하며 재시도·합치기·덮어쓰기는 하지 않는다. file sync와 namespace sync는 구분하며 CLI 복구는 `namespace_synced:false`다. 정상 완료에도 과거 프로세스의 Written/Synced를 복원했다고 주장하지 않는다.
 
 단독 offline CLI의 cursor/blob는 프로세스의 Snapshot 수명에 한정된다. 기본 결과는 metadata/descriptor이며 실제 bytes는 `--include-payload`로 명시한다. 대형 원본 읽기는 개별/누적 blob 예산과 출력 예산을 함께 소비한다.
 
@@ -103,3 +104,8 @@ REV-022 보강: `tail`의 전체 입력/예약 검증은 연결 전에 수행한
 만료/세대 폐기로 handoff가 사전 거절되면 `gone_or_expired`/exit3이고 ACK는 없다. 원본 손상은 `invalid_data`/exit4, 메시지 크기 상한은 `limit`/exit3이다. 원격 config apply/check run/replay의 Gone도 이미 게시된 호스트 작업의 완료를 증명하지 않으므로 `posted_host_io: completion_unconfirmed`를 표시한다. 읽기 전용 capability Gone과 Unsupported 응답의 기존 분류는 유지한다.
 
 저장 파일은 `dot-logger/standard/1` native MCAP이며 사용자 payload와 schema를 직접 담는다. `_dot_logger/meta`가 원래 receipt·시계·설정 정보를 보존한다. 별도 `export --standard` 변환은 제공하지 않는다. 구형 파일은 지원하지 않는다.
+
+
+`loss --manifest session.json --json`은 native `_dot_logger/loss`만 별도 `loss` 행으로 출력한다. `limits.max_loss_reports`에 양수 part 상한을 지정하고 external_bytes도 그 예약에 맞춘다. 생략/0이면 일반 query는 control을 검증하고 건너뛰지만, 수집된 loss를 조회할 때는 Limit이다. 수집 비활성 파일은 summary의 unavailable_sources로 보고하며 손실 0을 증명하지 않는다.
+
+loss의 `--from/--to`는 `observation_clock:counter_epoch_monotonic_ns` 관측 구간의 겹침이며 사용자 record 시각·손실 발생 시각이 아니다. `--channel`은 제품 채널이고 `--basis`는 mono만 지원한다. 누적값은 session/epoch/원래 assignment target별 watermark로 비교하며 출력 replica를 합산하지 않는다. part 누락·overflow·관측 감소 등에서는 delta가 null이다. tail_confirmed가 false이면 마지막 표본 뒤 꼬리는 미확인이다. summary.records는 사용자 record 줄 수이므로 0이고 loss_rows/report_parts는 별도다. 손실 수를 고유한 원본 메시지 수로 합산하지 않는다. count0/overflow=false 행은 생략한다. 사용자 복구 quota를 채운 뒤에도 남은 control allowance 안에서 control-only source를 복구하며 뒤 사용자 기록은 Limit(exit3)이다.

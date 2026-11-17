@@ -190,6 +190,7 @@ pub fn process_crash(
                     router.writer_budget(target)?,
                     channels(),
                     RecoveryOptions {
+                        source_target: None,
                         source_sequence: 0,
                         writer: writer_config(1024),
                         limits: RecoveryConfig {
@@ -380,6 +381,7 @@ fn channels() -> Vec<StorageChannel> {
 }
 fn writer_config(block: usize) -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: block,
         write_buffer_bytes: 4096,
         chunk_target_bytes: block,
@@ -677,6 +679,7 @@ fn run_inner(
                 router.writer_budget(target)?,
                 channels(),
                 RecoveryOptions {
+                    source_target: None,
                     source_sequence: 0,
                     writer: writer_config(block),
                     limits: RecoveryConfig {

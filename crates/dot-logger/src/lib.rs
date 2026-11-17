@@ -46,6 +46,8 @@
 
 pub mod capture;
 pub mod config;
+/// Fixed loss counters and bounded session checkpoint reports.
+pub mod loss;
 pub mod platform;
 pub mod pool;
 

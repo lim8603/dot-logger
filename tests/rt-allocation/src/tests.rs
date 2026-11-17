@@ -457,6 +457,7 @@ fn tracked_rt_admission_full_window_raw_rejection_skip_and_last_drop_never_alloc
         tracked_fixtures::tracking(2),
     )
     .unwrap();
+    owner.enable_loss_tracking().unwrap();
     owner.scope(|mut scope| {
         let completion = scope.completion().unwrap();
         let (mut producer, mut reader) = scope.next().unwrap();
@@ -750,7 +751,7 @@ fn storage_encoder_indexes_and_finish_remain_within_shared_output_reservations()
             let router=Router::new(&plan,scope.map(|(_,r)|r).collect(),route).unwrap();
             let budget=router.writer_budget(10).unwrap();let mut concrete=0;let mut returned=None;
             let (remaining,peak)=allocator::observe_memory(|| {
-                let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:records,max_chunks:records,max_metadata_bytes:(128*channel_count as usize).max(1024)};
+                let config=WriterConfig{max_loss_reports: 0,max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:records,max_chunks:records,max_metadata_bytes:(128*channel_count as usize).max(1024)};
                 let channels:Vec<_>=registrations.iter().map(|&channel|StorageChannel{channel,topic:format!("opaque/{}",channel.channel_id),payload_encoding:"application/octet-stream".into(),schema:None}).collect();
                 let mut writer=SegmentWriter::new(budget.clone(),config,channels,file).unwrap();concrete=writer.reserved_bytes();
                 for sequence in 1..=records as u64 {
@@ -830,7 +831,7 @@ fn rotating_catalog_events_and_pins_stay_inside_shared_memory_reservations() {
             let mut concrete=0;
             let (remaining,peak)=allocator::observe_memory(|| {
                 let store=FileStore::new(&root,&budget,||Ok(1024*1024*1024)).unwrap();
-                let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
+                let config=WriterConfig{max_loss_reports: 0,max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
                 let retention=RetentionConfig{mode:RetentionMode::Event,disk_bytes:512*1024*1024,disk_reserve_bytes:1024,max_age_ns:1000,max_segment_bytes:32*1024*1024,max_segment_ns:100,
                     max_index_bytes:16384,protected_bytes:256*1024*1024,pre_ns:10,post_ns:10,max_segments:8,max_events:4,max_pins:4,max_pin_bytes:4096,max_pin_ns:100};
                 let mut log=SegmentLog::new(budget.clone(),config,vec![StorageChannel{channel:ChannelConfig::new(7,99,1),topic:"opaque".into(),payload_encoding:"opaque".into(),schema:None}],retention,store,0).unwrap();
@@ -912,7 +913,7 @@ fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations()
                 routes:vec![Route{channel_id:7,targets:vec![10]}],shared_records:2,small_copy_bytes:512,
                 schedule:Schedule{record_quantum:1,byte_quantum:256,records_per_turn:1,bytes_per_turn:256,retries_per_target:1,reclaim_slots_per_producer:1}};
             let router=Router::new(&plan,scope.map(|(_,r)|r).collect(),route).unwrap();let budget=router.writer_budget(10).unwrap();
-            let config=WriterConfig{max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
+            let config=WriterConfig{max_loss_reports: 0,max_payload_bytes:max,write_buffer_bytes:4096,chunk_target_bytes:65536,max_records:2,max_chunks:2,max_metadata_bytes:1024};
             let channels=||vec![StorageChannel{channel:ChannelConfig::new(7,99,1),topic:"opaque".into(),payload_encoding:"opaque".into(),schema:None}];
             let file=std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&source_path).unwrap();
             let mut writer=SegmentWriter::new(budget.clone(),config,channels(),file).unwrap();
@@ -920,7 +921,7 @@ fn recovery_scratch_and_rebuilt_indexes_stay_inside_shared_output_reservations()
             writer.flush_chunk().unwrap();drop(writer);
             let mut source=std::fs::File::open(&source_path).unwrap();
             let output=std::fs::OpenOptions::new().read(true).write(true).create_new(true).open(&output_path).unwrap();
-            let options=RecoveryOptions{source_sequence:0,writer:config,limits:RecoveryConfig{max_source_bytes:(max+65536) as u64,max_record_bytes:max+8192,max_chunks:2}};
+            let options=RecoveryOptions{source_target: None,source_sequence:0,writer:config,limits:RecoveryConfig{max_source_bytes:(max+65536) as u64,max_record_bytes:max+8192,max_chunks:2}};
             let mut concrete=0;let mut returned=None;
             let (remaining,peak)=allocator::observe_memory(||{
                 let channels=channels();
@@ -1025,6 +1026,7 @@ fn query_and_replay_pages_and_large_blobs_stay_inside_external_reservation() {
             let mut writer = SegmentWriter::new(
                 router.writer_budget(10).unwrap(),
                 WriterConfig {
+                    max_loss_reports: 0,
                     max_payload_bytes: max,
                     write_buffer_bytes: 4096,
                     chunk_target_bytes: 65536,
@@ -1066,6 +1068,7 @@ fn query_and_replay_pages_and_large_blobs_stay_inside_external_reservation() {
             let source = std::fs::File::open(&path).unwrap();
             let budget = QueryBudget::new(&plan);
             let config = QueryConfig {
+                max_loss_reports: 0,
                 max_segments: 1,
                 max_records: 2,
                 max_record_bytes: max + 8192,
@@ -1668,4 +1671,115 @@ mod facade {
         drop(second);
         assert_eq!(allocator::observe(|| drop(orphan)), (0, 0));
     }
+}
+
+#[test]
+fn loss_counter_storage_and_query_temporaries_stay_inside_their_reserved_partitions() {
+    use dot_logger::{query::*, routing::Router, storage::*};
+    use std::sync::atomic::AtomicBool;
+    let mut config = tracked_fixtures::plan().config().clone();
+    config.memory.external_bytes = 4 << 20;
+    config.memory.total_bytes += 4 << 20;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let routes = tracked_fixtures::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routes,
+        tracked_fixtures::tracking(16),
+    )
+    .unwrap();
+    let before = owner.control_reserved_bytes();
+    let (live, peak) = allocator::observe_memory(|| owner.enable_loss_tracking().unwrap());
+    let required = owner.control_reserved_bytes() - before;
+    assert!(live > 0 && peak <= required as i128);
+    let path = std::env::temp_dir().join(format!("dot-loss-memory-{}.mcap", std::process::id()));
+    let file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .read(true)
+        .open(&path)
+        .unwrap();
+    let channels = || {
+        vec![StorageChannel {
+            channel: ChannelConfig::new(7, 99, 1),
+            topic: "raw".into(),
+            payload_encoding: "opaque".into(),
+            schema: None,
+        }]
+    };
+    owner.scope(|scope| {
+        let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), routes).unwrap();
+        let budget = router.writer_budget(10).unwrap();
+        let mut required = 0;
+        let (live, peak) = allocator::observe_memory(|| {
+            let mut writer = SegmentWriter::new(
+                budget.clone(),
+                WriterConfig {
+                    max_loss_reports: 8,
+                    max_payload_bytes: 16,
+                    write_buffer_bytes: 64,
+                    chunk_target_bytes: 4096,
+                    max_records: 16,
+                    max_chunks: 16,
+                    max_metadata_bytes: 128,
+                },
+                channels(),
+                file,
+            )
+            .unwrap();
+            required = writer.reserved_bytes();
+            writer.checkpoint().unwrap();
+            writer.checkpoint().unwrap();
+            drop(writer.finish().unwrap());
+        });
+        assert_eq!(live, 0);
+        assert!(peak > 0 && peak <= required as i128);
+        assert_eq!(budget.used_bytes(), 0);
+        println!("loss storage requested-byte peak={peak}, reservation={required}");
+    });
+    let file = std::fs::File::open(&path).unwrap();
+    let len = file.metadata().unwrap().len();
+    let budget = QueryBudget::new(&plan);
+    let no = AtomicBool::new(false);
+    let config = QueryConfig {
+        max_loss_reports: 8,
+        max_segments: 1,
+        max_records: 1,
+        max_record_bytes: 16384,
+        max_payload_bytes: 16,
+        max_source_bytes: 1_000_000,
+        max_metadata_bytes: 128,
+        producers: 2,
+        page_records: 1,
+        page_bytes: 1024,
+        inline_bytes: 16,
+        blob_read_bytes: 16,
+        read_bytes: 1_000_000,
+    };
+    let required = config.reservation(&channels()).unwrap();
+    let (live, peak) = allocator::observe_memory(|| {
+        let snapshot = LossSnapshot::new(
+            &budget,
+            42,
+            channels(),
+            vec![QuerySource::active(file, 0, 1, len).expect_target(10)],
+            config,
+            0,
+            100,
+            &no,
+        )
+        .unwrap();
+        drop(snapshot.deltas(1, &no).unwrap());
+        let _ = snapshot.reports(2, &no).unwrap();
+    });
+    assert_eq!(live, 0);
+    assert!(peak > 0 && peak <= required as i128);
+    assert_eq!(budget.used_bytes(), 0);
+    println!("loss query requested-byte peak={peak}, reservation={required}");
+    std::fs::remove_file(path).unwrap();
 }

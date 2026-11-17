@@ -675,6 +675,10 @@ impl<'owner> Router<'owner> {
             ledger: Arc::clone(&self.ledger),
             session: self.session_id,
             revision: self.revision,
+            loss: self
+                .completion
+                .and_then(|c| c.registry.loss.as_ref().cloned()),
+            recovered_file: None,
             target,
             producers: self.inputs.len(),
             target_state: Arc::clone(&target_state.ledger),

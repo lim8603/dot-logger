@@ -42,6 +42,7 @@ impl SyncSink for File {
 }
 fn cfg() -> QueryConfig {
     QueryConfig {
+        max_loss_reports: 0,
         max_segments: 4,
         max_records: 32,
         max_record_bytes: 16384,
@@ -125,6 +126,7 @@ fn with_writer_on(storage: Vec<StorageChannel>, f: impl FnOnce(SegmentWriter<Fil
         let w = SegmentWriter::new(
             r.writer_budget(10).unwrap(),
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 8192,
                 write_buffer_bytes: 0,
                 chunk_target_bytes: 16384,

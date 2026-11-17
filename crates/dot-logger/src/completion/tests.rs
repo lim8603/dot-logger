@@ -128,6 +128,7 @@ impl crate::storage::SyncSink for MemorySink {
 }
 fn storage_config() -> crate::storage::WriterConfig {
     crate::storage::WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 16,
         write_buffer_bytes: 256,
         chunk_target_bytes: 1024,

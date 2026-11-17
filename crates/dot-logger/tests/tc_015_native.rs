@@ -47,6 +47,7 @@ fn file_channels(target: usize, channels: Vec<StorageChannel>) -> Vec<u8> {
         let mut w = SegmentWriter::new(
             router.writer_budget(10).unwrap(),
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 256,
                 write_buffer_bytes: 0,
                 chunk_target_bytes: target,
@@ -386,6 +387,7 @@ fn untrusted_file_metadata_rejects_duplicate_keys_and_unallocatable_producer_cou
 fn reserved_native_topics_and_schemas_are_rejected_before_any_sink_write() {
     use dot_logger::storage::PayloadSchema;
     let config = WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 256,
         write_buffer_bytes: 0,
         chunk_target_bytes: 4096,
@@ -526,6 +528,7 @@ fn metadata_io_failure_never_publishes_a_partial_pair_or_written_completion() {
         let mut writer = SegmentWriter::new(
             router.writer_budget(10).unwrap(),
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 16,
                 write_buffer_bytes: 0,
                 chunk_target_bytes: 4096,

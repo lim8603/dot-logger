@@ -1,6 +1,6 @@
 use crate::Cancellation;
 use dot_logger::{
-    query::{QueryBudget, QueryConfig, QueryError, QuerySource, Snapshot},
+    query::{LossSnapshot, QueryBudget, QueryConfig, QueryError, QuerySource, Snapshot},
     storage::StorageChannel,
 };
 use std::{fs::File, path::PathBuf};
@@ -19,6 +19,8 @@ pub struct OfflineConfig {
 }
 /// One immutable read-only file and its published complete prefix.
 pub struct OfflineSource {
+    /// Explicit original target for combining equal sequences from different outputs.
+    pub target: Option<u32>,
     /// Expected original user configuration revision of this file.
     pub revision: u64,
     /// Existing source file; opened read-only without modifying the original.
@@ -40,6 +42,45 @@ pub fn open_snapshot(
     now_ns: u64,
     cancel: &Cancellation,
 ) -> Result<Snapshot<File>, QueryError> {
+    let readers = open_sources(&config, sources, cancel)?;
+    Snapshot::new(
+        budget,
+        config.session,
+        config.channels,
+        readers,
+        config.limits,
+        now_ns,
+        config.deadline_ns,
+        cancel.as_atomic(),
+    )
+}
+
+/// Open a separate loss-only view; no user record or replay stream is synthesized.
+/// All sources and cumulative read/report reservations retain the core limits.
+pub fn open_loss_snapshot(
+    budget: &QueryBudget,
+    config: OfflineConfig,
+    sources: Vec<OfflineSource>,
+    now_ns: u64,
+    cancel: &Cancellation,
+) -> Result<LossSnapshot<File>, QueryError> {
+    let readers = open_sources(&config, sources, cancel)?;
+    LossSnapshot::new(
+        budget,
+        config.session,
+        config.channels,
+        readers,
+        config.limits,
+        now_ns,
+        config.deadline_ns,
+        cancel.as_atomic(),
+    )
+}
+fn open_sources(
+    config: &OfflineConfig,
+    sources: Vec<OfflineSource>,
+    cancel: &Cancellation,
+) -> Result<Vec<QuerySource<File>>, QueryError> {
     if sources.is_empty() || sources.len() > config.limits.max_segments {
         return Err(QueryError::Limit);
     }
@@ -71,21 +112,12 @@ pub fn open_snapshot(
         if safe > metadata.len() || safe > config.limits.max_source_bytes {
             return Err(QueryError::Limit);
         }
-        readers.push(QuerySource::active(
-            file,
-            source.sequence,
-            source.revision,
-            safe,
-        ));
+        let reader = QuerySource::active(file, source.sequence, source.revision, safe);
+        readers.push(if let Some(target) = source.target {
+            reader.expect_target(target)
+        } else {
+            reader
+        });
     }
-    Snapshot::new(
-        budget,
-        config.session,
-        config.channels,
-        readers,
-        config.limits,
-        now_ns,
-        config.deadline_ns,
-        cancel.as_atomic(),
-    )
+    Ok(readers)
 }

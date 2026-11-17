@@ -34,6 +34,9 @@ pub(crate) struct RecordSlot {
     pub(crate) sequence: AtomicU64,
     terminal_at: AtomicU64,
     revision: AtomicU64,
+    // Original registered channel; published by phase Release before general
+    // output reports Acquire the slot. Never reconstructed from a DispatchEvent.
+    channel_index: AtomicUsize,
     cells: Box<[TargetCell]>,
 }
 struct Retired {
@@ -49,6 +52,7 @@ pub(crate) struct ProducerState {
 }
 struct RoutePlan {
     channel_id: u32,
+    channel_index: usize,
     indices: Box<[usize]>,
 }
 #[derive(Clone, Copy)]
@@ -61,6 +65,7 @@ pub(crate) struct Limits {
     pub(crate) reconcile: usize,
 }
 pub(crate) struct Registry {
+    pub(crate) loss: Option<std::sync::Arc<crate::loss::Bank>>,
     pub(crate) control_attached: AtomicBool,
     pub(crate) control_epoch: AtomicU64,
     pub(crate) session_id: u128,
@@ -211,6 +216,10 @@ impl Registry {
             .iter()
             .map(|r| RoutePlan {
                 channel_id: r.channel_id,
+                channel_index: channels
+                    .iter()
+                    .position(|c| c.channel_id == r.channel_id)
+                    .unwrap_or(0),
                 indices: r
                     .targets
                     .iter()
@@ -230,6 +239,7 @@ impl Registry {
                         sequence: AtomicU64::new(0),
                         terminal_at: AtomicU64::new(u64::MAX),
                         revision: AtomicU64::new(revision),
+                        channel_index: AtomicUsize::new(0),
                         cells: (0..targets.len())
                             .map(|_| TargetCell {
                                 word: AtomicU32::new(NOT_ROUTED),
@@ -247,6 +257,7 @@ impl Registry {
             })
             .collect();
         Ok(Self {
+            loss: None,
             control_attached: AtomicBool::new(false),
             control_epoch: AtomicU64::new(0),
             session_id,
@@ -499,6 +510,10 @@ impl<'owner> Completion<'owner> {
         slot.cells[index]
             .word
             .store(value | confirmed | outcome, Ordering::Release);
+        if value & TERM_MASK == 0 && outcome != 0 {
+            self.registry
+                .count_loss(receipt.producer_id as usize, slot, index, outcome);
+        }
         Ok(())
     }
     /// Reconcile at most `limit` physical slots after unreported output release.
@@ -554,7 +569,16 @@ impl<'owner> Completion<'owner> {
             }
             let sequence = slot.sequence.load(Ordering::Acquire);
             for i in 0..self.registry.targets.len() {
+                let old = slot.cells[i].word.load(Ordering::Acquire);
                 let effective = self.registry.effective(slot, i, sequence);
+                if old & TERM_MASK == 0 && effective & TERM_MASK != 0 {
+                    registry.count_loss(
+                        index / registry.limits.window,
+                        slot,
+                        i,
+                        effective & TERM_MASK,
+                    );
+                }
                 slot.cells[i].word.store(effective, Ordering::Release);
             }
             let phase = if self.registry.settled(slot) {
@@ -774,6 +798,7 @@ impl<'owner> Completion<'owner> {
         Ok(Reservation {
             registry: self.registry,
             producer: state,
+            producer_id: producer,
             slot,
             sequence,
             route,
@@ -864,6 +889,7 @@ impl Drop for ActiveCall<'_> {
 pub(crate) struct Reservation<'a> {
     registry: &'a Registry,
     producer: &'a ProducerState,
+    producer_id: u32,
     slot: &'a RecordSlot,
     sequence: u64,
     route: &'a RoutePlan,
@@ -903,6 +929,18 @@ impl Reservation<'_> {
             }) {
                 self.slot.cells[i].word.store(0, Ordering::Release);
                 selected += 1;
+            }
+        }
+        self.slot
+            .channel_index
+            .store(self.route.channel_index, Ordering::Relaxed);
+        if selected == 0 {
+            if let Some(bank) = self.registry.loss.as_deref() {
+                bank.ingress(
+                    self.producer_id,
+                    Some(self.route.channel_index),
+                    crate::loss::Cause::NoRoute,
+                );
             }
         }
         self.slot.revision.store(self.revision, Ordering::Relaxed);
@@ -1011,6 +1049,29 @@ impl Drop for Publication<'_> {
     }
 }
 impl Registry {
+    fn count_loss(&self, producer: usize, slot: &RecordSlot, target: usize, outcome: u32) {
+        use crate::loss::Cause;
+        let cause = match outcome >> TERM_SHIFT {
+            1 => Cause::Io,
+            2 => Cause::Sync,
+            3 => Cause::Adapter,
+            4 => Cause::Capacity,
+            5 => Cause::RetryExhausted,
+            6 => Cause::PendingFull,
+            7 => Cause::Expired,
+            8 => Cause::Cancelled,
+            9 => Cause::Unconfirmed,
+            _ => return,
+        };
+        if let Some(bank) = self.loss.as_deref() {
+            bank.output(
+                producer,
+                slot.channel_index.load(Ordering::Relaxed),
+                target,
+                cause,
+            );
+        }
+    }
     fn stamp(&self, slot: &RecordSlot) {
         let elapsed = self
             .origin

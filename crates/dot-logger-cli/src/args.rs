@@ -95,6 +95,10 @@ pub fn command() -> Command {
             "Session identity and explicitly unavailable metrics",
         ),
         ("query", "Bounded time/channel query"),
+        (
+            "loss",
+            "Bounded counter-epoch loss observations; no user records",
+        ),
         ("replay", "Remote replay transition or local timed playback"),
         (
             "tail",

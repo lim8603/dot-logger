@@ -56,6 +56,7 @@ fn record(seq: u64, mono: u64, real: i64, len: usize) -> CapturedRecord {
 }
 fn config(max: usize) -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: max,
         write_buffer_bytes: 4096,
         chunk_target_bytes: 1024,
@@ -843,6 +844,7 @@ fn file_session<R>(
 /// Small enough that an older finished file and a new writer fit together.
 fn small() -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 64,
         write_buffer_bytes: 1024,
         chunk_target_bytes: 1024,

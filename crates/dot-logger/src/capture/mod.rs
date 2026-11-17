@@ -85,6 +85,7 @@ pub(crate) struct CaptureCore {
     memory: MemoryBudget,
     telemetry: Option<Box<crate::telemetry::Bank>>,
     telemetry_epoch: u64,
+    loss: Option<std::sync::Arc<crate::loss::Bank>>,
     updates: Option<Box<crate::control::config_update::State>>,
 }
 
@@ -244,6 +245,7 @@ impl CaptureOwner {
                 memory: config.memory.clone(),
                 telemetry: None,
                 telemetry_epoch: 0,
+                loss: None,
                 updates: None,
             },
         })
@@ -332,6 +334,54 @@ impl CaptureOwner {
         core.control_reserved_bytes += state.reserved();
         core.updates = Some(Box::new(state));
         Ok(())
+    }
+
+    /// Preallocate independent session loss counters before lending producers.
+    /// Requires tracked target registration for exact assignment accounting.
+    /// Repeated enable is idempotent; telemetry reset never resets these counters.
+    pub fn enable_loss_tracking(&mut self) -> Result<(), CaptureBuildError> {
+        let core = &mut self.core;
+        if core.loss.is_some() {
+            return Ok(());
+        }
+        let registry = core
+            .completion
+            .as_mut()
+            .ok_or(CaptureBuildError::InvalidCompletion)?;
+        let bytes = crate::loss::Bank::required(
+            core.entries.len(),
+            core.channels.len(),
+            registry.targets.len(),
+        )
+        .ok_or(CaptureBuildError::Config(ConfigError::ArithmeticOverflow))?;
+        let required = core
+            .control_reserved_bytes
+            .checked_add(bytes)
+            .ok_or(CaptureBuildError::Config(ConfigError::ArithmeticOverflow))?;
+        if required > core.memory.control_bytes {
+            return Err(CaptureBuildError::Config(ConfigError::BudgetExceeded {
+                resource: Resource::Control,
+                required,
+                available: core.memory.control_bytes,
+            }));
+        }
+        let bank = std::sync::Arc::new(crate::loss::Bank::new(
+            core.session_id,
+            core.entries.len(),
+            core.channels.iter().map(|c| c.channel_id).collect(),
+            registry.targets.iter().map(|t| t.id).collect(),
+        ));
+        registry.loss = Some(bank.clone());
+        core.loss = Some(bank);
+        core.control_reserved_bytes = required;
+        Ok(())
+    }
+    /// Session loss counters, independent of optional telemetry.
+    pub fn loss_tracking(&self) -> Option<crate::loss::Counters<'_>> {
+        self.core
+            .loss
+            .as_deref()
+            .map(|bank| crate::loss::Counters { bank })
     }
 
     /// Borrow management completion metadata; absent for untracked ingress.
@@ -469,6 +519,24 @@ impl CaptureOwner {
 }
 
 impl CaptureCore {
+    pub(crate) fn loss_before_submit(
+        &self,
+        producer: usize,
+        channel: Option<u32>,
+        cause: crate::loss::Cause,
+    ) {
+        if let Some(bank) = self.loss.as_deref() {
+            let index =
+                channel.and_then(|id| self.channels.iter().position(|c| c.channel_id == id));
+            bank.ingress(producer as u32, index, cause);
+        }
+    }
+    pub(crate) fn prove_loss_quiescent(&self) {
+        if let Some(bank) = self.loss.as_deref() {
+            bank.prove_quiescent();
+        }
+    }
+
     /// Number of producers, equal to the endpoint count.
     pub(crate) fn producers(&self) -> usize {
         self.entries.len()
@@ -499,6 +567,7 @@ impl CaptureCore {
             raw: entry.raw.as_ref(),
             completion: self.completion(),
             telemetry: self.telemetry.as_deref().map(|bank| &bank.cells[id]),
+            loss: self.loss.as_deref(),
             updates: self.updates.as_deref(),
         }
     }
@@ -585,6 +654,14 @@ pub struct CaptureScope<'owner> {
 }
 
 impl<'owner> CaptureScope<'owner> {
+    /// Borrow fixed independent loss counters from this capture session.
+    pub fn loss_tracking(&self) -> Option<crate::loss::Counters<'owner>> {
+        self.core
+            .loss
+            .as_deref()
+            .map(|bank| crate::loss::Counters { bank })
+    }
+
     /// Management observations sharing this scope's immutable registration.
     pub fn telemetry(&self) -> Option<crate::telemetry::Telemetry<'owner>> {
         self.core.telemetry()
@@ -657,6 +734,7 @@ pub struct Producer<'owner> {
     raw: Option<&'owner RawPool>,
     completion: Option<Completion<'owner>>,
     telemetry: Option<&'owner crate::telemetry::CounterCell>,
+    loss: Option<&'owner crate::loss::Bank>,
     updates: Option<&'owner crate::control::config_update::State>,
 }
 
@@ -677,7 +755,7 @@ impl<'owner> Producer<'owner> {
         }
         self.revision
     }
-    fn sampled_out(&mut self, channel: u32, importance: Importance) -> bool {
+    fn sampled_out(&mut self, index: usize, channel: u32, importance: Importance) -> bool {
         if importance == Importance::Important {
             return false;
         }
@@ -685,9 +763,6 @@ impl<'owner> Producer<'owner> {
             return false;
         };
         let Some((_, every)) = state.policy(self.revision, channel) else {
-            return false;
-        };
-        let Some(index) = self.channels.iter().position(|c| c.channel_id == channel) else {
             return false;
         };
         let remaining = &mut self.write.sampling[index];
@@ -708,8 +783,33 @@ impl<'owner> Producer<'owner> {
         metadata: RecordMetadata,
         payload: &[u8],
     ) -> Result<RecordOutcome, CaptureError> {
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
         self.apply_pending_config();
-        let result = self.record_small_inner(metadata, payload);
+        let index = self
+            .channels
+            .iter()
+            .position(|c| c.channel_id == metadata.channel_id);
+        let result = self.record_small_inner(metadata, payload, index);
+        if let Some(bank) = self.loss {
+            let cause = match result {
+                Ok(RecordOutcome::Accepted(_)) => None,
+                Ok(RecordOutcome::Skipped) => Some(crate::loss::Cause::Policy),
+                Err(error) => Some(crate::loss::reason(error)),
+            };
+            if let Some(cause) = cause {
+                bank.ingress(
+                    self.producer_id,
+                    if cause == crate::loss::Cause::InvalidInput {
+                        None
+                    } else {
+                        index
+                    },
+                    cause,
+                );
+            }
+        }
         if let Some(counter) = self.telemetry {
             match &result {
                 Ok(RecordOutcome::Accepted(_)) => counter.record(0, payload.len()),
@@ -723,12 +823,10 @@ impl<'owner> Producer<'owner> {
         &mut self,
         mut metadata: RecordMetadata,
         payload: &[u8],
+        index: Option<usize>,
     ) -> Result<RecordOutcome, CaptureError> {
-        let _active = self
-            .completion
-            .map(|completion| completion.enter(self.producer_id));
-        let (importance, skip) = self.classify(&metadata, payload.len(), self.slot_bytes)?;
-        if skip || self.sampled_out(metadata.channel_id, importance) {
+        let (importance, skip) = self.classify(&metadata, payload.len(), self.slot_bytes, index)?;
+        if skip || self.sampled_out(index.unwrap_or(0), metadata.channel_id, importance) {
             return Ok(RecordOutcome::Skipped);
         }
         if importance == Importance::Normal {
@@ -804,14 +902,13 @@ impl<'owner> Producer<'owner> {
         metadata: &RecordMetadata,
         length: usize,
         maximum: usize,
+        index: Option<usize>,
     ) -> Result<(Importance, bool), CaptureError> {
         if self.closing.load(Ordering::SeqCst) {
             return Err(CaptureError::Closing);
         }
-        let channel = self
-            .channels
-            .iter()
-            .find(|channel| channel.channel_id == metadata.channel_id)
+        let channel = index
+            .and_then(|i| self.channels.get(i))
             .ok_or(CaptureError::InvalidInput)?;
         if metadata.schema_id != channel.schema_id
             || metadata.schema_version != channel.schema_version
@@ -838,7 +935,13 @@ impl<'owner> Producer<'owner> {
         length: usize,
         importance: Importance,
     ) -> Result<Loan<'owner>, CaptureError> {
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
         let result = self.acquire_inner(length, importance);
+        if let (Some(bank), Err(error)) = (self.loss, &result) {
+            bank.acquire(self.producer_id, *error);
+        }
         if let Err(error) = &result {
             if let Some(counter) = self.telemetry {
                 counter.reject(*error, true);
@@ -853,9 +956,6 @@ impl<'owner> Producer<'owner> {
     ) -> Result<Loan<'owner>, CaptureError> {
         // Loan acquisition can overlap closure just like record publication.
         // Quiescent shutdown must observe its final Loaned/return state too.
-        let _active = self
-            .completion
-            .map(|completion| completion.enter(self.producer_id));
         if self.closing.load(Ordering::SeqCst) {
             return Err(CaptureError::Closing);
         }
@@ -874,9 +974,34 @@ impl<'owner> Producer<'owner> {
         metadata: RecordMetadata,
         loan: Loan<'owner>,
     ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
+        let _active = self
+            .completion
+            .map(|completion| completion.enter(self.producer_id));
         self.apply_pending_config();
         let length = loan.len();
-        let result = self.record_raw_inner(metadata, loan);
+        let index = self
+            .channels
+            .iter()
+            .position(|c| c.channel_id == metadata.channel_id);
+        let result = self.record_raw_inner(metadata, loan, index);
+        if let Some(bank) = self.loss {
+            let cause = match &result {
+                Ok(RawRecordOutcome::Accepted(_)) => None,
+                Ok(RawRecordOutcome::Skipped(_)) => Some(crate::loss::Cause::Policy),
+                Err(error) => Some(crate::loss::reason(error.reason)),
+            };
+            if let Some(cause) = cause {
+                bank.ingress(
+                    self.producer_id,
+                    if cause == crate::loss::Cause::InvalidInput {
+                        None
+                    } else {
+                        index
+                    },
+                    cause,
+                );
+            }
+        }
         if let Some(counter) = self.telemetry {
             match &result {
                 Ok(RawRecordOutcome::Accepted(_)) => counter.record(0, length),
@@ -890,12 +1015,10 @@ impl<'owner> Producer<'owner> {
         &mut self,
         mut metadata: RecordMetadata,
         loan: Loan<'owner>,
+        index: Option<usize>,
     ) -> Result<RawRecordOutcome<'owner>, RawRecordError<'owner>> {
-        let _active = self
-            .completion
-            .map(|completion| completion.enter(self.producer_id));
         let classify = (|| {
-            let (importance, skip) = self.classify(&metadata, loan.len(), usize::MAX)?;
+            let (importance, skip) = self.classify(&metadata, loan.len(), usize::MAX, index)?;
             let pool = self.raw.ok_or(CaptureError::Unsupported)?;
             if !loan.belongs_to(pool) || importance != loan.importance() {
                 return Err(CaptureError::InvalidInput);
@@ -906,7 +1029,7 @@ impl<'owner> Producer<'owner> {
             Ok(value) => value,
             Err(reason) => return Err(RawRecordError { reason, loan }),
         };
-        if skip || self.sampled_out(metadata.channel_id, importance) {
+        if skip || self.sampled_out(index.unwrap_or(0), metadata.channel_id, importance) {
             return Ok(RawRecordOutcome::Skipped(loan));
         }
         if importance == Importance::Normal
@@ -1009,6 +1132,22 @@ impl GeneralProducer<'_> {
                 return Err(CaptureError::Closing);
             }
             if Instant::now() >= deadline {
+                let _active = self
+                    .producer
+                    .completion
+                    .map(|c| c.enter(self.producer.producer_id));
+                if let Some(bank) = self.producer.loss {
+                    let index = self
+                        .producer
+                        .channels
+                        .iter()
+                        .position(|c| c.channel_id == metadata.channel_id);
+                    bank.ingress(
+                        self.producer.producer_id,
+                        index,
+                        crate::loss::Cause::Deadline,
+                    );
+                }
                 return Err(CaptureError::DeadlineExceeded);
             }
             match self.producer.try_record_small(metadata, payload) {

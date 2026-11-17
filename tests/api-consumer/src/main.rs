@@ -154,6 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut writer = SegmentWriter::new(
             router.writer_budget(1)?,
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 256,
                 write_buffer_bytes: 4096,
                 chunk_target_bytes: 1024,
@@ -231,6 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         finished.safe_offset(),
                     )],
                     dot_logger::query::QueryConfig {
+                        max_loss_reports: 0,
                         max_segments: 1,
                         max_records: 4,
                         max_record_bytes: 16384,

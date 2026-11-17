@@ -105,6 +105,23 @@ impl Context {
                 self.number::<u64>("after")?;
             }
             ("status", _) => {}
+            ("loss", _) if !remote => {
+                self.limit()?;
+                let from = self.number::<u64>("from")?;
+                let to = self
+                    .text("to")?
+                    .parse::<u128>()
+                    .map_err(|_| Failure::Input)?;
+                if to > u128::from(u64::MAX) + 1 || u128::from(from) >= to {
+                    return Err(Failure::Input);
+                }
+                if self.text("basis")? != "mono" {
+                    return Err(Failure::Unsupported);
+                }
+                if let Some(channel) = self.optional("channel") {
+                    channel.parse::<u32>().map_err(|_| Failure::Input)?;
+                }
+            }
             ("recover", _) if !remote => {
                 self.text("output")?;
             }
@@ -257,11 +274,58 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
         return Ok(json!({"scope":"offline_session_declaration"}));
     }
     if command == "status" {
-        out.emit("status",json!({"session":manifest.session,"sources":manifest.sources.iter().map(|s|json!({"sequence":s.sequence.to_string(),"revision":s.revision.to_string()})).collect::<Vec<_>>(),"availability":"Observed","metrics":{"state":"Unavailable","reason":"no_runtime_metrics_backend"}}))?;
+        out.emit("status",json!({"session":manifest.session,"sources":manifest.sources.iter().map(|s|json!({"sequence":s.sequence.to_string(),"revision":s.revision.to_string(),"target":s.target.map(|id|id.to_string())})).collect::<Vec<_>>(),"availability":"Observed","metrics":{"state":"Unavailable","reason":"no_runtime_metrics_backend"}}))?;
         return Ok(json!({}));
     }
     if command == "recover" {
         return recover(ctx, out, &manifest, path);
+    }
+    if command == "loss" {
+        let snapshot = manifest.loss_snapshot(path, ctx.now(), ctx.deadline_ns, &ctx.cancel)?;
+        let reports = snapshot.reports(ctx.now(), ctx.cancel.as_atomic())?;
+        let unavailable = snapshot.unavailable_sources();
+        let limit = ctx.limit()?;
+        let channel = ctx
+            .optional("channel")
+            .map(|c| c.parse::<u32>().map_err(|_| Failure::Input))
+            .transpose()?;
+        let from = ctx.number::<u64>("from")?;
+        let to = ctx
+            .text("to")?
+            .parse::<u128>()
+            .map_err(|_| Failure::Input)?;
+        // Filter report observation intervals before comparing their counters.
+        // These are epoch-management intervals, not user record timestamps.
+        let selected: Vec<_> = reports
+            .iter()
+            .filter(|r| u128::from(r.observed_from_ns) < to && r.observed_to_ns >= from)
+            .cloned()
+            .collect();
+        let deltas = dot_logger::loss::summarize(
+            &selected,
+            manifest
+                .limits()
+                .max_loss_reports
+                .checked_mul(dot_logger::loss::ROWS_PER_REPORT)
+                .ok_or(Failure::Limit)?,
+        )
+        .map_err(|_| Failure::Corrupt)?;
+        let mut emitted = 0;
+        for delta in deltas {
+            ctx.check()?;
+            let c = &delta.counter;
+            if channel.is_some_and(|id| c.channel != Some(id)) || c.count == 0 && !c.overflowed {
+                continue;
+            }
+            if emitted == limit {
+                return Err(Failure::Limit);
+            }
+            out.emit("loss",json!({"session":format!("{:032x}",delta.session),"counter_epoch":delta.epoch.to_string(),"scope":format!("{:?}",c.scope),"cause":format!("{:?}",c.cause),"producer":c.producer.map(|v|v.to_string()),"channel":c.channel.map(|v|v.to_string()),"origin_target":c.target.map(|v|v.to_string()),"cumulative_count":c.count.to_string(),"delta":delta.delta.map(|v|v.to_string()),"overflowed":c.overflowed,"observed_from_ns":delta.observed_from_ns.to_string(),"observed_to_ns":delta.observed_to_ns.to_string(),"observation_clock":"counter_epoch_monotonic_ns","tail_confirmed":delta.tail_confirmed}))?;
+            emitted += 1;
+        }
+        return Ok(
+            json!({"loss_rows":emitted,"report_parts":reports.len(),"unavailable_sources":unavailable,"observation_clock":"counter_epoch_monotonic_ns","unobserved_before_baseline":true,"unconfirmed_tails_possible":true}),
+        );
     }
     let mut snapshot = manifest.snapshot(path, ctx.now(), ctx.deadline_ns, &ctx.cancel)?;
     let query = ctx.query()?;
@@ -446,6 +510,10 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
     }
     let output = Path::new(ctx.text("output")?);
     let multiple = sources.len() > 1;
+    let repeated_sequences = sources
+        .iter()
+        .enumerate()
+        .any(|(i, s)| sources[..i].iter().any(|p| p.sequence == s.sequence));
     if ctx.cancel.is_cancelled() {
         return Err(Failure::Cancelled);
     }
@@ -454,6 +522,7 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
     }
     let mut remaining = m.limits().max_records;
     let mut remaining_bytes = m.limits().read_bytes;
+    let mut remaining_loss = m.limits().max_loss_reports;
     let mut recovered_files = 0;
     for source in sources {
         if ctx.cancel.is_cancelled() {
@@ -462,11 +531,19 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
         if ctx.now() >= ctx.deadline_ns {
             return Err(Failure::Deadline);
         }
-        if remaining == 0 {
+        if remaining == 0 && remaining_loss == 0 {
             return Err(Failure::Limit);
         }
         let destination = if multiple {
-            output.join(format!("{}.mcap", source.sequence))
+            if repeated_sequences {
+                output.join(format!(
+                    "{}-{}.mcap",
+                    source.target.ok_or(Failure::Input)?,
+                    source.sequence
+                ))
+            } else {
+                output.join(format!("{}.mcap", source.sequence))
+            }
         } else {
             output.to_path_buf()
         };
@@ -476,9 +553,11 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
             m,
             source,
             &destination,
-            remaining,
-            remaining_bytes,
+            (remaining, remaining_loss, remaining_bytes),
         )?;
+        remaining_loss = remaining_loss
+            .checked_sub(report.loss_reports)
+            .ok_or(Failure::Limit)?;
         remaining_bytes = remaining_bytes
             .checked_sub(report.source_bytes)
             .ok_or(Failure::Limit)?;
@@ -495,9 +574,9 @@ fn recover_one(
     m: &Manifest,
     source: dot_logger_client::OfflineSource,
     output_path: &Path,
-    remaining_records: usize,
-    remaining_bytes: u64,
+    remaining_limits: (usize, usize, u64),
 ) -> Result<RecoveryReport, Failure> {
+    let (remaining_records, remaining_loss, remaining_bytes) = remaining_limits;
     use dot_logger::routing::{Router, RoutingConfig, Schedule, TargetConfig};
     let metadata = std::fs::metadata(&source.path)?;
     if !metadata.is_file() {
@@ -556,8 +635,10 @@ fn recover_one(
         }).map_err(|_| Failure::Input)?;
         let limits = m.limits();
         let options = RecoveryOptions {
+            source_target: source.target,
             source_sequence: source.sequence,
             writer: WriterConfig {
+                max_loss_reports: remaining_loss,
                 max_payload_bytes: limits.max_payload_bytes, write_buffer_bytes: 0,
                 chunk_target_bytes: limits.max_record_bytes, max_records: remaining_records,
                 max_chunks: 1024, max_metadata_bytes: limits.max_metadata_bytes,
@@ -573,16 +654,16 @@ fn recover_one(
             Err(error) => {
                 let report = error.report;
                 out.emit("recovery", json!({
-                    "sequence": source.sequence.to_string(), "revision": source.revision.to_string(),
-                    "records": report.records, "chunks": report.chunks,
+                    "sequence": source.sequence.to_string(), "revision": source.revision.to_string(), "target":source.target.map(|id|id.to_string()),
+                    "records": report.records, "loss_reports":report.loss_reports,"chunks": report.chunks,
                     "verified_end": report.verified_end, "excluded_from": report.excluded.0,
                     "excluded_to": report.excluded.1, "stop": format!("{:?}", report.stop), "published": false,
                 }))?;
-                Err(if report.stop == RecoveryStop::Cancelled { Failure::Cancelled } else { Failure::Io })
+                Err(match report.stop { RecoveryStop::Cancelled=>Failure::Cancelled, RecoveryStop::Limit=>Failure::Limit, _=>Failure::Io })
             }
         }
     })?;
-    out.emit("recovery",json!({"sequence":source.sequence.to_string(),"revision":source.revision.to_string(),"records":report.records,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
+    out.emit("recovery",json!({"sequence":source.sequence.to_string(),"revision":source.revision.to_string(),"records":report.records,"loss_reports":report.loss_reports,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
     if !matches!(
         report.stop,
         RecoveryStop::DataEnd | RecoveryStop::EndOfInput

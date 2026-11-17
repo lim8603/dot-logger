@@ -102,6 +102,7 @@ impl SegmentStore for Store {
 }
 fn writer() -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 16,
         write_buffer_bytes: 64,
         chunk_target_bytes: 1024,
@@ -300,6 +301,7 @@ fn run_interleaved(fault: Option<&'static str>) {
                 .unwrap();
             let budget = QueryBudget::new(&query_plan);
             let limits = QueryConfig {
+                max_loss_reports: 0,
                 max_segments: 4,
                 max_records: 8,
                 max_record_bytes: 16384,
@@ -572,6 +574,7 @@ fn a_receipt_cannot_be_relabelled_as_another_revision_in_a_snapshot() {
         let first = make(old, 1);
         let second = make(new.clone(), 2);
         let options = RecoveryOptions {
+            source_target: None,
             source_sequence: 0,
             writer: writer(),
             limits: RecoveryConfig {
@@ -608,6 +611,7 @@ fn a_receipt_cannot_be_relabelled_as_another_revision_in_a_snapshot() {
             channels(),
             sources,
             QueryConfig {
+                max_loss_reports: 0,
                 max_segments: 2,
                 max_records: 8,
                 max_record_bytes: 16384,

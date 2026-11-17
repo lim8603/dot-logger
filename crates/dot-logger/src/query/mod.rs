@@ -41,6 +41,8 @@ pub struct Query {
 /// Caller supplied limits; page sizes charge metadata as well as inline payload.
 #[derive(Clone, Copy, Debug)]
 pub struct QueryConfig {
+    /// Maximum retained loss-report parts; zero validates and skips control data.
+    pub max_loss_reports: usize,
     /// Frozen segment count limit.
     pub max_segments: usize,
     /// Maximum indexed messages across all frozen segments.
@@ -164,10 +166,20 @@ pub struct QuerySource<R> {
     reader: R,
     sequence: u64,
     revision: u64,
+    expected_target: Option<u32>,
+    actual_target: Option<u32>,
+    loss_rows: usize,
     safe_offset: u64,
     permit: Option<ReadPermit>,
 }
 impl<R> QuerySource<R> {
+    /// Require this original target identity. Needed to distinguish equal file
+    /// sequences from different outputs; it is validated against file Metadata.
+    pub fn expect_target(mut self, target: u32) -> Self {
+        self.expected_target = Some(target);
+        self
+    }
+
     /// Freeze an active source at a writer-published complete-chunk offset.
     /// Sequence and revision are checked against the original file metadata.
     /// The host prevents truncation/replacement and deletion for this reader's lifetime.
@@ -176,6 +188,9 @@ impl<R> QuerySource<R> {
             reader,
             sequence,
             revision,
+            expected_target: None,
+            actual_target: None,
+            loss_rows: 0,
             safe_offset,
             permit: None,
         }
@@ -191,6 +206,9 @@ impl<R> QuerySource<R> {
             reader,
             sequence,
             revision,
+            expected_target: None,
+            actual_target: None,
+            loss_rows: 0,
             safe_offset,
             permit: Some(permit),
         }
@@ -264,8 +282,10 @@ impl Page<'_> {
 }
 /// Owns readers, fixed index/buffers and their reservation until actual reads end.
 pub struct Snapshot<R> {
+    loss_only: bool,
     sources: Vec<QuerySource<R>>,
     rows: Vec<Row>,
+    losses: Vec<crate::loss::LossReport>,
     order: Vec<usize>,
     ordered_query: Option<Query>,
     items: Vec<QueryRecord>,
@@ -340,6 +360,10 @@ impl QueryConfig {
         let mut result = 65536usize;
         for (count, size) in [
             (self.max_record_bytes, 4),
+            (
+                self.max_loss_reports,
+                256 + crate::loss::ROWS_PER_REPORT * 512,
+            ),
             (self.max_payload_bytes, 4),
             (
                 self.max_records,
@@ -383,6 +407,22 @@ impl<R: Read + Seek> Snapshot<R> {
         deadline: u64,
         cancel: &AtomicBool,
     ) -> Result<Self, QueryError> {
+        Self::build(
+            budget, session, channels, sources, config, now, deadline, cancel, false,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn build(
+        budget: &QueryBudget,
+        session: u128,
+        channels: Vec<StorageChannel>,
+        sources: Vec<QuerySource<R>>,
+        config: QueryConfig,
+        now: u64,
+        deadline: u64,
+        cancel: &AtomicBool,
+        loss_only: bool,
+    ) -> Result<Self, QueryError> {
         let deadline = sources
             .iter()
             .filter_map(|s| s.permit.as_ref().map(ReadPermit::deadline))
@@ -396,7 +436,12 @@ impl<R: Read + Seek> Snapshot<R> {
             if s.safe_offset > config.max_source_bytes {
                 return Err(QueryError::Limit);
             }
-            if sources[..i].iter().any(|a| a.sequence == s.sequence) {
+            if sources[..i].iter().any(|a| {
+                a.sequence == s.sequence
+                    && (a.expected_target.is_none()
+                        || s.expected_target.is_none()
+                        || a.expected_target == s.expected_target)
+            }) {
                 return Err(QueryError::InvalidInput);
             }
         }
@@ -409,8 +454,10 @@ impl<R: Read + Seek> Snapshot<R> {
             }
         }
         let mut snapshot = Self {
+            loss_only,
             sources: sources.into_boxed_slice().into_vec(),
-            rows: Vec::with_capacity(config.max_records),
+            rows: Vec::with_capacity(if loss_only { 0 } else { config.max_records }),
+            losses: Vec::with_capacity(config.max_loss_reports),
             order: Vec::with_capacity(config.max_records),
             ordered_query: None,
             items: Vec::with_capacity(config.page_records),
@@ -433,6 +480,15 @@ impl<R: Read + Seek> Snapshot<R> {
                 now,
                 cancel,
             )?;
+        }
+        for (i, source) in snapshot.sources.iter().enumerate() {
+            if source.actual_target.is_some()
+                && snapshot.sources[..i].iter().any(|old| {
+                    old.sequence == source.sequence && old.actual_target == source.actual_target
+                })
+            {
+                return Err(QueryError::InvalidInput);
+            }
         }
         // Reuse the already reserved ordering buffer. Receipt identity is session
         // scoped, so a second source/revision may not relabel the same capture.
@@ -467,7 +523,9 @@ impl<R: Read + Seek> Snapshot<R> {
         now: u64,
         cancel: &AtomicBool,
     ) -> Result<(), QueryError> {
+        let loss_only = self.loss_only;
         let end = self.sources[index].safe_offset;
+        let expected_target = self.sources[index].expected_target;
         let sequence = self.sources[index].sequence;
         if end == 0 {
             return Ok(());
@@ -518,7 +576,10 @@ impl<R: Read + Seek> Snapshot<R> {
             match op {
                 12 => {
                     validation.metadata(body).map_err(invalid)?;
-                    if validation.file_sequence() != Some(sequence) {
+                    if validation.file_sequence() != Some(sequence)
+                        || expected_target
+                            .is_some_and(|id| validation.file_info().is_none_or(|f| f.target != id))
+                    {
                         return Err(QueryError::CorruptData);
                     }
                 }
@@ -537,6 +598,19 @@ impl<R: Read + Seek> Snapshot<R> {
                         let at = len - nested.0.len();
                         let (op, record) = nested.record().map_err(invalid)?;
                         if op != 5 {
+                            continue;
+                        }
+                        if let Some(report) = validation.loss_report(record).map_err(invalid)? {
+                            if self.config.max_loss_reports > 0 {
+                                if self.losses.len() == self.config.max_loss_reports {
+                                    return Err(QueryError::Limit);
+                                }
+                                self.losses.push(report);
+                            }
+                            continue;
+                        }
+                        if loss_only {
+                            nested.record().map_err(invalid)?;
                             continue;
                         }
                         if self.rows.len() == self.config.max_records {
@@ -573,7 +647,43 @@ impl<R: Read + Seek> Snapshot<R> {
         if validation.file_sequence() != Some(sequence) {
             return Err(QueryError::CorruptData);
         }
+        self.sources[index].loss_rows = validation.file_info().map_or(0, |file| file.loss_rows);
+        self.sources[index].actual_target = validation.file_info().map(|file| file.target);
         Ok(())
+    }
+    /// Number of frozen sources that explicitly have no loss collection.
+    /// These sources provide no evidence of zero loss.
+    pub fn loss_unavailable_sources(&self) -> usize {
+        self.sources.iter().filter(|s| s.loss_rows == 0).count()
+    }
+    /// Return the separately bounded control parts. No fake QueryRecord or receipt
+    /// is created. A positive max_loss_reports is required for enabled files.
+    pub fn loss_reports(
+        &self,
+        now: u64,
+        cancel: &AtomicBool,
+    ) -> Result<&[crate::loss::LossReport], QueryError> {
+        self.alive(now, cancel)?;
+        if self.config.max_loss_reports == 0 && self.sources.iter().any(|s| s.loss_rows > 0) {
+            return Err(QueryError::Limit);
+        }
+        Ok(&self.losses)
+    }
+    /// Compare complete counter watermarks without adding replicated ingress rows.
+    pub fn loss_deltas(
+        &self,
+        now: u64,
+        cancel: &AtomicBool,
+    ) -> Result<Vec<crate::loss::LossDelta>, QueryError> {
+        let reports = self.loss_reports(now, cancel)?;
+        crate::loss::summarize(
+            reports,
+            self.config
+                .max_loss_reports
+                .checked_mul(crate::loss::ROWS_PER_REPORT)
+                .ok_or(QueryError::Limit)?,
+        )
+        .map_err(|_| QueryError::CorruptData)
     }
     fn alive(&self, now: u64, cancel: &AtomicBool) -> Result<(), QueryError> {
         // A stale host timestamp must never revive an already observed expiry.
@@ -801,4 +911,51 @@ fn timestamp(row: &Row, basis: TimeBasis) -> Result<i128, QueryError> {
             t.ticks as i128
         }
     })
+}
+
+/// Separately bounded loss-only snapshot. User pairs are validated but never
+/// indexed, replayed or converted into synthetic loss records. Equal source
+/// sequences across outputs require explicit expected target identities.
+pub struct LossSnapshot<R> {
+    inner: Snapshot<R>,
+}
+impl<R: Read + Seek> LossSnapshot<R> {
+    /// Validate frozen source prefixes and retain only bounded control reports.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        budget: &QueryBudget,
+        session: u128,
+        channels: Vec<StorageChannel>,
+        sources: Vec<QuerySource<R>>,
+        config: QueryConfig,
+        now: u64,
+        deadline: u64,
+        cancel: &AtomicBool,
+    ) -> Result<Self, QueryError> {
+        Ok(Self {
+            inner: Snapshot::build(
+                budget, session, channels, sources, config, now, deadline, cancel, true,
+            )?,
+        })
+    }
+    /// Sources with unavailable collection provide no evidence of zero loss.
+    pub fn unavailable_sources(&self) -> usize {
+        self.inner.loss_unavailable_sources()
+    }
+    /// Bounded parts, after validating every record in their complete chunk.
+    pub fn reports(
+        &self,
+        now: u64,
+        cancel: &AtomicBool,
+    ) -> Result<&[crate::loss::LossReport], QueryError> {
+        self.inner.loss_reports(now, cancel)
+    }
+    /// Replicated ingress values are compared as watermarks, never summed.
+    pub fn deltas(
+        &self,
+        now: u64,
+        cancel: &AtomicBool,
+    ) -> Result<Vec<crate::loss::LossDelta>, QueryError> {
+        self.inner.loss_deltas(now, cancel)
+    }
 }

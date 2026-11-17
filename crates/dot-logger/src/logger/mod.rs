@@ -844,6 +844,7 @@ impl LoggerBuilder {
             &derived.routing,
             derived.completion,
         )?;
+        owner.enable_loss_tracking()?;
         if self.telemetry {
             owner.enable_telemetry()?;
         }

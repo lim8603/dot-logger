@@ -6,7 +6,9 @@ use dot_logger::{
     query::QueryConfig,
     storage::{PayloadSchema, StorageChannel},
 };
-use dot_logger_client::{Cancellation, OfflineConfig, OfflineSource, open_snapshot};
+use dot_logger_client::{
+    Cancellation, OfflineConfig, OfflineSource, open_loss_snapshot, open_snapshot,
+};
 use serde::Deserialize;
 use std::{
     fs::File,
@@ -82,6 +84,8 @@ struct Descriptor {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
+    #[serde(default)]
+    pub target: Option<u32>,
     pub revision: u64,
     pub path: PathBuf,
     pub sequence: u64,
@@ -91,6 +95,8 @@ pub struct Source {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Limits {
+    #[serde(default)]
+    max_loss_reports: usize,
     max_segments: usize,
     max_records: usize,
     max_record_bytes: usize,
@@ -135,6 +141,7 @@ impl Manifest {
     pub fn limits(&self) -> QueryConfig {
         let l = &self.limits;
         QueryConfig {
+            max_loss_reports: l.max_loss_reports,
             max_segments: l.max_segments,
             max_records: l.max_records,
             max_record_bytes: l.max_record_bytes,
@@ -160,6 +167,7 @@ impl Manifest {
             || self.sources.len() > self.limits.max_segments
             || self.external_bytes > 2 * 1024 * 1024 * 1024
             || self.limits.max_records > 1_000_000
+            || self.limits.max_loss_reports > 1_000_000
             || self.limits.max_record_bytes > 128 * 1024 * 1024
             || self.limits.max_payload_bytes > 64 * 1024 * 1024
             || self.limits.page_bytes > 16 * 1024 * 1024
@@ -169,10 +177,11 @@ impl Manifest {
         }
         id(&self.session)?;
         for (i, s) in self.sources.iter().enumerate() {
-            if self.sources[..i]
-                .iter()
-                .any(|p| p.sequence == s.sequence || p.path == s.path)
-            {
+            if self.sources[..i].iter().any(|p| {
+                p.path == s.path
+                    || p.sequence == s.sequence
+                        && (p.target.is_none() || s.target.is_none() || p.target == s.target)
+            }) {
                 return Err(Failure::Input);
             }
         }
@@ -250,6 +259,7 @@ impl Manifest {
         self.sources
             .iter()
             .map(|s| OfflineSource {
+                target: s.target,
                 revision: s.revision,
                 path: if s.path.is_absolute() {
                     s.path.clone()
@@ -270,6 +280,28 @@ impl Manifest {
     ) -> Result<dot_logger::query::Snapshot<File>, Failure> {
         let budget = dot_logger::query::QueryBudget::new(&self.plan(1024 * 1024)?);
         open_snapshot(
+            &budget,
+            OfflineConfig {
+                session: id(&self.session)?,
+                channels: self.channels()?,
+                limits: self.limits(),
+                deadline_ns: deadline,
+            },
+            self.sources(path),
+            now,
+            cancel,
+        )
+        .map_err(Failure::from)
+    }
+    pub fn loss_snapshot(
+        &self,
+        path: &Path,
+        now: u64,
+        deadline: u64,
+        cancel: &Cancellation,
+    ) -> Result<dot_logger::query::LossSnapshot<File>, Failure> {
+        let budget = dot_logger::query::QueryBudget::new(&self.plan(1024 * 1024)?);
+        open_loss_snapshot(
             &budget,
             OfflineConfig {
                 session: id(&self.session)?,

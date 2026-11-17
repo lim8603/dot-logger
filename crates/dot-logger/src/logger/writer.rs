@@ -329,15 +329,28 @@ impl Writer {
         // A `Channel<T>` is only issued after its topic's schema matched
         // `T::SCHEMA`; the core still checks registration on every record.
         if channel.session != self.session {
+            if let Some(owned) = self.state.as_ref() {
+                owned
+                    .core
+                    .loss_before_submit(self.id, None, crate::loss::Cause::InvalidInput);
+            }
             return Err(LogError::InvalidInput);
         }
         let Some(owned) = self.state.as_mut() else {
             return Err(LogError::Closing);
         };
-        let length = message
-            .encode(&mut owned.scratch)
-            .map_err(|EncodeError| LogError::Encode)?;
-        let payload = owned.scratch.get(..length).ok_or(LogError::Encode)?;
+        let length = match message.encode(&mut owned.scratch) {
+            Ok(length) if length <= owned.scratch.len() => length,
+            _ => {
+                owned.core.loss_before_submit(
+                    self.id,
+                    Some(channel.id),
+                    crate::loss::Cause::Encode,
+                );
+                return Err(LogError::Encode);
+            }
+        };
+        let payload = &owned.scratch[..length];
         let metadata = channel.metadata(mono_ns, real_ns);
         match owned
             .core

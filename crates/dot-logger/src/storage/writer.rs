@@ -173,6 +173,21 @@ pub(super) fn registration_bytes(channels: &[StorageChannel]) -> Result<usize, S
 // and one application-channel/chunk auxiliary entry in the conservative model.
 pub(super) const MIN_INDEX_BYTES: usize = 128 + 512 + 512;
 impl WriterConfig {
+    pub(crate) fn validate_loss(&self, rows: usize) -> Result<(), StorageError> {
+        let parts = rows.div_ceil(crate::loss::ROWS_PER_REPORT);
+        if rows > 0
+            && (self.max_loss_reports < parts.checked_mul(2).ok_or(StorageError::InvalidConfig)?
+                || self.max_chunks
+                    < parts
+                        .checked_mul(2)
+                        .and_then(|n| n.checked_add(2))
+                        .ok_or(StorageError::InvalidConfig)?)
+        {
+            return Err(StorageError::InvalidConfig);
+        }
+        Ok(())
+    }
+
     fn index_entries(&self, channels: usize) -> usize {
         // Each nonempty channel/chunk pair requires at least one message.
         self.max_chunks
@@ -189,7 +204,7 @@ impl WriterConfig {
     ) -> Result<usize, StorageError> {
         if self.max_payload_bytes == 0
             || self.chunk_target_bytes == 0
-            || self.max_records == 0
+            || self.max_records == 0 && self.max_loss_reports == 0
             || self.max_chunks == 0
             || self.max_records > u32::MAX as usize
             || self.max_chunks > u32::MAX as usize
@@ -199,6 +214,9 @@ impl WriterConfig {
             || self.max_metadata_bytes > u32::MAX as usize
             || producers == 0
         {
+            return Err(StorageError::InvalidConfig);
+        }
+        if self.max_loss_reports > u32::MAX as usize {
             return Err(StorageError::InvalidConfig);
         }
         let metadata = registration_bytes(channels)?;
@@ -216,6 +234,11 @@ impl WriterConfig {
             (2, max),
             (self.write_buffer_bytes, 1),
             (self.max_records, 128),
+            (self.max_loss_reports, 64),
+            (
+                usize::from(self.max_loss_reports > 0),
+                8 * crate::loss::MAX_REPORT_BYTES + 16384,
+            ),
             (self.max_chunks, 512),
             (self.index_entries(channels.len()), 512),
             (channels.len() + 1, 8192),
@@ -251,6 +274,12 @@ pub struct SegmentWriter<W: SyncSink> {
     standalone: bool,
     encoder: Vec<u8>,
     meta_channel: u16,
+    loss_channel: u16,
+    loss_parts: usize,
+    reserved_final: usize,
+    loss_count: usize,
+    sample_start: u64,
+    deferred: bool,
     records: usize,
     chunks: usize,
     pending_records: usize,
@@ -347,6 +376,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         sink: W,
     ) -> Result<Self, StorageError> {
         config.reservation(&channels, budget.producers)?;
+        config.validate_loss(budget.loss_rows())?;
         let target_lease = TargetLease::enter(&budget)?;
         Self::with_target(budget, config, channels, sink, target_lease, true, 0)
     }
@@ -362,6 +392,15 @@ impl<W: SyncSink> SegmentWriter<W> {
         sequence: u64,
     ) -> Result<Self, StorageError> {
         let bytes = config.reservation(&channels, budget.producers)?;
+        let loss_rows = budget.loss_rows();
+        let loss_parts = loss_rows.div_ceil(crate::loss::ROWS_PER_REPORT);
+        if budget.recovered_file.is_some() {
+            if loss_rows > 0 && config.max_loss_reports == 0 {
+                return Err(StorageError::NeedRotation);
+            }
+        } else {
+            config.validate_loss(loss_rows)?;
+        }
         let lease = budget.reserve(bytes)?;
         if sink.stream_position().map_err(StorageError::Io)? != 0
             || sink.seek(SeekFrom::End(0)).map_err(StorageError::Io)? != 0
@@ -410,9 +449,12 @@ impl<W: SyncSink> SegmentWriter<W> {
             })?;
         writer.write_metadata(
             &super::FileInfo {
+                loss_rows,
                 session: budget.session,
                 revision: budget.revision,
-                target: budget.target,
+                target: budget
+                    .recovered_file
+                    .map_or(budget.target, |file| file.target),
                 sequence,
                 producers: budget.producers,
                 channels: channels.len(),
@@ -430,6 +472,18 @@ impl<W: SyncSink> SegmentWriter<W> {
             "protobuf",
             &BTreeMap::new(),
         )?;
+        let loss_channel = (channels.len() + 2) as u16;
+        if loss_rows > 0 {
+            let schema =
+                writer.add_schema(crate::loss::SCHEMA, "protobuf", crate::loss::DESCRIPTOR)?;
+            writer.add_channel_with_id(
+                loss_channel,
+                schema,
+                codec::LOSS_TOPIC,
+                "protobuf",
+                &BTreeMap::new(),
+            )?;
+        }
         for (i, c) in channels.iter().enumerate() {
             let mut metadata = BTreeMap::from([
                 ("session_id".into(), format!("{:032x}", budget.session)),
@@ -470,7 +524,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             )?;
         }
         let count = channels.len();
-        Ok(Self {
+        let mut result = Self {
             writer: Some(writer),
             signals,
             config,
@@ -484,6 +538,12 @@ impl<W: SyncSink> SegmentWriter<W> {
             standalone,
             encoder: Vec::with_capacity(codec::OVERHEAD),
             meta_channel,
+            loss_channel,
+            loss_parts,
+            reserved_final: if budget.loss.is_some() { loss_parts } else { 0 },
+            loss_count: 0,
+            sample_start: 0,
+            deferred: false,
             records: 0,
             chunks: 0,
             pending_records: 0,
@@ -494,7 +554,9 @@ impl<W: SyncSink> SegmentWriter<W> {
             poisoned: false,
             _target: target_lease,
             lease: Some(lease),
-        })
+        };
+        result.collect_loss(crate::loss::Coverage::Baseline, false)?;
+        Ok(result)
     }
     /// Conservative bytes reserved until this writer or its finished index is dropped.
     pub fn reserved_bytes(&self) -> usize {
@@ -524,7 +586,8 @@ impl<W: SyncSink> SegmentWriter<W> {
             return Err(StorageError::InvalidRecord);
         }
         if self.records == self.config.max_records
-            || (!self.open && self.chunks == self.config.max_chunks)
+            || (!self.open
+                && self.chunks.saturating_add(1 + self.reserved_final) > self.config.max_chunks)
         {
             return Err(StorageError::NeedRotation);
         }
@@ -533,7 +596,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         let bytes = payload.len() + self.encoder.len() + 62;
         let split = self.pending_records > 0
             && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
-        if split && self.chunks + 1 >= self.config.max_chunks {
+        if split && self.chunks.saturating_add(2 + self.reserved_final) > self.config.max_chunks {
             return Err(StorageError::NeedRotation);
         }
         if split {
@@ -593,6 +656,96 @@ impl<W: SyncSink> SegmentWriter<W> {
         entry.record_count += 1;
         Ok(())
     }
+    /// Collect and flush a complete bounded cumulative checkpoint, when enabled.
+    /// NeedRotation preserves all counters for a later file/coalesced observation.
+    pub fn checkpoint(&mut self) -> Result<(), StorageError> {
+        let coverage = if self.deferred {
+            crate::loss::Coverage::Coalesced
+        } else {
+            crate::loss::Coverage::Observed
+        };
+        self.collect_loss(coverage, false)
+    }
+    pub(super) fn defer_loss(&mut self) {
+        self.deferred = true;
+    }
+    fn collect_loss(
+        &mut self,
+        coverage: crate::loss::Coverage,
+        final_sample: bool,
+    ) -> Result<(), StorageError> {
+        let budget = &self.lease.as_ref().ok_or(StorageError::Poisoned)?.budget;
+        let Some(bank) = budget.loss.clone() else {
+            return Ok(());
+        };
+        let target = budget.target;
+        let parts = bank.parts();
+        let reserve = if final_sample { 0 } else { parts };
+        if self
+            .loss_count
+            .checked_add(parts)
+            .and_then(|n| n.checked_add(reserve))
+            .is_none_or(|n| n > self.config.max_loss_reports)
+            || self
+                .chunks
+                .checked_add(usize::from(self.open))
+                .and_then(|n| n.checked_add(parts))
+                .and_then(|n| n.checked_add(reserve))
+                .is_none_or(|n| n > self.config.max_chunks)
+        {
+            self.deferred = true;
+            return Err(StorageError::NeedRotation);
+        }
+        let started = bank.now();
+        let checkpoint = bank
+            .next_checkpoint(target)
+            .ok_or(StorageError::InvalidRecord)?;
+        for part in 0..parts {
+            let mut report = bank.sample(target, checkpoint, part, self.sample_start, coverage);
+            report.coalesced = self.deferred;
+            self.append_loss_report(&report)?;
+        }
+        self.sample_start = started;
+        self.deferred = false;
+        Ok(())
+    }
+    pub(super) fn append_loss_report(
+        &mut self,
+        report: &crate::loss::LossReport,
+    ) -> Result<(), StorageError> {
+        if self.poisoned {
+            return Err(StorageError::Poisoned);
+        }
+        if self.loss_parts == 0
+            || self.loss_count >= self.config.max_loss_reports
+            || self.chunks + usize::from(self.open) + 1 > self.config.max_chunks
+        {
+            return Err(StorageError::NeedRotation);
+        }
+        report.encode(&mut self.encoder)?;
+        self.flush_chunk()?;
+        self.chunk_start = self.signals.position.load(Ordering::Acquire);
+        let header = mcap::records::MessageHeader {
+            channel_id: self.loss_channel,
+            sequence: report.checkpoint as u32,
+            log_time: report.publish_time_unix_ns,
+            publish_time: report.publish_time_unix_ns,
+        };
+        let result = self
+            .writer
+            .as_mut()
+            .ok_or(StorageError::Poisoned)?
+            .write_to_known_channel(&header, &self.encoder);
+        if let Err(error) = result {
+            self.poisoned = true;
+            return Err(error.into());
+        }
+        self.open = true;
+        self.loss_count += 1;
+        self.flush_chunk()?;
+        Ok(())
+    }
+
     /// Last complete chunk flushed to the adapter write boundary, not disk durability.
     pub fn safe_offset(&self) -> u64 {
         self.safe
@@ -625,6 +778,25 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.safe = self.signals.position.load(Ordering::Acquire);
         Ok(self.safe)
     }
+    // Include both this observation and the already reserved final sample.
+    pub(super) fn projected_loss_index_bytes(&self) -> usize {
+        let reports = self.loss_parts.saturating_add(self.reserved_final);
+        self.records
+            .saturating_mul(128)
+            .saturating_add(self.loss_count.saturating_add(reports).saturating_mul(64))
+            .saturating_add(
+                self.chunks
+                    .saturating_add(usize::from(self.open))
+                    .saturating_add(reports)
+                    .saturating_mul(512),
+            )
+            .saturating_add(
+                self.index
+                    .len()
+                    .saturating_add(self.current.iter().filter(|e| e.is_some()).count())
+                    .saturating_mul(512),
+            )
+    }
     pub(super) fn projected_index_bytes(
         &self,
         record: CapturedRecord,
@@ -652,8 +824,13 @@ impl<W: SyncSink> SegmentWriter<W> {
             .saturating_add(1)
             .saturating_mul(128)
             .saturating_add(
+                self.loss_count
+                    .saturating_add(self.reserved_final)
+                    .saturating_mul(64),
+            )
+            .saturating_add(
                 self.chunks
-                    .saturating_add(1 + usize::from(split))
+                    .saturating_add(1 + usize::from(split) + self.reserved_final)
                     .saturating_mul(512),
             )
             .saturating_add(pairs.saturating_mul(512))
@@ -779,6 +956,17 @@ impl<W: SyncSink> SegmentWriter<W> {
     }
     /// Write the standard summary/footer; finish alone does not synchronize storage.
     pub fn finish(mut self) -> Result<FinishedSegment<W>, StorageError> {
+        let coverage = if self
+            .lease
+            .as_ref()
+            .and_then(|l| l.budget.loss.as_ref())
+            .is_some_and(|bank| bank.quiescent())
+        {
+            crate::loss::Coverage::Quiescent
+        } else {
+            crate::loss::Coverage::FinalPartial
+        };
+        self.collect_loss(coverage, true)?;
         self.flush_chunk()?;
         let mut writer = self.writer.take().ok_or(StorageError::Poisoned)?;
         if let Err(e) = writer.finish() {

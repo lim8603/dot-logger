@@ -191,8 +191,24 @@ fn f1_native_file_decodes_user_payloads_and_keeps_full_metadata() {
         .unwrap()
         .collect::<Result<_, _>>()
         .unwrap();
-    let (user, meta): (Vec<_>, Vec<_>) =
-        messages.iter().partition(|m| m.channel.topic != META_TOPIC);
+    let controls: Vec<_> = messages
+        .iter()
+        .filter(|m| m.channel.topic == "_dot_logger/loss")
+        .collect();
+    assert!(
+        !controls.is_empty(),
+        "facade loss checkpoints are enabled without telemetry"
+    );
+    assert!(controls.iter().all(|m| {
+        m.channel
+            .schema
+            .as_ref()
+            .is_some_and(|s| s.name == "dot_logger.LossReport")
+    }));
+    let (user, meta): (Vec<_>, Vec<_>) = messages
+        .iter()
+        .filter(|m| m.channel.topic != "_dot_logger/loss")
+        .partition(|m| m.channel.topic != META_TOPIC);
     assert_eq!(user.len(), 110);
     assert_eq!(meta.len(), 110);
 
@@ -247,15 +263,19 @@ fn f1_native_file_decodes_user_payloads_and_keeps_full_metadata() {
 
     // Every user message: payload verbatim, sequence low 32 bits, real time;
     // the following meta message keeps the rest (API §21.1).
+    let pairs: Vec<_> = messages
+        .iter()
+        .filter(|m| m.channel.topic != "_dot_logger/loss")
+        .collect();
     for (i, stored) in originals.iter().enumerate() {
-        let m = &messages[2 * i];
-        let info = RecordMeta::decode(&messages[2 * i + 1].data[..]).unwrap();
+        let m = &pairs[2 * i];
+        let info = RecordMeta::decode(&pairs[2 * i + 1].data[..]).unwrap();
         assert_eq!(&m.data[..], stored.payload);
         let seq = stored.record.receipt.accepted_seq;
         assert_eq!(m.sequence, seq as u32);
         assert_eq!(m.log_time, stored.record.metadata.real_ns as u64);
         assert_eq!(m.publish_time, m.log_time);
-        assert_eq!(messages[2 * i + 1].log_time, m.log_time);
+        assert_eq!(pairs[2 * i + 1].log_time, m.log_time);
         assert_eq!(info.channel, u32::from(m.channel.id));
         assert_eq!(info.producer, stored.record.receipt.producer_id);
         assert_eq!(info.sequence, seq);

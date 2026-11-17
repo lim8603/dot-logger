@@ -282,6 +282,46 @@ pub(crate) fn log_required(
         .checked_add(catalog)
         .ok_or(RetentionError::InvalidConfig)
 }
+fn base_bound(
+    config: WriterConfig,
+    channels: usize,
+    loss_rows: usize,
+) -> Result<u64, RetentionError> {
+    let reports = loss_rows
+        .div_ceil(crate::loss::ROWS_PER_REPORT)
+        .checked_mul(2)
+        .ok_or(RetentionError::InvalidConfig)?;
+    16384u64
+        .checked_add(
+            (reports as u64)
+                .checked_mul(crate::loss::CONTROL_CHARGE)
+                .ok_or(RetentionError::InvalidConfig)?,
+        )
+        .and_then(|n| {
+            n.checked_add(if loss_rows > 0 {
+                crate::loss::DESCRIPTOR.len() as u64 * 2 + 8192
+            } else {
+                0
+            })
+        })
+        .and_then(|n| n.checked_add(include_bytes!("record_meta.bin").len() as u64 * 2))
+        .and_then(|n| n.checked_add((config.max_metadata_bytes as u64).checked_mul(4)?))
+        .and_then(|n| n.checked_add((channels as u64).checked_mul(1024)?))
+        .ok_or(RetentionError::InvalidConfig)
+}
+pub(crate) fn native_file_minimum(
+    config: WriterConfig,
+    channels: usize,
+    loss_rows: usize,
+) -> Result<u64, RetentionError> {
+    base_bound(config, channels, loss_rows)?
+        .checked_add(
+            (config.max_payload_bytes as u64)
+                .checked_add(RECORD_BOUND_OVERHEAD)
+                .ok_or(RetentionError::InvalidConfig)?,
+        )
+        .ok_or(RetentionError::InvalidConfig)
+}
 impl<S: SegmentStore> SegmentLog<S> {
     /// Validate, reserve finite metadata, and create the first active file.
     pub fn new(
@@ -294,10 +334,27 @@ impl<S: SegmentStore> SegmentLog<S> {
     ) -> Result<Self, RetentionError> {
         retention.validate()?;
         config.reservation(&channels, budget.producers)?;
+        config.validate_loss(budget.loss_rows())?;
+        let controls = budget
+            .loss_rows()
+            .div_ceil(crate::loss::ROWS_PER_REPORT)
+            .checked_mul(2)
+            .ok_or(RetentionError::InvalidConfig)?;
+        let minimum = super::writer::MIN_INDEX_BYTES
+            .checked_add(
+                controls
+                    .checked_mul(576)
+                    .ok_or(RetentionError::InvalidConfig)?,
+            )
+            .and_then(|n| n.checked_add(usize::from(controls > 0) * 512))
+            .ok_or(RetentionError::InvalidConfig)?;
+        if retention.max_index_bytes < minimum {
+            return Err(RetentionError::InvalidConfig);
+        }
         if !store.directory_sync_supported() {
             return Err(RetentionError::UnsupportedDirectorySync);
         }
-        let base = Self::base_bound(config, channels.len())?;
+        let base = base_bound(config, channels.len(), budget.loss_rows())?;
         if base
             .checked_add(Self::record_bound(config.max_payload_bytes)?)
             .is_none_or(|n| n > retention.max_segment_bytes)
@@ -349,13 +406,6 @@ impl<S: SegmentStore> SegmentLog<S> {
         };
         log.open(now)?;
         Ok(log)
-    }
-    fn base_bound(config: WriterConfig, channels: usize) -> Result<u64, RetentionError> {
-        16384u64
-            .checked_add(include_bytes!("record_meta.bin").len() as u64 * 2)
-            .and_then(|n| n.checked_add((config.max_metadata_bytes as u64).checked_mul(4)?))
-            .and_then(|n| n.checked_add((channels as u64).checked_mul(1024)?))
-            .ok_or(RetentionError::InvalidConfig)
     }
     fn record_bound(bytes: usize) -> Result<u64, RetentionError> {
         (bytes as u64)
@@ -469,7 +519,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             sequence,
             opened: now,
             records: 0,
-            upper: Self::base_bound(self.config, self.channels.len())?,
+            upper: base_bound(self.config, self.channels.len(), self.budget.loss_rows())?,
             range: None,
             visible: None,
         });
@@ -605,6 +655,57 @@ impl<S: SegmentStore> SegmentLog<S> {
             segment: a.sequence,
             rotated,
         })
+    }
+    /// Observe shared counters and flush a bounded checkpoint before a sync.
+    /// Control saturation rotates or leaves the old writer/counters intact on capacity.
+    pub fn checkpoint(&mut self, now: u64) -> Result<(), RetentionError> {
+        self.healthy()?;
+        self.clock(now)?;
+        if self.budget.loss.is_none() {
+            return Ok(());
+        }
+        let parts = self
+            .budget
+            .loss_rows()
+            .div_ceil(crate::loss::ROWS_PER_REPORT);
+        let charge = (parts as u64)
+            .checked_mul(crate::loss::CONTROL_CHARGE)
+            .ok_or(RetentionError::InvalidConfig)?;
+        let active = self.active.as_ref().ok_or(RetentionError::Poisoned)?;
+        let fits = active
+            .upper
+            .checked_add(charge)
+            .is_some_and(|v| v <= self.catalog.config.max_segment_bytes)
+            && self
+                .writer
+                .as_ref()
+                .ok_or(RetentionError::Poisoned)?
+                .projected_loss_index_bytes()
+                <= self.catalog.config.max_index_bytes;
+        let result = if fits {
+            self.writer
+                .as_mut()
+                .ok_or(RetentionError::Poisoned)?
+                .checkpoint()
+        } else {
+            Err(StorageError::NeedRotation)
+        };
+        match result {
+            Ok(()) => {
+                self.active.as_mut().ok_or(RetentionError::Poisoned)?.upper += charge;
+                Ok(())
+            }
+            Err(StorageError::NeedRotation) => {
+                if let Some(writer) = self.writer.as_mut() {
+                    writer.defer_loss();
+                }
+                self.rotate(now)
+            }
+            Err(error) => {
+                self.poisoned = true;
+                Err(error.into())
+            }
+        }
     }
     /// Flush the final complete chunk; this is Written, not durable synchronization.
     pub fn flush(&mut self) -> Result<(), RetentionError> {

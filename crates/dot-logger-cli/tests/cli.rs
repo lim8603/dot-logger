@@ -48,6 +48,7 @@ fn fixture(times: [u64; 2]) -> Fixture {
         let mut writer = SegmentWriter::new(
             router.writer_budget(10).unwrap(),
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 8192,
                 write_buffer_bytes: 0,
                 chunk_target_bytes: 16384,
@@ -472,6 +473,7 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
             let _ = done.await;
         }));
         let native = QueryConfig {
+            max_loss_reports: 0,
             max_segments: 1,
             max_records: 32,
             max_record_bytes: 16384,
@@ -499,6 +501,7 @@ fn actual_cli_remote_query_blob_and_replay_control_use_real_file_primitives() {
                 deadline_ns: 10_000_000_000,
             },
             vec![OfflineSource {
+                target: None,
                 revision: 1,
                 path: f.source.clone(),
                 sequence: 0,
@@ -2283,6 +2286,7 @@ fn mixed_revision_fixture() -> Fixture {
         let mut log = SegmentLog::new(
             old,
             WriterConfig {
+                max_loss_reports: 0,
                 max_payload_bytes: 8192,
                 write_buffer_bytes: 0,
                 chunk_target_bytes: 16384,
@@ -2514,4 +2518,247 @@ fn native_header_without_file_identity_cannot_be_accepted_as_an_empty_snapshot()
     ]);
     assert_outcome(&result, 3, "limit");
     assert_eq!(result.1[0]["data"]["stop"], "InvalidRecord");
+}
+
+fn loss_fixture() -> Fixture {
+    loss_fixture_with_fanout(true)
+}
+fn loss_fixture_with_fanout(fanout: bool) -> Fixture {
+    let f = fixture([10, 20]);
+    let mut config = support::plan().config().clone();
+    config.memory.output_bytes = 8 << 20;
+    config.memory.total_bytes += 8 << 20;
+    let plan = SessionBuilder::new(config)
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+    let routes = support::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routes,
+        support::tracking(16),
+    )
+    .unwrap();
+    owner.enable_loss_tracking().unwrap();
+    owner.scope(|mut scope| {
+        let (mut p, a) = scope.next().unwrap();
+        let (_, b) = scope.next().unwrap();
+        let router = Router::new(&plan, vec![a, b], routes).unwrap();
+        for target in [10, 20] {
+            let mut writer = SegmentWriter::new(
+                router.writer_budget(target).unwrap(),
+                WriterConfig {
+                    max_loss_reports: 8,
+                    max_payload_bytes: 8192,
+                    write_buffer_bytes: 0,
+                    chunk_target_bytes: 16384,
+                    max_records: 32,
+                    max_chunks: 16,
+                    max_metadata_bytes: 1024,
+                },
+                vec![StorageChannel {
+                    channel: ChannelConfig::new(7, 99, 1),
+                    topic: "raw".into(),
+                    payload_encoding: "opaque".into(),
+                    schema: None,
+                }],
+                std::fs::File::create(f.dir.join(format!("{target}.mcap"))).unwrap(),
+            )
+            .unwrap();
+            if target == 10 {
+                for _ in 0..8 {
+                    support::accepted(p.try_record_small(support::meta(), &[1]).unwrap());
+                }
+                for _ in 0..3 {
+                    assert_eq!(
+                        p.try_record_small(support::meta(), &[1]),
+                        Err(CaptureError::Capacity)
+                    );
+                }
+            }
+            if target == 10 || fanout {
+                writer
+                    .append(
+                        CapturedRecord {
+                            receipt: CaptureReceipt {
+                                session_id: 42,
+                                producer_id: 0,
+                                accepted_seq: 1,
+                            },
+                            metadata: RecordMetadata {
+                                importance: Some(Importance::Normal),
+                                ..support::meta()
+                            },
+                            revision: 1,
+                            payload_len: 1,
+                        },
+                        &[1],
+                    )
+                    .unwrap();
+            }
+            writer.checkpoint().unwrap();
+            drop(writer.finish().unwrap());
+        }
+    });
+    let mut m: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+    m["sources"] = json!([{"path":f.dir.join("10.mcap"),"target":10,"sequence":0,"revision":1},{"path":f.dir.join("20.mcap"),"target":20,"sequence":0,"revision":1}]);
+    m["limits"]["max_loss_reports"] = json!(16);
+    m["limits"]["max_records"] = json!(1);
+    std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
+    f
+}
+#[test]
+fn loss_cli_compares_target_replicas_without_replaying_or_summing_user_fanout() {
+    let f = loss_fixture();
+    let output = command()
+        .args(["loss", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = lines(&output.stdout);
+    let losses: Vec<_> = rows.iter().filter(|r| r["kind"] == "loss").collect();
+    assert_eq!(losses.len(), 1);
+    assert_eq!(losses[0]["data"]["scope"], "SubmissionRejected");
+    assert_eq!(losses[0]["data"]["cause"], "Capacity");
+    assert_eq!(losses[0]["data"]["cumulative_count"], "3");
+    assert_eq!(losses[0]["data"]["delta"], "3");
+    assert!(losses[0]["data"]["origin_target"].is_null());
+    assert_eq!(rows.last().unwrap()["data"]["records"], 0);
+    assert_eq!(rows.last().unwrap()["data"]["unavailable_sources"], 0);
+    assert!(!rows.iter().any(|r| r["kind"] == "record"));
+    let output = command()
+        .args(["loss", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .args(["--channel", "99"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!lines(&output.stdout).iter().any(|r| r["kind"] == "loss"));
+    let mut m: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+    m["limits"]["max_loss_reports"] = json!(1);
+    std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
+    let output = command()
+        .args(["loss", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    assert!(!lines(&output.stdout).iter().any(|r| r["kind"] == "loss"));
+    m["limits"]["max_loss_reports"] = json!(16);
+    m["sources"][0]["target"] = json!(99);
+    std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
+    let output = command()
+        .args(["loss", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(4));
+}
+#[test]
+fn loss_cli_untracked_source_reports_unavailability_instead_of_zero_loss_proof() {
+    let f = fixture([1, 2]);
+    let output = command()
+        .args(["loss", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = lines(&output.stdout);
+    assert_eq!(rows.last().unwrap()["data"]["unavailable_sources"], 1);
+    assert!(!rows.iter().any(|r| r["kind"] == "loss"));
+}
+#[test]
+fn recovery_cli_preserves_cross_target_report_origins_and_bounds_the_whole_job() {
+    for limit in [16, 8] {
+        let f = loss_fixture();
+        let mut m: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+        m["limits"]["max_records"] = json!(4);
+        m["limits"]["max_loss_reports"] = json!(limit);
+        std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
+        let destination = f.dir.join("recovered");
+        let output = command()
+            .args(["recover", "--json", "--manifest"])
+            .arg(&f.manifest)
+            .arg("--output")
+            .arg(&destination)
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(if limit == 16 { 0 } else { 3 }),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let mut reports = Vec::new();
+        for target in [10, 20] {
+            let path = destination.join(format!("{target}-0.mcap"));
+            if !path.exists() {
+                continue;
+            }
+            let bytes = std::fs::read(path).unwrap();
+            let reader = LossReader::new(&bytes, 8192, 2).unwrap();
+            assert_eq!(reader.info().target, target);
+            reports.extend(reader.collect::<Result<Vec<_>, _>>().unwrap());
+        }
+        let deltas = dot_logger::loss::summarize(&reports, 1024).unwrap();
+        assert!(
+            deltas
+                .iter()
+                .any(|d| d.counter.cause == dot_logger::loss::Cause::Capacity
+                    && d.counter.count == 3
+                    && d.delta == Some(3))
+        );
+    }
+}
+
+#[test]
+fn recovery_user_record_quota_does_not_consume_control_only_later_sources() {
+    for fanout in [false, true] {
+        let f = loss_fixture_with_fanout(fanout);
+        let destination = f.dir.join("controls-after-user-quota");
+        let output = command()
+            .args(["recover", "--json", "--manifest"])
+            .arg(&f.manifest)
+            .arg("--output")
+            .arg(&destination)
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(if fanout { 3 } else { 0 }),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let rows = lines(&output.stdout);
+        let recovered: Vec<_> = rows.iter().filter(|r| r["kind"] == "recovery").collect();
+        assert_eq!(recovered.len(), 2);
+        assert_eq!(recovered[1]["data"]["records"], 0);
+        if !fanout {
+            assert_eq!(recovered[1]["data"]["loss_reports"], 6);
+        }
+        let data = std::fs::read(destination.join("20-0.mcap")).unwrap();
+        assert_eq!(
+            NativeReader::new(&data, 8192, 2)
+                .unwrap()
+                .filter_map(Result::ok)
+                .count(),
+            0
+        );
+        if !fanout {
+            assert_eq!(LossReader::new(&data, 8192, 2).unwrap().count(), 6);
+        }
+    }
 }

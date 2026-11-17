@@ -70,7 +70,7 @@ mod index;
 mod read;
 pub(crate) mod recovery;
 mod retention;
-pub(crate) use retention::{log_required, smallest_rotated_segment};
+pub(crate) use retention::{log_required, native_file_minimum, smallest_rotated_segment};
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};
@@ -78,7 +78,7 @@ pub(crate) use catalog::ReadPermit;
 pub use catalog::{EventReport, ReadPin, RetentionConfig, RetentionMode, SegmentInfo};
 pub use codec::StoredRecord;
 pub use index::ChunkIndexEntry;
-pub use read::{FileInfo, NativeReader};
+pub use read::{FileInfo, LossReader, NativeReader};
 pub use recovery::{
     RecoveredSegment, RecoveryConfig, RecoveryError, RecoveryOptions, RecoveryReport, RecoveryStop,
     recover_segment, recover_to_store,
@@ -97,11 +97,19 @@ pub struct WriterBudget {
     pub(crate) ledger: Arc<SharedLedger>,
     pub(crate) session: u128,
     pub(crate) revision: u64,
+    pub(crate) loss: Option<Arc<crate::loss::Bank>>,
+    pub(crate) recovered_file: Option<FileInfo>,
     pub(crate) target: u32,
     pub(crate) producers: usize,
     pub(crate) target_state: Arc<TargetLedger>,
 }
 impl WriterBudget {
+    pub(crate) fn loss_rows(&self) -> usize {
+        self.loss.as_ref().map_or_else(
+            || self.recovered_file.map_or(0, |f| f.loss_rows),
+            |bank| bank.len(),
+        )
+    }
     pub(crate) fn same_target(&self, other: &Self) -> bool {
         self.session == other.session
             && self.target == other.target
@@ -299,6 +307,8 @@ pub struct StorageChannel {
 /// Explicit per-segment limits; no disk retention or capacity defaults are inferred.
 #[derive(Clone, Copy, Debug)]
 pub struct WriterConfig {
+    /// Maximum physical loss-report parts in this file; zero for unavailable collection.
+    pub max_loss_reports: usize,
     /// Largest payload, separate from metadata pair overhead.
     pub max_payload_bytes: usize,
     /// Explicit management-path write buffer capacity; zero selects direct IO.
@@ -306,6 +316,7 @@ pub struct WriterConfig {
     /// Chunk target; a single larger permitted record uses its own chunk.
     pub chunk_target_bytes: usize,
     /// Hard logical user-record count; each record writes two MCAP messages.
+    /// Zero permits only controls when max_loss_reports is positive.
     pub max_records: usize,
     /// Hard chunk/index count, including a metadata-only flushed chunk.
     pub max_chunks: usize,
@@ -417,6 +428,8 @@ mod reserve_tests {
             ledger: Arc::new(ledger),
             session: 1,
             revision: 1,
+            loss: None,
+            recovered_file: None,
             target: 1,
             producers: 1,
             target_state: Arc::new(TargetLedger::default()),

@@ -864,6 +864,7 @@ mod sockets {
                 let mut writer = SegmentWriter::new(
                     router.writer_budget(10).unwrap(),
                     WriterConfig {
+                        max_loss_reports: 0,
                         max_payload_bytes: 256,
                         write_buffer_bytes: 0,
                         chunk_target_bytes: 1024,
@@ -932,6 +933,7 @@ mod sockets {
                                 safe,
                             )],
                             QueryConfig {
+                                max_loss_reports: 0,
                                 max_segments: 1,
                                 max_records: 8,
                                 max_record_bytes: 16384,
@@ -977,6 +979,7 @@ mod sockets {
                                 safe,
                             )],
                             QueryConfig {
+                                max_loss_reports: 0,
                                 max_segments: 1,
                                 max_records: 8,
                                 max_record_bytes: 16384,

@@ -10,6 +10,8 @@ use std::collections::{BTreeMap, HashMap};
 /// Identity and registration bounds repeated in every native file.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FileInfo {
+    /// Registered cumulative counter row count; zero means collection unavailable.
+    pub loss_rows: usize,
     /// Session identity, independent of file rotation.
     pub session: u128,
     /// Revision of application records in this file.
@@ -35,7 +37,14 @@ impl FileInfo {
                 ("segment_sequence".into(), self.sequence.to_string()),
                 ("producers".into(), self.producers.to_string()),
                 ("channels".into(), self.channels.to_string()),
-                ("loss_tracking".into(), "unavailable".into()),
+                (
+                    "loss_tracking".into(),
+                    if self.loss_rows == 0 {
+                        "unavailable".into()
+                    } else {
+                        format!("cumulative/1:{}", self.loss_rows)
+                    },
+                ),
             ]),
         }
     }
@@ -67,17 +76,29 @@ impl FileInfo {
         }
         let bad = || StorageError::CorruptData;
         let get = |key: &str| metadata.get(key).copied().ok_or_else(bad);
-        if metadata.len() != 8
-            || get("format_version")? != "1"
-            || get("loss_tracking")? != "unavailable"
-        {
+        if metadata.len() != 8 || get("format_version")? != "1" {
             return Err(bad());
         }
         let session = get("session_id")?;
         if session.len() != 32 {
             return Err(bad());
         }
+        let tracking = get("loss_tracking")?;
+        let loss_rows = if tracking == "unavailable" {
+            0
+        } else {
+            let rows = tracking
+                .strip_prefix("cumulative/1:")
+                .ok_or_else(bad)?
+                .parse::<usize>()
+                .map_err(|_| bad())?;
+            if rows == 0 || rows.div_ceil(crate::loss::ROWS_PER_REPORT) > u32::MAX as usize {
+                return Err(bad());
+            }
+            rows
+        };
         let value = Self {
+            loss_rows,
             session: u128::from_str_radix(session, 16).map_err(|_| bad())?,
             revision: get("revision")?.parse().map_err(|_| bad())?,
             target: get("target_id")?.parse().map_err(|_| bad())?,
@@ -85,7 +106,11 @@ impl FileInfo {
             producers: get("producers")?.parse().map_err(|_| bad())?,
             channels: get("channels")?.parse().map_err(|_| bad())?,
         };
-        if value.producers == 0 || value.channels == 0 || value.channels > u16::MAX as usize - 2 {
+        if value.producers == 0
+            || value.channels == 0
+            || value.channels > u16::MAX as usize - 2
+            || !crate::loss::Bank::valid_rows(value.loss_rows, value.producers, value.channels)
+        {
             return Err(bad());
         }
         Ok(value)
@@ -157,8 +182,7 @@ impl<'a> NativeReader<'a> {
             ended: false,
         })
     }
-    /// Self-described file identity; loss collection is unavailable until the
-    /// dedicated checkpoint collector is enabled by its implementation stage.
+    /// Self-described file identity, including cumulative collection availability.
     pub fn info(&self) -> FileInfo {
         self.info
     }
@@ -166,18 +190,25 @@ impl<'a> NativeReader<'a> {
     pub fn channels(&self) -> &[StorageChannel] {
         &self.validation.channels
     }
-    fn next_record(&mut self) -> Result<Option<StoredRecord<'a>>, StorageError> {
+    fn next_item(&mut self) -> Result<Option<Item<'a>>, StorageError> {
         loop {
             if !self.chunk.0.is_empty() {
                 let (op, user) = self.chunk.record().map_err(corrupt)?;
                 if op != 5 {
                     continue;
                 }
+                if let Some(report) = self.validation.loss_report(user).map_err(corrupt)? {
+                    return Ok(Some(Item::Loss(report)));
+                }
                 let (op, meta) = self.chunk.record().map_err(corrupt)?;
                 if op != 5 {
                     return Err(StorageError::CorruptData);
                 }
-                return self.validation.pair(user, meta).map(Some).map_err(corrupt);
+                return self
+                    .validation
+                    .pair(user, meta)
+                    .map(|r| Some(Item::User(r)))
+                    .map_err(corrupt);
             }
             if self.frames.0.is_empty() {
                 return Ok(None);
@@ -212,15 +243,65 @@ impl<'a> Iterator for NativeReader<'a> {
         if self.ended {
             return None;
         }
-        match self.next_record() {
-            Ok(Some(r)) => Some(Ok(r)),
-            Ok(None) => {
-                self.ended = true;
-                None
+        loop {
+            match self.next_item() {
+                Ok(Some(Item::User(r))) => return Some(Ok(r)),
+                Ok(Some(Item::Loss(_))) => continue,
+                Ok(None) => {
+                    self.ended = true;
+                    return None;
+                }
+                Err(error) => {
+                    self.ended = true;
+                    return Some(Err(error));
+                }
             }
-            Err(e) => {
-                self.ended = true;
-                Some(Err(e))
+        }
+    }
+}
+enum Item<'a> {
+    User(StoredRecord<'a>),
+    Loss(crate::loss::LossReport),
+}
+/// Independent borrowed iterator over bounded loss parts, excluding user records.
+/// A whole chunk is validated before any control or user record is exposed.
+pub struct LossReader<'a> {
+    reader: NativeReader<'a>,
+}
+impl<'a> LossReader<'a> {
+    /// Validate original registration and caller payload/producer bounds.
+    pub fn new(
+        bytes: &'a [u8],
+        max_payload_bytes: usize,
+        max_producers: usize,
+    ) -> Result<Self, StorageError> {
+        Ok(Self {
+            reader: NativeReader::new(bytes, max_payload_bytes, max_producers)?,
+        })
+    }
+    /// Original file identity; zero loss_rows means unavailable, never zero loss.
+    pub fn info(&self) -> FileInfo {
+        self.reader.info()
+    }
+}
+impl Iterator for LossReader<'_> {
+    type Item = Result<crate::loss::LossReport, StorageError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.reader.ended {
+            return None;
+        }
+        loop {
+            match self.reader.next_item() {
+                Ok(Some(Item::Loss(report))) => return Some(Ok(report)),
+                Ok(Some(Item::User(_))) => continue,
+                Ok(None) => {
+                    self.reader.ended = true;
+                    return None;
+                }
+                Err(error) => {
+                    self.reader.ended = true;
+                    return Some(Err(error));
+                }
             }
         }
     }
@@ -285,13 +366,13 @@ fn registrations(
             }
             match mcap::parse_record(op, body).map_err(corrupt)? {
                 Record::Schema { header, data } => {
-                    if schemas.len() > file.channels + 1 {
+                    if schemas.len() > file.channels + 2 {
                         return Err(StorageError::CorruptData);
                     }
                     schemas.insert(header.id, (header.name, header.encoding, data.into_owned()));
                 }
                 Record::Channel(c) => {
-                    if c.topic == META_TOPIC {
+                    if c.topic == META_TOPIC || c.topic == super::codec::LOSS_TOPIC {
                         continue;
                     }
                     if c.id == 0 || usize::from(c.id) > file.channels {

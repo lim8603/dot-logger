@@ -601,6 +601,7 @@ pub fn run(
             let mut file = SegmentWriter::new(
                 router.writer_budget_for_revision(FILE, revision)?,
                 WriterConfig {
+                    max_loss_reports: 0,
                     max_payload_bytes: 512,
                     write_buffer_bytes: 4096,
                     chunk_target_bytes: 4096,

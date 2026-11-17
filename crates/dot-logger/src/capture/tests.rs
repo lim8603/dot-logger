@@ -61,6 +61,7 @@ fn owner((entry, endpoint): (Entry, Endpoint)) -> CaptureOwner {
             completion: None,
             telemetry: None,
             telemetry_epoch: 0,
+            loss: None,
             updates: None,
             memory: crate::config::MemoryBudget {
                 total_bytes: 0,

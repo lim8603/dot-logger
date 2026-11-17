@@ -723,6 +723,13 @@ pub(crate) fn derive(
         })
         .sum();
     let writer = WriterConfig {
+        max_loss_reports: 16384usize.max(
+            crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
+                .ok_or_else(overflow)?
+                .div_ceil(crate::loss::ROWS_PER_REPORT)
+                .checked_mul(2)
+                .ok_or_else(overflow)?,
+        ),
         max_payload_bytes: max_payload,
         write_buffer_bytes: 64 * 1024,
         chunk_target_bytes: 256 * 1024,
@@ -731,7 +738,15 @@ pub(crate) fn derive(
         max_metadata_bytes: metadata + 1024,
     };
 
-    let floor = SEGMENT_FLOOR.max((max_payload as u64).saturating_mul(2) + 1024 * 1024);
+    let loss_rows = crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
+        .ok_or_else(overflow)?;
+    let floor = SEGMENT_FLOOR
+        .max((max_payload as u64).saturating_mul(2) + 1024 * 1024)
+        .max(crate::storage::native_file_minimum(
+            writer,
+            channels.len(),
+            loss_rows,
+        )?);
     let mut events = Vec::with_capacity(retention.len());
     let retention = retention
         .iter()
@@ -817,6 +832,8 @@ pub(crate) fn derive(
         CaptureOwner::registration_bytes(channels.len(), producer_count, raw_metadata)
             .ok_or_else(overflow)?;
     let parts = [
+        crate::loss::Bank::required(producer_count, channels.len(), target_count)
+            .ok_or_else(overflow)?,
         Registry::required(producer_count, window, target_count, &routing)
             .map_err(|_| overflow())?,
         ControlOwner::own_bytes(control.sync_slots, producer_count, target_count)

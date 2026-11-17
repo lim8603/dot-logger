@@ -387,7 +387,8 @@ fn logger_run_matches_the_p0_workload_and_passes_read_back() {
         channels: 8,
         slots: 1024,
         raw_slots: 0,
-        memory_bytes: 64 * MIB as usize,
+        // Native loss reports additionally reserve physical message indexes.
+        memory_bytes: 80 * MIB as usize,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
         telemetry: false,
@@ -729,7 +730,7 @@ fn mixed_load(producers: usize) -> LoggerLoad {
         channels: 8,
         slots: 256,
         raw_slots: 4,
-        memory_bytes: 64 << 20,
+        memory_bytes: 80 << 20,
         producer_cpus: Vec::new(),
         worker_cpus: Vec::new(),
         telemetry: false,

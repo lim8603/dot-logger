@@ -96,6 +96,7 @@ impl SegmentStore for Store {
 }
 fn writer() -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 16,
         write_buffer_bytes: 64,
         chunk_target_bytes: 1024,
@@ -1052,6 +1053,7 @@ fn query_owned_pin_waits_for_reader_close_on_error_cancel_and_expiry() {
                 channels(),
                 vec![source],
                 QueryConfig {
+                    max_loss_reports: 0,
                     max_segments: 1,
                     max_records: 4,
                     max_record_bytes: 8192,

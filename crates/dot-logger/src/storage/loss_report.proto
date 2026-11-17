@@ -1,0 +1,43 @@
+syntax = "proto3";
+package dot_logger;
+enum LossScope {
+  SUBMISSION_REJECTED = 0; ACQUIRE_REJECTED = 1; INTENTIONAL_SKIP = 2;
+  OUTPUT_FAILED = 3; OUTPUT_DROPPED = 4; OUTPUT_UNKNOWN = 5;
+}
+enum LossCause {
+  CAPACITY = 0; COMPLETION_CAPACITY = 1; INVALID_INPUT = 2; SCHEMA_MISMATCH = 3;
+  TOO_LARGE = 4; UNSUPPORTED = 5; CLOSING = 6; EXHAUSTED = 7; ENCODE = 8;
+  POLICY = 9; NO_ROUTE = 10; DEADLINE = 11; IO = 12; SYNC = 13; ADAPTER = 14;
+  RETRY_EXHAUSTED = 15; PENDING_FULL = 16; EXPIRED = 17; CANCELLED = 18; UNCONFIRMED = 19;
+}
+enum LossCoverage {
+  BASELINE = 0; OBSERVED = 1; COALESCED = 2; FINAL_PARTIAL = 3; QUIESCENT = 4;
+}
+// Counts refer to attempts or target assignments, not unique dropped inputs.
+message LossCount {
+  LossScope scope = 1;
+  LossCause cause = 2;
+  optional uint32 producer = 3;
+  optional uint32 channel = 4;
+  optional uint32 origin_target = 5;
+  uint64 cumulative_count = 6;
+  bool overflowed = 7;
+}
+// Observation clocks are management monotonic nanoseconds of counter_epoch.
+// Every part is required for a complete checkpoint; counts are session cumulative.
+message LossReport {
+  uint32 schema_version = 1;
+  // Exactly 16 bytes: the original session u128 in little-endian order.
+  bytes session = 2;
+  uint64 counter_epoch = 3;
+  uint32 observer_target = 4;
+  uint64 checkpoint_id = 5;
+  uint32 part = 6;
+  uint32 parts = 7;
+  uint64 observed_from_ns = 8;
+  uint64 observed_to_ns = 9;
+  LossCoverage coverage = 10;
+  repeated LossCount counts = 11;
+  uint64 publish_time_unix_ns = 12;
+  bool coalesced = 13;
+}

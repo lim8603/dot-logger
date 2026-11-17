@@ -4,7 +4,7 @@
 mod cancel;
 pub use cancel::Cancellation;
 mod offline;
-pub use offline::{OfflineConfig, OfflineSource, open_snapshot};
+pub use offline::{OfflineConfig, OfflineSource, open_loss_snapshot, open_snapshot};
 #[cfg(feature = "remote")]
 mod codec;
 #[cfg(feature = "remote")]

@@ -519,6 +519,14 @@ fn run(
                     std::thread::sleep(config.tuning.idle_wait);
                 }
             };
+            // Only returned writers and a successful fully drained shutdown
+            // prove that no producer/encoder can still change loss counters.
+            if closed.0.is_success()
+                && writers_outstanding(mailboxes) == 0
+                && completion.active_calls() == 0
+            {
+                core.prove_loss_quiescent();
+            }
             // Closed: let IO threads publish their last segments, then report.
             config.flags.finish.store(true, Ordering::Release);
             drop(stop);
@@ -757,6 +765,14 @@ fn io_loop(
             if !target.batch.is_empty() {
                 index += 1;
                 continue;
+            }
+            // Observe after the drained batch and before its sync barrier.
+            // Capacity leaves cumulative counters for the next observation.
+            if let Err(error) = target.log.checkpoint(ns(origin, Instant::now())) {
+                if !matches!(error, RetentionError::Capacity | RetentionError::EventQuota) {
+                    flags.io_failed.store(true, Ordering::Release);
+                    target.status.fail();
+                }
             }
             match target.log.sync_work(syncs.swap_remove(index)) {
                 Ok(()) => target.status.synced(ns(origin, Instant::now())),

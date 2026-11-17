@@ -87,6 +87,7 @@ impl SegmentStore for Store {
 }
 fn config() -> WriterConfig {
     WriterConfig {
+        max_loss_reports: 0,
         max_payload_bytes: 64,
         write_buffer_bytes: 0,
         chunk_target_bytes: 4096,
@@ -97,6 +98,7 @@ fn config() -> WriterConfig {
 }
 fn options() -> RecoveryOptions {
     RecoveryOptions {
+        source_target: None,
         source_sequence: 0,
         writer: config(),
         limits: RecoveryConfig {

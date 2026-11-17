@@ -16,6 +16,8 @@ pub struct RecoveryConfig {
 /// Frozen output configuration and finite source bounds.
 #[derive(Clone, Copy, Debug)]
 pub struct RecoveryOptions {
+    /// Optional original target identity, required to disambiguate equal sequences.
+    pub source_target: Option<u32>,
     /// Expected original file sequence. Independent sink recovery preserves it;
     /// `recover_to_store` instead names its output with the supplied new sequence.
     pub source_sequence: u64,
@@ -59,6 +61,8 @@ pub struct RecoveryReport {
     pub chunks: usize,
     /// Recovered product messages, preserving their original receipts.
     pub records: usize,
+    /// Copied physical loss-report parts; excluded from logical user records.
+    pub loss_reports: usize,
     /// Stop cause; a successful prefix can still exclude corrupt input.
     pub stop: RecoveryStop,
 }
@@ -132,7 +136,14 @@ fn recover_at<R: Read + Seek, W: SyncSink>(
         .map(|segment| RecoveredSegment { segment, report })
         .map_err(|error| {
             if report.stop != RecoveryStop::Cancelled {
-                report.stop = RecoveryStop::Failed;
+                report.stop = if matches!(
+                    error,
+                    Some(StorageError::NeedRotation) | Some(StorageError::Budget { .. })
+                ) {
+                    RecoveryStop::Limit
+                } else {
+                    RecoveryStop::Failed
+                };
             }
             RecoveryError { error, report }
         })
@@ -205,6 +216,7 @@ impl RecoveryReport {
             excluded: (0, 0),
             chunks: 0,
             records: 0,
+            loss_reports: 0,
             stop: RecoveryStop::Failed,
         }
     }
@@ -246,7 +258,7 @@ fn cancelled(cancel: &AtomicBool, report: &mut RecoveryReport) -> Result<(), Opt
 }
 fn recover_inner<R: Read + Seek, W: SyncSink>(
     source: &mut R,
-    budget: WriterBudget,
+    mut budget: WriterBudget,
     channels: Vec<StorageChannel>,
     setup: (RecoveryOptions, u64),
     sink: W,
@@ -286,6 +298,28 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         return Err(Some(StorageError::CorruptData));
     }
     data_crc = crc_update(crc_update(data_crc, &header_bytes), &buffer[..len]);
+    // Inspect only the fixed-size root identity before creating the new writer.
+    // Recovery copies original cumulative reports; it never samples today's bank.
+    budget.loss = None;
+    let root_start = position;
+    if let Ok((12, len, _)) = read_frame(source, &mut buffer, report.source_bytes, &mut position)
+        .map_err(StorageError::Io)?
+    {
+        let file = super::FileInfo::parse(&buffer[..len])?;
+        if file.session == budget.session
+            && file.revision == budget.revision
+            && file.producers == budget.producers
+            && file.channels == channels.len()
+            && file.sequence == options.source_sequence
+            && options.source_target.is_none_or(|id| id == file.target)
+        {
+            budget.recovered_file = Some(file);
+        }
+    }
+    source
+        .seek(SeekFrom::Start(root_start))
+        .map_err(StorageError::Io)?;
+    position = root_start;
     // Normalize moved caller registrations before retaining/copying them.
     let channels: Vec<_> = channels
         .into_iter()
@@ -320,7 +354,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         true,
         output_sequence,
     )?;
-    loop {
+    'scan: loop {
         cancelled(cancel, report)?;
         if position == report.source_bytes {
             report.stop = RecoveryStop::EndOfInput;
@@ -338,7 +372,11 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         let body = &buffer[..len];
         let result = match op {
             12 => state.metadata(body).and_then(|()| {
-                if state.file_sequence() == Some(options.source_sequence) {
+                if state.file_sequence() == Some(options.source_sequence)
+                    && options
+                        .source_target
+                        .is_none_or(|id| state.file_info().is_some_and(|file| file.target == id))
+                {
                     Ok(())
                 } else {
                     Err(RecoveryStop::InvalidRecord)
@@ -353,6 +391,36 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                 }
                 match state.chunk(body) {
                     Ok(count) => {
+                        // Bound the complete chunk before adopting any of its records.
+                        let mut inspect =
+                            Fields(chunk_data(body).map_err(|_| Some(StorageError::CorruptData))?);
+                        let mut controls = 0usize;
+                        while !inspect.0.is_empty() {
+                            let (opcode, record) = inspect
+                                .record()
+                                .map_err(|_| Some(StorageError::CorruptData))?;
+                            if opcode == 5 {
+                                if state
+                                    .loss_report(record)
+                                    .map_err(|_| Some(StorageError::CorruptData))?
+                                    .is_some()
+                                {
+                                    controls += 1;
+                                } else {
+                                    inspect
+                                        .record()
+                                        .map_err(|_| Some(StorageError::CorruptData))?;
+                                }
+                            }
+                        }
+                        if report
+                            .loss_reports
+                            .checked_add(controls)
+                            .is_none_or(|n| n > options.writer.max_loss_reports)
+                        {
+                            report.stop = RecoveryStop::Limit;
+                            break 'scan;
+                        }
                         // Validation of every nested message precedes the first append.
                         let mut nested = Fields(&body[40..]);
                         while !nested.0.is_empty() {
@@ -361,6 +429,13 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                                 .record()
                                 .map_err(|_| Some(StorageError::CorruptData))?;
                             if opcode == 5 {
+                                if let Some(control) = state
+                                    .loss_report(record)
+                                    .map_err(|_| Some(StorageError::CorruptData))?
+                                {
+                                    writer.append_loss_report(&control)?;
+                                    continue;
+                                }
                                 let (op, meta) = nested
                                     .record()
                                     .map_err(|_| Some(StorageError::CorruptData))?;
@@ -376,6 +451,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                         writer.flush_chunk()?;
                         report.chunks += 1;
                         report.records += count;
+                        report.loss_reports += controls;
                         report.verified_end = position;
                         report.excluded = (position, report.source_bytes);
                         Ok(())
@@ -493,6 +569,8 @@ pub(crate) struct Validation<'a> {
     pub(crate) channels: std::borrow::Cow<'a, [StorageChannel]>,
     meta_schema: Option<u16>,
     meta_seen: bool,
+    loss_schema: Option<u16>,
+    loss_seen: bool,
     payload_schemas: Vec<Option<u16>>,
     seen: Vec<bool>,
     last: Vec<u64>,
@@ -520,12 +598,17 @@ impl<'a> Validation<'a> {
             channels,
             meta_schema: None,
             meta_seen: false,
+            loss_schema: None,
+            loss_seen: false,
             payload_schemas: vec![None; n],
             seen: vec![false; n],
             last: vec![0; producers],
             max_payload,
             file: None,
         }
+    }
+    pub(crate) fn file_info(&self) -> Option<super::FileInfo> {
+        self.file
     }
     pub(crate) fn file_sequence(&self) -> Option<u64> {
         self.file.map(|file| file.sequence)
@@ -558,8 +641,23 @@ impl<'a> Validation<'a> {
         if id == 0 || !f.0.is_empty() {
             return Err(RecoveryStop::InvalidRecord);
         }
+        if name == crate::loss::SCHEMA.as_bytes()
+            && encoding == b"protobuf"
+            && data == crate::loss::DESCRIPTOR
+        {
+            if self.file.is_none_or(|file| file.loss_rows == 0)
+                || self.loss_schema.is_some_and(|old| old != id)
+                || self.meta_schema == Some(id)
+                || self.payload_schemas.contains(&Some(id))
+            {
+                return Err(RecoveryStop::InvalidRecord);
+            }
+            self.loss_schema = Some(id);
+            return Ok(());
+        }
         if name == META_SCHEMA.as_bytes() && encoding == b"protobuf" && data == META_DESCRIPTOR {
-            if self.meta_schema.is_some_and(|old| old != id)
+            if self.loss_schema == Some(id)
+                || self.meta_schema.is_some_and(|old| old != id)
                 || self.payload_schemas.contains(&Some(id))
             {
                 return Err(RecoveryStop::InvalidRecord);
@@ -567,7 +665,7 @@ impl<'a> Validation<'a> {
             self.meta_schema = Some(id);
             return Ok(());
         }
-        if self.meta_schema == Some(id) {
+        if self.meta_schema == Some(id) || self.loss_schema == Some(id) {
             return Err(RecoveryStop::InvalidRecord);
         }
         let mut found = false;
@@ -606,6 +704,19 @@ impl<'a> Validation<'a> {
         let mut f = Fields(body);
         let id = f.u16()?;
         let schema = f.u16()?;
+        if usize::from(id) == self.channels.len() + 2 {
+            if self.file.is_none_or(|file| file.loss_rows == 0)
+                || Some(schema) != self.loss_schema
+                || f.string()? != super::codec::LOSS_TOPIC.as_bytes()
+                || f.string()? != b"protobuf"
+                || !f.string()?.is_empty()
+                || !f.0.is_empty()
+            {
+                return Err(RecoveryStop::InvalidRecord);
+            }
+            self.loss_seen = true;
+            return Ok(());
+        }
         if usize::from(id) == self.channels.len() + 1 {
             if Some(schema) != self.meta_schema
                 || f.string()? != super::codec::META_TOPIC.as_bytes()
@@ -717,6 +828,49 @@ impl<'a> Validation<'a> {
             payload: u.0,
         })
     }
+    pub(crate) fn loss_report(
+        &self,
+        body: &[u8],
+    ) -> Result<Option<crate::loss::LossReport>, RecoveryStop> {
+        let mut f = Fields(body);
+        if usize::from(f.u16()?) != self.channels.len() + 2 {
+            return Ok(None);
+        }
+        let file = self
+            .file
+            .filter(|f| f.loss_rows > 0)
+            .ok_or(RecoveryStop::InvalidRecord)?;
+        if !self.loss_seen {
+            return Err(RecoveryStop::InvalidRecord);
+        }
+        let sequence = f.u32()?;
+        let log = f.u64()?;
+        let publish = f.u64()?;
+        let report =
+            crate::loss::LossReport::decode(f.0).map_err(|_| RecoveryStop::InvalidRecord)?;
+        let expected_parts = file.loss_rows.div_ceil(crate::loss::ROWS_PER_REPORT);
+        if report.session != self.session
+            || report.observer != file.target
+            || report.parts as usize != expected_parts
+            || report.checkpoint as u32 != sequence
+            || report.publish_time_unix_ns != log
+            || log != publish
+            || report.counts.len()
+                != if report.part as usize + 1 == expected_parts {
+                    file.loss_rows - (expected_parts - 1) * crate::loss::ROWS_PER_REPORT
+                } else {
+                    crate::loss::ROWS_PER_REPORT
+                }
+            || report.counts.iter().any(|r| {
+                r.producer.is_some_and(|p| p as usize >= self.last.len())
+                    || r.channel
+                        .is_some_and(|id| !self.channels.iter().any(|c| c.channel.channel_id == id))
+            })
+        {
+            return Err(RecoveryStop::InvalidRecord);
+        }
+        Ok(Some(report))
+    }
     pub(crate) fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
         let data = chunk_data(body)?;
         let mut f = Fields(data);
@@ -728,6 +882,12 @@ impl<'a> Validation<'a> {
                 3 => self.schema(body)?,
                 4 => self.channel(body)?,
                 5 => {
+                    if let Some(report) = self.loss_report(body)? {
+                        let time = report.publish_time_unix_ns;
+                        range =
+                            Some(range.map_or((time, time), |(a, b)| (a.min(time), b.max(time))));
+                        continue;
+                    }
                     let (op, meta) = f.record()?;
                     if op != 5 {
                         return Err(RecoveryStop::InvalidRecord);

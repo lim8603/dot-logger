@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-008 In Progress(재개) — TASK-034 facade 노출; MS-009 In Progress — 표준 호환·원격 시각화·TASK-035; MS-007 In Progress — 일정 판단(TASK-033)·장기/native(TASK-024)·실사용처(TASK-026) — 024·026은 마지막·일정 판단 밖 |
 | 활성 Task | TASK-034 In Progress(기존 결과 확인 대기, 다음 D runtime 통합); TASK-030 In Progress(S1·S2 A/B/C 로컬 Done, D/E 후속); TASK-035 In Progress(S1·S2 C 로컬 Done, E 최종 마감 대기); TASK-033 In Progress(034·035 뒤 재측정) |
-| 미처리 리뷰 | 없음. [REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) RV-146~148 수정·회귀·위임 수락으로 Closed(2026-11-17, EV-085). REV-055~057도 Closed |
-| 상태 | 로컬 회귀 Pass — 1.96.0/1.85.0 각665 Pass·5 ignored, 각18 feature·Miri17+control-only1 재검증(EV-085), REV-058 Closed. 라인 커버리지93.56%(EV-080, TASK-034 전; 재측정 대기). Done25/35 Task. D runtime·E GUI/호출 비용/통합 판정 미완료, native·장기·실사용처 Not Run(TASK-024·026), Gate4/5 미완료 |
+| 미처리 리뷰 | [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) (**Open**, Conditional — P1 1·P2 2·P3 1: `RV-149~152`). REV-055~058은 Closed |
+| 상태 | 로컬 회귀 Pass(1.96.0/1.85.0 각665 Pass·5 ignored, EV-085), 독립 리뷰 [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Open(RV-149~152 조치 대기). 라인 커버리지93.56%(EV-080, 재측정 대기). Done25/35 Task. D runtime·E GUI/호출 비용/통합 판정 미완료, native·장기·실사용처 Not Run(TASK-024·026), Gate4/5 미완료 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-17 / 세션 종료·다음 TASK-034 runtime(D) / AI |
-| 세션 상태 | 종료 — 2026-11-17 Human 「세션 마감」. B/C 로컬 단위·검증·리뷰·게시 완료(EV-084·085), 다음 TASK-034 runtime WIP(D) → E 통합·TASK-033 재측정. 승인된 범위는 재승인 없이 재개 |
-| 최근 세션 | 2026-11-17 #001 — B revision 저장(EV-084)·C loss checkpoint(EV-085) 로컬 단위 완료, 다음 D runtime WIP |
+| 갱신 | 2026-11-17 / 세션 종료·다음 REV-059 조치 후 TASK-034(D) / AI |
+| 세션 상태 | 종료 — 2026-11-17 Human 「세션마감」. REV-059 코드리뷰 완료(`Open`, RV-149~152). 다음 개발 세션에서 REV-059 조치 후 TASK-034 runtime WIP(D) → E 통합·TASK-033 재측정 |
+| 최근 세션 | 2026-11-17 #002 — `949a74e..0270f03` 통합 코드리뷰(REV-059 Open) |
 
 ## 현재 결정과 제약
 
@@ -78,19 +78,15 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 | ID | 범위 | 상태 | 현재 처리/후속 |
 |---|---|---|---|
-| REV-001~054 | 완료된 core·파일·조회·운영·facade·preset·통합 가드 리뷰 | Closed | 회차별 근거는 [리뷰 문서](../05_verification/reviews/). native·실앱·성능 이월은 각 Task에 유지 |
-| [REV-055](../05_verification/reviews/REV-055_FACADE_STANDARD_EXPORT_REVIEW.md) | TASK-030 S1 export·TASK-033 S3/S4 시험·ring 결함 수정·client diagnostics 이동·TASK-034 facade 중요도/최소 level/이벤트 보존 누적 리뷰(`64e9d69..949a74e`) | Closed | RV-136~140 전부 수용·조치, [EV-082](../05_verification/verification_evidence.md#ev-082) `5d7fe6a`. 2026-11-16 위임 수락 |
-| [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md) | TASK-030 S2 A native 단일 형식 개발·자가검토 | Closed | RV-141~144 전부 수용·수정, [EV-083](../05_verification/verification_evidence.md#ev-083) `048cdf3`. 두 Rust 각630 Pass·각18 feature, 2026-11-16 위임 수락 |
-| [REV-057](../05_verification/reviews/REV-057_REVISION_STORAGE_B.md) | TASK-030 S2 B revision 회전·source별 조회/복구·manifest v2 개발 자가검토 | Closed | RV-145 Header-only identity 공백 수정·EV-084, 두 Rust 각642 Pass·각18 feature·Miri20, 2026-11-17 위임 수락 |
-| [REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) | TASK-035 S2 C counter·native checkpoint·별도 조회/복구/CLI 자가검토 | Closed | RV-146~148 수정·EV-085 각665/각18 feature·Miri17+1·RT 가드, 2026-11-17 위임 수락 |
+| REV-001~058 | 완료된 core·파일·조회·운영·facade·preset·통합 가드 및 ADR-013 A/B/C 개발 자가검토 | Closed | 회차별 근거는 [리뷰 문서](../05_verification/reviews/)(EV-082~085). native·실앱·성능 이월은 각 Task에 유지 |
+| [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `949a74e..0270f03` (REV-055 조치·ADR-013 A/B/C native 저장·revision 회전·loss checkpoint) 독립 코드리뷰 | **Open** | Conditional — P1 1(`RV-149` 복구 `max_records` 선검사/완결·루트 peek·CLI target), P2 2(`RV-150` 회전 baseline 구간/다중 출력 baseline 차분, `RV-151` 종료 경계 `ActiveCall`/`closing`), P3 1(`RV-152`). D 착수 전 조치 |
 
-이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024 이관을 따른다.
+이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence.md#ev-082)). 별도 Human 확인 대기는 TASK-034 기존 구현 결과(EV-081·082)다.
-
-1. **TASK-034 runtime 통합(D):** WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 승인된 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md)·API §22·23.1~23.3의 현재 native 저장/loss 계약에 맞춰 적용한다. A/B/C 선행은 EV-083~085로 로컬 완료했다. `.set_channel`·Writer refresh·쉬는 writer ack·원격 ApplyConfig·update 전후 실제 파일 revision 회전과 loss session 누적을 시험한다. 단순 cherry-pick 성공으로 수락하지 않는다. TASK-034 기존 결과 Human 확인 대기는 유지하되 이미 승인된 runtime 구현을 재승인받지 않는다. 그 뒤 E native GUI user/meta/loss·counter 전후 호출 비용·전체 회귀와 TASK-033 커버리지/UC 판정으로 TASK-030·034·035를 마감한다.
+1. **[REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) 결함 조치 ( 최우선 ):** `RV-149`(P1: `recover_segment` chunk 단위 `max_records`/chunk 상한 선검사 및 prefix 완결, 루트 메타 peek 오류 분류, CLI `recover` 성공 JSON `"target"` 추가), `RV-150`(P2: 회전 파일 `Baseline`의 `observed_from_ns`·다중 출력 단일 `Baseline` 차분 방지·체크포인트 그룹 단위 시간 필터), `RV-151`(P2: `loss_before_submit`·`record_until`의 `ActiveCall`/`closing` 경계), `RV-152`(P3: `read::registrations` 중복 ID 검사 및 `recovery.rs` `s.name` 축소)를 Red → Green → 회귀로 해결하고 REV-059를 마감한다.
+2. **TASK-034 runtime 통합(D):** WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 승인된 [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md)·API §22·23.1~23.3의 현재 native 저장/loss 계약에 맞춰 적용한다. `.set_channel`·Writer refresh·쉬는 writer ack·원격 ApplyConfig·update 전후 실제 파일 revision 회전과 loss session 누적을 시험한다. 그 뒤 E native GUI user/meta/loss·counter 전후 호출 비용·전체 회귀와 TASK-033 커버리지/UC 판정으로 TASK-030·034·035를 마감한다.
 2. **TASK-033 S4:** 승인 목표치 기준 1~3 충족(EV-080). TASK-034·035 뒤 최종 재측정(기준 4)으로 MS-007 일정 판단을 마무리한다.
 3. **2026-11-16 주 목표:** TASK-034·TASK-030 S2·TASK-035 → TASK-033 판정 → TASK-025 문서·인수 정리. 납기 확정이 아닌 합의 목표다.
 4. **2026-11-23 주 계획:** TASK-031 viewer → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7 트리거를 확인한다.
@@ -143,7 +139,7 @@ REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence
 
 ## 최근 작업·이력
 
-- 2026-11-17 #001: B revision 저장·C loss checkpoint 로컬 단위와 REV-057·058 마감([EV-084](../05_verification/verification_evidence.md#ev-084)·[EV-085](../05_verification/verification_evidence.md#ev-085)); Human 「세션 마감」, 다음 D runtime WIP([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_001.md)).
+- 2026-11-17 #001~002: B revision 저장·C loss checkpoint 로컬 단위와 REV-057·058 마감([EV-084](../05_verification/verification_evidence.md#ev-084)·[EV-085](../05_verification/verification_evidence.md#ev-085)), `949a74e..0270f03` 독립 코드리뷰 [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Open(`RV-149~152`)([로그 #001](../members/lim8603/workspace/session_logs/session_2026-11-17_001.md)·[#002](../members/lim8603/workspace/session_logs/session_2026-11-17_002.md)).
 - 2026-11-16 #001: 리뷰 조치·ADR-013 승인·native A 완료([EV-082](../05_verification/verification_evidence.md#ev-082)·[EV-083](../05_verification/verification_evidence.md#ev-083), [로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
 - 2026-11-15 #001: 사용 사례/판정 목표·TASK-030 S1·TASK-034 중요도/시작 level/이벤트 보존 진행([로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
 

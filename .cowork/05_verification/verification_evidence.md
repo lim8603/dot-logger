@@ -1353,6 +1353,29 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **근거 위치:** [검증 명령·결과/압축 원본](../06_evolution/imported_context/task_030_s2b_2026-11-17/)의 `<toolchain>-results.json`·`.log.gz`, `common-results.json`, `miri-results.json`, `final-doc-results.json`, `final-bounds-results.json`. source175개 SHA-256과 제품 commit blob 일치를 [commit.json](../06_evolution/imported_context/task_030_s2b_2026-11-17/commit.json)으로 확인했다. 최초 검사 후 실행 코드 변경 없이 storage 모듈 문서 주석을 보완해 final-doc(fmt·두 Rust strict workspace doc)을 추가했다. 기존 CLI 복구 시험에는 전체 파일 수·누적 기록 수 상한을 추가했고, 두 Rust에서 해당 CLI 시험·clippy를 final-bounds로 확인했다(전체 시험 개수 변화 없음). 최종 source175개 blob은 `70d2f6a`와 일치한다. 시작/최종 source hash 차이와 그 범위는 `source-check-notes.json`에 명시했다.
 - **한계/다음:** loss는 unavailable(0으로 해석 금지). 다음 C TASK-035 S2 collector/checkpoint → D TASK-034 실행 중 설정 WIP → E 통합·TASK-033 커버리지/UC 재측정이다. 기존 TASK-034 결과 Human 확인 대기는 유지한다. GUI 재판독·정량 성능/커버리지 재측정·다른 OS/native T3·24h·실앱은 미실행이며 각각 TASK-024·026/해당 Task에 유지한다. API §23.2와 Task/MS 목록에 구현 범위를 반영했다.
 
+<a id="ev-085"></a>
+### EV-085 — TASK-035 S2 C 손실 누적 checkpoint·별도 조회/복구
+
+- **판정:** 로컬 **Pass** / 2026-11-17. C 구현·검증·위임 수락 완료, REV-058 **Closed**. 승인된 ADR-013 §3의 C 로컬 구현 단위이며 TASK-030·035 전체·MS-009·Gate4/5 완료는 아니다. 개발 리뷰는 [REV-058](reviews/REV-058_LOSS_CHECKPOINT_C.md)(RV-146~148 모두 Closed)다.
+- **대상/환경:** `fa1d498` 이후 counter/native loss·core/facade/client/CLI·fixture. Ubuntu PC의 기존 `7.0.0-43-realtime` 커널, Rust1.96.0·MSRV1.85.0, Miri nightly-2026-10-26 고정. 재부팅/전역 toolchain/에디터 설정 변경 없음. GitHub PRIVATE를 확인했고 공개 후 T3·공개 전 T2는 미도래다.
+- **실행 자료:** [원본/종료값/명령/해시](../06_evolution/imported_context/task_035_s2_2026-11-17/). `final-1.96.0-results.json`·`final-1.85.0-results.json`이 최종 제품 소스의 전체/정적/doc/18 feature 결과다. 첫 전체 각664 이후 RV-148 CLI 시험을 더하고 제품의 사용자/control quota 경계를 수정해 최종 각665로 재실행해 Pass했다. 제품 `0270f03`과 최종156개 source SHA/commit blob이 모두 일치한다. 최초 `source-sha256.txt`와 최종 `source-sha256-final.txt`를 구분한다. attempt1/중간 실행을 최종 Pass에 대신 사용하지 않는다.
+
+| 검증 | 최종 결과/근거 |
+|---|---|
+| 두 Rust workspace all-features | 1.96.0/1.85.0 각665 Pass·5 ignored |
+| 두 Rust 18 feature 구성·독립 consumer/allocator·예제 | 각18 구성·독립 소비 경로·allocator(default19/remote20) Pass |
+| fmt·clippy all-targets/all-features·strict workspace/core rustdoc | 두 Rust clippy/strict docs·fmt Pass |
+| 표면/레시피 | common: self-test18·facade34/60·레시피 가드 Pass. 새 공개 이름은 advanced loss/query에 있고 facade 표면 수 증가 없음 |
+| Miri strict provenance | loss 단위4 + TC-017 13(파일 기반 facade 제외)=17 Pass. 마지막 max_records0 control-only 변경은 baseline TC1 재실행 Pass. 최초 isolation 실행은 REALTIME clock 미지원으로 종료, disable-isolation 추가 후 실제 wall-clock 경로 검증 |
+| RT/메모리 | loss-enabled tracked admission/거절/raw/Drop allocator0/free0. counter bank 사전 예약 이내. checkpoint storage peak19,574/reserve186,080, loss query/summarize peak50,792/reserve398,080 requested bytes·최종 반환0(시험 구성) |
+| 독립 형식 검사 | 기존 독립 MCAP reader의 사용자/meta/control 분리·payload/receipt 보존, protoc FileDescriptorSet decode exit0(1422B·고정 enum). GUI decode 성공으로 대신하지 않음 |
+
+- **TDD/새 시험:** 최초 loss API/module 부재 compile Red → telemetry off retry3/반복 output report1 Green. 신규 loss 단위4·TC-017 14·CLI4·allocator1(총23) 및 기존 native/query/replay/retention·consumer 회귀. ID0/None, raw 대여·schema/encode/Policy/NoRoute/Deadline·Unknown, 동시 target report256개/4thread·반복 terminal, telemetry reset 후 epoch 보존, count/index 포화·coalesce·reserved final·exact control budget, malformed 후반 control의 앞 pair 반출0, 원래 loss 보존 복구·미완성 part·overflow/observer 감소·다중 출력 replica 비합산, control-only quota와 source target 대조, outstanding writer·전 출력 실패의 미확인 꼬리를 대조한다.
+- **자가검토 조치:** RV-146은 주기 control의 retention index 상한 누락, RV-147은 CRC 정상 observer 변조 수락, RV-148은 사용자 quota0 뒤 control-only 파일 거절/Limit의 IO 오분류다. 각각 Red 원본·Green을 보존했다. 일반 output atomic 포화 RMW와 producer 단독 store를 구분하고 신규 unsafe0, phase 게시 뒤 channel index 읽기·guard 내 최초 terminal 집계를 검토했다. 상세는 REV-058이다.
+- **구현 계약:** [API §23.3](../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17). session 누적·64행/8192B part·K=ceil(N/64)·L≥2K, user max_records와 별도 control part/count/chunk/bytes/index·final 예약. telemetry off인 facade도 수집한다. native report observer는 원 file target과 일치하며 같은 sequence/다른 출력은 explicit target으로 구분한다. loss-only API/CLI는 사용자 payload/가짜 receipt를 만들거나 fanout을 replay하지 않는다. 복구는 현재 bank를 다시 찍지 않고 원래 보고를 보존한다. max_records0은 양수 control allowance가 있을 때 control-only를 허용하고 실제 user append는 IO 전 거절한다.
+- **해석 제한:** 시도·skip·assignment·Unknown을 고유 메시지 손실로 합산하지 않는다. 관측 구간은 counter_epoch monotonic이며 user record clock/실제 발생 시각과 다르다. MCAP header wall time을 별도 보존한다. complete part 집합 밖 최신값·포화·observer 감소는 exact delta를 만들지 않는다. Closed만으로 quiescence를 주장하지 않고 전 출력 고장/마지막 성공 보고 뒤 RAM-only 변화는 미관측이다.
+- **성능/후속:** 새 physical index 예약을 반영해 4출력 perf fixture64→80MiB로 조정했다. 기존 처리량/지연 수치의 승계가 아니며 이번 단위는 정량 호출 비용·성능 목표의 Pass가 아니다. 다음 D TASK-034 runtime WIP 통합 → E native GUI의 user/meta/loss 판독·counter 전후 호출 비용·전체 통합/커버리지/UC 판정. TASK-030·035 전체 In Progress, TASK-034 기존 결과 Human 확인 대기·다른 OS/native T3·24h·실앱 TASK-024·026 및 Gate4/5 미완료는 유지한다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

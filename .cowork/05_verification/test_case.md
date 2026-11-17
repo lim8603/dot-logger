@@ -292,7 +292,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: In Progress / 최근 실행: 2026-11-16 S2 A native pair/독립 protobuf·reader 손상/예산·query/recovery 하위([EV-083](verification_evidence.md#ev-083)); S1 export 하위 이력은 EV-082. S1 Foxglove Topics 판독은 2026-11-15 Human 확인([TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15), EV-077). S2 B 교차 revision 회전·source identity·v2 조회/복구는 2026-11-17 EV-084로 추가 검증했다. 손실·runtime 통합 이후·native GUI 재판독·viewer·대시보드·Lichtblick 판독은 미실행.
+- 상태: In Progress / 최근 실행: 2026-11-16 S2 A native pair/독립 protobuf·reader 손상/예산·query/recovery 하위([EV-083](verification_evidence.md#ev-083)); S1 export 하위 이력은 EV-082. S1 Foxglove Topics 판독은 2026-11-15 Human 확인([TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15), EV-077). S2 B 교차 revision 회전·source identity·v2 조회/복구는 2026-11-17 EV-084로 추가 검증했다. 손실 C 로컬 단위는 2026-11-17 EV-085로 추가 검증했다. runtime 통합 이후·native GUI 재판독·호출 비용 비교·viewer·대시보드·Lichtblick 판독은 미실행.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
@@ -313,6 +313,21 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 | source별 revision/sequence·여러 revision blob/replay·중복 receipt | identity 대조, 원 payload/시간/정렬 유지, 중복 receipt와 Header-only nonzero prefix 거절 |
 | manifest v2·v1/전역 revision/중복 path·파일 identity 불일치 | v2만 수락, 잘못된 선언은 입력 오류·파일 불일치는 손상, 부분 snapshot 반출 0 |
 | 여러 revision 파일 복구·전체 파일/바이트/기록 한도·뒤 파일 손상 | 독립 새 파일·원 revision/receipt와 sequence 보존, 앞 완료 결과 유지·개별 prefix 보고·덮어쓰기 금지 |
+
+#### TASK-035 S2 C 하위 시나리오 — 2026-11-17
+
+근거: [EV-085](verification_evidence.md#ev-085), `loss::tests` 4개·TC-017 14개·CLI4개·allocator1개 신규 및 기존 native/query/replay/retention 회귀. TC-014/MS-009 전체 완료와 GUI 판독은 별도다.
+
+| 입력·동작 | 기대 결과 |
+|---|---|
+| telemetry off·Capacity retry3·나중 수락·raw 대여/제출·encode 오류 | 시도별 누적·대여 미귀속·encode1회, telemetry reset에도 epoch/counter 유지 |
+| level/sampling·명시 NoRoute·Unknown guard·공유 report256개/4thread·반복 report | skip 별도·원래 target assignment 최초1회·원자 갱신 유실/중복0 |
+| control count/index 포화·회전 capacity·final 예약 | 기존 active/counter 보존, 누적 count3/delta3와 coalesced, 명시 상한 초과0 |
+| part 누락·MAX/overflow·observer 감소·다중 출력 replica | 누적 증거 보존, 부정확 delta 없음, session/epoch/origin별 비교·합산0 |
+| chunk 후반 잘못된 control·CRC 정상 observer 변조 | chunk 전체 거절, 앞 사용자 pair 반출0, 복구 prefix/InvalidRecord 명시 |
+| baseline/periodic/final·미반납 writer·전 출력 IO 실패 | control에 가짜 사용자 identity 없음, 증명된 quiescence만 tail 확인, 저장 watermark 밖 RAM은 미관측 |
+| 같은 sequence/다른 target의 loss-only CLI·복구 전체 part 상한 | explicit target 대조·사용자 fanout 미재생·replica 비합산·원 보고/시각 보존·부분 한도 보고 |
+| 고정 control required-1/exact·RT guard·encoder/query 임시 할당 | 대여 전 부족 거절/정확 수락·RT 할당/해제0·각 예약 안 peak·최종 반환 |
 
 ## 3. 요구사항–설계–구현–테스트 추적 체크리스트
 

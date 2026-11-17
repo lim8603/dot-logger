@@ -9,8 +9,8 @@
 | ADR | ADR-012 Accepted(facade 소유 모델). 실행 중 변경의 저장 계약은 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 승인) |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | 기존 결과 Human 확인 대기. ADR-013 승인 완료 → TASK-030 S2 저장 구현 뒤 ① 실행 중 변경 마무리 |
+| 마지막 갱신일 | 2026-11-17 |
+| 다음 액션 | 기존 결과 Human 확인 대기 유지. A/B/C 로컬 선행 완료(EV-083~085) → WIP36c1724를 native/loss 계약에 맞춰 ① runtime 통합·시험(D) |
 | 의존 | TASK-027·TASK-029(facade·표면 가드) |
 | 예상 소요 | S1 1 + S2 3~4 + S3 1 인일, 리뷰 대기 제외 |
 

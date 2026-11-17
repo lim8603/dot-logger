@@ -215,3 +215,8 @@ A native writer/reader·단일 revision query/recovery·구형 경로 제거를 
 ### B 진행 기록 — 2026-11-17
 
 B revision 경계 회전·source별 조회/복구·manifest v2 구현/검증·위임 수락을 완료했다([EV-084](../../05_verification/verification_evidence.md#ev-084), [REV-057](../../05_verification/reviews/REV-057_REVISION_STORAGE_B.md)). 실제 r1→r2→r1→r2·event/pin·publish 이후 create/header/pair 실패와 prefix·sync work를 검증한다. 현재 계약은 API §23.2다. 손실 unavailable과 C TASK-035 S2·D runtime WIP·E 커버리지/일정 판단 미완료는 유지한다.
+
+
+### C 진행 기록 — 2026-11-17
+
+승인된 §3의 TASK-035 S2 C 로컬 구현·검증 단위를 마쳤다([EV-085](../../05_verification/verification_evidence.md#ev-085), [REV-058](../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md)). 현재 구현 계약은 API §23.3이다. telemetry 독립 counter·native loss 보고·관측 watermark 비교·bounded loss-only API/CLI·원 report 복구를 제공한다. count/chunk/byte/retention index 및 reserved final을 검사하며 부족하면 기존 active와 counter를 보존한다. D runtime WIP·E native GUI/호출 비용 비교/최종 통합·커버리지 판정은 후속으로 남긴다. A/B 진행 기록의 loss unavailable은 당시 구현 상태이며 설계 승인 내용은 바꾸지 않는다.

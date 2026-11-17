@@ -133,9 +133,17 @@ Completion RecordSlot은 accepted record의 revision과 target 선택을 보존�
 
 ## TASK-030 S2·TASK-035 저장 모델 — 2026-11-16
 
-**Accepted — 2026-11-16 Human 「승인」, [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 채택했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 당시 구현 이력으로 유지한다. 현재 native A/B 구현은 API §23.1·23.2와 EV-083·084를 따르며, 손실 checkpoint 등 미구현 부분은 설계 승인만으로 구현된 것으로 해석하지 않는다.
+**Accepted — 2026-11-16 Human 「승인」, [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 채택했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 당시 구현 이력으로 유지한다. 현재 native A/B/C 구현은 API §23.1~23.3과 EV-083~085를 따른다. loss checkpoint도 C 로컬 구현에 포함되며 D runtime·E GUI/비용·통합 판정은 별도로 남는다.
 
 
 ### B 구현 모델 — 2026-11-17
 
 `SegmentInfo.revision`과 `QuerySource`의 sequence/revision/safe_offset이 파일별 사용자 identity다. snapshot은 session·고정 채널 등록을 공유하되 source별 revision을 검증하고, receipt(session/producer/accepted_seq)는 revision이 달라도 하나만 존재한다. 기존 bounded order 버퍼로 중복을 검사한다. catalog의 revision 바이트는 실제 SegmentInfo 폭으로 예약한다. 파일 sequence와 producer sequence는 교차 revision 회전에서 초기화하지 않으며 event/pin/FileLedger도 계속 유지한다. `RecoveryOptions.source_sequence`는 원본 검증에, store의 새 sequence는 복구 출력 Metadata에 반영한다. CLI manifest v2는 전역 revision 없이 source별 revision을 담고, 과거 v1 adapter는 없다. 현재 손실 데이터는 unavailable이며 누적 checkpoint는 TASK-035 S2가 소유한다. API 세부는 [§23.2](interface_contract.md#232-revision-회전source별-조회복구-b-구현--2026-11-17).
+
+### 손실 누적 checkpoint — TASK-035 S2 C (2026-11-17)
+
+현재 구현은 [API §23.3](interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·ADR-013 §3을 따른다. tracked 고급 owner는 명시 활성화, facade는 항상 활성화한다. 파일 `loss_tracking=cumulative/1:N`은 session 고정 N행을 64행/8192B 이하의 `_dot_logger/loss` protobuf part로 남긴다. 비활성 고급 파일은 `unavailable`이다. 이것을 손실 0의 증거로 바꾸지 않는다.
+
+`LossReport`는 version/session(16-byte LE u128)/epoch/observer/checkpoint/part·parts/management 관측 구간/coverage/counts/별도 Unix header 시각/coalesced를 보존한다. `LossCount`는 고정 scope·cause, presence 있는 producer/channel/origin target, u64 cumulative_count/overflowed다. 원래 session 누적값이며 사용자 revision으로 분할하지 않는다. 제출·대여 시도, 의도적 skip, 원래 출력 assignment와 Unknown을 구분하고 ingress replica를 합산하지 않는다. control은 사용자 Meta/receipt/sequence·논리 max_records와 별도다.
+
+part 누락·포화·같은 observer 감소·미관측 꼬리는 exact delta/성공으로 추정하지 않는다. counter epoch monotonic 구간은 사용자 record timestamp나 실제 거절 시각이 아니다. body와 MCAP header의 wall 시각은 별도 필드로 보존한다. recovery는 원래 report를 복사하며 loss-only 조회는 사용자 pair를 검증하되 replay/index하지 않는다. 같은 sequence의 여러 출력은 explicit expected target으로 구분하고 report observer와 파일 target을 대조한다. [EV-085](../05_verification/verification_evidence.md#ev-085)의 로컬 판독·복구·경계 시험과 GUI/성능/전체 커버리지 후속을 구분한다.

@@ -1316,7 +1316,7 @@ Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 �
 - query/recovery는 같은 native 검증을 사용하고 user payload의 직접 파일 offset을 사용한다. 기존 active safe offset·source 원본 보존·손상 후 재동기화 금지·sync 채무·event/pin·완료 의미는 유지한다. 이 단계의 조회/복구는 여전히 호출자가 지정한 단일 revision이며 source별 revision/manifest v2는 B다.
 - `WriterConfig.max_records`·보조 index·회복 records는 논리 사용자 수, MCAP Statistics는 물리 Message 수(현재 pair 2건)다. pair 단위 사전 chunk 분할, metadata 쓰기 실패 시 poison, flush 성공 전 safe offset/Written 비공개를 적용한다. 물리 Message index 예약은 사용자당 128B의 보수 한도와 chunk/채널 예약으로 계산한다. RetentionConfig의 최소 max_index_bytes는1152B(128+512+512)이며 이보다 작으면 파일 생성 전에 거절한다. `max_metadata_bytes`는 caller 등록 한도이며 고정 native Metadata/descriptor는 별도 고정 예약에 포함한다.
 - §21.2는 **S1 당시 이력**이다. 제품의 `storage::standard::export`·CLI `export --standard`·Envelope codec/schema/fixture는 제거했다. 구형 profile은 판독 대상이 아니며 `NativeReader`는 `UnsupportedFormat`으로 거절한다. 과거 signature를 위한 wrapper/형식 선택 API는 없다. 일반 출력 cap의 terminal summary 검사 등 형식과 무관한 검증은 유지했다.
-- 단계 A의 모든 writer는 `loss_tracking=unavailable`이다. 손실 0을 뜻하지 않는다. `_dot_logger/loss` 충돌은 지금 거절하고, 실제 collector/체크포인트/손실 조회는 TASK-035 S2(C)에서 구현한다. runtime WIP는 병합하지 않았다.
+- 단계 A의 모든 writer는 `loss_tracking=unavailable`이다. 손실 0을 뜻하지 않는다. `_dot_logger/loss` 충돌은 지금 거절하고, 당시 collector/체크포인트/손실 조회는 미구현이었고 현재 C 구현은 §23.3을 따른다. runtime WIP는 병합하지 않았다.
 - 검증: [EV-083](../05_verification/verification_evidence.md#ev-083), 개발 자가검토 [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md). GUI/native·장기·실앱·재측정 성능/커버리지는 이번 결과에 포함하지 않는다.
 
 
@@ -1332,3 +1332,27 @@ Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 �
 - client `OfflineConfig`의 revision은 제거하고 `OfflineSource.revision`으로 옮겼다. CLI manifest는 schema_version 2, 전역 revision 없이 각 source에 revision을 필수 지정한다. v1/알 수 없는 필드·중복 경로/sequence·파일 identity 불일치는 명시 거절한다. offline status는 source별 revision/sequence를 반환한다. NDJSON 공통 출력 schema_version 1은 유지한다.
 - `RecoveryOptions.source_sequence`는 원본 sequence 검증값이다. `recover_segment` 출력은 그 sequence를 보존하고, `recover_to_store` 출력은 명시한 새 sequence를 파일 Metadata에도 사용한다. session/revision은 해당 source의 budget과 대조한다. Header만으로는 정상 빈 복구로 판정하지 않는다. CLI 복구는 source별 revision의 owner/budget을 한 번에 하나만 만들고 별도 파일로 쓴다. 단일 source는 새 파일, 여러 source는 새 디렉터리 아래 `<sequence>.mcap`이다. 전체 파일 수/max_segments, 개별 max_source_bytes, 전체 read_bytes·max_records를 제한하고 각 파일 prefix·실패를 보고한다. 뒤 파일 실패로 앞 결과를 덮거나 지우지 않는다. namespace_synced:false와 부분 파일 보존은 유지한다.
 - 파일 손실은 아직 unavailable이다. TASK-035 S2 collector/checkpoint와 TASK-034 실행 중 설정 WIP·원격 ApplyConfig 통합은 후속이며 이 구현을 해당 기능의 완료로 대신하지 않는다. 처리량·커버리지·GUI 재판독은 별도 검증이다.
+
+### 23.3 손실 누적 checkpoint (C 구현 — 2026-11-17)
+
+승인된 ADR-013 §3의 TASK-035 S2 구현이다. 구현/로컬 검증 근거는 [EV-085](../05_verification/verification_evidence.md#ev-085), 개발 자가검토는 [REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md)다. D runtime WIP·E GUI/비용 비교/최종 커버리지 판정은 별도 후속이다.
+
+| 경계 | 구현 계약 |
+|---|---|
+| 활성화 | 고급 경로는 tracked `CaptureOwner::enable_loss_tracking()`을 producer 대여 전에 호출한다. facade는 telemetry off여도 항상 활성화한다. `loss_tracking()`은 고정 counter의 빌림 관리 뷰다. telemetry reset은 counter/epoch를 바꾸지 않는다 |
+| 단위 | `SubmissionRejected`·`AcquireRejected`는 재시도별 시도 수, `IntentionalSkip`은 level/sampling/NoRoute, `OutputFailed`·`OutputDropped`·`OutputUnknown`은 원래 target assignment의 최초 terminal 전이 수다. 반복 보고·reconcile은 다시 세지 않는다. 합쳐 고유 입력 손실 수라고 표시하지 않는다 |
+| 귀속 | 키는 session/epoch/scope/cause/producer/optional channel/optional origin target이다. 대여는 channel 없음, foreign/unknown identity는 미귀속이며 ID 0과 None을 구분한다. facade encode 거절은 core 진입 전 1회, 이후 core 거절과 중복 집계하지 않는다. Closing 이후 시도는 저장 종료 watermark 밖이다 |
+| 동시성 | producer 전용 cell은 단일 writer 포화 store, output cell은 일반 경로의 공유 atomic 포화 RMW다. 기존 채널 등록 검사 index를 재사용하고 RT에 할당/해제·추가 clock·map·lock·CAS 재시도를 넣지 않는다. 여러 counter의 relaxed 관측은 동시에 찍은 전역 snapshot이 아니다 |
+| 파일 | `_dot_logger/loss`, protobuf `dot_logger.LossReport`, 고정 FileDescriptorSet·enum. `dot_logger.file.loss_tracking`은 `unavailable` 또는 `cumulative/1:N`이다. control은 사용자 RecordMeta/receipt·accepted sequence를 만들지 않으며 max_records·복구 records·query/replay 데이터에서 제외한다 |
+| 시간 | 본문의 관측 구간은 counter epoch 생성 후 management monotonic ns다. 사용자 mono clock과 같은 epoch라고 해석하지 않는다. MCAP log_time/publish_time은 별도 `publish_time_unix_ns`와 일치하는 Unix ns다. 개별 손실 발생 시각은 알 수 없다 |
+| checkpoint | 파일 baseline, facade sync_every의 sync 직전, 회전 전 final/새 파일 baseline, 종료 final을 쓴다. 이전 읽기 시작부터 현재 part 읽기 종료를 보수적 구간으로 보존한다. report가 지연되면 counter를 지우지 않고 후속 누적값에 `coalesced` 표시를 남긴다 |
+| 종료 | 모든 writer 반납·수집 active call 0·배출 성공을 확인한 facade만 Quiescent proof를 게시한다. outstanding writer가 있으면 Closed여도 FinalPartial이다. 전 출력 IO 실패나 마지막 성공 checkpoint 밖 RAM 증가는 미관측이며 파일로 복원됐다고 주장하지 않는다 |
+| 상한 | N=P×((C+1)×12+8+C×T×9), K=ceil(N/64). part당 최대64행·8192B. live writer는 L=max_loss_reports≥2K, max_chunks≥2K+2가 필요하다. counter cell/ID/checkpoint 원자·보고 scratch·물리 message/chunk index·baseline/final 디스크 크기를 checked 예약한다. 마지막 K개 part의 count/chunk/bytes/index를 남긴다 |
+| 회전/실패 | 주기 보고의 count/chunk/디스크/retention index 포화는 회전하며, 회전 capacity 실패는 기존 active와 counter를 보존한다. 제어 IO 오류는 기존 poison 규칙을 따르고 보고 실패 자체를 재귀 집계하지 않는다. 이미 발행된 파일/prefix는 유지한다 |
+| 조회 | `LossReader` 또는 별도 `LossSnapshot`/client `open_loss_snapshot`을 쓴다. 사용자 pair는 chunk 전체 검증하되 loss-only 뷰에서는 index/replay하지 않는다. `QueryConfig.max_loss_reports=0`은 일반 조회에서 검증 후 skip하며 enabled 파일의 loss 조회에는 Limit이다 |
+| 비교 | `loss::summarize`는 complete checkpoint의 누적 watermark를 비교한다. session/epoch를 분리하고 ingress replica를 합산하지 않는다. 최소 두 complete 관측이 필요하며 overflow·같은 observer 감소·중복 checkpoint·미완성 part에만 있는 최신값이면 exact delta는 None이다. 이후 complete checkpoint가 gap을 덮을 수 있다. 출력 assignment는 origin target별로 유지한다 |
+| source identity | `QuerySource::expect_target`, `OfflineSource.target`·manifest `sources[].target`·`RecoveryOptions.source_target`으로 원래 target을 대조한다. 같은 sequence를 다른 출력에서 함께 열려면 각각 explicit target이 필요하다. native report observer도 해당 파일 target과 일치해야 한다. 일반 사용자 Snapshot의 receipt 중복 거절은 유지한다 |
+| 복구 | 오늘의 bank를 다시 표본하지 않고 원래 report와 session/epoch/origin/관측 시각을 복사한다. 완전 chunk를 검증한 뒤 채택하며 report 한도는 물리 part 수다. 일부 part만 남으면 누적 증거는 유지해도 정확 차분은 만들지 않는다. 원래 프로세스의 Written/Synced는 복원하지 않는다 |
+| CLI | offline `loss --manifest`는 별도 `loss` 행과 summary를 낸다. `--channel`은 product channel, `--from/--to`는 counter epoch 관측 구간의 겹침이다(mono만 지원). nullable delta/ID·overflow·tail_confirmed·unavailable_sources를 내며 summary.records는 출력한 사용자 record 줄 수이므로 0이다. recovery의 max_loss_reports는 작업 전체 합계다. 사용자 quota를 채워도 남은 control-only 파일은 처리하며, 양수 control allowance가 있는 writer의 max_records0은 사용자 append를 거절하고 control만 허용한다 |
+
+facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 4출력 성능 fixture의 메모리는 새 physical index 예약으로 64MiB에서 80MiB로 조정했다. 이는 기존 처리량·지연 수치의 승계나 새 성능 목표 달성 판정이 아니다. counter 추가 전후 비용과 표준 GUI 판독은 ADR-013 E에서 실제 실행 후 기록한다.

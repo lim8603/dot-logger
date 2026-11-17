@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-17 |
-| 다음 액션 | S2 A/B Done(EV-083·084). 다음 C TASK-035 S2 손실 collector/checkpoint → D TASK-034 runtime → E 통합·판정 |
+| 다음 액션 | S2 A/B/C 로컬 단위 Done(EV-083~085). 다음 D TASK-034 runtime WIP 통합 → E GUI/비용 비교·통합·판정 |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 단일 경로 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), A/B Done(EV-083·084), 다음 TASK-035 S2 손실 기록** |
+| S2 | native 표준 단일 경로 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), A/B/C 로컬 Done(EV-083~085), 다음 D runtime WIP·E 통합** |
 
 ## 변경 대상과 첫 검증
 
@@ -73,11 +73,11 @@
 |---|---|
 | A native 쓰기/읽기·구형 경로 제거 | Done — EV-083, 두 Rust 각630 Pass·각18 feature·REV-056 Closed |
 | B revision 경계 회전·source별 조회/복구·manifest v2 | Done — 2026-11-17 EV-084, REV-057 Closed |
-| C 손실 collector/체크포인트/조회 | TASK-035 S2, B 뒤 |
+| C 손실 collector/체크포인트/조회 | Done — 2026-11-17 EV-085, REV-058 Closed(전체 Task는 E 뒤) |
 | D runtime facade 설정 변경 | TASK-034 WIP, C 뒤 |
 | E 통합·커버리지·일정 판단 | TASK-033 재측정, 전체 저장 변경 뒤 |
 
-A 완료 당시 모든 파일은 `loss_tracking=unavailable`, 단일 revision 조회/복구였다. 현재 A/B 구현은 아래를 따르며 native GUI 재판독·정량 성능/커버리지 재측정·다른 OS·24h·실사용처는 미실행이다.
+A 완료 당시 모든 파일은 `loss_tracking=unavailable`, 단일 revision 조회/복구였다. 현재 A/B/C 구현은 아래를 따르며 native GUI 재판독·정량 성능/커버리지 재측정·다른 OS·24h·실사용처는 미실행이다.
 
 
 ## S2 B 구현·검증 — 2026-11-17
@@ -88,3 +88,10 @@ A 완료 당시 모든 파일은 `loss_tracking=unavailable`, 단일 revision �
 - 새 source별 revision/sequence snapshot·중복 receipt/identity 누락 거절, blob/replay, source별 recovery sequence와 CLI manifest v2·다중 파일 복구/상한을 구현했다. v1 호환 adapter는 없다.
 - 신규 교차 revision 통합 8개와 CLI 4개, 기존 fixture/consumer/RT allocator/UPS 예제를 정렬했다. capacity·보호/pin·create/header/첫 pair 오류·발행 prefix와 sync work를 검증했다. Header-only 정상 빈 조회 공백(RV-145)을 Red→Green으로 수정했다.
 - B 검증·위임 수락 결과는 EV-084다. **TASK-030 S2 전체 Done은 아니다.** 모든 파일의 loss는 unavailable이고 C TASK-035 S2 → D TASK-034 runtime WIP → E 통합·커버리지/일정 판단이 남는다.
+
+
+## S2 C 손실 checkpoint — 2026-11-17
+
+TASK-035 S2의 C 로컬 단위를 구현·검증·위임 수락했다([EV-085](../../05_verification/verification_evidence.md#ev-085)·[REV-058](../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md), API §23.3). facade는 telemetry off여도 누적 loss를 기록하며 고급 경로는 명시 활성화한다. source별 expected target·별도 loss-only API/CLI·원 report 보존 복구를 제공하고 사용자 record/replay와 섞지 않는다. 앞의 A/B 절의 unavailable·C 미완료는 해당 단위 완료 당시 기록이다.
+
+다음 D는 TASK-034 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 현재 native 저장·loss 계약에 맞춰 적용·시험하는 것이다. 단순 cherry-pick 성공으로 수락하지 않는다. E의 native GUI·counter 전후 호출 비용·통합/커버리지·일정 판정은 아직 미실행이며 TASK-030·035 전체 In Progress를 유지한다.

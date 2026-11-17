@@ -16,6 +16,7 @@ use crate::config::{
 };
 use crate::control::ControlConfig;
 use crate::control::ControlOwner;
+use crate::control::config_update::State as UpdateState;
 #[cfg(not(target_os = "linux"))]
 use crate::platform::CapabilityStatus;
 use crate::platform::{PlatformCapabilities, Requirement};
@@ -843,6 +844,8 @@ pub(crate) fn derive(
         } else {
             0
         },
+        // Runtime channel policy banks; `start()` always enables them (§22.2).
+        UpdateState::required(channels.len(), producer_count, target_count).ok_or_else(overflow)?,
     ];
     for part in parts {
         control_need = control_need.checked_add(part).ok_or_else(overflow)?;

@@ -1800,3 +1800,308 @@ fn f37_a_new_mark_reclaims_expired_quota_before_periodic_sync() {
             .is_success()
     );
 }
+
+fn stored_revisions(dir: &Path) -> Vec<(i32, Level, Option<Importance>, u64)> {
+    let (files, active) = closed_files(dir);
+    assert_eq!(active, 0, "no active segment may remain after Closed");
+    let mut stored = Vec::new();
+    for file in files {
+        let bytes = std::fs::read(file).unwrap();
+        let reader = NativeReader::new(&bytes, 64, 3).unwrap();
+        let revision = reader.info().revision;
+        for record in reader {
+            let record = record.unwrap();
+            assert_eq!(record.record.revision, revision);
+            let m = record.record.metadata;
+            let x = i32::from_le_bytes(record.payload[..4].try_into().unwrap());
+            stored.push((x, m.level, m.importance, record.record.revision));
+        }
+    }
+    stored.sort_by_key(|(x, ..)| *x);
+    stored
+}
+
+/// Log one pose that must be admitted, retrying capacity off the RT path.
+fn accept(writer: &mut Writer, channel: Channel<Pose>, x: i32) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        assert!(std::time::Instant::now() < deadline, "admission deadline");
+        match writer.try_log(channel, &Pose { x, y: 0 }) {
+            Ok(Logged::Accepted(_)) => return,
+            Ok(Logged::Skipped) => panic!("record {x} skipped"),
+            Err(e) if e.is_capacity() => std::thread::yield_now(),
+            Err(e) => panic!("record {x}: {e:?}"),
+        }
+    }
+}
+
+fn close(logger: Logger) {
+    let shutdown = logger.shutdown(Duration::from_secs(10)).unwrap();
+    assert!(shutdown.is_success(), "{shutdown:?}");
+}
+
+/// TASK-034 S2 (§22.2): `set_channel` raises a channel's minimum level at
+/// runtime and lowers it again. Each change returns the new revision; asking
+/// for the policy already in effect returns that revision without posting a
+/// new one. Stored records carry the revision they were admitted under.
+#[test]
+fn f38_set_channel_raises_and_lowers_the_level_at_runtime() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    accept(&mut writer, pose, 0);
+    assert_eq!(logger.set_channel(pose, Level::Warn, 1), Ok(2));
+    assert_eq!(logger.set_channel(pose, Level::Warn, 1), Ok(2));
+    assert_eq!(
+        writer.try_log(pose, &Pose { x: 1, y: 0 }),
+        Ok(Logged::Skipped)
+    );
+    accept(&mut writer, pose.at(Level::Warn), 2);
+    assert_eq!(logger.set_channel(pose, Level::Trace, 1), Ok(3));
+    accept(&mut writer, pose.at(Level::Debug), 3);
+    accept(&mut writer, pose, 4);
+    drop(writer);
+    close(logger);
+    let normal = Some(Importance::Normal);
+    assert_eq!(
+        stored_revisions(&directory),
+        [
+            (0, Level::Info, normal, 1),
+            (2, Level::Warn, normal, 2),
+            (3, Level::Debug, normal, 3),
+            (4, Level::Info, normal, 3),
+        ]
+    );
+}
+
+/// TASK-034 S2 (§22.2): `sample_every = 3` keeps the first and every third
+/// Normal record, while Important records (`.important()`, §22.4) bypass
+/// sampling and do not advance its count. Deterministic: 64 slots never fill
+/// with these 12 records, so no attempt is retried.
+#[test]
+fn f39_sampling_keeps_every_third_normal_record_and_every_important_one() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    assert_eq!(logger.set_channel(pose, Level::Trace, 3), Ok(2));
+    let sequence = [
+        (pose, 0, true),
+        (pose.important(), 100, true),
+        (pose, 1, false),
+        (pose, 2, false),
+        (pose.important(), 101, true),
+        (pose, 3, true),
+        (pose, 4, false),
+        (pose, 5, false),
+        (pose, 6, true),
+        (pose.important(), 102, true),
+        (pose, 7, false),
+        (pose, 8, false),
+    ];
+    for (channel, x, kept) in sequence {
+        let logged = writer.try_log(channel, &Pose { x, y: 0 }).unwrap();
+        assert_eq!(
+            matches!(logged, Logged::Accepted(_)),
+            kept,
+            "{x}: {logged:?}"
+        );
+    }
+    drop(writer);
+    close(logger);
+    let (normal, important) = (Some(Importance::Normal), Some(Importance::Important));
+    assert_eq!(
+        stored_revisions(&directory),
+        [
+            (0, Level::Info, normal, 2),
+            (3, Level::Info, normal, 2),
+            (6, Level::Info, normal, 2),
+            (100, Level::Info, important, 2),
+            (101, Level::Info, important, 2),
+            (102, Level::Info, important, 2),
+        ]
+    );
+}
+
+/// TASK-034 S2 (§22.2, D1): a change needs every producer to have applied the
+/// previous one. A taken writer that stays idle makes the next change `Busy`
+/// (after the bounded wait, here `drop_deadline` = 300 ms) until it calls
+/// `Writer::refresh`. Writers the logger still holds (never taken) and
+/// writers already dropped never cause `Busy`.
+#[test]
+fn f40_an_idle_taken_writer_makes_the_next_change_busy_until_it_refreshes() {
+    use dot_logger::logger::ConfigError;
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget().drop_deadline(Duration::from_millis(300)))
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer("active")
+        .writer("idle")
+        .writer("spare")
+        .start()
+        .unwrap();
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut active = logger.take_writer("active").unwrap();
+    let mut idle = logger.take_writer("idle").unwrap();
+    // The first change is always accepted.
+    assert_eq!(logger.set_channel(pose, Level::Warn, 1), Ok(2));
+    accept(&mut active, pose.at(Level::Warn), 0);
+    // `idle` has not applied revision 2 yet.
+    assert_eq!(
+        logger.set_channel(pose, Level::Error, 1),
+        Err(ConfigError::Busy)
+    );
+    assert_eq!(idle.refresh(), 2);
+    assert_eq!(logger.set_channel(pose, Level::Error, 1), Ok(3));
+    // A dropped writer is acknowledged by the logger; `active` refreshes.
+    assert_eq!(active.refresh(), 3);
+    drop(idle);
+    assert_eq!(logger.set_channel(pose, Level::Trace, 1), Ok(4));
+    accept(&mut active, pose, 1);
+    drop(active);
+    close(logger);
+    let normal = Some(Importance::Normal);
+    assert_eq!(
+        stored_revisions(&directory),
+        [(0, Level::Warn, normal, 2), (1, Level::Info, normal, 4)]
+    );
+}
+
+/// TASK-034 S2 (§22.2, D1): the tracing connection's internal writer is held
+/// by the logger, so consecutive changes succeed even when no event is ever
+/// emitted.
+#[cfg(feature = "tracing-adapter")]
+#[test]
+fn f41_the_idle_tracing_writer_never_makes_a_change_busy() {
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget().drop_deadline(Duration::from_millis(300)))
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<Pose>("robot/pose")
+        .writer("control")
+        .tracing(
+            "app/log",
+            ::tracing::Level::INFO,
+            WriterQuota::small(8, 512),
+        )
+        .start()
+        .unwrap();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    for (expected, level) in [(2, Level::Warn), (3, Level::Error), (4, Level::Info)] {
+        assert_eq!(logger.set_channel(pose, level, 1), Ok(expected));
+        assert_eq!(writer.refresh(), expected);
+    }
+    drop(writer);
+    close(logger);
+}
+
+/// TASK-034 S2 (§22.2): `sample_every = 0` and a channel issued by another
+/// logger are `Invalid`; nothing is posted, so the next valid change still
+/// gets revision 2.
+#[test]
+fn f42_invalid_changes_are_rejected_without_posting() {
+    use dot_logger::logger::ConfigError;
+    let (temp_a, temp_b) = (Temp::new(), Temp::new());
+    let (a, b) = (start(&temp_a), start(&temp_b));
+    let pose = b.channel::<Pose>("robot/pose").unwrap();
+    let foreign = a.channel::<Pose>("robot/pose").unwrap();
+    assert_eq!(
+        b.set_channel(pose, Level::Warn, 0),
+        Err(ConfigError::Invalid)
+    );
+    assert_eq!(
+        b.set_channel(foreign, Level::Warn, 1),
+        Err(ConfigError::Invalid)
+    );
+    assert_eq!(b.set_channel(pose, Level::Warn, 1), Ok(2));
+    close(a);
+    close(b);
+}
+
+#[test]
+fn f43_runtime_files_keep_revisions_and_session_cumulative_loss() {
+    use dot_logger::loss::{Cause, Scope};
+    use dot_logger::storage::LossReader;
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let directory = logger.directories()[0].clone();
+    let pose = logger.channel::<Pose>("robot/pose").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    accept(&mut writer, pose, 0);
+    assert_eq!(logger.set_channel(pose, Level::Warn, 1), Ok(2));
+    for _ in 0..3 {
+        assert_eq!(
+            writer.try_log(pose, &Pose { x: 1, y: 0 }),
+            Ok(Logged::Skipped)
+        );
+    }
+    accept(&mut writer, pose.at(Level::Warn), 2);
+    assert_eq!(logger.set_channel(pose, Level::Trace, 3), Ok(3));
+    for x in 10..15 {
+        writer.try_log(pose, &Pose { x, y: 0 }).unwrap();
+    }
+    drop(writer);
+    close(logger);
+    let mut reports = Vec::new();
+    let mut session = None;
+    let mut revisions = Vec::new();
+    for file in closed_files(&directory).0 {
+        let bytes = std::fs::read(file).unwrap();
+        let info = NativeReader::new(&bytes, 64, 1).unwrap().info();
+        assert_eq!(*session.get_or_insert(info.session), info.session);
+        revisions.push(info.revision);
+        reports.extend(
+            LossReader::new(&bytes, 64, 1)
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+        );
+    }
+    assert_eq!(revisions, [1, 2, 3]);
+    assert!(
+        reports
+            .iter()
+            .all(|r| r.session == session.unwrap() && r.epoch == 1)
+    );
+    let deltas = dot_logger::loss::summarize(&reports, 4096).unwrap();
+    let row = deltas
+        .iter()
+        .find(|d| {
+            d.counter.scope == Scope::IntentionalSkip
+                && d.counter.cause == Cause::Policy
+                && d.counter.channel == Some(1)
+        })
+        .unwrap();
+    assert_eq!(
+        (row.counter.count, row.delta, row.tail_confirmed),
+        (6, Some(6), true)
+    );
+    assert_eq!(
+        stored_revisions(&directory)
+            .iter()
+            .map(|(x, ..)| *x)
+            .collect::<Vec<_>>(),
+        [0, 2, 10, 13]
+    );
+}
+
+#[test]
+fn f44_native_control_topic_collisions_fail_before_creating_a_namespace() {
+    for topic in ["_dot_logger/meta", "_dot_logger/loss"] {
+        let temp = Temp::new();
+        let result = Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+            .channel::<Pose>(topic)
+            .writer("control")
+            .start();
+        assert!(result.is_err(), "reserved topic {topic} accepted");
+        assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
+    }
+}

@@ -98,11 +98,13 @@ let logger = Logger::builder()
     .writer_with("control", WriterQuota::small(64, 256).important(8)) // 중요 기록 예약
     .start()?;
 writer.try_log(alarm.important(), &msg)?;                 // 기록 하나만 중요로 표시
+let revision = logger.set_channel(alarm, Level::Warn, 3)?; // 일반 thread: level·Normal 샘플링
 let mark = logger.mark_event()?;                          // 지금 시각 기준 [-30 s, +10 s] 보호
 ```
 
 - **중요 기록:** writer 예약(`WriterQuota::important`)이 있을 때만 포화에서 보호됩니다. 예약 없이 `important_from`을 쓰면 `plan()`이 `PlanWarning::NoImportantReserve`를 보고합니다.
-- **최소 level:** 시작할 때 정합니다. 실행 중 변경은 저장 계층의 revision 회전 설계(TASK-030 S2) 뒤에 추가됩니다.
+- **level·샘플링 변경:** `set_channel(channel, minimum, sample_every)`는 게시된 revision을 반환합니다. Normal 기록은 첫 번째와 매 `sample_every`번째를 남기며(1은 모두), Important는 샘플링하지 않습니다. level 하한은 Important에도 적용됩니다. 파일은 기록이 적용받은 revision 경계에서 회전합니다.
+- **쉬는 writer:** 다음 `try_log`에서 새 설정을 적용합니다. 사용자가 꺼낸 writer가 쉬고 있으면 후속 변경이 `ConfigError::Busy`일 수 있으므로 그 thread에서 주기적으로 `writer.refresh()`를 부릅니다. 꺼내지 않은 writer·tracing writer·반납한 writer는 facade가 ack합니다. 다른 로컬 설정 요청이 대기 중이어도 Busy를 반환합니다. 이 응답은 파일 sync 완료를 뜻하지 않습니다.
 - **이벤트 보존:**
   - `mark_event`는 일반 thread에서 부릅니다. RT thread는 그 thread에 알리면 됩니다.
   - `hold`가 끝나거나 `release_event`를 부르면 보호가 풀립니다.

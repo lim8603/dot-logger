@@ -131,21 +131,8 @@ impl State {
             .len()
             .checked_mul(routing.targets.len())
             .ok_or_else(overflow)?;
-        let mut bytes = size_of::<Self>();
-        for (n, size) in [
-            (channels.len(), 2 * size_of::<Policy>() + size_of::<u32>()),
-            (route_count, 2 * size_of::<AtomicUsize>()),
-            (routing.targets.len(), size_of::<u32>()),
-            (producers, size_of::<Progress>()),
-        ] {
-            bytes = bytes
-                .checked_add(
-                    n.checked_mul(size)
-                        .filter(|n| *n <= isize::MAX as usize)
-                        .ok_or_else(overflow)?,
-                )
-                .ok_or_else(overflow)?;
-        }
+        let bytes = Self::required(channels.len(), producers, routing.targets.len())
+            .ok_or_else(overflow)?;
         if bytes > available {
             return Err(ConfigUpdateError::Config(ConfigError::BudgetExceeded {
                 resource: Resource::Control,
@@ -195,6 +182,23 @@ impl State {
             }),
             reserved: bytes,
         })
+    }
+    /// Control bytes `new` charges for this shape: both banks, progress and
+    /// the registered ID lists. `None` on overflow or a layout a boxed slice
+    /// cannot represent. Shared with the facade sizing so the derived budget
+    /// and the actual reservation cannot diverge.
+    pub(crate) fn required(channels: usize, producers: usize, targets: usize) -> Option<usize> {
+        let mut bytes = size_of::<Self>();
+        for (n, size) in [
+            (channels, 2 * size_of::<Policy>() + size_of::<u32>()),
+            (channels.checked_mul(targets)?, 2 * size_of::<AtomicUsize>()),
+            (targets, size_of::<u32>()),
+            (producers, size_of::<Progress>()),
+        ] {
+            bytes =
+                bytes.checked_add(n.checked_mul(size).filter(|n| *n <= isize::MAX as usize)?)?;
+        }
+        Some(bytes)
     }
     pub(crate) fn reserved(&self) -> usize {
         self.reserved

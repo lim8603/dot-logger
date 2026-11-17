@@ -72,7 +72,10 @@ use crate::capture::{
     CaptureBuildError, CaptureOwner, ChannelConfig, Importance, ImportanceMapping,
 };
 use crate::completion::ProducerRange;
-use crate::config::{ConfigError, MemoryBudget, Resource, SessionBuilder, ValidatedConfig};
+use crate::config::{
+    ConfigError as CoreConfigError, MemoryBudget, Resource, SessionBuilder, ValidatedConfig,
+};
+use crate::control::config_update::ConfigUpdateError;
 use crate::control::{ControlError, ShutdownReport};
 use crate::routing::RoutingError;
 use crate::storage::{RetentionError, StorageChannel, StorageError};
@@ -138,7 +141,7 @@ pub enum StartError {
         available: u64,
     },
     /// Platform or configuration validation failed.
-    Config(ConfigError),
+    Config(CoreConfigError),
     /// Ingress construction failed.
     Capture(CaptureBuildError),
     /// Routing construction failed.
@@ -181,9 +184,9 @@ impl fmt::Display for StartError {
 }
 impl std::error::Error for StartError {}
 
-fn budget_error(error: &ConfigError) -> Option<StartError> {
+fn budget_error(error: &CoreConfigError) -> Option<StartError> {
     match *error {
-        ConfigError::BudgetExceeded {
+        CoreConfigError::BudgetExceeded {
             resource,
             required,
             available,
@@ -195,8 +198,8 @@ fn budget_error(error: &ConfigError) -> Option<StartError> {
         _ => None,
     }
 }
-impl From<ConfigError> for StartError {
-    fn from(error: ConfigError) -> Self {
+impl From<CoreConfigError> for StartError {
+    fn from(error: CoreConfigError) -> Self {
         budget_error(&error).unwrap_or(Self::Config(error))
     }
 }
@@ -261,6 +264,36 @@ impl fmt::Display for LookupError {
     }
 }
 impl std::error::Error for LookupError {}
+
+/// Why [`Logger::set_channel`] could not confirm a change (API §22.2).
+/// Fixed codes, no dynamic diagnostics. Busy, Invalid and Closing do not post
+/// this request; Failed can leave an unconfirmed posted revision.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConfigError {
+    /// The previous change has not settled within the bounded wait
+    /// (`Budget::drop_deadline`): a writer taken with
+    /// [`Logger::take_writer`] has neither logged nor called
+    /// [`Writer::refresh`] since that change, or records admitted before it
+    /// are still being written. Also returned if another local request already
+    /// occupies the host's single waiting slot. Retry after the writer refreshes
+    /// or the waiting call finishes.
+    Busy,
+    /// `sample_every` is 0, or the channel was issued by another logger.
+    Invalid,
+    /// Admission is closed (shutdown started, or a worker failed).
+    Closing,
+    /// The default worker stopped or did not answer in time, or the core
+    /// refused the change for an internal reason (exhausted revisions,
+    /// unavailable management state). After a missing answer the change may
+    /// still have been posted.
+    Failed,
+}
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "channel change failed: {self:?}")
+    }
+}
+impl std::error::Error for ConfigError {}
 
 /// Shutdown could not report a result.
 #[derive(Debug)]
@@ -411,7 +444,8 @@ pub struct ChannelOptions {
 }
 
 impl ChannelOptions {
-    /// Defaults: routed to every file output, every level Normal.
+    /// Defaults: routed to every file output, every level Normal, every
+    /// level admitted.
     pub fn new() -> Self {
         Self::default()
     }
@@ -431,9 +465,9 @@ impl ChannelOptions {
     /// Admit only records sent at `level` or more severe (API §22.2). Lower
     /// records return [`Logged::Skipped`] on
     /// the RT path without waiting, are not stored and are not counted as
-    /// losses. The minimum is fixed for the session; changing it while
-    /// running waits for the storage revision rotation planned with TASK-030
-    /// S2 (Human decision 2026-11-15). Default: every level (Trace).
+    /// accidental losses (they remain intentional Policy omissions in loss
+    /// reports). Change the policy while running with [`Logger::set_channel`].
+    /// Default: every level (Trace).
     pub fn minimum(mut self, level: Level) -> Self {
         self.minimum = Some(level);
         self
@@ -562,7 +596,8 @@ impl LoggerBuilder {
     ///
     /// Records are sent at `Info` unless [`Channel::at`] picks another level;
     /// the channel itself admits every level (its minimum is `Trace`), so a
-    /// lower sending level is never filtered out by the registration.
+    /// lower sending level is never filtered out by the registration. Use
+    /// [`ChannelOptions::minimum`] or [`Logger::set_channel`] to filter.
     pub fn channel<T: Record + ?Sized>(self, topic: &str) -> Self {
         self.channel_with::<T>(topic, ChannelOptions::new())
     }
@@ -615,7 +650,10 @@ impl LoggerBuilder {
     /// wrote, so a channel routed away from output 0 with
     /// [`ChannelOptions::outputs`] is not observed; copies are not completion
     /// targets, and their overflow is their own
-    /// Gap/Disconnect. GetStatus is answered; other requests are Unsupported.
+    /// Gap/Disconnect. GetStatus and channel level/sampling ApplyConfig are
+    /// served by the default worker. Route patches are InvalidInput and memory
+    /// changes RestartRequired; other data requests are Unsupported. Compare
+    /// has no registered snapshots and cannot produce a comparison.
     /// Limits are derived from the writer quotas (see API §18.11) and their
     /// buffers are charged to `Budget::memory_bytes`.
     #[cfg(feature = "remote")]
@@ -848,6 +886,14 @@ impl LoggerBuilder {
         if self.telemetry {
             owner.enable_telemetry()?;
         }
+        // Runtime level/sampling changes (API §22.2); `derive` sized the banks.
+        owner
+            .enable_config_updates(&derived.routing)
+            .map_err(|error| match error {
+                ConfigUpdateError::Config(error) => StartError::from(error),
+                // The routing is the one the registry was built from.
+                _ => StartError::InvalidBudget,
+            })?;
         let slot_bytes: Vec<usize> = plan
             .config()
             .producers
@@ -886,6 +932,11 @@ impl LoggerBuilder {
             }
             _ => None,
         };
+        let held = Held {
+            writers: Arc::new(Mutex::new(writers)),
+            #[cfg(feature = "tracing-adapter")]
+            sink,
+        };
         let shared = Arc::new(Shared::new(self.outputs.len(), self.telemetry));
         #[cfg(feature = "remote")]
         shared.placed(remote_placed);
@@ -919,6 +970,7 @@ impl LoggerBuilder {
             shared: Arc::clone(&shared),
             cpus: derived.cpus,
             remote: running,
+            held: held.clone(),
         };
         let (directories, _detached) = match host::spawn(host, receive) {
             Ok(started) => started,
@@ -927,9 +979,8 @@ impl LoggerBuilder {
                 // failed host's reaper on this management thread, then wait
                 // until it stopped the listener and released the core, so
                 // nothing keeps running once `start` returns.
-                drop(writers);
-                #[cfg(feature = "tracing-adapter")]
-                drop(sink);
+                held.release();
+                drop(held);
                 if let Some(host) = failed.host {
                     let _ = host.join();
                 }
@@ -940,7 +991,7 @@ impl LoggerBuilder {
             commands: Some(commands),
             events,
             next_mark: AtomicU64::new(1),
-            writers: Mutex::new(writers),
+            held,
             channels,
             session,
             directories,
@@ -948,8 +999,6 @@ impl LoggerBuilder {
             shared,
             origin,
             overdue,
-            #[cfg(feature = "tracing-adapter")]
-            sink,
             #[cfg(feature = "remote")]
             remote_addr,
         })
@@ -986,6 +1035,52 @@ fn new_session_id() -> u128 {
         ^ (u128::from(NEXT.fetch_add(1, Ordering::Relaxed)) << 64)
 }
 
+/// Writers the logger holds itself: declared but not taken, and the tracing
+/// connection's internal writer. Shared with the default worker, which makes
+/// them apply a posted configuration revision (API §22.2, D1).
+type HeldWriters = Arc<Mutex<Vec<(String, Option<Writer>)>>>;
+
+#[derive(Clone)]
+pub(crate) struct Held {
+    writers: HeldWriters,
+    #[cfg(feature = "tracing-adapter")]
+    sink: Option<Arc<sink::SinkState>>,
+}
+
+impl Held {
+    /// Apply the latest posted revision without waiting for an application
+    /// thread holding a writer. A later management turn retries skipped locks.
+    pub(crate) fn acknowledge(&self) {
+        let writers = match self.writers.try_lock() {
+            Ok(writers) => Some(writers),
+            Err(std::sync::TryLockError::Poisoned(writers)) => Some(writers.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => None,
+        };
+        if let Some(mut writers) = writers {
+            for writer in writers.iter_mut().filter_map(|(_, w)| w.as_mut()) {
+                writer.refresh();
+            }
+        }
+        #[cfg(feature = "tracing-adapter")]
+        if let Some(sink) = &self.sink {
+            sink.acknowledge();
+        }
+    }
+
+    /// Return every held writer's state (shutdown, failed start); later
+    /// tracing events are dropped and counted.
+    fn release(&self) {
+        self.writers
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+        #[cfg(feature = "tracing-adapter")]
+        if let Some(sink) = &self.sink {
+            drop(sink.reclaim());
+        }
+    }
+}
+
 /// A running logger. Management handle: create, query and shut it down on
 /// ordinary threads; hand [`Writer`]s to RT threads.
 pub struct Logger {
@@ -993,7 +1088,7 @@ pub struct Logger {
     /// Request channel of each event output's IO thread.
     events: Vec<Sender<event::EventWork>>,
     next_mark: AtomicU64,
-    writers: Mutex<Vec<(String, Option<Writer>)>>,
+    held: Held,
     channels: Vec<ChannelSpec>,
     session: u128,
     directories: Vec<PathBuf>,
@@ -1001,8 +1096,6 @@ pub struct Logger {
     shared: Arc<Shared>,
     origin: Instant,
     overdue: Duration,
-    #[cfg(feature = "tracing-adapter")]
-    sink: Option<Arc<sink::SinkState>>,
     #[cfg(feature = "remote")]
     remote_addr: Option<std::net::SocketAddr>,
 }
@@ -1030,6 +1123,7 @@ impl Logger {
     /// Take a declared writer. Each writer can be taken once.
     pub fn take_writer(&self, name: &str) -> Result<Writer, LookupError> {
         let mut writers = self
+            .held
             .writers
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -1058,7 +1152,7 @@ impl Logger {
         let mut health = self.shared.health(now, self.overdue);
         #[cfg(feature = "tracing-adapter")]
         {
-            health.tracing_dropped = self.sink.as_ref().map(|s| s.dropped());
+            health.tracing_dropped = self.held.sink.as_ref().map(|s| s.dropped());
         }
         health
     }
@@ -1073,7 +1167,8 @@ impl Logger {
     /// Clones share one internal writer; shutdown reclaims it.
     #[cfg(feature = "tracing-adapter")]
     pub fn tracing(&self) -> Result<TracingSink, LookupError> {
-        self.sink
+        self.held
+            .sink
             .as_ref()
             .map(|state| TracingSink {
                 state: Arc::clone(state),
@@ -1181,6 +1276,74 @@ impl Logger {
         result
     }
 
+    /// Change a channel's minimum level and sampling while running (API
+    /// §22.2) and return its posted configuration revision. Writers apply it
+    /// at their next call boundary; this does not wait for file rotation or sync. Records sent at a less severe level are then
+    /// [`Logged::Skipped`]; of the Normal records at or above it, the first
+    /// and every `sample_every`-th are kept (1 keeps all), while Important
+    /// records are never sampled out. Every stored record carries the
+    /// revision it was admitted under, so records before and after a change
+    /// stay distinguishable.
+    ///
+    /// General path: the default worker posts the change and this call waits
+    /// for its answer. Each writer applies a posted change at its next
+    /// [`Writer::try_log`] or [`Writer::refresh`]; writers still held by the
+    /// logger (not taken, the tracing writer) and writers already dropped are
+    /// handled by the logger. A change can only be posted once every writer
+    /// applied the previous one and the records admitted before it were
+    /// written; the worker retries until `Budget::drop_deadline` passes and
+    /// then reports [`ConfigError::Busy`]. Asking for the policy already in
+    /// effect posts nothing and returns its revision. The first revision is 1.
+    ///
+    /// ```no_run
+    /// # use dot_logger::logger::{Logger, Writer, Level};
+    /// # fn adjust(logger: &Logger, writer: &mut Writer) -> Result<(), Box<dyn std::error::Error>> {
+    /// let channel = logger.channel::<[u8]>("robot/pose")?;
+    /// let _posted = logger.set_channel(channel, Level::Warn, 3)?;
+    /// writer.refresh(); // Optional when this writer logs regularly.
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::Invalid`] for `sample_every == 0` or a channel of
+    /// another logger; [`ConfigError::Busy`], [`ConfigError::Closing`] and
+    /// [`ConfigError::Failed`] as documented on [`ConfigError`].
+    pub fn set_channel<T: ?Sized>(
+        &self,
+        channel: Channel<T>,
+        minimum: Level,
+        sample_every: u32,
+    ) -> Result<u64, ConfigError> {
+        let known =
+            usize::try_from(channel.id).is_ok_and(|id| (1..=self.channels.len()).contains(&id));
+        if channel.session != self.session || !known || sample_every == 0 {
+            return Err(ConfigError::Invalid);
+        }
+        let commands = self.commands.as_ref().ok_or(ConfigError::Closing)?;
+        // D1: writers the logger holds apply the latest revision first, so
+        // only taken writers can hold the change back.
+        self.held.acknowledge();
+        let (reply, answer) = mpsc::channel();
+        commands
+            .send(Command::Configure {
+                channel: crate::control::config_update::ChannelPatch {
+                    channel_id: channel.id,
+                    minimum_level: minimum,
+                    sample_every,
+                },
+                deadline: budget::later(Instant::now(), self.drop_deadline),
+                reply,
+            })
+            .map_err(|_| ConfigError::Failed)?;
+        // The worker answers by the deadline; the grace covers its turn.
+        match answer.recv_timeout(self.drop_deadline.saturating_add(REPORT_GRACE)) {
+            Ok(result) => result,
+            Err(_) => Err(ConfigError::Failed),
+        }
+    }
+
     /// Close admission, drain, synchronize and publish every file, then report.
     /// After `deadline` the current state is returned as `Incomplete`.
     pub fn shutdown(mut self, deadline: Duration) -> Result<Shutdown, ShutdownError> {
@@ -1189,14 +1352,7 @@ impl Logger {
 
     fn request_shutdown(&mut self, deadline: Duration) -> Result<Shutdown, ShutdownError> {
         // Untaken writers return their state before the report counts them.
-        self.writers
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clear();
-        #[cfg(feature = "tracing-adapter")]
-        if let Some(sink) = &self.sink {
-            drop(sink.reclaim());
-        }
+        self.held.release();
         let commands = self.commands.take().ok_or(ShutdownError::WorkerFailed)?;
         let (reply, progress) = mpsc::channel();
         commands

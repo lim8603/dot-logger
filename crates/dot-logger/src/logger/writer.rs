@@ -193,7 +193,10 @@ impl<T: ?Sized> std::fmt::Debug for Channel<T> {
 pub enum Logged {
     /// Accepted into the preallocated ingress.
     Accepted(CaptureReceipt),
-    /// Filtered by the channel's level or sampling policy.
+    /// Filtered by the channel's minimum level
+    /// ([`ChannelOptions::minimum`](crate::logger::ChannelOptions::minimum),
+    /// [`Logger::set_channel`](crate::logger::Logger::set_channel)) or its
+    /// sampling; nothing is stored.
     Skipped,
 }
 
@@ -298,6 +301,20 @@ impl Writer {
             // `state` is only taken inside Drop, after which no method can run.
             None => unreachable!("writer state is present until drop"),
         }
+    }
+
+    /// Apply the latest channel change posted with
+    /// [`Logger::set_channel`](crate::logger::Logger::set_channel) (API §22.2,
+    /// D1) and return the configuration revision this writer now applies.
+    ///
+    /// `try_log` does the same on entry, so a writer that logs regularly never
+    /// needs this. A writer that stays idle holds the next change back
+    /// ([`ConfigError::Busy`](crate::logger::ConfigError::Busy)) until it logs
+    /// or calls `refresh`; call it periodically from such a thread. RT path:
+    /// a fixed number of atomic loads and stores, no waiting and no
+    /// allocation; it does not drain records or wake the worker.
+    pub fn refresh(&mut self) -> u64 {
+        self.producer().apply_pending_config()
     }
 
     /// Session monotonic time of this logger, in nanoseconds.

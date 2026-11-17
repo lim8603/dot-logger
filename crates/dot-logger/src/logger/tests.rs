@@ -436,3 +436,127 @@ fn event_rollback_still_runs_after_the_worker_failed_flag() {
         "rollback skipped after worker failure"
     );
 }
+
+/// TASK-034 S2 (§22.2): `set_channel` once admission closed. `shutdown`
+/// consumes the `Logger`, so the reachable closed state is a failed IO worker
+/// (admission closed, host still answering): `Closing`. A dead host answers
+/// nothing: `Failed`, without waiting for the deadline.
+#[test]
+// Real files, threads and the wall clock: outside Miri's isolation.
+#[cfg_attr(miri, ignore)]
+fn set_channel_reports_closing_after_an_io_failure_and_failed_without_a_host() {
+    use super::{ConfigError, Level};
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    assert_eq!(logger.set_channel(blob, Level::Warn, 1), Ok(2));
+    logger.shared.inject.store(2, Ordering::Release);
+    until_closing(&mut writer, blob, Duration::from_secs(5));
+    assert_eq!(
+        logger.set_channel(blob, Level::Error, 1),
+        Err(ConfigError::Closing)
+    );
+    drop(writer);
+    let _ = logger.shutdown(Duration::from_secs(10));
+
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    logger.shared.inject.store(1, Ordering::Release);
+    until_closing(&mut writer, blob, Duration::from_secs(5));
+    // The host thread may still be unwinding; it never answers either way.
+    let begun = Instant::now();
+    assert_eq!(
+        logger.set_channel(blob, Level::Error, 1),
+        Err(ConfigError::Failed)
+    );
+    assert!(begun.elapsed() < Duration::from_secs(1));
+    drop(writer);
+    let _ = logger.shutdown(Duration::from_secs(10));
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn configuration_does_not_wait_for_the_held_writer_mutex() {
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let held = logger.held.clone();
+    let lock = held.writers.lock().unwrap();
+    let result = std::thread::scope(|scope| {
+        let (send, receive) = std::sync::mpsc::channel();
+        let logger = &logger;
+        scope.spawn(move || {
+            let _ = send.send(logger.set_channel(blob, super::Level::Warn, 1));
+        });
+        let result = receive.recv_timeout(Duration::from_millis(500));
+        drop(lock);
+        result
+    });
+    assert_eq!(result.unwrap(), Ok(2));
+    logger.shutdown(Duration::from_secs(5)).unwrap();
+}
+
+#[test]
+#[cfg_attr(miri, ignore)]
+fn a_waiting_configuration_is_retained_and_additional_requests_are_busy() {
+    use super::{Command, ConfigError, Level};
+    use crate::control::config_update::ChannelPatch;
+    let temp = Temp::new();
+    let logger = start(&temp);
+    let blob = logger.channel::<[u8]>("blob").unwrap();
+    let mut writer = logger.take_writer("control").unwrap();
+    assert_eq!(logger.set_channel(blob, Level::Warn, 1), Ok(2));
+    let request = |minimum_level| {
+        let (reply, answer) = std::sync::mpsc::channel();
+        logger
+            .commands
+            .as_ref()
+            .unwrap()
+            .send(Command::Configure {
+                channel: ChannelPatch {
+                    channel_id: 1,
+                    minimum_level,
+                    sample_every: 1,
+                },
+                deadline: Instant::now() + Duration::from_secs(5),
+                reply,
+            })
+            .unwrap();
+        answer
+    };
+    let first = request(Level::Error);
+    let second = request(Level::Info);
+    assert_eq!(
+        second.recv_timeout(Duration::from_secs(1)).unwrap(),
+        Err(ConfigError::Busy)
+    );
+    assert_eq!(writer.refresh(), 2);
+    assert_eq!(first.recv_timeout(Duration::from_secs(1)).unwrap(), Ok(3));
+    assert_eq!(writer.refresh(), 3);
+    // An already expired queued request must never be posted later.
+    let (reply, answer) = std::sync::mpsc::channel();
+    logger
+        .commands
+        .as_ref()
+        .unwrap()
+        .send(Command::Configure {
+            channel: ChannelPatch {
+                channel_id: 1,
+                minimum_level: Level::Trace,
+                sample_every: 1,
+            },
+            deadline: Instant::now() - Duration::from_secs(1),
+            reply,
+        })
+        .unwrap();
+    assert_eq!(
+        answer.recv_timeout(Duration::from_secs(1)).unwrap(),
+        Err(ConfigError::Busy)
+    );
+    assert_eq!(logger.set_channel(blob, Level::Error, 1), Ok(3));
+    drop(writer);
+    logger.shutdown(Duration::from_secs(5)).unwrap();
+}

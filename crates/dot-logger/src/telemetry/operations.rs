@@ -239,7 +239,9 @@ impl OperationsHost {
 fn posted_revision(updates: Option<ConfigUpdates<'_>>) -> Option<u64> {
     updates.and_then(|u| u.posted_revision().ok())
 }
-fn parse_patch(bytes: &[u8]) -> Result<ConfigPatch, RemoteError> {
+/// Parse a `dot_logger.config_patch.v1` patch without posting it. The facade
+/// uses it to refuse route changes before `apply` (API §22.2).
+pub(crate) fn parse_patch(bytes: &[u8]) -> Result<ConfigPatch, RemoteError> {
     let bad = RemoteError::InvalidInput;
     let Ok(Json::Object(root)) = serde_json::from_slice::<Json>(bytes) else {
         return Err(bad);

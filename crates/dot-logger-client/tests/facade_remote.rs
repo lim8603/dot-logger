@@ -362,3 +362,125 @@ fn f13_status_carries_the_operations_report_when_telemetry_is_enabled() {
     };
     assert!(report.is_success(), "{report:?}");
 }
+
+/// TASK-034 S2 (§22.2): a remote `ApplyConfig` (`dot_logger.config_patch.v1`,
+/// Manage permission) changes a channel's level through the facade host, like
+/// `Logger::set_channel`. Route and memory changes stay refused: a route patch
+/// is `InvalidInput` and a memory patch `RestartRequired`; neither posts.
+#[test]
+fn f13_remote_apply_config_changes_the_level_and_refuses_routes() {
+    use dot_logger::adapters::remote::{AccessToken, Permission};
+    use dot_logger::logger::Logged;
+    for telemetry in [false, true] {
+        let token = "test-only-manage-credential";
+        let temp = Temp::new();
+        let builder = Logger::builder()
+            .budget(budget())
+            .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+            .channel::<[u8]>("blob")
+            .writer("control")
+            .remote(ServerConfig {
+                tokens: vec![AccessToken::new(token.into(), Permission::Manage).unwrap()],
+                ..server()
+            });
+        let logger = if telemetry {
+            builder.telemetry()
+        } else {
+            builder
+        }
+        .start()
+        .unwrap();
+        let directory = logger.directories()[0].clone();
+        let address = logger.remote_addr().unwrap();
+        let blob = logger.channel::<[u8]>("blob").unwrap();
+        let mut writer = logger.take_writer("control").unwrap();
+        assert!(matches!(
+            writer.try_log(blob, &[0][..]),
+            Ok(Logged::Accepted(_))
+        ));
+        let rt = runtime();
+        let cancel = Cancellation::new();
+        let mut config = RemoteConfig::new(format!("http://{address}"));
+        config.token = Some(token.into());
+        let mut client = rt.block_on(RemoteClient::connect(config, &cancel)).unwrap();
+        let mut apply = |base_revision: u64, patch: &str| {
+            rt.block_on(client.request(
+                ManagementRequest::ApplyConfig {
+                    base_revision,
+                    patch: patch.as_bytes().to_vec(),
+                },
+                &cancel,
+            ))
+        };
+        let routes =
+            r#"{"schema":"dot_logger.config_patch.v1","routes":[{"channel":1,"targets":[1]}]}"#;
+        assert!(
+            matches!(
+                apply(1, routes),
+                Err(ClientError::Remote(RemoteError::InvalidInput))
+            ),
+            "a route patch must be refused"
+        );
+        let memory = r#"{"schema":"dot_logger.config_patch.v1","memory":{"total_bytes":1}}"#;
+        assert!(matches!(
+            apply(1, memory),
+            Err(ClientError::Remote(RemoteError::RestartRequired))
+        ));
+        let warn = r#"{"schema":"dot_logger.config_patch.v1","channels":[{"channel":1,"minimum_level":"warn","sample_every":1}]}"#;
+        let applied = apply(1, warn).unwrap();
+        assert!(
+            matches!(applied, ManagementReply::Applied(2)),
+            "{applied:?}"
+        );
+
+        let error = r#"{"schema":"dot_logger.config_patch.v1","channels":[{"channel":1,"minimum_level":"error","sample_every":1}]}"#;
+        assert!(matches!(
+            apply(1, error),
+            Err(ClientError::Remote(RemoteError::Conflict))
+        ));
+        assert!(matches!(
+            apply(2, error),
+            Err(ClientError::Remote(RemoteError::Busy))
+        ));
+        assert_eq!(writer.try_log(blob, &[1][..]), Ok(Logged::Skipped));
+        assert!(matches!(
+            writer.try_log(blob.at(Level::Warn), &[2][..]),
+            Ok(Logged::Accepted(_))
+        ));
+        let status = rt
+            .block_on(client.request(ManagementRequest::GetStatus, &cancel))
+            .unwrap();
+        assert!(
+            matches!(status, ManagementReply::Status { revision: 2, .. }),
+            "{status:?}"
+        );
+        // The local path continues from the remote revision.
+        assert_eq!(logger.set_channel(blob, Level::Trace, 1), Ok(3));
+        assert!(matches!(
+            writer.try_log(blob.at(Level::Debug), &[3][..]),
+            Ok(Logged::Accepted(_))
+        ));
+        client.disconnect();
+        drop(writer);
+        let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {
+            panic!("shutdown did not close");
+        };
+        assert!(report.is_success(), "{report:?}");
+        let mut stored = Vec::new();
+        for entry in std::fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|e| e == "mcap") {
+                let bytes = std::fs::read(path).unwrap();
+                let reader = dot_logger::storage::NativeReader::new(&bytes, 8, 1).unwrap();
+                let revision = reader.info().revision;
+                for item in reader {
+                    let item = item.unwrap();
+                    assert_eq!(item.record.revision, revision);
+                    stored.push((item.payload[0], revision));
+                }
+            }
+        }
+        stored.sort_unstable();
+        assert_eq!(stored, [(0, 1), (2, 2), (3, 3)]);
+    }
+}

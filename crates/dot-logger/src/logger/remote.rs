@@ -2,9 +2,11 @@
 //!
 //! Subscribers receive best-effort copies of what the first file output wrote;
 //! they are not completion targets, so the network never delays or fails file
-//! recording. Management answers GetStatus only. Without the `remote` feature
-//! every type here is an inert stub so the host code stays free of `cfg`.
+//! recording. Management answers GetStatus and level/sampling ApplyConfig
+//! (API §22.2). Without the `remote` feature every type here is an inert stub
+//! so the host code stays free of `cfg`.
 
+use crate::control::config_update::ConfigUpdates;
 use crate::routing::Delivery;
 use crate::telemetry::Telemetry;
 
@@ -43,11 +45,19 @@ impl Remote {
     }
 
     /// Answer queued management commands; one nonwaiting host turn.
+    /// `acknowledge` makes the producers the facade holds apply the latest
+    /// revision before an ApplyConfig is posted (D1).
     #[cfg_attr(not(feature = "remote"), allow(unused_variables))]
-    pub(crate) fn serve(&mut self, telemetry: Option<Telemetry<'_>>, now_ns: u64) {
+    pub(crate) fn serve(
+        &mut self,
+        telemetry: Option<Telemetry<'_>>,
+        updates: Option<ConfigUpdates<'_>>,
+        acknowledge: &mut dyn FnMut(),
+        now_ns: u64,
+    ) {
         #[cfg(feature = "remote")]
         if let Some(runtime) = self.runtime.as_mut() {
-            runtime.serve(telemetry, now_ns);
+            runtime.serve(telemetry, updates, acknowledge, now_ns);
         }
     }
 
@@ -98,10 +108,11 @@ mod imp {
         RemoteServer, ServerConfig,
     };
     use crate::config::ValidatedConfig;
+    use crate::control::config_update::ConfigUpdates;
     use crate::platform::Requirement;
     use crate::query::QueryBudget;
     use crate::telemetry::Telemetry;
-    use crate::telemetry::operations::OperationsHost;
+    use crate::telemetry::operations::{OperationsHost, parse_patch};
 
     use super::super::StartError;
     use super::super::affinity::pin_current;
@@ -249,26 +260,54 @@ mod imp {
             }
         }
 
-        /// Answer every queued command. With telemetry the operations backend
-        /// serves GetStatus (`dot_logger.status.v1`), ApplyConfig (Unsupported:
-        /// no live configuration path) and Compare (no snapshots: Gone). Without
-        /// it GetStatus carries an empty report, meaning no metrics backend.
-        /// Every other request is Unsupported.
-        pub(crate) fn serve(&mut self, telemetry: Option<Telemetry<'_>>, now_ns: u64) {
+        /// Answer every queued command. ApplyConfig (`dot_logger.config_patch.v1`)
+        /// posts level/sampling changes like `Logger::set_channel`, once and
+        /// without waiting: a previous change that has not settled is `Busy`.
+        /// Route changes are refused as `InvalidInput` and memory changes as
+        /// `RestartRequired` (API §22.2). With telemetry the operations backend
+        /// serves GetStatus (`dot_logger.status.v1`) and Compare (no
+        /// snapshots: Gone). Without it GetStatus carries an empty report,
+        /// meaning no metrics backend. Every other request is Unsupported.
+        pub(crate) fn serve(
+            &mut self,
+            telemetry: Option<Telemetry<'_>>,
+            updates: Option<ConfigUpdates<'_>>,
+            acknowledge: &mut dyn FnMut(),
+            now_ns: u64,
+        ) {
             let Some(inbox) = self.inbox.as_mut() else {
                 return;
             };
             while let Some(command) = inbox.try_next() {
+                if let ManagementRequest::ApplyConfig {
+                    base_revision,
+                    patch,
+                } = command.request()
+                {
+                    let reply = match parse_patch(patch) {
+                        Err(error) => Err(error),
+                        // Routes are fixed in the facade: `outputs` at start.
+                        Ok(parsed) if !parsed.routes.is_empty() => Err(RemoteError::InvalidInput),
+                        Ok(_) => {
+                            acknowledge();
+                            self.operations.apply(updates, *base_revision, patch)
+                        }
+                    };
+                    command.respond(reply.map(ManagementReply::Applied));
+                    continue;
+                }
                 match telemetry {
                     Some(telemetry) => {
                         self.operations
-                            .handle_command(command, telemetry, None, now_ns);
+                            .handle_command(command, telemetry, updates, now_ns);
                     }
                     None => {
                         let reply = match command.request() {
                             ManagementRequest::GetStatus => Ok(ManagementReply::Status {
                                 session: self.session,
-                                revision: 1,
+                                revision: updates
+                                    .and_then(|u| u.posted_revision().ok())
+                                    .unwrap_or(1),
                                 report: Vec::new(),
                             }),
                             _ => Err(RemoteError::Unsupported),

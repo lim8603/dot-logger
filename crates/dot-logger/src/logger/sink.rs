@@ -4,7 +4,7 @@
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, TryLockError};
 
 use crate::adapters::tracing::{log_level, log_record, tracing_event, tracing_level};
 use crate::capture::Level;
@@ -45,6 +45,19 @@ impl SinkState {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .take()
+    }
+
+    /// Acknowledge a posted revision without waiting for an event encoder
+    /// holding this lock (including reentrant management on that thread).
+    pub(crate) fn acknowledge(&self) {
+        let mut writer = match self.writer.try_lock() {
+            Ok(writer) => Some(writer),
+            Err(TryLockError::Poisoned(writer)) => Some(writer.into_inner()),
+            Err(TryLockError::WouldBlock) => None,
+        };
+        if let Some(writer) = writer.as_mut().and_then(|w| w.as_mut()) {
+            writer.refresh();
+        }
     }
 
     pub(crate) fn dropped(&self) -> u64 {

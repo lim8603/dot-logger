@@ -38,7 +38,9 @@ cargo run -p dot-logger-cli -- check run --endpoint http://127.0.0.1:50051 --pla
 
 ## 운영 상태·설정 적용·비교
 
-호스트가 `telemetry::operations::OperationsHost`를 만들고 일반 worker에서 `GetStatus`/`ApplyConfig`/`Compare` Command를 `handle_command(command, telemetry, config_updates, now_ns)`로 명시 처리해야 한다. 1초 `Telemetry::sample`·비교용 snapshot 등록(`register_snapshot`)·producer의 `apply_pending_config()` 호출은 호스트 책임이며 자동 worker는 없다.
+고급 경로에서는 호스트가 `telemetry::operations::OperationsHost`를 만들고 일반 worker에서 `GetStatus`/`ApplyConfig`/`Compare` Command를 `handle_command(command, telemetry, config_updates, now_ns)`로 명시 처리해야 한다. 1초 `Telemetry::sample`·비교용 snapshot 등록(`register_snapshot`)·producer의 `apply_pending_config()` 호출은 호스트 책임이며 자동 worker는 없다.
+
+facade `LoggerBuilder::remote`는 기본 worker가 status와 채널 level·샘플링 ApplyConfig를 처리한다. telemetry가 꺼져 있어도 ApplyConfig는 동작한다. facade의 출력 route는 시작 시 고정이어서 route patch는 InvalidInput, memory patch는 RestartRequired다. 게시 revision 응답은 파일 회전·sync 완료를 뜻하지 않으며, 사용자가 꺼내 쉰 writer는 그 thread에서 `Writer::refresh()`로 ack해야 후속 변경이 가능하다. facade에는 비교용 snapshot 등록 경로가 없어 Compare로 결과를 만들 수 없다.
 
 - `status`의 `metrics`는 최근 표본과 10/60/300초 window를 각각 Observed/Stale/Unavailable로 표시하고, 비교에 쓸 수 있는 snapshot ID 목록을 함께 준다. 미관측 값은 0으로 채우지 않는다.
 - `config apply` patch 예시. 알 수 없는 필드는 거절한다. level은 trace/debug/info/warn/error이고, 생략한 목록은 바꾸지 않는다:

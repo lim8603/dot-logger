@@ -226,6 +226,7 @@ struct logger::Schema
 struct logger::Writer
   field .. (private)
   fn producer(&mut Self) -> Producer<'_>
+  fn refresh(&mut Self) -> u64
   fn now_ns(&Self) -> u64
   fn try_log<T: Record + ?Sized>(&mut Self, channel: Channel<T>, message: &T) -> Result<Logged, LogError>
   fn try_log_at<T: Record + ?Sized>(&mut Self, channel: Channel<T>, message: &T, mono_ns: u64, real_ns: i64) -> Result<Logged, LogError>
@@ -283,6 +284,19 @@ enum logger::LookupError
   impl PartialEq for LookupError
   impl Display for LookupError
   impl Error for LookupError
+enum logger::ConfigError
+  variant Busy
+  variant Invalid
+  variant Closing
+  variant Failed
+  impl Clone for ConfigError
+  impl Copy for ConfigError
+  impl Debug for ConfigError
+  impl Eq for ConfigError
+  impl StructuralPartialEq for ConfigError
+  impl PartialEq for ConfigError
+  impl Display for ConfigError
+  impl Error for ConfigError
 enum logger::ShutdownError
   variant WorkerFailed
   variant Unresponsive(PendingShutdown)
@@ -371,6 +385,7 @@ struct logger::Logger
   fn tracing(&Self) -> Result<TracingSink, LookupError>
   fn mark_event(&Self) -> Result<EventMark, EventError>
   fn release_event(&Self, mark: EventMark) -> Result<(), EventError>
+  fn set_channel<T: ?Sized>(&Self, channel: Channel<T>, minimum: Level, sample_every: u32) -> Result<u64, ConfigError>
   fn shutdown(self, deadline: Duration) -> Result<Shutdown, ShutdownError>
   impl Drop for Logger
   impl Debug for Logger

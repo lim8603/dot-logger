@@ -31,7 +31,8 @@ use super::event::{EventWork, Marks};
 use super::health::{AFFINITY_APPLIED, AFFINITY_FAILED, AFFINITY_NONE, OutputStatus, Shared};
 use super::remote::{Remote, Tap};
 use super::writer::Owned;
-use super::{FacadeReport, StartError};
+use super::{ConfigError, FacadeReport, Held, StartError};
+use crate::control::config_update::{ChannelPatch, ConfigPatch, ConfigUpdateError, ConfigUpdates};
 
 type Probe = Box<dyn FnMut() -> std::io::Result<u64> + Send>;
 type Log = SegmentLog<FileStore<Probe>>;
@@ -41,6 +42,13 @@ pub(crate) enum Command {
     Shutdown {
         deadline: Instant,
         reply: Sender<Progress>,
+    },
+    /// `Logger::set_channel` (API §22.2): post one channel policy, retrying
+    /// while the previous change settles, until `deadline`.
+    Configure {
+        channel: ChannelPatch,
+        deadline: Instant,
+        reply: Sender<Result<u64, ConfigError>>,
     },
 }
 
@@ -71,6 +79,8 @@ pub(crate) struct HostPlan {
     pub(crate) cpus: Option<(Vec<usize>, Requirement)>,
     /// Running remote server, stopped by the host before it reports Closed.
     pub(crate) remote: Remote,
+    /// Writers the `Logger` holds; acknowledged before a channel change.
+    pub(crate) held: Held,
 }
 
 /// A host that failed to start. When `host` is present the thread is still
@@ -175,6 +185,7 @@ fn host_main(
         shared,
         cpus,
         mut remote,
+        held,
     } = plan;
     let mut ready = Some(ready);
     {
@@ -205,6 +216,7 @@ fn host_main(
                     commands: &commands,
                     ready: &mut ready,
                     remote: &mut remote,
+                    held: &held,
                 },
             )
         }));
@@ -226,6 +238,8 @@ fn host_main(
     // No more commands are read: a later `shutdown` fails fast as WorkerFailed
     // instead of waiting for a reply that never comes.
     drop(commands);
+    // The reaper below waits for every writer; this clone must not keep any.
+    drop(held);
     // Every exit path (including failure and panic) stops the listener.
     remote.stop();
     // Reaper: an outstanding Writer still points into `core` and its rings.
@@ -260,6 +274,7 @@ struct Links<'a> {
     commands: &'a Receiver<Command>,
     ready: &'a mut Option<SyncSender<Result<Vec<PathBuf>, StartError>>>,
     remote: &'a mut Remote,
+    held: &'a Held,
 }
 
 /// Restrict the calling worker thread to the configured CPUs. A `Required`
@@ -336,6 +351,71 @@ fn open_logs(
     }
 }
 
+/// A `set_channel` request waiting for the previous change to settle.
+struct Configure {
+    channel: ChannelPatch,
+    deadline: Instant,
+    reply: Sender<Result<u64, ConfigError>>,
+}
+
+/// Make every producer the host can reach apply the latest posted revision
+/// (API §22.2, D1): writers the `Logger` holds, without waiting for a lock in
+/// use, and the states of dropped writers waiting in their mailboxes.
+fn acknowledge(core: &CaptureCore, held: &Held, mailboxes: &mut [rtrb::Consumer<Owned>]) {
+    held.acknowledge();
+    for (id, mailbox) in mailboxes.iter_mut().enumerate() {
+        // Read without commit: the state stays in the mailbox for the reaper.
+        if let Ok(mut chunk) = mailbox.read_chunk(1) {
+            let (first, _) = chunk.as_mut_slices();
+            if let Some(owned) = first.first_mut() {
+                core.producer(id, &mut owned.write).apply_pending_config();
+            }
+        }
+    }
+}
+
+/// One attempt to post `channel` on top of the latest posted revision.
+/// `None` means retry: the previous change has not settled yet.
+fn configure(
+    updates: Option<ConfigUpdates<'_>>,
+    channel: &ChannelPatch,
+) -> Option<Result<u64, ConfigError>> {
+    let Some(updates) = updates else {
+        return Some(Err(ConfigError::Failed));
+    };
+    let Ok(base) = updates.posted_revision() else {
+        return Some(Err(ConfigError::Failed));
+    };
+    let error = match updates.channel_policy(base, channel.channel_id) {
+        // Already in effect: posting it again would be an empty patch.
+        Ok(current) if current == *channel => return Some(Ok(base)),
+        Ok(_) => {
+            let patch = ConfigPatch {
+                channels: vec![*channel],
+                ..ConfigPatch::default()
+            };
+            match updates.apply_config(base, &patch) {
+                Ok(revision) => return Some(Ok(revision)),
+                Err(error) => error,
+            }
+        }
+        Err(error) => error,
+    };
+    match error {
+        // The host is the only poster, so Conflict cannot persist; Busy
+        // clears once every producer applied the change and its records drained.
+        ConfigUpdateError::RevisionBusy | ConfigUpdateError::Conflict => None,
+        ConfigUpdateError::InvalidPatch => Some(Err(ConfigError::Invalid)),
+        ConfigUpdateError::Closing => Some(Err(ConfigError::Closing)),
+        ConfigUpdateError::BufferTooSmall
+        | ConfigUpdateError::Untracked
+        | ConfigUpdateError::RestartRequired
+        | ConfigUpdateError::RevisionExhausted
+        | ConfigUpdateError::Config(_)
+        | ConfigUpdateError::Unavailable => Some(Err(ConfigError::Failed)),
+    }
+}
+
 fn run(
     core: &CaptureCore,
     reads: &mut [ReadState],
@@ -349,6 +429,7 @@ fn run(
         commands,
         ready,
         remote,
+        held,
     } = links;
     let consumers = reads
         .iter_mut()
@@ -432,6 +513,8 @@ fn run(
             let mut events = vec![None; budget::HOST_EVENTS];
             let mut shutdown: Option<ShutdownState> = None;
             let mut sampled: Option<Instant> = None;
+            // Keep management waiting state bounded independently of caller count.
+            let mut configuring: Option<Configure> = None;
             let closed = loop {
                 let now = Instant::now();
                 #[cfg(test)]
@@ -452,7 +535,12 @@ fn run(
                         sampled = Some(now);
                     }
                 }
-                remote.serve(telemetry, ns(config.origin, now));
+                remote.serve(
+                    telemetry,
+                    core.config_updates(),
+                    &mut || acknowledge(core, held, mailboxes),
+                    ns(config.origin, now),
+                );
                 let turn = dispatcher.turn(now, &mut events)?;
                 if let Some(fault) = turn.fault {
                     return Err(StartError::Routing(fault));
@@ -466,6 +554,22 @@ fn run(
                 if shutdown.is_none() {
                     let command = match commands.try_recv() {
                         Ok(Command::Shutdown { deadline, reply }) => Some((deadline, Some(reply))),
+                        Ok(Command::Configure {
+                            channel,
+                            deadline,
+                            reply,
+                        }) => {
+                            if configuring.is_some() {
+                                let _ = reply.send(Err(ConfigError::Busy));
+                            } else {
+                                configuring = Some(Configure {
+                                    channel,
+                                    deadline,
+                                    reply,
+                                });
+                            }
+                            None
+                        }
                         // The handle vanished without shutdown (leaked or panicked).
                         Err(TryRecvError::Disconnected) => {
                             Some((budget::later(now, config.tuning.drop_deadline), None))
@@ -485,6 +589,24 @@ fn run(
                             pending: Vec::new(),
                             incomplete_sent: false,
                         });
+                    }
+                }
+                if let Some(request) = configuring.as_ref() {
+                    let closing = shutdown.is_some()
+                        || core.is_closing()
+                        || config.flags.worker_failed.load(Ordering::Acquire);
+                    let result = if closing {
+                        Some(Err(ConfigError::Closing))
+                    } else if now >= request.deadline {
+                        Some(Err(ConfigError::Busy))
+                    } else {
+                        acknowledge(core, held, mailboxes);
+                        configure(core.config_updates(), &request.channel)
+                    };
+                    if let Some(result) = result {
+                        if let Some(request) = configuring.take() {
+                            let _ = request.reply.send(result);
+                        }
                     }
                 }
                 if let Some(state) = shutdown.as_mut() {

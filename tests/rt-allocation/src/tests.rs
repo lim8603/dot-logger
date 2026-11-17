@@ -1636,6 +1636,15 @@ mod facade {
             }
         });
         assert_eq!(calls, (0, 0), "RT facade path touched the allocator");
+        assert_eq!(
+            logger.set_channel(channel, dot_logger::capture::Level::Warn, 1),
+            Ok(2)
+        );
+        let calls = allocator::observe(|| {
+            assert_eq!(writer.refresh(), 2);
+            assert_eq!(writer.try_log(channel, &Sample(0)), Ok(Logged::Skipped));
+        });
+        assert_eq!(calls, (0, 0), "refresh/skip touched the allocator");
         assert!(accepted > 0);
         assert!(capacity > 0, "the test must exercise rejection");
         let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(10)).unwrap() else {

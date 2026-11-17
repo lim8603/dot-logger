@@ -1318,3 +1318,17 @@ Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 �
 - §21.2는 **S1 당시 이력**이다. 제품의 `storage::standard::export`·CLI `export --standard`·Envelope codec/schema/fixture는 제거했다. 구형 profile은 판독 대상이 아니며 `NativeReader`는 `UnsupportedFormat`으로 거절한다. 과거 signature를 위한 wrapper/형식 선택 API는 없다. 일반 출력 cap의 terminal summary 검사 등 형식과 무관한 검증은 유지했다.
 - 단계 A의 모든 writer는 `loss_tracking=unavailable`이다. 손실 0을 뜻하지 않는다. `_dot_logger/loss` 충돌은 지금 거절하고, 실제 collector/체크포인트/손실 조회는 TASK-035 S2(C)에서 구현한다. runtime WIP는 병합하지 않았다.
 - 검증: [EV-083](../05_verification/verification_evidence.md#ev-083), 개발 자가검토 [REV-056](../05_verification/reviews/REV-056_NATIVE_STORAGE_A.md). GUI/native·장기·실앱·재측정 성능/커버리지는 이번 결과에 포함하지 않는다.
+
+
+### 23.2 revision 회전·source별 조회/복구 B 구현 — 2026-11-17
+
+[ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D3의 구현이다. §14~16·§23.1의 단일 revision 조회·manifest v1 설명은 당시 이력이며 현재 계약은 아래를 따른다.
+
+- `SegmentLog::append_with_budget(WriterBudget, record, payload, now)`는 같은 router/target/session/ledger/producer 수의 budget만 받는다. record revision·등록·sequence·길이 검증을 IO 전에 하고, active revision과 다르면 `RotationReason::Revision`으로 회전한다. 일반 `append`는 현재 revision을 쓴다. `write_batch`는 live `Delivery`의 shared/target ledger가 일치할 때만 내부 budget을 파생하며 Router 공유 borrow·임의 revision setter·전역 전환 barrier를 추가하지 않는다. plan guard는 기존 Delivery 소유권으로 IO 동안 유지된다.
+- r1→r2→r1→r2도 도착 순서대로 파일을 나눈다. active writer는 하나이며 파일 sequence·producer별 receipt watermark·catalog·event window·읽기 pin·FileLedger를 초기화하지 않는다. capacity 거절은 기존 active를 보존한다. publish 뒤 create/header/pair 오류는 이전 closed 파일을 유지하고 출력을 poison한다.
+- `RetentionBatchError`의 `appended`는 수락한 논리 사용자 prefix, `written`은 성공한 flush 또는 이전 회전으로 발행된 prefix, `reported`는 Written 보고 성공 prefix다. 실패 전 발행한 prefix에도 보고를 시도하되 report Busy가 원래 실패 원인을 덮지 않는다. 수락 prefix를 재작성하지 않고 실제 `reported..written`만 보고 재시도한다. Synced는 별도 sync work가 해당 파일 범위를 확인한 경우만 보고한다.
+- `SegmentInfo`는 사용자 `revision`을 직접 보존한다. catalog 예약은 `max_segments × size_of::<SegmentInfo>()`를 사용해 추가 필드도 포함한다. `active_query_source`와 `query_source`는 해당 파일의 revision/sequence/safe_offset을 source에 동결한다. event·pin은 revision 경계를 넘어 삭제 보호를 유지한다.
+- `QuerySource::active(reader, sequence, revision, safe_offset)`와 `Snapshot::new(budget, session, channels, sources, limits, now, deadline, cancel)`를 사용한다. Snapshot 전역 revision은 제거했다. source별 file Metadata/session/revision/sequence·고정 등록을 검증하고 session receipt가 여러 source/revision에서 중복되면 CorruptData다. 기존 예약 order 버퍼를 재사용해 검증하며 무제한 revision 표는 추가하지 않는다. mono/real/source 정렬·inline/blob·Replay·읽기 예산/수명은 유지한다. safe_offset 0은 미공개 빈 active 범위지만, Header만 있는 nonzero 범위는 identity 미확인으로 거절한다.
+- client `OfflineConfig`의 revision은 제거하고 `OfflineSource.revision`으로 옮겼다. CLI manifest는 schema_version 2, 전역 revision 없이 각 source에 revision을 필수 지정한다. v1/알 수 없는 필드·중복 경로/sequence·파일 identity 불일치는 명시 거절한다. offline status는 source별 revision/sequence를 반환한다. NDJSON 공통 출력 schema_version 1은 유지한다.
+- `RecoveryOptions.source_sequence`는 원본 sequence 검증값이다. `recover_segment` 출력은 그 sequence를 보존하고, `recover_to_store` 출력은 명시한 새 sequence를 파일 Metadata에도 사용한다. session/revision은 해당 source의 budget과 대조한다. Header만으로는 정상 빈 복구로 판정하지 않는다. CLI 복구는 source별 revision의 owner/budget을 한 번에 하나만 만들고 별도 파일로 쓴다. 단일 source는 새 파일, 여러 source는 새 디렉터리 아래 `<sequence>.mcap`이다. 전체 파일 수/max_segments, 개별 max_source_bytes, 전체 read_bytes·max_records를 제한하고 각 파일 prefix·실패를 보고한다. 뒤 파일 실패로 앞 결과를 덮거나 지우지 않는다. namespace_synced:false와 부분 파일 보존은 유지한다.
+- 파일 손실은 아직 unavailable이다. TASK-035 S2 collector/checkpoint와 TASK-034 실행 중 설정 WIP·원격 ApplyConfig 통합은 후속이며 이 구현을 해당 기능의 완료로 대신하지 않는다. 처리량·커버리지·GUI 재판독은 별도 검증이다.

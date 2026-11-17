@@ -9,8 +9,8 @@
 | ADR | [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted — TASK-030 S2와 함께 Human 승인(2026-11-16) |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-16 |
-| 다음 액션 | S1 Done(ADR-013 D1~D3 승인). 다음 S2 구현 — TASK-030 S2 A/B 저장 경로 선행 |
+| 마지막 갱신일 | 2026-11-17 |
+| 다음 액션 | S1 Done(ADR-013 D1~D3 승인). 다음 S2 구현 — TASK-030 S2 A/B Done(EV-083·084), collector/checkpoint 실패 시험부터 |
 | 의존 | TASK-030 S2 ADR(같은 저장 형식 결정) |
 | 예상 소요 | S1 1 + S2 2~3 인일, 리뷰 대기 제외 |
 
@@ -29,7 +29,7 @@ Human 「모두 권고대로 진행하자」로 추가가 결정됐다(UC-04).
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 형식안 | 손실 기록의 위치(전용 topic 또는 MCAP metadata)·필드(채널·producer·개수·구간·사유)·주기, 채널별 카운터, 표준 도구·Foxglove 표시, native 단일 형식의 손실 조회/복구 → Human 승인 | **Done — ADR-013 §3, 2026-11-16 Human 승인** |
-| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | Planned |
+| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | Planned — A/B 저장 선행 완료(EV-084), 다음 시작점 |
 
 ## 완료 기준
 

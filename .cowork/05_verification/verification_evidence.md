@@ -1335,6 +1335,24 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **자가검토/한계:** native product metadata/descriptor는 고정 예약, caller metadata는 max_metadata_bytes로 분리, 입력 prefix와 u16 channel 수로 제한된 NativeReader 등록과 명시 producer bound를 문서화했다. loss는 모든 파일에서 unavailable이며 0을 만들지 않는다. B revision 회전/source별 query/recovery/manifest v2, C loss(TASK-035), D runtime WIP(TASK-034), E 커버리지/일정 판정이 남는다. 현재 단일 revision query/recovery와 manifest v1은 B에서 직접 갱신한다.
 - **미실행:** native/다른 OS(T3, TASK-024)·24h/전원 차단(TASK-024)·실앱(TASK-026), native 파일 GUI 재판독·정량 성능/커버리지 재측정. Miri는 unsafe·원자 변경 없어 미재실행. source-copy 제거로 T6의 구현 원인은 해소했지만 과거 +37~45% 추정 달성이나 새 처리량을 주장하지 않는다. max-payload 여유분 등 일부 보수 예약은 유지한다. 큰 raw 성능 smoke의 명시 memory 64→80MiB는 늘어난 두 MCAP index 예약을 수용하기 위한 fixture 변경이며 64MiB에서 수락한다고 주장하지 않는다. Gate4/5·Task/MS 전체 수락 조건은 변경하지 않았다.
 
+
+<a id="ev-084"></a>
+### EV-084 — TASK-030 S2 B revision 회전·source별 조회/복구·manifest v2
+
+- **판정:** 로컬 **Pass** / 2026-11-17. B 구현·검증·위임 수락 완료, [REV-057](reviews/REV-057_REVISION_STORAGE_B.md) **Closed**(RV-145 수정·회귀). TASK-030 S2 전체·MS-009·Gate4/5 완료는 아니다.
+- **대상/환경:** 기준 `5e320a9` → 제품 소스 `2dff5f0`·최종 상한 시험 `70d2f6a`. Ubuntu PC / 실제 Linux `7.0.0-43-realtime` x86_64, Rust 1.96.0·MSRV 1.85.0. 기존에 부팅된 RT 커널이며 재부팅/커널 설정 변경이나 RT 지연·처리량 측정은 하지 않았다. GitHub PRIVATE 확인으로 T3 미도래, 게시에는 `[skip ci]`를 사용한다.
+- **구현:** single active writer의 다음 Delivery revision 경계 회전(r1→r2→r1→r2), 같은 router/target budget 검증·고급 append_with_budget·live Delivery 파생, SegmentInfo revision/예약 폭·receipt/file sequence/event/pin/FileLedger 유지. 실패 전 발행 prefix를 RetentionBatchError written/reported에 보존한다. source별 revision/sequence Snapshot·receipt 중복/필수 file identity 검증, recovery 원본 sequence와 새 store sequence 대조, SDK source revision·CLI manifest v2/status·여러 파일 독립 복구/전체 파일·바이트·기록 상한을 연결했다. 구형 v1 adapter는 없다.
+- **TDD/자가검토:** 실제 delivery의 두 번째 revision이 InvalidRecord(appended1/written0/reported0)로 거절되는 Red → 회전 구현 Green. 기존 전역 revision Snapshot은 CorruptData Red → source별 검증 Green. 다중 파일 CLI recovery는 invalid_input Red → v2 Green. 추가 발견 RV-145는 Header-only nonzero source가 정상 빈 조회로 끝나는 Red(exit0→기대4) → query CorruptData·recover InvalidRecord/partial Green. [TDD 기록](../06_evolution/imported_context/task_030_s2b_2026-11-17/tdd.json)·[Header Red 원본](../06_evolution/imported_context/task_030_s2b_2026-11-17/identity-red.log).
+- **시나리오:** `tc_016_revision.rs` **8개**(실제 교차 delivery·원 receipt/파일 identity/query·sync work, create/header/첫 pair fault의 published prefix, 고급 budget·다른 router/invalid/중복 거절, capacity 뒤 기존 active 재사용, event/pin 경계 보호·해제, 새 create 실패 뒤 poison/Drop 무IO, 교차 revision의 중복 receipt 거절). CLI **4개 신규**(v2 실파일 query/replay/blob·v1/잘못된 identity 거절, source별 recovery와 no-overwrite, 전체 바이트/기록·뒤 파일 손상/완료 prefix, Header-only query/recover). 기존 가짜 sequence로 같은 파일을 중복 등록한 query 시험은 실제 sequence 위조 거절로 정리하고 정상 병합은 실제 회전 파일로 검증했다. API consumer·remote/query/replay·UPS·allocator fixture는 실제 standalone sequence 0과 source_sequence에 맞췄다.
+- **최종 검사(모두 exit0):**
+  - Rust 1.96.0·1.85.0 각각 `cargo test --workspace --all-features --locked`: **642 passed·0 failed·5 ignored**(외부 DB). RT allocator19 포함. 기존630에서 신규12 추가이며 기존 시험 개수 삭제 없음.
+  - 각 Rust `clippy --workspace --all-targets --all-features --locked -- -D warnings`, `RUSTDOCFLAGS=-D warnings` workspace `doc --all-features --no-deps --locked --jobs 1`와 core-only rustdoc Pass.
+  - 각 Rust `scripts/check-feature-matrix.py --toolchain <version>`: **16 feature 조합 + calibrate 단독/전체 = 18구성**, 독립 core/remote consumer·RT allocator·scoped_capture 예제 Pass. 이것은 native/다른 OS CI 실행 근거가 아니다.
+  - fmt, integration guard self-test18·facade 표면 **34/60**·레시피 L1 20줄/6개념·L2 40/7·L3 제한 Pass. nightly guard의 기존 redundant link 경고는 남고 고정 두 Rust의 strict rustdoc는 Pass다.
+  - `MIRIFLAGS=-Zmiri-strict-provenance cargo +nightly-2026-10-26 miri test -p dot-logger --test tc_016_revision --test tc_006_query --locked`: **20 Pass**, 기본 seed 1회. 새 unsafe/원자 순서 변경은 없으며 기존 전체 Miri를 다시 실행했다고 주장하지 않는다.
+- **근거 위치:** [검증 명령·결과/압축 원본](../06_evolution/imported_context/task_030_s2b_2026-11-17/)의 `<toolchain>-results.json`·`.log.gz`, `common-results.json`, `miri-results.json`, `final-doc-results.json`, `final-bounds-results.json`. source175개 SHA-256과 제품 commit blob 일치를 [commit.json](../06_evolution/imported_context/task_030_s2b_2026-11-17/commit.json)으로 확인했다. 최초 검사 후 실행 코드 변경 없이 storage 모듈 문서 주석을 보완해 final-doc(fmt·두 Rust strict workspace doc)을 추가했다. 기존 CLI 복구 시험에는 전체 파일 수·누적 기록 수 상한을 추가했고, 두 Rust에서 해당 CLI 시험·clippy를 final-bounds로 확인했다(전체 시험 개수 변화 없음). 최종 source175개 blob은 `70d2f6a`와 일치한다. 시작/최종 source hash 차이와 그 범위는 `source-check-notes.json`에 명시했다.
+- **한계/다음:** loss는 unavailable(0으로 해석 금지). 다음 C TASK-035 S2 collector/checkpoint → D TASK-034 실행 중 설정 WIP → E 통합·TASK-033 커버리지/UC 재측정이다. 기존 TASK-034 결과 Human 확인 대기는 유지한다. GUI 재판독·정량 성능/커버리지 재측정·다른 OS/native T3·24h·실앱은 미실행이며 각각 TASK-024·026/해당 Task에 유지한다. API §23.2와 Task/MS 목록에 구현 범위를 반영했다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

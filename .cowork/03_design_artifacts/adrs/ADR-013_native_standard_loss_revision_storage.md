@@ -210,3 +210,8 @@ Human 「승인, 다음 할일은?」로 legacy 보존을 제거한 D1~D3 수정
 ## 구현 진행 기록 — 2026-11-16
 
 A native writer/reader·단일 revision query/recovery·구형 경로 제거를 구현·검증·위임 수락을 마쳤다(A Done)([EV-083](../../05_verification/verification_evidence.md#ev-083)). 현재 파일 loss_tracking은 unavailable, B revision/source/manifest v2·C loss·D runtime WIP·E 통합/커버리지는 후속이다. 위 승인 전 관측과 §초안 검토는 당시 기록으로 유지하며 현재 구현은 API §23.1을 따른다.
+
+
+### B 진행 기록 — 2026-11-17
+
+B revision 경계 회전·source별 조회/복구·manifest v2 구현/검증·위임 수락을 완료했다([EV-084](../../05_verification/verification_evidence.md#ev-084), [REV-057](../../05_verification/reviews/REV-057_REVISION_STORAGE_B.md)). 실제 r1→r2→r1→r2·event/pin·publish 이후 create/header/pair 실패와 prefix·sync work를 검증한다. 현재 계약은 API §23.2다. 손실 unavailable과 C TASK-035 S2·D runtime WIP·E 커버리지/일정 판단 미완료는 유지한다.

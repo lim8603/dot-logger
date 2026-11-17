@@ -133,4 +133,9 @@ Completion RecordSlot은 accepted record의 revision과 target 선택을 보존�
 
 ## TASK-030 S2·TASK-035 저장 모델 — 2026-11-16
 
-**Accepted — 2026-11-16 Human 「승인」, [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 채택했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 현재 구현 사실/이력으로 유지하고, 설계 승인만으로 새 형식·메모리 예약이 구현된 것으로 해석하지 않는다.
+**Accepted — 2026-11-16 Human 「승인」, [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md) D1~D3.** 배포 전 native 단일 형식의 사용자 payload/RecordMeta pair와 손실 누적 checkpoint, 파일별 사용자 revision과 다중 revision source 조회/복구를 채택했다. 손실 counter는 session 누적이며 정확 revision별 손실 분할·고유 입력 손실·개별 발생 시각을 추정해 넣지 않는다. 구형 파일 판독/legacy 쓰기·호환 wrapper를 유지하는 요구는 초안에서 제거했다. 기존 Envelope/단일 revision 설명은 당시 구현 이력으로 유지한다. 현재 native A/B 구현은 API §23.1·23.2와 EV-083·084를 따르며, 손실 checkpoint 등 미구현 부분은 설계 승인만으로 구현된 것으로 해석하지 않는다.
+
+
+### B 구현 모델 — 2026-11-17
+
+`SegmentInfo.revision`과 `QuerySource`의 sequence/revision/safe_offset이 파일별 사용자 identity다. snapshot은 session·고정 채널 등록을 공유하되 source별 revision을 검증하고, receipt(session/producer/accepted_seq)는 revision이 달라도 하나만 존재한다. 기존 bounded order 버퍼로 중복을 검사한다. catalog의 revision 바이트는 실제 SegmentInfo 폭으로 예약한다. 파일 sequence와 producer sequence는 교차 revision 회전에서 초기화하지 않으며 event/pin/FileLedger도 계속 유지한다. `RecoveryOptions.source_sequence`는 원본 검증에, store의 새 sequence는 복구 출력 Metadata에 반영한다. CLI manifest v2는 전역 revision 없이 source별 revision을 담고, 과거 v1 adapter는 없다. 현재 손실 데이터는 unavailable이며 누적 checkpoint는 TASK-035 S2가 소유한다. API 세부는 [§23.2](interface_contract.md#232-revision-회전source별-조회복구-b-구현--2026-11-17).

@@ -697,3 +697,19 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - **완료된 Human 결정(11-07~11-11: TASK-023 S2·S3 마감·⑪·T5·CRC vendor·rustix·TASK-027 S3c/S3d·TASK-028 S1):** 원문은 [상태 아카이브](state_archive.md) #026, 계약은 API §18~19·ADR-010 개정 1·EV-054~069. T4 이월은 아래 백로그, T6는 native 전환으로 해소(EV-083).
 
  **T5 → 해소(2026-11-11, EV-066~068): 원인 규명, ⑫ 조치 `234ea62`, 무압축 chunk CRC 1회 `942eecf`, 잔여 개선은 T6.** **T6 → 해소(2026-11-16, EV-083): native 사용자 payload 직접 쓰기로 Envelope scratch 복사를 제거. 정량 효과는 재측정하지 않음.** 트리거 ①은 EV-065에서 재현되지 않음. T1~T4는 미도래(T4: 복사 p50 21 ns = 시계 오버헤드). T4 입력: S2b smoke(측정 아님)에서 256B `try_log` p50 143 ns 중 복사 p50 21 ns(시계 오버헤드와 같은 수준) — 정식 판정은 TASK-023 S3. 공개 후 native 실행 시점 지정은 공개 전환 자체 요청이 아니므로 T2를 지금 발동하지 않는다. OQ를 T/B에 중복 등록하지 않는다.
+
+
+## #029 — 2026-11-17 #001 세션 종료 R1/R2 하베스트
+
+공유 상태의 24KiB 경고선 초과(27,249B)와 완료 서사를 정리했다. 아래는 B/C 마감 당시 원문이며 현재 상태/제약은 project_state·API·Task·EV를 따른다. 최근 이력은 최대3세션의 한 문장으로 축약했고 상세는 EV-084·085와 기존 세션 로그에 보존한다.
+
+- **2026-11-17 TASK-035 S2 C 로컬 단위 완료:** [API §23.3](../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·[EV-085](../05_verification/verification_evidence.md#ev-085)·[REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) Closed(RV-146~148). 제품 `0270f03`. telemetry 독립 counter·native loss checkpoint·bounded loss-only API/CLI·원 report 복구·target identity를 구현했다. retry 시도/skip/assignment/Unknown·미확인 꼬리·포화/누락 part를 분리한다. 다음 D TASK-034 WIP36c1724 통합, 그 뒤 E GUI/호출 비용·전체 통합/커버리지 판정. TASK-030·035 전체 In Progress를 유지하며 이전 A/B 절의 unavailable은 당시 구현 기록이다. GitHub PRIVATE로 T2/T3 미도래.
+
+- **2026-11-17 TASK-030 S2 B 완료:** [API §23.2](../03_design_artifacts/interface_contract.md#232-revision-회전source별-조회복구-b-구현--2026-11-17)·[EV-084](../05_verification/verification_evidence.md#ev-084)·[REV-057](../05_verification/reviews/REV-057_REVISION_STORAGE_B.md) Closed. r1→r2→r1→r2 single writer 회전·source별 revision/sequence query/recovery·manifest v2, event/pin·발행 prefix·sync 범위 검증. loss는 unavailable, runtime WIP는 미통합이다. GitHub PRIVATE로 T2/T3 미도래. 이번 로컬 검증의 실제 커널은 `7.0.0-43-realtime`; 재부팅·커널 변경·정량 성능 측정은 수행하지 않았다.
+
+
+### 완료된 facade 가드·preset 결정 원문
+
+- **TASK-028 auto preset:** Done. JSON profile·측정/추정 구분과 사용자 값 우선 계약 유지. 측정 도중 취소는 미실행([API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071)).
+
+- **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).

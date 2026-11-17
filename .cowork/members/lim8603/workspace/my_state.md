@@ -4,9 +4,9 @@
 |---|---|
 | 역할/실행 모드 | 프로젝트 오너/Master, solo |
 | 활성 Intent/Milestone | INT-001 Approved / MS-009·MS-008·MS-007 In Progress([공유 상태](../../../06_evolution/project_state.md)) |
-| 현재 담당 | TASK-030 S2 A/B·TASK-035 S2 C 로컬 단위, C 로컬 단위 마감(EV-085). TASK-030·035 전체는 E 통합 판정 뒤 마감 |
+| 현재 담당 | TASK-034 runtime 통합(D) 재개 대기. B/C 로컬 단위 완료, 전체 Task 마감은 공유 상태의 E 조건 유지 |
 | 리뷰 | [REV-058](../../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) Closed(RV-146~148 수정·EV-085). REV-055~057 Closed |
-| 갱신/세션 | 2026-11-17 / #001 진행 — Human 「다음 이어서 작업하자」 |
+| 갱신/세션 | 2026-11-17 / #001 종료 — Human 「세션 마감」 |
 | 참조 세션 로그 | [2026-11-17 #001](session_logs/session_2026-11-17_001.md) |
 | 다음 시작점 | TASK-034 runtime WIP `wip/task-034-s2b-runtime-config`(`36c1724`) 통합·시험(D). native loss/교차 revision 계약에 맞춰 적용한다 |
 | 개인 이월 | 없음. TASK-034 기존 결과 Human 확인 대기·E GUI/호출 비용·전체 커버리지·native/장기/실앱 조건은 공유 상태에 유지 |

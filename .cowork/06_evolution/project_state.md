@@ -15,15 +15,13 @@
 | 상태 | 로컬 회귀 Pass — 1.96.0/1.85.0 각665 Pass·5 ignored, 각18 feature·Miri17+control-only1 재검증(EV-085), REV-058 Closed. 라인 커버리지93.56%(EV-080, TASK-034 전; 재측정 대기). Done25/35 Task. D runtime·E GUI/호출 비용/통합 판정 미완료, native·장기·실사용처 Not Run(TASK-024·026), Gate4/5 미완료 |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-17 / TASK-035 S2 C 로컬 단위 완료·REV-058 Closed·다음 TASK-034 runtime(D) / AI |
-| 세션 상태 | 진행(2026-11-17 Human 「다음 이어서 작업하자」로 C 수행). TASK-030 S2 B(EV-084)·TASK-035 S2 C 로컬 작업 단위 마감(EV-085). 다음 TASK-034 runtime WIP(D) → E 통합·TASK-033 재측정. 승인된 ADR-013 범위는 재승인 없이 진행 |
+| 갱신 | 2026-11-17 / 세션 종료·다음 TASK-034 runtime(D) / AI |
+| 세션 상태 | 종료 — 2026-11-17 Human 「세션 마감」. B/C 로컬 단위·검증·리뷰·게시 완료(EV-084·085), 다음 TASK-034 runtime WIP(D) → E 통합·TASK-033 재측정. 승인된 범위는 재승인 없이 재개 |
 | 최근 세션 | 2026-11-17 #001 — B revision 저장(EV-084)·C loss checkpoint(EV-085) 로컬 단위 완료, 다음 D runtime WIP |
 
 ## 현재 결정과 제약
 
-- **2026-11-17 TASK-035 S2 C 로컬 단위 완료:** [API §23.3](../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·[EV-085](../05_verification/verification_evidence.md#ev-085)·[REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) Closed(RV-146~148). 제품 `0270f03`. telemetry 독립 counter·native loss checkpoint·bounded loss-only API/CLI·원 report 복구·target identity를 구현했다. retry 시도/skip/assignment/Unknown·미확인 꼬리·포화/누락 part를 분리한다. 다음 D TASK-034 WIP36c1724 통합, 그 뒤 E GUI/호출 비용·전체 통합/커버리지 판정. TASK-030·035 전체 In Progress를 유지하며 이전 A/B 절의 unavailable은 당시 구현 기록이다. GitHub PRIVATE로 T2/T3 미도래.
-
-- **2026-11-17 TASK-030 S2 B 완료:** [API §23.2](../03_design_artifacts/interface_contract.md#232-revision-회전source별-조회복구-b-구현--2026-11-17)·[EV-084](../05_verification/verification_evidence.md#ev-084)·[REV-057](../05_verification/reviews/REV-057_REVISION_STORAGE_B.md) Closed. r1→r2→r1→r2 single writer 회전·source별 revision/sequence query/recovery·manifest v2, event/pin·발행 prefix·sync 범위 검증. loss는 unavailable, runtime WIP는 미통합이다. GitHub PRIVATE로 T2/T3 미도래. 이번 로컬 검증의 실제 커널은 `7.0.0-43-realtime`; 재부팅·커널 변경·정량 성능 측정은 수행하지 않았다.
+- **저장 A/B·손실 C 로컬 완료(EV-083~085):** [API §23](../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·[REV-058](../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md) Closed. facade는 telemetry와 독립적으로 손실을 보존한다. 다음 D runtime WIP36c1724 → E GUI/호출 비용·통합/커버리지 판정이며 TASK-030·035 전체는 In Progress다. GitHub PRIVATE, T2/T3 미도래.
 
 - **2026-11-16 Human 「승인」 — ADR-013 Accepted:** D1 배포 전 native 단일 형식(legacy 쓰기/판독·선택 API·호환 wrapper 제외), D2 누적 손실 checkpoint(시도·assignment·skip·Unknown·미관측 분리), D3 단일 active writer의 교차 revision 회전·source별 조회/복구를 승인했다. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) 범위 안의 구현·검증은 재승인 없이 진행한다. 설계 승인을 제품 구현/시험 Pass로 대신하지 않는다.
 
@@ -36,8 +34,6 @@
 - **2026-11-13 Human 결정 — 완료 기준 변경:** dot-logger는 범용 라이브러리이고 dot-probe는 첫 사용처다. 「실사용처 테스트는 마지막에 진행은 하겠지만, 일정 판단에 두지 말고, 일정 판단은 유닛테스트 케이스 커버리지, 실제 로깅 사용 사례 조사 등을 통해서 마무리」. 이에 따라 Task 22건 Done, native 잔여는 TASK-024, 실사용처는 TASK-026(MS-007, 마지막), 커버리지·사용 사례는 TASK-033. 커버리지 도구는 AI가 설치(Human 「필요한건 알아서 설치」). [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[EV-078](../05_verification/verification_evidence.md#ev-078).
 - **TASK-030 매핑:** 사용자 schema/encoding·real 시각·전체 receipt의 RecordMeta 보존은 native A에 반영(API §23.1). ROS 2 encoding은 T1 유지. [API §21](../03_design_artifacts/interface_contract.md#21-task-030-mcap-표준-호환--2026-11-12).
 - **2026-11-12 Human 결정 — TASK-029 S4 범위:** `dot_probe_pipeline`(InfluxDB·설정 비교)은 facade로 옮기지 않고 고급 경로 예제로 유지, facade 전용 `dot_probe_facade` 예제 추가. DB·설정 변경의 facade 편입은 TASK-026에서 판단([EV-075](../05_verification/verification_evidence.md#ev-075)).
-- **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
-- **TASK-028 auto preset:** Done. JSON profile·측정/추정 구분과 사용자 값 우선 계약 유지. 측정 도중 취소는 미실행([API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071)).
 - **이전 완료 결정:** TASK-023·027·028 및 T5 상세는 API §18~19·EV-054~069를 따른다. T4는 이월, T6는 native A로 해소(EV-083).
 
 - **2026-11-05 Human 결정 — TASK-027 S1 facade 계약:** ADR-012 Accepted(공유 `CaptureCore`·소유 `Writer`·빌림 `Producer<'_>`, Writer Drop은 반납함 이동만), 손실 값 필수·성능 값 기본값, `Logger::drop` 기한 종료, NFR-008 수치(L1 ≤20줄·≤6개념 등), `writer.try_log(channel, &msg)`. [API §18](../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05).
@@ -70,7 +66,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 |---|---|---|---|---|---|
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | AI | In Progress | 2026-11-17 | S1 Done(EV-077·082), S2 A/B/C 로컬 Done(EV-083~085). 다음 D TASK-034 runtime → E GUI/비용·통합 판정 |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | AI | In Progress | 2026-11-15 | S2 [UC 31개](imported_context/research_2026-11-15_logging_use_cases.md)·S3 대응표·공백 시험 16+1·작은 ring 결함 수정([EV-079](../05_verification/verification_evidence.md#ev-079)), 결정 4건 반영, S3 Done(라인 92.40%). S4 목표치 승인·기준 1~3 충족, TASK-034·035 뒤 최종 재측정 대기 |
-| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-16 | S1 승인·S2/S3 Done(runtime 제외, EV-081·082). 기존 결과 Human 확인 대기 유지. A/B/C 선행 완료, 다음 WIP36c1724 runtime 통합(D) |
+| TASK-034 | facade에 core 기능 노출 | AI | In Progress | 2026-11-17 | S1 승인·S2/S3 Done(runtime 제외, EV-081·082). 기존 결과 Human 확인 대기 유지. A/B/C 선행 완료, 다음 WIP36c1724 runtime 통합(D) |
 | TASK-035 | 손실 기록의 파일 내 표시 | AI | In Progress | 2026-11-17 | S1 Done, S2 C 로컬 Done(EV-085·REV-058). D 통합 뒤 E GUI/호출 비용·최종 마감 대기 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
@@ -147,12 +143,8 @@ REV-055 조치는 완료했다([EV-082](../05_verification/verification_evidence
 
 ## 최근 작업·이력
 
-- 2026-11-17 #001 C: Human 「다음 이어서 작업하자」로 TASK-035 S2 C 로컬 단위 완료. 고정 counter·native loss·별도 조회/복구·CLI, RV-146~148 Red→Green·REV-058 Closed([EV-085](../05_verification/verification_evidence.md#ev-085), 두 Rust 각665·각18 feature·Miri17+1·RT 가드). 제품0270f03·source156 일치. 다음 TASK-034 runtime(D), E 전체 마감은 후속.
+- 2026-11-17 #001: B revision 저장·C loss checkpoint 로컬 단위와 REV-057·058 마감([EV-084](../05_verification/verification_evidence.md#ev-084)·[EV-085](../05_verification/verification_evidence.md#ev-085)); Human 「세션 마감」, 다음 D runtime WIP([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_001.md)).
+- 2026-11-16 #001: 리뷰 조치·ADR-013 승인·native A 완료([EV-082](../05_verification/verification_evidence.md#ev-082)·[EV-083](../05_verification/verification_evidence.md#ev-083), [로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
+- 2026-11-15 #001: 사용 사례/판정 목표·TASK-030 S1·TASK-034 중요도/시작 level/이벤트 보존 진행([로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
 
-- 2026-11-17 #001: Human 「권고대로 시작하자」로 TASK-030 S2 B 재개·완료. 실제 교차 delivery·보호/pin·fault prefix·sync·v2 query/replay/blob/recovery 검증, RV-145 수정·REV-057 Closed([EV-084](../05_verification/verification_evidence.md#ev-084), 두 Rust 각642 Pass·각18 feature·Miri20). 다음 TASK-035 S2([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_001.md)).
-
-- 2026-11-16 #001: REV-055 조치·목록 정렬·ADR-013 승인·TASK-030 S2 A 완료·REV-056 Closed([EV-082](../05_verification/verification_evidence.md#ev-082)·[EV-083](../05_verification/verification_evidence.md#ev-083), 두 Rust 각630 Pass), 다음 B로 세션 종료([로그](../members/lim8603/workspace/session_logs/session_2026-11-16_001.md)).
-- 2026-11-15 #001: TASK-030 S1 Done·사용 사례31개·목표치 승인·TASK-034 중요도/시작 level/이벤트 보존 구현, runtime은 저장 ADR 뒤([로그](../members/lim8603/workspace/session_logs/session_2026-11-15_001.md)).
-- 2026-11-13 #001: 범용 라이브러리 완료 기준 변경·Task22건 Done·TASK-033 등록·커버리지 기준선 준비([EV-078](../05_verification/verification_evidence.md#ev-078), [로그](../members/lim8603/workspace/session_logs/session_2026-11-13_001.md)).
-
-이전 이력과 상세 원문은 [상태 아카이브](state_archive.md)의 #028·#027·#026·#025·#023·#022, R1/R2 이관 원문은 #020/021을 따른다.
+완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #029·#028 및 관련 EV/세션 로그에 보존한다.

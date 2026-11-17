@@ -1172,8 +1172,8 @@ logger.set_channel(pose, Level::Warn, 1)?;          // 일반 경로(&self), Rev
   - 아직 꺼내지 않은 writer와 tracing 내부 writer는 facade가 `Mutex` 안에서 직접 ack시킨다.
   - 사용자가 꺼낸 writer가 쉬고 있으면 다음 변경은 `ConfigError::Busy`가 된다.
   - 이 경우를 위해 `Writer::refresh(&mut self)`를 둔다. 기존 `producer().apply_pending_config()`와 같고, 무대기·무할당이다. 쉬는 thread가 주기적으로 부르면 된다.
-- 시작 시 초기값: `ChannelOptions::minimum(Level)`. 지금은 Trace로 고정이다.
-- 원격 `ApplyConfig`: facade host가 `handle_command`에 `config_updates()`를 넘긴다(지금은 `None` → Unsupported). route·memory 변경은 facade에서도 계속 거절한다(`InvalidPatch`·`RestartRequired`).
+- 시작 시 초기값: `ChannelOptions::minimum(Level)`, 기본 Trace. 시작 옵션과 runtime 구현 현황은 §23.4를 따른다.
+- 원격 `ApplyConfig`: facade host가 `config_updates()`로 채널 patch를 게시한다(§23.4 구현). route·memory 변경은 facade에서도 계속 거절한다(`InvalidPatch`·`RestartRequired`).
 - 이렇게 되면 `Logged::Skipped`에 도달할 수 있다. S2에서 시험한다.
 
 ### 22.3 ② 이벤트 전후 구간 보존
@@ -1356,3 +1356,19 @@ Human의 미배포 지적을 반영해 `StorageFormat` 재수출/형식 선택 �
 | CLI | offline `loss --manifest`는 별도 `loss` 행과 summary를 낸다. `--channel`은 product channel, `--from/--to`는 counter epoch 관측 구간의 겹침이다(mono만 지원). 시간 필터는 (session, epoch, observer, checkpoint)의 모든 part 관측 구간을 묶어 적용한다. nullable delta/ID·overflow·tail_confirmed·unavailable_sources를 내며 summary.records는 출력한 사용자 record 줄 수이므로 0이다. recovery의 max_loss_reports는 작업 전체 합계다. 사용자 quota를 채워도 남은 control-only 파일은 처리하며, 양수 control allowance가 있는 writer의 max_records0은 사용자 append를 거절하고 control만 허용한다 |
 
 facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 4출력 성능 fixture의 메모리는 새 physical index 예약으로 64MiB에서 80MiB로 조정했다. 이는 기존 처리량·지연 수치의 승계나 새 성능 목표 달성 판정이 아니다. counter 추가 전후 비용과 표준 GUI 판독은 ADR-013 E에서 실제 실행 후 기록한다.
+
+
+### 23.4 facade runtime 설정 D 구현 — 2026-11-18
+
+보관 WIP36c1724를 현재 native/loss에 맞춰 적용했다. 구현·검증/자가검토는 [EV-087](../05_verification/verification_evidence.md#ev-087)·[REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)을 따른다. 새 형식 선택/legacy API나 별도 저장 wrapper를 추가하지 않았다. 기존 B의 SegmentLog.write_batch가 Delivery의 검증된 budget으로 revision 경계를 처리한다.
+
+| 경계 | 구현 계약 |
+|---|---|
+| 공개 API | `Logger::set_channel(channel, minimum, sample_every) -> Result<u64, logger::ConfigError>`, `Writer::refresh() -> u64`. ConfigError는 Busy/Invalid/Closing/Failed. 표면35/60, 기존 레시피 불변 |
+| 게시/관측 | 성공은 posted revision이며 파일의 전환·Written/Synced 완료를 뜻하지 않는다. 각 writer가 다음 수집/refresh 경계에서 적용하고 정상 기록은 그 revision으로 저장한다. 같은 현재 정책이면 새 revision 없이 posted 값을 돌려준다 |
+| 일반 요청 | host는 대기 요청 하나만 보존한다. 이전 revision의 producer ack·ingress 소비·guard 종료를 기다리며 drop_deadline 안에 준비되지 않으면 Busy다. 다른 로컬 대기 요청이 있으면 추가 호출도 Busy. 만료 요청은 게시 전에 Busy, 종료는 Closing이며 둘 다 해당 요청을 게시하지 않는다. Failed는 host 장애/무응답 등으로 게시 여부가 미확인일 수 있다 |
+| 소유 writer ack | Logger가 아직 보유한 writer·tracing 내부 writer는 try_lock으로 실제 Writer를 빌려 refresh한다. 사용 중인 lock은 건너뛰고 관리 turn에서 재시도한다. 반납 mailbox의 상태는 commit하지 않고 그 자리에서 refresh해 reaper 소유권을 보존한다. 사용자가 꺼낸 idle Writer는 대신 ack하지 않고 Busy/직접 refresh 계약을 유지한다 |
+| RT·예산 | refresh는 사전 등록한 상태/배열·atomics만 쓰며 RT 할당/해제·clock/I/O/lock/retry 없음. core State::required와 facade가 같은 두 live bank 예약 산식을 사용한다. loss bank는 세션 누적 한 벌이고 revision마다 다시 만들지 않는다 |
+| native 저장 | 기존 active revision과 다음 Delivery가 다르면 B 회전 계약으로 이전 파일을 발행하고 다음 sequence를 연다. r1/r2/r3 실제 파일의 Metadata/RecordMeta/payload를 대조한다. Policy 생략은 revision별 손실로 임의 분할하지 않고 session/epoch 누적6건을 보존한다 |
+| 원격 | telemetry off/on 모두 ApplyConfig 가능. facade는 route patch를 InvalidInput, memory 변경은 RestartRequired로 거절한다. core의 base Conflict·미전환 Busy를 유지하며 원격 Applied2 다음 로컬 게시3과 실제 파일을 검증했다. 자동 비교 snapshot/backend 추가는 없음 |
+| 마감 범위 | D 로컬 구현·회귀 단위다. E GUI native user/meta/loss·counter 전후 호출 비용·최종 커버리지/UC와 TASK-030/034/035 전체 완료는 별도 |

@@ -220,3 +220,8 @@ B revision 경계 회전·source별 조회/복구·manifest v2 구현/검증·�
 ### C 진행 기록 — 2026-11-17
 
 승인된 §3의 TASK-035 S2 C 로컬 구현·검증 단위를 마쳤다([EV-085](../../05_verification/verification_evidence.md#ev-085), [REV-058](../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md)). 현재 구현 계약은 API §23.3이다. telemetry 독립 counter·native loss 보고·관측 watermark 비교·bounded loss-only API/CLI·원 report 복구를 제공한다. count/chunk/byte/retention index 및 reserved final을 검사하며 부족하면 기존 active와 counter를 보존한다. D runtime WIP·E native GUI/호출 비용 비교/최종 통합·커버리지 판정은 후속으로 남긴다. A/B 진행 기록의 loss unavailable은 당시 구현 상태이며 설계 승인 내용은 바꾸지 않는다.
+
+
+### D 진행 기록 — 2026-11-18
+
+TASK-034 runtime WIP36c1724를 현재 native/loss에 맞춰 통합했다. 설정 게시/Writer refresh·held/tracing/반납 writer ack·원격 ApplyConfig와 실제 revision 파일·세션 누적 손실을 검증한다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md), API §23.4). D의 대기 요청 보존·기한과 무대기 ack 조치는 기존 승인 범위의 구현 세부이며 D1~D3를 변경하지 않는다. E GUI/호출 비용/최종 커버리지·UC 판정과 Task/MS 전체 완료는 후속이다.

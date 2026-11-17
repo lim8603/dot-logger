@@ -9,8 +9,8 @@
 | ADR | [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted — TASK-030 S2와 함께 Human 승인(2026-11-16) |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-17 |
-| 다음 액션 | S1 Done. S2 C 구현·로컬 검증 단위 마감(EV-085). 다음 D TASK-034 runtime 통합 후 E GUI/호출 비용/최종 회귀로 전체 마감 |
+| 마지막 갱신일 | 2026-11-18 |
+| 다음 액션 | D runtime 로컬 Done(EV-087·REV-060 Closed, 제품874c27c). 다음 E native GUI user/meta/loss·counter 전후 호출 비용·최종 통합/커버리지·UC 판정 |
 | 의존 | TASK-030 S2 ADR(같은 저장 형식 결정) |
 | 예상 소요 | S1 1 + S2 2~3 인일, 리뷰 대기 제외 |
 
@@ -29,7 +29,7 @@ Human 「모두 권고대로 진행하자」로 추가가 결정됐다(UC-04).
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 형식안 | 손실 기록의 위치(전용 topic 또는 MCAP metadata)·필드(채널·producer·개수·구간·사유)·주기, 채널별 카운터, 표준 도구·Foxglove 표시, native 단일 형식의 손실 조회/복구 → Human 승인 | **Done — ADR-013 §3, 2026-11-16 Human 승인** |
-| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | C 로컬 구현·검증 Done(EV-085); D 통합 뒤 E GUI/호출 비용·전체 마감 대기 |
+| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | C 로컬 Done(EV-085), D runtime 로컬 Done(EV-087); 다음 E GUI/호출 비용·전체 마감 |
 
 ## 완료 기준
 
@@ -55,3 +55,8 @@ Human 「모두 권고대로 진행하자」로 추가가 결정됐다(UC-04).
 ## REV-059 후속 — 2026-11-17
 
 RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Closed, [EV-086](../../05_verification/verification_evidence.md#ev-086), 제품 `8b59aa6`). 복구 완전 prefix·손실 관측/차분·종료 watermark·초기 등록 검증을 보강했고 두 Rust 각672 Pass·5 ignored, Miri7·RT20 Pass다. A/B/C 로컬 완료와 Task 전체 In Progress를 유지한다. 다음 D TASK-034 runtime 통합 → E GUI/호출 비용·최종 통합/커버리지 판정이다.
+
+
+## D facade runtime 통합 — 2026-11-18
+
+현재 B/C 저장 계약을 소비하는 facade runtime을 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). 로컬/원격 설정 전후 파일 revision·세션 누적 손실·쉬는 writer ack 및 두 Rust 각684 Pass·5 ignored를 확인했다. D 로컬 검증·위임 마감(제품 `874c27c`, REV-060 Closed) 뒤 E GUI/호출 비용·통합/최종 커버리지·UC 판정으로 진행한다. Task 전체 In Progress와 native/장기/실앱 이월은 유지한다.

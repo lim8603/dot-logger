@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-17 / EV-001~086 |
+| 버전 | 2026-11-18 / EV-001~087 |
 
 ---
 
@@ -1399,6 +1399,29 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **RV-152:** NativeReader 초기 스캔의 중복 Schema/Channel ID·이름 불일치·user의 control schema 참조 거절, 복구 caller schema.name capacity 정렬. new() 시점의 거절을 시험한다.
 - **새 시험/범위:** 7개 신규 및 기존 시험 확장(665→672). 기존 record quota 시험의 미완결/NeedRotation 기대를 완전 prefix/Limit 기대에 맞춰 수정했다. 반환 오류·원본 보존·취소/IO 실패·query/replay/retention·CLI·allocator 회귀를 포함한다.
 - **미실행/후속:** feature/dependency 경계를 바꾸지 않아 18-feature matrix는 재실행하지 않았다. GUI user/meta/loss·counter 전후 호출 비용·최종 커버리지/UC는 D 이후 E에서 확인한다. native 공개 후 T3·TASK-024/026·Gate4/5 미완료를 유지한다. 다음은 TASK-034 runtime WIP36c1724의 D 통합이다.
+
+<a id="ev-087"></a>
+
+### EV-087 — TASK-034 runtime 설정·native/loss 통합(D)
+
+- **판정:** 로컬 **Pass** / 마감일 2026-11-18(착수 11-17). 승인된 ADR-013 D·API §22/23의 구현 단위. [REV-060](reviews/REV-060_RUNTIME_CONFIG_D.md)의 RV-153/154를 조치·자가검토·위임 수락하여 Closed로 마감했다. D 로컬 Done. E GUI/호출 비용/최종 커버리지와 Task 전체는 후속이다.
+- **대상/환경:** 기준 `6628475`, 보관 WIP `36c1724`를 현재 native 저장/loss에 맞춰 적용. 제품 `874c27c`(15개 파일). 고정 Rust1.96.0·MSRV1.85.0·Miri nightly-2026-10-26, 현재 Ubuntu PC. 커널/전역 toolchain/에디터 설정·저장소 공개 상태 변경 없음.
+- **실행 자료:** [명령·종료값·Red/최종 로그·source SHA](../06_evolution/imported_context/task_034_runtime_d_2026-11-18/results.json). API 부재 Red·WIP busy/lock Red·표면 snapshot Red 및 최초 clippy alias 정리 전 실패를 최종 Pass와 분리한다. feature 미지정 remote 실행0건은 Pass 근거로 세지 않는다. 194개 source SHA가 제품 commit blob과 일치한다. feature matrix는 마지막 f44/문서 보강 전에 시작했고 제품 동작은 같으며 최종 두 전체684 및 별도 default f44가 보강분을 포함한다.
+
+| 검증 | 결과 |
+|---|---|
+| Rust1.96.0·1.85.0 workspace all-features | 각각 **684 passed·0 failed·5 ignored**(외부 DB), RT allocation20 포함 |
+| 두 Rust 18 feature 구성·독립 core/client consumer·allocator·예제 | 각18 구성·독립 consumer·default19/remote20 allocator·예제 Pass |
+| 두 Rust workspace all-targets/all-features clippy -D warnings | Pass |
+| fmt·git diff --check·strict196 workspace all-features/core-only rustdoc | Pass. 기존 Cargo lib/bin 문서 경로 경고와 nightly rustdoc 경고는 제품 strict rustdoc 오류와 구분 |
+| 표면/레시피 | 승인된 ConfigError·set_channel/refresh snapshot 추가로 **35/60**, L1 20줄/6개념·L2 40/7·L3 +3/+5·README/레시피 실행 Pass |
+| Miri strict provenance/disable-isolation | `tc_009_config_update` **13 Pass**. publication·whole revision·guard 수명·거절/메모리 경계를 검증한 범위이며 모든 동시 실행 증명은 아님 |
+
+- **새 시험:** 11개 + 공개 rustdoc1개(672→684). facade f38~f44(7), logger 내부3, remote client1(각 telemetry off/on), rustdoc1. 기존 allocator f2에 refresh·새 정책 Skipped의 allocator0/free0를 추가했다. WIP minimum 옵션·과거 helper의 중복은 제거했고 이전 이벤트/손실/종료 조치를 보존했다.
+- **로컬/파일:** level 상향/복원·동일 정책 no-op·sample_every3/Important 우회·Invalid·idle Busy→refresh→성공·untaken/tracing/반납 ack. native 파일별 Metadata와 사용자 RecordMeta revision 일치, r1/r2/r3 payload 보존, control topic 충돌은 namespace 생성 전 거절. 같은 session/epoch의 Policy 생략6건이 파일 회전 뒤에도 누적·차분6·quiescent tail로 남는다.
+- **원격:** telemetry off/on 모두 route InvalidInput·memory RestartRequired·stale base Conflict·미ack Busy·Applied2. 그 뒤 로컬 게시3과 실제 user0/r1·user2/r2·user3/r3를 확인했다. 게시 응답을 파일 sync 완료로 해석하지 않는다.
+- **자가검토 조치:** RV-153 pending을 None turn에서 버리는 WIP 결함은 단일 Option slot·종료/기한 우선 확인·추가 요청 Busy로 수정했다. RV-154의 blocking ack는 try_lock과 관리 turn 재시도로 수정했다. 사용자 소유 writer를 대신 ack하지 않으며 public refresh만 RT 경로다. core required()와 facade의 두 live bank 사전 예약을 공유한다. 새 unsafe0·RT allocation/free/I/O/lock/retry 추가0.
+- **미실행/후속:** E GUI native user/meta/loss 판독·counter 추가 전후 호출 비용·TASK-033 최종 커버리지/UC 판정은 남았다. TASK-030/034/035·MS-008/009 In Progress, TASK-024/026 마지막 단계·native 공개 후 T3·Gate4/5 미완료를 유지한다.
 
 ## Open Evidence Gaps
 

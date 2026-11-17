@@ -524,12 +524,20 @@ impl CaptureCore {
         producer: usize,
         channel: Option<u32>,
         cause: crate::loss::Cause,
-    ) {
+    ) -> Result<(), CaptureError> {
+        let _active = self.completion().map(|c| c.enter(producer as u32));
+        if self.is_closing() {
+            return Err(CaptureError::Closing);
+        }
         if let Some(bank) = self.loss.as_deref() {
             let index =
                 channel.and_then(|id| self.channels.iter().position(|c| c.channel_id == id));
             bank.ingress(producer as u32, index, cause);
         }
+        Ok(())
+    }
+    pub(crate) fn is_closing(&self) -> bool {
+        self.closing.load(Ordering::SeqCst)
     }
     pub(crate) fn prove_loss_quiescent(&self) {
         if let Some(bank) = self.loss.as_deref() {
@@ -1136,6 +1144,9 @@ impl GeneralProducer<'_> {
                     .producer
                     .completion
                     .map(|c| c.enter(self.producer.producer_id));
+                if self.producer.closing.load(Ordering::SeqCst) {
+                    return Err(CaptureError::Closing);
+                }
                 if let Some(bank) = self.producer.loss {
                     let index = self
                         .producer

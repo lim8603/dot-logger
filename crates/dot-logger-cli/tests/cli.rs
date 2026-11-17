@@ -2746,6 +2746,13 @@ fn recovery_user_record_quota_does_not_consume_control_only_later_sources() {
         let recovered: Vec<_> = rows.iter().filter(|r| r["kind"] == "recovery").collect();
         assert_eq!(recovered.len(), 2);
         assert_eq!(recovered[1]["data"]["records"], 0);
+        assert_eq!(recovered[0]["data"]["target"], "10");
+        assert_eq!(recovered[1]["data"]["target"], "20");
+        assert_eq!(recovered[1]["data"]["file_synced"], true);
+        if fanout {
+            assert_eq!(recovered[1]["data"]["loss_reports"], 2);
+            assert_eq!(recovered[1]["data"]["stop"], "Limit");
+        }
         if !fanout {
             assert_eq!(recovered[1]["data"]["loss_reports"], 6);
         }

@@ -848,28 +848,80 @@ fn disk_full_on_one_output_preserves_the_other_output_and_further_capture_admiss
 }
 
 #[test]
-fn exhausted_output_capacity_returns_the_last_complete_prefix_without_claiming_success() {
+fn exhausted_output_capacity_finishes_only_whole_source_chunks() {
     with_budget(|budget| {
         let bytes = fixture(budget.clone(), false);
         let ch = chunks(&bytes);
+        for (max_records, max_chunks, chunk_bytes, admitted) in [
+            (1, 8, 4096, 0),
+            (3, 8, 4096, 2),
+            (16, 1, 4096, 2),
+            (16, 3, 1, 2),
+            (16, 6, 1, 6),
+        ] {
+            let output = Buffer::default();
+            let mut opt = options();
+            opt.writer.max_records = max_records;
+            opt.writer.max_chunks = max_chunks;
+            opt.writer.chunk_target_bytes = chunk_bytes;
+            let recovered = recover_segment(
+                &mut Cursor::new(bytes.clone()),
+                budget.clone(),
+                channels(),
+                opt,
+                output.clone(),
+                &AtomicBool::new(false),
+            )
+            .unwrap();
+            assert_eq!(recovered.report.records, admitted);
+            assert_eq!(
+                recovered.report.stop,
+                if admitted == 6 {
+                    RecoveryStop::EndOfInput
+                } else {
+                    RecoveryStop::Limit
+                }
+            );
+            if admitted > 0 {
+                assert_eq!(recovered.report.verified_end, ch[admitted / 2 - 1].1 as u64);
+            }
+            let state = output.0.borrow();
+            assert!(state.ops.contains(&"sync"));
+            assert_eq!(
+                receipts(state.bytes.get_ref()),
+                (1..=admitted as u64).collect::<Vec<_>>()
+            );
+            drop(state);
+            drop(recovered);
+            assert_eq!(budget.used_bytes(), 0);
+        }
+    });
+}
+
+#[test]
+fn damaged_root_metadata_returns_a_finished_invalid_record_prefix() {
+    with_budget(|budget| {
+        let mut bytes = fixture(budget.clone(), false);
+        let root = records(&bytes).into_iter().find(|r| r.0 == 12).unwrap();
+        bytes[root.1 + 13] ^= 1;
         let output = Buffer::default();
-        let mut opt = options();
-        opt.writer.max_records = 2;
-        let error = recover_segment(
+        let recovered = recover_segment(
             &mut Cursor::new(bytes),
-            budget.clone(),
+            budget,
             channels(),
-            opt,
+            options(),
             output.clone(),
             &AtomicBool::new(false),
         )
-        .err()
         .unwrap();
-        assert!(matches!(error.error, Some(StorageError::NeedRotation)));
-        assert_eq!(error.report.records, 2);
-        assert_eq!(error.report.verified_end, ch[0].1 as u64);
-        assert!(!output.0.borrow().ops.contains(&"sync"));
-        assert_eq!(budget.used_bytes(), 0);
+        assert_eq!(recovered.report.stop, RecoveryStop::InvalidRecord);
+        assert_eq!(recovered.report.records, 0);
+        assert!(output.0.borrow().ops.contains(&"sync"));
+        assert!(
+            mcap::Summary::read(output.0.borrow().bytes.get_ref())
+                .unwrap()
+                .is_some()
+        );
     });
 }
 // T5 (EV-068): the vendored MCAP writer hashes an uncompressed chunk once and

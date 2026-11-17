@@ -326,19 +326,19 @@ impl Writer {
         mono_ns: u64,
         real_ns: i64,
     ) -> Result<Logged, LogError> {
-        // A `Channel<T>` is only issued after its topic's schema matched
-        // `T::SCHEMA`; the core still checks registration on every record.
-        if channel.session != self.session {
-            if let Some(owned) = self.state.as_ref() {
-                owned
-                    .core
-                    .loss_before_submit(self.id, None, crate::loss::Cause::InvalidInput);
-            }
-            return Err(LogError::InvalidInput);
-        }
         let Some(owned) = self.state.as_mut() else {
             return Err(LogError::Closing);
         };
+        if owned.core.is_closing() {
+            return Err(LogError::Closing);
+        }
+        // The helper rechecks closure inside ActiveCall if shutdown overlaps encoding.
+        if channel.session != self.session {
+            owned
+                .core
+                .loss_before_submit(self.id, None, crate::loss::Cause::InvalidInput)?;
+            return Err(LogError::InvalidInput);
+        }
         let length = match message.encode(&mut owned.scratch) {
             Ok(length) if length <= owned.scratch.len() => length,
             _ => {
@@ -346,7 +346,7 @@ impl Writer {
                     self.id,
                     Some(channel.id),
                     crate::loss::Cause::Encode,
-                );
+                )?;
                 return Err(LogError::Encode);
             }
         };
@@ -370,5 +370,51 @@ impl Drop for Writer {
             // Moving into the preallocated slot neither allocates nor frees.
             let _ = self.mailbox.push(owned);
         }
+    }
+}
+
+#[cfg(test)]
+mod closing_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use crate::logger::{Budget, Logger, Retention, WriterQuota};
+    #[test]
+    fn closing_during_encoding_outranks_encode_and_foreign_channel_errors() {
+        struct Closing<'a>(&'a CaptureCore);
+        impl Record for Closing<'_> {
+            const SCHEMA: Schema = Schema::new(99, 1, "opaque");
+            fn encode(&self, _: &mut [u8]) -> Result<usize, EncodeError> {
+                self.0.control().close();
+                Err(EncodeError)
+            }
+        }
+        let temp = crate::logger::tests::Temp::new();
+        let logger = Logger::builder()
+            .budget(
+                Budget::new()
+                    .memory_bytes(32 << 20)
+                    .sync_every(std::time::Duration::from_millis(20))
+                    .drop_deadline(std::time::Duration::from_secs(3))
+                    .writer_quota(WriterQuota::small(8, 16)),
+            )
+            .file_output(&temp.0, Retention::continuous(64 << 20))
+            .channel::<Closing<'_>>("closing")
+            .writer("p")
+            .start()
+            .unwrap();
+        let mut channel = logger.channel::<Closing<'_>>("closing").unwrap();
+        let mut writer = logger.take_writer("p").unwrap();
+        let core = Arc::clone(&writer.state.as_ref().unwrap().core);
+        assert_eq!(
+            writer.try_log_at(channel, &Closing(&core), 0, 0),
+            Err(LogError::Closing)
+        );
+        channel.session ^= 1;
+        assert_eq!(
+            writer.try_log_at(channel, &Closing(&core), 0, 0),
+            Err(LogError::Closing)
+        );
+        drop(writer);
+        logger.shutdown(std::time::Duration::from_secs(5)).unwrap();
     }
 }

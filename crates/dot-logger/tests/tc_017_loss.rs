@@ -921,6 +921,12 @@ fn saturated_control_budget_keeps_the_active_file_and_coalesces_its_final_sample
                 .unwrap()
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
+            assert!(
+                reports
+                    .iter()
+                    .filter(|r| r.coverage == dot_logger::loss::Coverage::Baseline)
+                    .all(|r| r.observed_from_ns > 0)
+            );
             assert_eq!(reports.len(), 4 + 2 * periodic as usize);
             assert!(reports[reports.len() - 2..].iter().all(|r| r.coalesced));
             let counts = dot_logger::loss::summarize(&reports, 512).unwrap();
@@ -1007,7 +1013,10 @@ fn facade_encode_failures_are_persisted_and_only_returned_writers_confirm_the_ta
                 .any(|c| c.cause == Cause::Encode && c.count == 1)
         );
         if outstanding {
-            assert!(writer.as_mut().unwrap().try_log(channel, &Bad).is_err());
+            assert_eq!(
+                writer.as_mut().unwrap().try_log(channel, &Bad),
+                Err(dot_logger::logger::LogError::Closing)
+            );
         }
     }
 }
@@ -1149,6 +1158,14 @@ fn control_io_failure_keeps_only_the_prefix_and_a_surviving_output_observes_the_
             }
             // All failed output files preserve their existing prefix; RAM-only
             // terminal changes after that watermark are explicitly unobserved.
+            if all_failed {
+                assert!(
+                    dot_logger::loss::summarize(&reports, 1024)
+                        .unwrap()
+                        .iter()
+                        .all(|d| d.delta.is_none())
+                );
+            }
             assert!(
                 dot_logger::loss::summarize(&reports, 1024)
                     .unwrap()
@@ -1181,4 +1198,72 @@ fn loss_report_observer_must_match_the_original_file_target() {
     bytes[a + 33..a + 37].copy_from_slice(&sum.to_le_bytes());
     let mut reader = dot_logger::storage::LossReader::new(&bytes, 16, 2).unwrap();
     assert!(reader.next().unwrap().is_err());
+}
+
+#[test]
+fn rotated_file_baselines_start_at_their_own_observation() {
+    use dot_logger::storage::*;
+    let plan = loss_plan();
+    let routes = support::routing();
+    let mut owner = CaptureOwner::new_tracked(
+        &plan,
+        42,
+        1,
+        &[ChannelConfig::new(7, 99, 1)],
+        &routes,
+        support::tracking(16),
+    )
+    .unwrap();
+    owner.enable_loss_tracking().unwrap();
+    owner.scope(|scope| {
+        let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), routes).unwrap();
+        let state = Rc::new(RefCell::new(State {
+            free: 10_000_000,
+            ..State::default()
+        }));
+        let retention = RetentionConfig {
+            mode: RetentionMode::Continuous,
+            disk_bytes: 10_000_000,
+            disk_reserve_bytes: 0,
+            max_age_ns: 1000,
+            max_segment_bytes: 200_000,
+            max_segment_ns: 1000,
+            max_index_bytes: 16384,
+            protected_bytes: 300_000,
+            pre_ns: 0,
+            post_ns: 0,
+            max_segments: 4,
+            max_events: 1,
+            max_pins: 1,
+            max_pin_bytes: 4096,
+            max_pin_ns: 100,
+        };
+        let mut log = SegmentLog::new(
+            router.writer_budget(10).unwrap(),
+            writer_config(),
+            storage(),
+            retention,
+            Store(Rc::clone(&state)),
+            0,
+        )
+        .unwrap();
+        log.rotate(1).unwrap();
+        log.checkpoint(2).unwrap();
+        log.finish(3).unwrap();
+        let state = state.borrow();
+        let bytes = state.files.get(&1).unwrap();
+        assert_eq!(NativeReader::new(bytes, 16, 2).unwrap().info().sequence, 1);
+        let reports = LossReader::new(bytes, 16, 2)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let start = reports[0].observed_from_ns;
+        assert!(start > 0);
+        assert!(
+            dot_logger::loss::summarize(&reports, 1024)
+                .unwrap()
+                .iter()
+                .all(|d| d.observed_from_ns == start)
+        );
+    });
 }

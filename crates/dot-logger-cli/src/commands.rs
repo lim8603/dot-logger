@@ -255,6 +255,31 @@ fn emit_record(
     out.records += 1;
     Ok(())
 }
+// Apply management time windows to whole multipart checkpoints so a boundary
+// between part reads cannot manufacture an incomplete observation.
+fn select_loss_reports(
+    reports: &[dot_logger::loss::LossReport],
+    from: u64,
+    to: u128,
+) -> Vec<dot_logger::loss::LossReport> {
+    let mut intervals = std::collections::BTreeMap::new();
+    for r in reports {
+        let interval = intervals
+            .entry((r.session, r.epoch, r.observer, r.checkpoint))
+            .or_insert((r.observed_from_ns, r.observed_to_ns));
+        interval.0 = interval.0.min(r.observed_from_ns);
+        interval.1 = interval.1.max(r.observed_to_ns);
+    }
+    reports
+        .iter()
+        .filter(|r| {
+            let (start, end) = intervals[&(r.session, r.epoch, r.observer, r.checkpoint)];
+            u128::from(start) < to && end >= from
+        })
+        .cloned()
+        .collect()
+}
+
 pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
     ctx.check()?;
     let (command, sub) = ctx.command()?;
@@ -294,13 +319,7 @@ pub fn local(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
             .text("to")?
             .parse::<u128>()
             .map_err(|_| Failure::Input)?;
-        // Filter report observation intervals before comparing their counters.
-        // These are epoch-management intervals, not user record timestamps.
-        let selected: Vec<_> = reports
-            .iter()
-            .filter(|r| u128::from(r.observed_from_ns) < to && r.observed_to_ns >= from)
-            .cloned()
-            .collect();
+        let selected = select_loss_reports(reports, from, to);
         let deltas = dot_logger::loss::summarize(
             &selected,
             manifest
@@ -663,7 +682,7 @@ fn recover_one(
             }
         }
     })?;
-    out.emit("recovery",json!({"sequence":source.sequence.to_string(),"revision":source.revision.to_string(),"records":report.records,"loss_reports":report.loss_reports,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
+    out.emit("recovery",json!({"sequence":source.sequence.to_string(),"revision":source.revision.to_string(),"target":source.target.map(|id|id.to_string()),"records":report.records,"loss_reports":report.loss_reports,"chunks":report.chunks,"verified_end":report.verified_end,"excluded_from":report.excluded.0,"excluded_to":report.excluded.1,"stop":format!("{:?}",report.stop),"file_synced":true,"namespace_synced":false}))?;
     if !matches!(
         report.stop,
         RecoveryStop::DataEnd | RecoveryStop::EndOfInput
@@ -1079,4 +1098,39 @@ fn calibrate(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
         }
     })?;
     Ok(json!({"profile": output.to_string_lossy()}))
+}
+
+#[cfg(test)]
+mod loss_tests {
+    use super::select_loss_reports;
+    use dot_logger::loss::{Coverage, LossReport};
+    #[test]
+    fn time_windows_keep_all_parts_of_each_selected_checkpoint() {
+        let first = LossReport {
+            session: 1,
+            epoch: 1,
+            observer: 10,
+            checkpoint: 1,
+            part: 0,
+            parts: 2,
+            observed_from_ns: 10,
+            observed_to_ns: 20,
+            publish_time_unix_ns: 0,
+            coverage: Coverage::Observed,
+            coalesced: false,
+            counts: vec![],
+        };
+        let mut second = first.clone();
+        second.part = 1;
+        second.observed_to_ns = 30;
+        let mut other = first.clone();
+        other.observer = 20;
+        let mut later = first.clone();
+        later.checkpoint = 2;
+        later.observed_from_ns = 40;
+        later.observed_to_ns = 50;
+        let reports = vec![first.clone(), second.clone(), other, later];
+        assert_eq!(select_loss_reports(&reports, 25, 40), vec![first, second]);
+        assert!(select_loss_reports(&reports, 0, 10).is_empty());
+    }
 }

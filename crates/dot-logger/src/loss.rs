@@ -705,6 +705,9 @@ pub fn summarize(
     let mut groups: Vec<_> = reports.iter().collect();
     groups.sort_unstable_by_key(|r| (r.session, r.epoch, r.observer, r.checkpoint, r.part));
     let mut samples = Vec::with_capacity(count);
+    // Include groups missing this row when deciding whether a later incomplete
+    // checkpoint invalidates an earlier quiescent tail.
+    let mut latest = std::collections::BTreeMap::new();
     let mut at = 0;
     while at < groups.len() {
         let first = groups[at];
@@ -727,14 +730,28 @@ pub fn summarize(
                     && r.coverage == first.coverage
                     && r.observed_from_ns == first.observed_from_ns
             });
+        let observed_to = groups[at..end]
+            .iter()
+            .map(|r| r.observed_to_ns)
+            .max()
+            .unwrap_or(0);
+        let quiescent = complete && first.coverage == Coverage::Quiescent;
+        let last = latest
+            .entry((first.session, first.epoch))
+            .or_insert((observed_to, quiescent));
+        match observed_to.cmp(&last.0) {
+            std::cmp::Ordering::Greater => *last = (observed_to, quiescent),
+            std::cmp::Ordering::Equal => last.1 &= quiescent,
+            std::cmp::Ordering::Less => {}
+        }
         for report in &groups[at..end] {
             for row in &report.counts {
-                samples.push((*report, row, complete));
+                samples.push((*report, row, complete, observed_to));
             }
         }
         at = end;
     }
-    samples.sort_unstable_by_key(|(report, row, _)| {
+    samples.sort_unstable_by_key(|(report, row, _, _)| {
         (
             report.session,
             report.epoch,
@@ -746,7 +763,7 @@ pub fn summarize(
     let mut result = Vec::new();
     let mut at = 0;
     while at < samples.len() {
-        let (report, row, _) = samples[at];
+        let (report, row, _, _) = samples[at];
         let key = (report.session, report.epoch, counter_key(row));
         let mut end = at + 1;
         while end < samples.len()
@@ -766,7 +783,9 @@ pub fn summarize(
         let mut from = u64::MAX;
         let mut to = 0;
         let mut previous = None;
-        for (r, c, complete) in &samples[at..end] {
+        let mut previous_complete = None;
+        let mut interval = false;
+        for (r, c, complete, _) in &samples[at..end] {
             valid &= !c.overflowed;
             if let Some((observer, checkpoint, value, observed)) = previous {
                 if observer == r.observer
@@ -780,6 +799,9 @@ pub fn summarize(
             previous = Some((r.observer, r.checkpoint, c.count, r.observed_to_ns));
             max = max.max(c.count);
             if *complete {
+                interval |=
+                    r.coverage != Coverage::Baseline || previous_complete == Some(r.observer);
+                previous_complete = Some(r.observer);
                 complete_count += 1;
                 min = min.min(c.count);
                 complete_max = complete_max.max(c.count);
@@ -787,31 +809,39 @@ pub fn summarize(
                 to = to.max(r.observed_to_ns);
             }
         }
-        valid &= complete_count >= 2 && max == complete_max;
+        let exact = valid && interval && complete_count >= 2 && max == complete_max;
         if complete_count == 0 {
             from = samples[at..end]
                 .iter()
-                .map(|(r, _, _)| r.observed_from_ns)
+                .map(|(r, _, _, _)| r.observed_from_ns)
                 .min()
                 .unwrap_or(0);
             to = samples[at..end]
                 .iter()
-                .map(|(r, _, _)| r.observed_to_ns)
+                .map(|(r, _, _, _)| r.observed_to_ns)
                 .max()
                 .unwrap_or(0);
             min = max;
         }
         let mut counter = row.clone();
         counter.count = max;
-        counter.overflowed = samples[at..end].iter().any(|(_, r, _)| r.overflowed);
-        let tail = samples[at..end].iter().any(|(r, c, complete)| {
-            *complete && r.coverage == Coverage::Quiescent && c.count == max
-        });
+        counter.overflowed = samples[at..end].iter().any(|(_, r, _, _)| r.overflowed);
+        let last = latest[&(report.session, report.epoch)];
+        let tail = valid
+            && last.1
+            && samples[at..end]
+                .iter()
+                .any(|(r, c, complete, observed_to)| {
+                    *complete
+                        && r.coverage == Coverage::Quiescent
+                        && c.count == max
+                        && *observed_to == last.0
+                });
         result.push(LossDelta {
             session: report.session,
             epoch: report.epoch,
             counter,
-            delta: valid.then_some(max - min),
+            delta: exact.then_some(max - min),
             observed_from_ns: from,
             observed_to_ns: to,
             tail_confirmed: tail,
@@ -919,6 +949,67 @@ mod tests {
             summarize(&[baseline], 1),
             Err(crate::storage::StorageError::NeedRotation)
         ));
+    }
+    #[test]
+    fn baseline_replicas_and_stale_quiescent_reports_do_not_confirm_unobserved_work() {
+        let bank = Bank::new(42, 1, vec![7], vec![10, 20]);
+        let mut first = bank.sample(10, 1, 0, 1, Coverage::Baseline);
+        first.observed_to_ns = 10;
+        let mut replica = first.clone();
+        replica.observer = 20;
+        assert!(
+            summarize(&[first.clone(), replica], 256)
+                .unwrap()
+                .iter()
+                .all(|d| d.delta.is_none())
+        );
+        let mut final_report = first.clone();
+        final_report.checkpoint = 2;
+        final_report.observed_to_ns = 20;
+        final_report.coverage = Coverage::Quiescent;
+        assert!(
+            summarize(&[first.clone(), final_report.clone()], 256)
+                .unwrap()
+                .iter()
+                .all(|d| d.tail_confirmed)
+        );
+        for (complete, coverage) in [(false, Coverage::Quiescent), (true, Coverage::Observed)] {
+            let mut later = final_report.clone();
+            later.checkpoint = 3;
+            later.observed_to_ns = 30;
+            later.coverage = coverage;
+            if !complete {
+                later.parts = 2;
+            }
+            assert!(
+                summarize(&[first.clone(), final_report.clone(), later], 256)
+                    .unwrap()
+                    .iter()
+                    .all(|d| !d.tail_confirmed)
+            );
+        }
+        assert!(
+            summarize(
+                &[first.clone(), final_report.clone(), final_report.clone()],
+                256
+            )
+            .unwrap()
+            .iter()
+            .all(|d| !d.tail_confirmed)
+        );
+        let mut decrease = final_report.clone();
+        decrease.checkpoint = 3;
+        decrease.observed_to_ns = 30;
+        final_report.counts[0].count = 1;
+        let key = counter_key(&decrease.counts[0]);
+        assert!(
+            !summarize(&[first, final_report, decrease], 256)
+                .unwrap()
+                .iter()
+                .find(|d| counter_key(&d.counter) == key)
+                .unwrap()
+                .tail_confirmed
+        );
     }
     #[test]
     fn registered_shape_and_memory_arithmetic_reject_impossible_counter_grids() {

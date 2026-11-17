@@ -596,3 +596,62 @@ fn metadata_io_failure_never_publishes_a_partial_pair_or_written_completion() {
         });
     });
 }
+
+#[test]
+fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_construction() {
+    let base = file_channels(
+        4096,
+        vec![StorageChannel {
+            channel: ChannelConfig::new(7, 99, 1),
+            topic: "robot/a".into(),
+            payload_encoding: "opaque".into(),
+            schema: Some(dot_logger::storage::PayloadSchema {
+                name: Some("example.Payload".into()),
+                encoding: "opaque".into(),
+                descriptor: vec![1, 2],
+            }),
+        }],
+    );
+    for damage in ["schema-id", "channel-id", "name", "control-alias"] {
+        let mut bytes = base.clone();
+        let chunk = chunks(&bytes)[0];
+        let nested = frames(&bytes, chunk.1 + 49, chunk.2);
+        let schema = nested.iter().find(|r| r.0 == 3).unwrap();
+        let channel = nested.iter().filter(|r| r.0 == 4).nth(1).unwrap();
+        match damage {
+            "schema-id" | "channel-id" => {
+                let record = if damage == "schema-id" {
+                    schema
+                } else {
+                    channel
+                };
+                let copy = bytes[record.1..record.2].to_vec();
+                let n = copy.len();
+                bytes.splice(channel.1..channel.1, copy);
+                for offset in [1, 25, 41] {
+                    let at = chunk.1 + offset;
+                    let old = u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
+                    bytes[at..at + 8].copy_from_slice(&(old + n as u64).to_le_bytes());
+                }
+                fix_chunk(&mut bytes, (6, chunk.1, chunk.2 + n));
+            }
+            "name" => {
+                let at = bytes
+                    .windows(b"example.Payload".len())
+                    .position(|b| b == b"example.Payload")
+                    .unwrap();
+                bytes[at] = b'X';
+                fix_chunk(&mut bytes, chunk);
+            }
+            _ => {
+                let id = bytes[schema.1 + 9..schema.1 + 11].to_vec();
+                bytes[channel.1 + 11..channel.1 + 13].copy_from_slice(&id);
+                fix_chunk(&mut bytes, chunk);
+            }
+        }
+        assert!(
+            NativeReader::new(&bytes, 100, 2).is_err(),
+            "accepted {damage}"
+        );
+    }
+}

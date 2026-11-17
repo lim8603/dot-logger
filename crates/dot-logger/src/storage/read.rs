@@ -314,6 +314,7 @@ fn registrations(
     let mut info = None;
     let mut schemas = HashMap::new();
     let mut channels = BTreeMap::new();
+    let mut channel_ids = std::collections::BTreeSet::new();
     while !outer.0.is_empty() {
         let (op, body) = outer.record().map_err(corrupt)?;
         if op == 12 {
@@ -366,12 +367,15 @@ fn registrations(
             }
             match mcap::parse_record(op, body).map_err(corrupt)? {
                 Record::Schema { header, data } => {
-                    if schemas.len() > file.channels + 2 {
+                    if schemas.len() >= file.channels + 2 || schemas.contains_key(&header.id) {
                         return Err(StorageError::CorruptData);
                     }
                     schemas.insert(header.id, (header.name, header.encoding, data.into_owned()));
                 }
                 Record::Channel(c) => {
+                    if !channel_ids.insert(c.id) || channel_ids.len() > file.channels + 2 {
+                        return Err(StorageError::CorruptData);
+                    }
                     if c.topic == META_TOPIC || c.topic == super::codec::LOSS_TOPIC {
                         continue;
                     }
@@ -387,8 +391,24 @@ fn registrations(
                     let schema = if c.schema_id == 0 {
                         None
                     } else {
-                        let (_name, encoding, data) =
+                        let (name, encoding, data) =
                             schemas.get(&c.schema_id).ok_or(StorageError::CorruptData)?;
+                        let expected = c
+                            .metadata
+                            .get("payload_schema_name")
+                            .cloned()
+                            .unwrap_or_else(|| {
+                                format!(
+                                    "payload.{:032x}.v{}",
+                                    channel.schema_id, channel.schema_version
+                                )
+                            });
+                        if name != &expected
+                            || name == super::codec::META_SCHEMA
+                            || name == crate::loss::SCHEMA
+                        {
+                            return Err(StorageError::CorruptData);
+                        }
                         Some(PayloadSchema {
                             name: c.metadata.get("payload_schema_name").cloned(),
                             encoding: encoding.clone(),

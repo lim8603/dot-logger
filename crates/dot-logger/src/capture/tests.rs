@@ -127,3 +127,29 @@ fn normal_quota_remains_correct_across_wrapping_occupancy_counters() {
         }
     });
 }
+
+#[test]
+fn pre_submit_failures_after_closing_do_not_change_loss_watermarks() {
+    let mut owner = owner(entry());
+    owner.core.loss = Some(crate::loss::Bank::new(3, 1, vec![1], vec![10]).into());
+    owner
+        .core
+        .loss_before_submit(0, Some(1), crate::loss::Cause::Encode)
+        .unwrap();
+    let bank = owner.core.loss.as_ref().unwrap();
+    let before: Vec<_> = bank
+        .sample(10, 1, 0, 0, crate::loss::Coverage::Observed)
+        .counts;
+    owner.core.control().close();
+    for cause in [crate::loss::Cause::Encode, crate::loss::Cause::InvalidInput] {
+        assert_eq!(
+            owner.core.loss_before_submit(0, Some(1), cause),
+            Err(CaptureError::Closing)
+        );
+    }
+    assert_eq!(
+        bank.sample(10, 2, 0, 0, crate::loss::Coverage::Observed)
+            .counts,
+        before
+    );
+}

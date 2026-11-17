@@ -701,7 +701,12 @@ impl<W: SyncSink> SegmentWriter<W> {
             .next_checkpoint(target)
             .ok_or(StorageError::InvalidRecord)?;
         for part in 0..parts {
-            let mut report = bank.sample(target, checkpoint, part, self.sample_start, coverage);
+            let from = if coverage == crate::loss::Coverage::Baseline {
+                started
+            } else {
+                self.sample_start
+            };
+            let mut report = bank.sample(target, checkpoint, part, from, coverage);
             report.coalesced = self.deferred;
             self.append_loss_report(&report)?;
         }
@@ -709,6 +714,65 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.deferred = false;
         Ok(())
     }
+    // Simulate output chunk splits before recovery admits any part of a source
+    // chunk. Re-encode metadata because source protobuf widths need not be canonical.
+    pub(super) fn recovery_chunk_fits(
+        &mut self,
+        data: &[u8],
+        state: &super::recovery::Validation<'_>,
+    ) -> Result<bool, StorageError> {
+        use super::recovery::Fields;
+        let mut nested = Fields(data);
+        let mut chunks = self.chunks;
+        let mut open = self.open;
+        let mut pending = self.pending_records;
+        let mut bytes = self.pending_bytes;
+        let mut controls = self.loss_count;
+        let mut records = self.records;
+        while !nested.0.is_empty() {
+            let (opcode, record) = nested.record().map_err(|_| StorageError::CorruptData)?;
+            if opcode != 5 {
+                continue;
+            }
+            if state
+                .loss_report(record)
+                .map_err(|_| StorageError::CorruptData)?
+                .is_some()
+            {
+                chunks = chunks.saturating_add(usize::from(open)).saturating_add(1);
+                controls = controls.saturating_add(1);
+                open = false;
+                pending = 0;
+                bytes = 0;
+            } else {
+                let (_, meta) = nested.record().map_err(|_| StorageError::CorruptData)?;
+                let stored = state
+                    .pair(record, meta)
+                    .map_err(|_| StorageError::CorruptData)?;
+                let mut fields = Fields(record);
+                let channel = fields.u16().map_err(|_| StorageError::CorruptData)?;
+                codec::encode_meta(stored.record, channel, &mut self.encoder)?;
+                let size = stored.payload.len() + self.encoder.len() + 62;
+                if pending > 0 && bytes.saturating_add(size) > self.config.chunk_target_bytes {
+                    chunks = chunks.saturating_add(1);
+                    pending = 0;
+                    bytes = 0;
+                }
+                open = true;
+                pending += 1;
+                bytes = bytes.saturating_add(size);
+                records = records.saturating_add(1);
+            }
+            if chunks.saturating_add(usize::from(open)) > self.config.max_chunks
+                || controls > self.config.max_loss_reports
+                || records > self.config.max_records
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     pub(super) fn append_loss_report(
         &mut self,
         report: &crate::loss::LossReport,

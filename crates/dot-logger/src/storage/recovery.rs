@@ -305,15 +305,16 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
     if let Ok((12, len, _)) = read_frame(source, &mut buffer, report.source_bytes, &mut position)
         .map_err(StorageError::Io)?
     {
-        let file = super::FileInfo::parse(&buffer[..len])?;
-        if file.session == budget.session
-            && file.revision == budget.revision
-            && file.producers == budget.producers
-            && file.channels == channels.len()
-            && file.sequence == options.source_sequence
-            && options.source_target.is_none_or(|id| id == file.target)
-        {
-            budget.recovered_file = Some(file);
+        if let Ok(file) = super::FileInfo::parse(&buffer[..len]) {
+            if file.session == budget.session
+                && file.revision == budget.revision
+                && file.producers == budget.producers
+                && file.channels == channels.len()
+                && file.sequence == options.source_sequence
+                && options.source_target.is_none_or(|id| id == file.target)
+            {
+                budget.recovered_file = Some(file);
+            }
         }
     }
     source
@@ -327,6 +328,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
             c.topic = c.topic.into_boxed_str().into_string();
             c.payload_encoding = c.payload_encoding.into_boxed_str().into_string();
             if let Some(s) = &mut c.schema {
+                s.name = s.name.take().map(|n| n.into_boxed_str().into_string());
                 s.encoding = std::mem::take(&mut s.encoding)
                     .into_boxed_str()
                     .into_string();
@@ -414,9 +416,17 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                             }
                         }
                         if report
-                            .loss_reports
-                            .checked_add(controls)
-                            .is_none_or(|n| n > options.writer.max_loss_reports)
+                            .records
+                            .checked_add(count)
+                            .is_none_or(|n| n > options.writer.max_records)
+                            || !writer.recovery_chunk_fits(
+                                chunk_data(body).map_err(|_| Some(StorageError::CorruptData))?,
+                                &state,
+                            )?
+                            || report
+                                .loss_reports
+                                .checked_add(controls)
+                                .is_none_or(|n| n > options.writer.max_loss_reports)
                         {
                             report.stop = RecoveryStop::Limit;
                             break 'scan;

@@ -8,8 +8,8 @@
 | 리뷰어 | Antigravity AI — 리뷰 전용 세션 |
 | 대상 | REV-055 이후 누적 코드 커밋 `949a74e..0270f03` (5개 코드 커밋: `5d7fe6a`, `048cdf3`, `2dff5f0`, `70d2f6a`, `0270f03`) |
 | 범위 | REV-055 결함 조치(`5d7fe6a`), TASK-030 S2 A native 표준 MCAP pair 저장/읽기(`048cdf3`), B revision 경계 회전·source별 조회/복구·manifest v2(`2dff5f0`, `70d2f6a`), TASK-035 S2 C 누적 손실 카운터·native `_dot_logger/loss` 체크포인트·오프라인 조회/복구(`0270f03`) |
-| 종합 판정 | **Conditional — P1 1건·P2 2건·P3 1건 (`RV-149~152`)** |
-| 상태 | **Open** |
+| 종합 판정 | 초기 **Conditional**(P1 1·P2 2·P3 1) → 조치 후 **Pass**([EV-086](../verification_evidence.md#ev-086)) |
+| 상태 | **Closed** — 2026-11-17, RV-149~152 조치·위임 수락 |
 
 워크스페이스 전체 테스트(665 passed·5 ignored), RT 무할당 시험(20 passed), `clippy`, `fmt`, strict `rustdoc`, NFR-008 표면/레시피 가드(`34/60`)는 모두 통과했다. 그러나 `949a74e..0270f03` 변경분을 ADR-013 및 API §22~23 계약과 대조해 정밀 검토한 결과 다음 4건을 확인했다:
 1. **P1 (`RV-149`):** `recover_segment` / `recover_to_store`가 chunk 내부 레코드를 복사하기 전에 `options.writer.max_records`(및 출력 chunk 상한)를 chunk 단위로 선검사하지 않아, 단일 chunk 내 2건 이상의 사용자 레코드 중 일부만 출력에 쓴 뒤 중간에 `NeedRotation`으로 실패(부분 chunk 반출)하고, `writer.append`의 `?` 조기 반환으로 인해 앞선 chunk에서 이미 검증·복구된 `Baseline` loss report나 사용자 레코드가 `writer.finish()`·`sync_recovered()` 없이 미완결 파일로 남는다. 또한 루트 `dot_logger.file` 선행 peek(`recovery.rs:308`)의 `?`가 손상된 메타데이터를 `RecoveryStop::InvalidRecord` 대신 `RecoveryStop::Failed`로 조기 실패시키며, CLI `recover` 성공 JSON 행에 `"target"` 필드가 누락되어 있다.
@@ -47,10 +47,10 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-149 | P1 | `storage/recovery.rs:304-318, 416-455`, `cli/src/commands.rs:651-673`, ADR-013 §2·§5, API §23.2·§23.3 | `recover_segment`가 chunk 복사 전 `options.writer.max_records`(및 출력 chunk 상한)를 선검사하지 않아 단일 chunk 내 부분 레코드가 출력에 쓰인 뒤 `NeedRotation`으로 중단되고, 앞선 chunk의 유효한 loss/user prefix가 `finish()`/`sync_all()` 없이 미완결로 남음; 루트 `op==12` peek의 `?`가 손상된 메타데이터를 `Failed`로 조기 실패시킴; CLI `recover` 성공 JSON에 `"target"` 누락 | chunk 복사 전 `report.records + count > options.writer.max_records` 및 출력 writer chunk 여유를 검사해 `RecoveryStop::Limit; break 'scan;`으로 정상 마감; 루트 peek을 `if let Ok(file)`로 변경; CLI 성공 행에 `"target"` 추가 | 미정 | Open |
-| RV-150 | P2 | `storage/writer.rs:545, 699-710`, `loss.rs:723-736, 761-819`, `cli/src/commands.rs:299-304`, ADR-013 §3, API §23.3 | 회전된 파일의 `Baseline`도 `observed_from_ns = 0`을 기록해 `summarize`의 `observed_from_ns`가 `0`으로 고정되고 CLI `--from/--to` 필터가 왜곡됨; 모든 출력이 첫 주기 체크포인트 전에 고장나도 다중 출력 `Baseline`끼리 합산돼 `delta = Some(0)`이 됨; `tail_confirmed` 및 다중 part 시간 필터 경계 미비 | `Coverage::Baseline`은 `started`를 `observed_from_ns`로 기록; `summarize`에서 실질적 관측 구간(비-Baseline 또는 동일 observer 다중 체크포인트) 및 `valid`·최신 체크포인트 기준으로 `delta`/`tail_confirmed` 판정; CLI 시간 필터를 체크포인트 그룹 단위로 적용 | 미정 | Open |
-| RV-151 | P2 | `capture/mod.rs:522-538, 1130-1152`, `logger/writer.rs:329-353`, ADR-013 §3, API §23.3 | `GeneralProducer::record_until`의 `Deadline` 분기와 `CaptureCore::loss_before_submit`(`Writer::try_log_at`의 `Encode`/`InvalidInput`)이 `ActiveCall` 내부 `closing`(`SeqCst`) 확인을 거치지 않아 종료 후에도 손실 카운터가 증가하고 `Closing` 대신 `Encode`/`InvalidInput` 반환 | `loss_before_submit`과 `record_until`이 `ActiveCall` 진입 후 `closing.load(Ordering::SeqCst)`를 확인해 종료 후 카운터 증가를 차단하고, `Writer::try_log_at`도 종료 상태를 우선 반영 | 미정 | Open |
-| RV-152 | P3 | `storage/read.rs:368-415`, `storage/recovery.rs:329-336`, API §23.1 | `read::registrations`에서 중복 `Schema`/`Channel` ID 덮어쓰기 미방지 및 `NativeReader::new` 직후 `channels()`의 스키마 이름/제어 스키마 별칭 미검증; `recover_inner`에서 `PayloadSchema::name` 초과 capacity 축소 누락 | `registrations`에서 중복 ID 및 스키마 이름 일치를 즉시 검사하고, `recovery.rs:335`에 `s.name` box slice 축소 추가 | 미정 | Open |
+| RV-149 | P1 | `storage/recovery.rs:304-318, 416-455`, `cli/src/commands.rs:651-673`, ADR-013 §2·§5, API §23.2·§23.3 | `recover_segment`가 chunk 복사 전 `options.writer.max_records`(및 출력 chunk 상한)를 선검사하지 않아 단일 chunk 내 부분 레코드가 출력에 쓰인 뒤 `NeedRotation`으로 중단되고, 앞선 chunk의 유효한 loss/user prefix가 `finish()`/`sync_all()` 없이 미완결로 남음; 루트 `op==12` peek의 `?`가 손상된 메타데이터를 `Failed`로 조기 실패시킴; CLI `recover` 성공 JSON에 `"target"` 누락 | chunk 복사 전 `report.records + count > options.writer.max_records` 및 출력 writer chunk 여유를 검사해 `RecoveryStop::Limit; break 'scan;`으로 정상 마감; 루트 peek을 `if let Ok(file)`로 변경; CLI 성공 행에 `"target"` 추가 | 수용 | Closed |
+| RV-150 | P2 | `storage/writer.rs:545, 699-710`, `loss.rs:723-736, 761-819`, `cli/src/commands.rs:299-304`, ADR-013 §3, API §23.3 | 회전된 파일의 `Baseline`도 `observed_from_ns = 0`을 기록해 `summarize`의 `observed_from_ns`가 `0`으로 고정되고 CLI `--from/--to` 필터가 왜곡됨; 모든 출력이 첫 주기 체크포인트 전에 고장나도 다중 출력 `Baseline`끼리 합산돼 `delta = Some(0)`이 됨; `tail_confirmed` 및 다중 part 시간 필터 경계 미비 | `Coverage::Baseline`은 `started`를 `observed_from_ns`로 기록; `summarize`에서 실질적 관측 구간(비-Baseline 또는 동일 observer 다중 체크포인트) 및 `valid`·최신 체크포인트 기준으로 `delta`/`tail_confirmed` 판정; CLI 시간 필터를 체크포인트 그룹 단위로 적용 | 수용 | Closed |
+| RV-151 | P2 | `capture/mod.rs:522-538, 1130-1152`, `logger/writer.rs:329-353`, ADR-013 §3, API §23.3 | `GeneralProducer::record_until`의 `Deadline` 분기와 `CaptureCore::loss_before_submit`(`Writer::try_log_at`의 `Encode`/`InvalidInput`)이 `ActiveCall` 내부 `closing`(`SeqCst`) 확인을 거치지 않아 종료 후에도 손실 카운터가 증가하고 `Closing` 대신 `Encode`/`InvalidInput` 반환 | `loss_before_submit`과 `record_until`이 `ActiveCall` 진입 후 `closing.load(Ordering::SeqCst)`를 확인해 종료 후 카운터 증가를 차단하고, `Writer::try_log_at`도 종료 상태를 우선 반영 | 수용 | Closed |
+| RV-152 | P3 | `storage/read.rs:368-415`, `storage/recovery.rs:329-336`, API §23.1 | `read::registrations`에서 중복 `Schema`/`Channel` ID 덮어쓰기 미방지 및 `NativeReader::new` 직후 `channels()`의 스키마 이름/제어 스키마 별칭 미검증; `recover_inner`에서 `PayloadSchema::name` 초과 capacity 축소 누락 | `registrations`에서 중복 ID 및 스키마 이름 일치를 즉시 검사하고, `recovery.rs:335`에 `s.name` box slice 축소 추가 | 수용 | Closed |
 
 ---
 
@@ -79,9 +79,9 @@
 
 #### [처리담당]
 
-- **판정:** (후속 개발 세션에서 작성)
-- **처리:**
-- **검증:**
+- **판정:** 수용 — 승인된 ADR-013의 완전 chunk 반출·prefix 복구 계약 복원.
+- **처리:** `recover_inner`는 max_records와 loss part 총량을 선검사하고 `SegmentWriter::recovery_chunk_fits`로 출력 chunk target에 따른 user split·control flush·초기 등록 chunk 비용까지 재인코딩해 검사한다. 한도는 `Limit`로 scan을 끝내고 `finish`/`sync_recovered`한다. 루트 identity peek의 parse 실패는 scan의 `InvalidRecord` 분류로 넘긴다. CLI 성공 행에 target을 추가했다.
+- **검증:** [EV-086](../verification_evidence.md#ev-086). `fault_storage::exhausted_output_capacity_finishes_only_whole_source_chunks`(max_records1/3, max_chunks1, 작은 출력 target의 경계/정확 수락), `damaged_root_metadata_returns_a_finished_invalid_record_prefix` Red→Green. `cli::recovery_user_record_quota_does_not_consume_control_only_later_sources`는 fanout의 두 Baseline 보존·file_synced·Limit 및 양쪽 target을 대조한다. OS IO/취소의 기존 실패·비발행 규칙은 회귀로 확인했다.
 
 ---
 
@@ -111,9 +111,9 @@
 
 #### [처리담당]
 
-- **판정:** (후속 개발 세션에서 작성)
-- **처리:**
-- **검증:**
+- **판정:** 수용 — 초기 Baseline 이전·마지막 성공 checkpoint 이후의 미관측 구간을 0손실로 표현하지 않음.
+- **처리:** `collect_loss`의 Baseline 시작점을 이번 읽기 시작으로 설정했다. `summarize`는 초기 replica만 있는 경우 delta=None을 유지하고, 중복/감소/overflow 유효성과 session/epoch 최신 multipart 그룹의 complete Quiescent 여부를 분리해 꼬리를 판정한다. CLI 시간 필터는 checkpoint 그룹의 전체 구간에 적용한다.
+- **검증:** [EV-086](../verification_evidence.md#ev-086). `loss::tests::baseline_replicas_and_stale_quiescent_reports_do_not_confirm_unobserved_work`, TC-017의 전 출력 IO 실패·saturated baseline 시험 Red→Green. 신규 `rotated_file_baselines_start_at_their_own_observation`은 실제 sequence1 파일의 시작점과 summarize 구간을 대조한다. `commands::loss_tests::time_windows_keep_all_parts_of_each_selected_checkpoint`는 part 사이 from 경계에서 개별 필터 변이 Red→그룹 필터 Green을 확인했다.
 
 ---
 
@@ -137,9 +137,9 @@
 
 #### [처리담당]
 
-- **판정:** (후속 개발 세션에서 작성)
-- **처리:**
-- **검증:**
+- **판정:** 수용 — 종료가 먼저 확정된 호출은 Closing 반환·저장 watermark 밖으로 유지.
+- **처리:** `loss_before_submit`은 ActiveCall 진입 뒤 SeqCst closing을 읽고 종료 시 CaptureError::Closing을 반환한다. `try_log_at`은 초기 closing을 우선 검사하고 encode/foreign-channel 실패의 helper 결과도 전파한다. Deadline 분기도 ActiveCall 직후 closing을 다시 검사한다. RT 경로에 할당·해제·I/O·재시도/lock을 추가하지 않았다.
+- **검증:** [EV-086](../verification_evidence.md#ev-086). `capture::tests::pre_submit_failures_after_closing_do_not_change_loss_watermarks`와 TC-017의 outstanding writer encode 결과 Red→Green. `logger::writer::closing_tests::closing_during_encoding_outranks_encode_and_foreign_channel_errors`는 encode 내부에서 close해 겹침 순서를 결정적으로 만들고 encode/foreign-channel보다 Closing이 우선함을 확인한다. 일반 Deadline 기존 회귀와 RT allocation20개를 통과했다. 모든 동시 실행 순서를 증명한 것은 아니다.
 
 ---
 
@@ -156,9 +156,9 @@
 
 #### [처리담당]
 
-- **판정:** (후속 개발 세션에서 작성)
-- **처리:**
-- **검증:**
+- **판정:** 수용 — 초기 reader 등록 불변식 및 caller capacity 정리 정렬.
+- **처리:** `registrations`에서 Schema/Channel 중복 ID를 거절하고 user schema 이름을 명시 metadata 또는 payload.<id>.v<ver>와 대조한다. user의 제어 schema 참조도 즉시 거절한다. `recover_inner`는 PayloadSchema.name도 boxed string으로 축소한다.
+- **검증:** [EV-086](../verification_evidence.md#ev-086). `tc_015_native::registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_construction`의 중복 Schema/Channel ID·이름 변조·제어 별칭 네 조건을 new() 시점에서 거절한다(중복 Schema ID 기존 수락 Red 확인). 기존 native writer/reader·복구 및 RT 회귀 통과.
 
 ---
 
@@ -185,3 +185,25 @@
 ### 다음 개발 세션 인계
 
 - 다음 개발 세션은 **TASK-034 runtime 통합(D) 착수 전에** 본 문서(`REV-059`)의 `RV-149`(P1), `RV-150~151`(P2), `RV-152`(P3)에 대해 실패 재현 테스트(Red) 작성 → 최소 코드 수정(Green) → 회귀 검증을 수행하고 `[처리담당]` 영역을 갱신한다.
+
+
+## 6. 개발 세션 최종 처리 — 2026-11-17
+
+Human의 브리핑·리뷰 지적사항 수정 요청과 기존 위임에 따라 `Open → In Progress → Resolved → Closed`로 처리했다. 제품/시험 커밋은 `8b59aa6`, 검증은 [EV-086](../verification_evidence.md#ev-086)이다. 앞의 리뷰어 원문·최초 검증은 당시 이력으로 보존한다.
+
+| 구분 | 변경 파일 | 내용 |
+|---|---|---|
+| 수정 | `storage/recovery.rs`·`storage/writer.rs` | 복구 chunk 선검사·prefix finish/sync·root 분류·Baseline 시작·schema.name 축소 |
+| 수정 | `loss.rs`·`storage/read.rs` | 초기 replica/최신 꼬리 판정·등록 ID/이름 즉시 검증 |
+| 수정 | `capture/mod.rs`·`logger/writer.rs` | ActiveCall/SeqCst 종료 경계·Closing 우선 반환 |
+| 수정 | CLI `commands.rs`·`tests/cli.rs` | 그룹 시간 필터·recovery target·control prefix 시험 |
+| 수정 | `capture/tests.rs`·`fault_storage.rs`·`tc_015_native.rs`·`tc_017_loss.rs` 및 위 모듈 단위 시험 | 7개 신규·기존 시험 확장, Red→Green 및 전체 회귀 |
+
+| 타입 | 동작 변경 |
+|---|---|
+| `SegmentWriter` | 복구 출력 chunk 수 시뮬레이션·파일별 Baseline 시작 |
+| `CaptureCore`·`GeneralProducer`·facade `Writer` | 종료가 먼저면 손실 counter를 늘리지 않고 Closing 반환 |
+| `NativeReader` | new()에서 등록 불변식 검증 강화 |
+| `LossDelta` | 타입 선언 변경 없이 summarize의 delta/tail 판정 강화 |
+
+자가검토: 새 unsafe·RT 할당/해제·I/O·lock·무한 재시도 없음. ActiveCall의 기존 SeqCst/Dekker 종료 순서를 실패 counter까지 확장한다. 복구 선검사는 출력 metadata를 실제로 재인코딩해 비정규 source protobuf 길이나 더 작은 output chunk target에도 한도 초과 전에 멈춘다. 전체 각672·RT20·Miri7·정적 검사·가드 Pass이며 GUI/호출 비용/최종 커버리지·native/장기/실앱은 이번 Pass 범위 밖이다. 다음은 D runtime 통합이다.

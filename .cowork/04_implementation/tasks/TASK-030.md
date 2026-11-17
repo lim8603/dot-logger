@@ -95,3 +95,8 @@ A 완료 당시 모든 파일은 `loss_tracking=unavailable`, 단일 revision �
 TASK-035 S2의 C 로컬 단위를 구현·검증·위임 수락했다([EV-085](../../05_verification/verification_evidence.md#ev-085)·[REV-058](../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md), API §23.3). facade는 telemetry off여도 누적 loss를 기록하며 고급 경로는 명시 활성화한다. source별 expected target·별도 loss-only API/CLI·원 report 보존 복구를 제공하고 사용자 record/replay와 섞지 않는다. 앞의 A/B 절의 unavailable·C 미완료는 해당 단위 완료 당시 기록이다.
 
 다음 D는 TASK-034 WIP `wip/task-034-s2b-runtime-config`(`36c1724`)를 현재 native 저장·loss 계약에 맞춰 적용·시험하는 것이다. 단순 cherry-pick 성공으로 수락하지 않는다. E의 native GUI·counter 전후 호출 비용·통합/커버리지·일정 판정은 아직 미실행이며 TASK-030·035 전체 In Progress를 유지한다.
+
+
+## REV-059 후속 — 2026-11-17
+
+RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Closed, [EV-086](../../05_verification/verification_evidence.md#ev-086), 제품 `8b59aa6`). 복구 완전 prefix·손실 관측/차분·종료 watermark·초기 등록 검증을 보강했고 두 Rust 각672 Pass·5 ignored, Miri7·RT20 Pass다. A/B/C 로컬 완료와 Task 전체 In Progress를 유지한다. 다음 D TASK-034 runtime 통합 → E GUI/호출 비용·최종 통합/커버리지 판정이다.

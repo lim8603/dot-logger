@@ -318,6 +318,8 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 
 근거: [EV-085](verification_evidence.md#ev-085), `loss::tests` 4개·TC-017 14개·CLI4개·allocator1개 신규 및 기존 native/query/replay/retention 회귀. TC-014/MS-009 전체 완료와 GUI 판독은 별도다.
 
+REV-059 후속 [EV-086](verification_evidence.md#ev-086): 완전 chunk 출력 한도·prefix finish/sync·루트 메타 InvalidRecord, 회전 Baseline/초기 replica/최신 꼬리·multipart time window, 종료 중 encode/Deadline·watermark, 초기 reader 등록 검증을 보강했다. 두 Rust 각672 Pass·5 ignored·Miri7·RT20 Pass. TC-014/MS-009 전체·GUI/호출 비용·커버리지 최종 판정은 미완료다.
+
 | 입력·동작 | 기대 결과 |
 |---|---|
 | telemetry off·Capacity retry3·나중 수락·raw 대여/제출·encode 오류 | 시도별 누적·대여 미귀속·encode1회, telemetry reset에도 epoch/counter 유지 |

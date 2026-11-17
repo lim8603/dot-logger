@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-002·003 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-13 / EV-001~078 |
+| 버전 | 2026-11-17 / EV-001~086 |
 
 ---
 
@@ -1375,6 +1375,30 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **구현 계약:** [API §23.3](../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17). session 누적·64행/8192B part·K=ceil(N/64)·L≥2K, user max_records와 별도 control part/count/chunk/bytes/index·final 예약. telemetry off인 facade도 수집한다. native report observer는 원 file target과 일치하며 같은 sequence/다른 출력은 explicit target으로 구분한다. loss-only API/CLI는 사용자 payload/가짜 receipt를 만들거나 fanout을 replay하지 않는다. 복구는 현재 bank를 다시 찍지 않고 원래 보고를 보존한다. max_records0은 양수 control allowance가 있을 때 control-only를 허용하고 실제 user append는 IO 전 거절한다.
 - **해석 제한:** 시도·skip·assignment·Unknown을 고유 메시지 손실로 합산하지 않는다. 관측 구간은 counter_epoch monotonic이며 user record clock/실제 발생 시각과 다르다. MCAP header wall time을 별도 보존한다. complete part 집합 밖 최신값·포화·observer 감소는 exact delta를 만들지 않는다. Closed만으로 quiescence를 주장하지 않고 전 출력 고장/마지막 성공 보고 뒤 RAM-only 변화는 미관측이다.
 - **성능/후속:** 새 physical index 예약을 반영해 4출력 perf fixture64→80MiB로 조정했다. 기존 처리량/지연 수치의 승계가 아니며 이번 단위는 정량 호출 비용·성능 목표의 Pass가 아니다. 다음 D TASK-034 runtime WIP 통합 → E native GUI의 user/meta/loss 판독·counter 전후 호출 비용·전체 통합/커버리지/UC 판정. TASK-030·035 전체 In Progress, TASK-034 기존 결과 Human 확인 대기·다른 OS/native T3·24h·실앱 TASK-024·026 및 Gate4/5 미완료는 유지한다.
+
+<a id="ev-086"></a>
+
+### EV-086 — REV-059 복구 완결·손실 관측·종료 경계·등록 검증 조치
+
+- **판정:** 로컬 **Pass** / 2026-11-17. RV-149(P1)·RV-150/151(P2)·RV-152(P3) 모두 수용·수정·자가검토·위임 수락, [REV-059](reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) **Closed**. TASK-030/034/035 전체 완료로 확대하지 않는다.
+- **대상/환경:** 기준 `ae3b6b3`, 제품·시험 `8b59aa6`(12개 파일). 현재 Ubuntu PC·고정 Rust1.96.0/MSRV1.85.0·Miri nightly-2026-10-26. 전역 설정·커널·외부 공개 상태 변경 없음.
+- **실행 자료:** [명령·종료값·원본 압축 로그·193개 source SHA](../06_evolution/imported_context/rev_059_fixes_2026-11-17/results.json). source-sha256.txt의 193개 파일은 제품 commit blob과 일치한다. 최초 Red 및 MSRV clippy comparison_chain 실패와 최종 결과를 구분해 보존했다. strict docs/표면 가드는 마지막 if→match 스타일 정리 전의 동일 공개 선언에 대한 결과이고 두 최종 Rust 전체 시험/clippy·loss Miri는 정리 후 실행했다.
+
+| 검증 | 결과 |
+|---|---|
+| Rust1.96.0·1.85.0 workspace all-features | 각각 **672 passed·0 failed·5 ignored**(외부 DB), RT allocation20 포함 |
+| 두 Rust workspace all-targets/all-features clippy -D warnings | Pass. MSRV comparison_chain을 match로 정리한 최종 실행 |
+| fmt --all --check·git diff --check | Pass |
+| Rust1.96.0 strict workspace all-features/core-only rustdoc | Pass(Cargo의 기존 lib/bin 문서 출력 경로 중복 경고는 rustdoc 오류와 구분) |
+| NFR-008 표면·레시피 | 34/60·L1 20줄/6개념·레시피4개 실행 Pass, 공개 선언 변경 없음 |
+| Miri strict provenance/disable-isolation | loss 단위5·capture 종료 watermark1·general deadline1 = **7 Pass**. 전체 interleaving 증명은 아님 |
+
+- **RV-149:** source chunk 단위 사용자 수·loss part·출력 chunk target/초기 등록/control flush 여유 선검사. Limit은 앞선 prefix를 완결하고 sync한다. root peek 손상은 InvalidRecord, CLI 성공/부분 prefix도 원 target을 보고한다. 재현 시험은 count1/3·chunk1·작은 출력 target·정확 경계·파일 summary/sync·fanout의 앞선 두 Baseline 보존을 확인한다.
+- **RV-150:** 회전 파일 Baseline을 이번 읽기 시작으로 제한. 초기 replica만으로 delta를 만들지 않으며 유효성·최신 complete Quiescent로 꼬리를 확인한다. CLI time window는 checkpoint 전체 part 그룹에 적용한다. 실제 sequence1 파일·전 출력 실패·감소/중복/최신 incomplete·part 사이 경계를 대조했다.
+- **RV-151:** pre-submit 실패·Deadline이 ActiveCall 진입 후 SeqCst closing을 검사한다. facade가 초기 및 encode 겹침 종료를 Closing으로 반환하고 종료 뒤 counter가 불변임을 확인했다. 기존 RT no-allocation 경로 유지, 새 unsafe 없음.
+- **RV-152:** NativeReader 초기 스캔의 중복 Schema/Channel ID·이름 불일치·user의 control schema 참조 거절, 복구 caller schema.name capacity 정렬. new() 시점의 거절을 시험한다.
+- **새 시험/범위:** 7개 신규 및 기존 시험 확장(665→672). 기존 record quota 시험의 미완결/NeedRotation 기대를 완전 prefix/Limit 기대에 맞춰 수정했다. 반환 오류·원본 보존·취소/IO 실패·query/replay/retention·CLI·allocator 회귀를 포함한다.
+- **미실행/후속:** feature/dependency 경계를 바꾸지 않아 18-feature matrix는 재실행하지 않았다. GUI user/meta/loss·counter 전후 호출 비용·최종 커버리지/UC는 D 이후 E에서 확인한다. native 공개 후 T3·TASK-024/026·Gate4/5 미완료를 유지한다. 다음은 TASK-034 runtime WIP36c1724의 D 통합이다.
 
 ## Open Evidence Gaps
 

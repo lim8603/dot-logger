@@ -50,3 +50,8 @@ Human 「모두 권고대로 진행하자」로 추가가 결정됐다(UC-04).
 [API §23.3](../../03_design_artifacts/interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·[EV-085](../../05_verification/verification_evidence.md#ev-085)·[REV-058](../../05_verification/reviews/REV-058_LOSS_CHECKPOINT_C.md)를 따른다. telemetry 독립 고정 counter, native loss report·baseline/주기/회전/final·bounded loss-only 조회/복구·CLI, optional 원래 target identity를 연결했다. retry 시도와 assignment·skip·Unknown·미확인 꼬리를 분리한다. 포화·누락 part·누적 감소는 exact delta를 만들지 않는다.
 
 신규 TC-017 14개·loss 단위4개·CLI4개·allocator1개가 counter/동시성·NoRoute/encode/raw·최종 tail·count/index 한도/coalesce·원 report 복구·전 출력 실패·잘못된 control/observer를 검증한다. 개발 중 RV-146~148을 Red→Green으로 수정했다. 4출력 성능 fixture의 메모리 조정은 새 예약을 반영한 것이며 성능 수치의 수락이 아니다. C 단위의 로컬 수락과 전체 Task 완료를 구분한다. 다음 작업은 TASK-034 runtime WIP(D), 그 뒤 E 표준 GUI/호출 비용/통합·TASK-033 재측정이다.
+
+
+## REV-059 후속 — 2026-11-17
+
+RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Closed, [EV-086](../../05_verification/verification_evidence.md#ev-086), 제품 `8b59aa6`). 복구 완전 prefix·손실 관측/차분·종료 watermark·초기 등록 검증을 보강했고 두 Rust 각672 Pass·5 ignored, Miri7·RT20 Pass다. A/B/C 로컬 완료와 Task 전체 In Progress를 유지한다. 다음 D TASK-034 runtime 통합 → E GUI/호출 비용·최종 통합/커버리지 판정이다.

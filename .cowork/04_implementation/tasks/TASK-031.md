@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | S3 원격 재생·파일 로컬 Pass. Foxglove Desktop 연결과 T7 정량 검증 잔여 |
+| 다음 액션 | [잔여 검증](#잔여-검증과-재개-순서) — Foxglove Desktop 실시간·기록 재생, T7 정량 실측 |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
 
@@ -103,4 +103,10 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 - [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의는 [TC-014](../../05_verification/test_case.md#tc-014), S2 증거는 [EV-092](../../05_verification/verification_evidence.md#ev-092)를 따른다.
+테스트 정의는 [TC-014](../../05_verification/test_case.md#tc-014), 검증 근거는 [EV-092](../../05_verification/verification_evidence.md#ev-092)~[EV-094](../../05_verification/verification_evidence.md#ev-094)를 따른다.
+
+## 잔여 검증과 재개 순서
+
+- [ ] 로그인 가능한 Foxglove Desktop에서 실시간 구독과 기록 재생을 확인한다. 격리 프로필에서는 로그인 화면까지 확인했다(EV-092).
+- [ ] T7의 LAN P4/P4-bulk, 동시 쓰기 P5, 정량 포화 회복을 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다. 루프백 포화 회복 기능은 EV-092에 있다.
+- [ ] TASK-031 수락을 정리한 뒤 [TASK-032](TASK-032.md) 운영 대시보드 S1로 진행한다.

@@ -15,9 +15,9 @@
 | 상태 | 29/35 Task Done. [EV-094](../05_verification/verification_evidence.md#ev-094) 원격 기록 재생 로컬·Lichtblick Pass, 두 Rust 각692 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / TASK-031 S3 원격 기록 재생 로컬 검증 / AI |
-| 세션 상태 | **진행 중 — 2026-11-18 #003.** S3 재생·파일 로컬 Pass |
-| 최근 완료 세션 | 2026-11-18 #002 — .logger·standard/2, EV-090, REV-062 Closed |
+| 갱신 | 2026-11-18 / 세션 종료·TASK-031 환경 검증 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-18 #003.** S2·S3 로컬 Pass, 환경 검증 인계 |
+| 최근 완료 세션 | 2026-11-18 #003 — ADR-014, viewer S2·S3, EV-091~094, REV-063~065 Closed |
 
 ## 현재 결정과 제약
 
@@ -92,7 +92,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **TASK-031:** S3 파일·원격 재생은 [EV-093](../05_verification/verification_evidence.md#ev-093)·[EV-094](../05_verification/verification_evidence.md#ev-094) 로컬 Pass. 로그인 가능한 Foxglove Desktop 연결과 T7 LAN/동시 쓰기 정량 검증이 남았다. 이후 TASK-032 대시보드.
+1. **TASK-031:** [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 시작한다. 로그인 가능한 Foxglove Desktop 실시간·기록 재생과 T7 LAN P4/P4-bulk·동시 쓰기 P5·정량 포화 회복을 검증한다. 이후 TASK-032 대시보드.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 

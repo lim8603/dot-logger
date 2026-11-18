@@ -718,3 +718,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 - 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `8b59aa6`, [EV-086](../05_verification/verification_evidence.md#ev-086), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_003.md)).
 - 2026-11-17 #002: `949a74e..0270f03` 독립 리뷰 REV-059 Open 생성 후 #003에서 Closed([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_002.md)).
+
+## #031 — 2026-11-18 #005 세션 종료 최근 이력 이관
+
+- 2026-11-18 #001~002: ADR-013 E와 TASK-033 S4 수락 및 .logger 예약 토픽·standard/2 적용([EV-088](../05_verification/verification_evidence.md#ev-088)~[EV-090](../05_verification/verification_evidence.md#ev-090), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)·[REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그 #001](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)·[#002](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).

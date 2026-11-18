@@ -1499,6 +1499,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **독립 WS 수신:** 같은 원본에서 두 번 모두 10개 protobuf 메시지 x=42~51과 mono 시각 일치. 1/1 평균 프레임 간격 101.3 ms, 1/4에서 401.9 ms를 루프백에서 관측했다. TC-012 LAN/P4/P5 실측 판정은 별도다.
 - **회귀:** Rust 1.85.0·1.96.0 `cargo test --locked --workspace --all-features` 각각 **692 Pass, 0 실패, 5 ignored**. 양쪽 `clippy --locked --workspace --all-targets --all-features -- -D warnings`와 fmt·문서 링크 검사 통과. Foxglove Desktop 연결과 T7 LAN/동시 쓰기는 미실행이다. 제품 기본 facade의 Query/ReadBlob은 Unsupported 상태다.
 
+<a id="ev-095"></a>
+### EV-095 — REV-066 조치와 등록·viewer 회귀
+
+- **대상:** 제품 `bd02d49`, Ubuntu x86_64, 2026-11-18 #005. [REV-066](reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) RV-156~159를 수정하고 위임 범위에서 수락했다.
+- **Red:** 기존 코드의 즉시 재구독은 feeds 1에서 거절됐고, 두 채널의 큐 상태 중 하나가 유실됐다. 280 KiB ReadBlob 요청은 256 KiB로 축소됐다. 복구는 등록 누락 EOF를 `EndOfInput`으로 처리했고 native 판독은 필수 제어 채널이 없는 파일을 열었다. Pinned nightly의 strict rustdoc은 중복 링크로 실패했다.
+- **Green:** 실제 TCP/gRPC·WS에서 같은 채널 구독 재사용, 다른 채널 전환·반납, 채널별 상태, 은퇴 시 Unsupported·광고 회수, 재생 만료 후 새 snapshot, 정상 채널의 계속 재생과 큰 ReadBlob·부분 응답을 확인했다. 등록 시험은 EOF·DataEnd·첫 청크·중복·늦은 등록·제어 채널과 사용자 metadata를 다룬다.
+- **종단 회귀:** NativeReader·LossReader, Query·비교·재생, CLI·manifest 복구를 작업 공간에서 확인했다. [EV-090 기존 등록 배치 파일](../06_evolution/imported_context/dot_logger_namespace_2026-11-18/README.md)의 CLI query/replay는 각 10건, loss는 12 parts, recover는 `DataEnd`로 사용자 10건·손실 12건을 별도 복구했다. 원본 SHA-256은 EV-090과 일치했다.
+- **품질 검사:** 1.96.0·1.85.0 `cargo test --workspace --all-features --locked --no-fail-fast` 각 **696 Pass, 0 실패, 외부 DB 5 ignored**. RT 할당 20건, viewer 8건 포함. 양쪽 workspace all-targets/all-features Clippy `-D warnings`, strict rustdoc, fmt 및 표면 가드(35/60, L1~L3) 통과. `nightly-2026-10-26`의 core strict rustdoc도 통과했다.
+- **잔여:** 작업자 실패와 원격 ApplyConfig가 같은 관리 턴에 교차하는 조건은 코드 순서와 기존 종료/설정 회귀로 확인했다. Foxglove Desktop 연결 및 T7 LAN 정량 실측은 TASK-031에 남긴다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

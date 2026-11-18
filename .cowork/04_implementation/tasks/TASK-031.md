@@ -31,8 +31,8 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Done — 2026-11-18 Human 승인, ADR-014 |
-| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). Foxglove 실시간·T7 LAN 실측 잔여 |
-| S3 | 기록 소스 | Query/ReadBlob 기반 시간 이동·배속, 파일 열기 | 로컬 Pass — MCAP EV-093, 원격 재생 EV-094 |
+| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). REV-066 조치 검증(EV-095). Foxglove 실시간·T7 LAN 실측 잔여 |
+| S3 | 기록 소스 | Query/ReadBlob 기반 시간 이동·배속, 파일 열기 | 로컬 Pass — MCAP EV-093, 원격 재생 EV-094, 등록·재연결 회귀 EV-095 |
 
 ## S1 기술 결정안 — 2026-11-18
 
@@ -104,6 +104,10 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의는 [TC-014](../../05_verification/test_case.md#tc-014), 검증 근거는 [EV-092](../../05_verification/verification_evidence.md#ev-092)~[EV-094](../../05_verification/verification_evidence.md#ev-094)를 따른다.
+
+## 리뷰 조치 — 2026-11-18
+
+[REV-066](../../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md)을 마감했다. 실시간 구독 교체와 채널별 상태, 원격 기록 재생의 실패 후 이동과 단일 채널 은퇴, MCAP 등록 판독·복구를 로컬 검증했다. [EV-095](../../05_verification/verification_evidence.md#ev-095)
 
 ## 잔여 검증과 재개 순서
 

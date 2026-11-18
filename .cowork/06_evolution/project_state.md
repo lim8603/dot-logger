@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | TASK-031 In Progress — S1 승인, S2·S3 로컬 Pass. Foxglove Desktop 연결·T7 정량 검증 잔여 |
-| 미처리 리뷰 | 없음. [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) **Closed**. REV-001~064 Closed |
-| 상태 | 29/35 Task Done. [EV-094](../05_verification/verification_evidence.md#ev-094) 원격 기록 재생 로컬·Lichtblick Pass, 두 Rust 각692 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 미처리 리뷰 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) (**Open**, Conditional — P1 0·P2 3·P3 1: `RV-156~159`). REV-001~065 Closed |
+| 상태 | 29/35 Task Done. [EV-094](../05_verification/verification_evidence.md#ev-094) 원격 기록 재생 로컬·Lichtblick Pass, 두 Rust 각692 Pass·5 ignored, 독립 리뷰 [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) Open(`RV-156~159` 조치 대기). [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / 세션 종료·TASK-031 환경 검증 인계 / AI |
-| 세션 상태 | **종료 — 2026-11-18 #003.** S2·S3 로컬 Pass, 환경 검증 인계 |
-| 최근 완료 세션 | 2026-11-18 #003 — ADR-014, viewer S2·S3, EV-091~094, REV-063~065 Closed |
+| 갱신 | 2026-11-18 / 코드리뷰 세션 종료·REV-066 Open 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-18 #004.** REV-066 코드리뷰 완료(Open, RV-156~159), 다음 개발 세션에서 조치 후 TASK-031 잔여 검증 |
+| 최근 완료 세션 | 2026-11-18 #004 — ae3b6b3..3f8a46f 통합 코드리뷰(REV-066 Open, RV-156~159) |
 
 ## 현재 결정과 제약
 
@@ -71,7 +71,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-18 | S3 MCAP·원격 재생 로컬 Pass. Foxglove Desktop 연결·T7 잔여 |
+| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-18 | REV-066(RV-156~159) 조치 후 Foxglove Desktop 연결·T7 잔여 |
 | TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -87,12 +87,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-063](../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md) | TASK-031 S2 WS bridge·카탈로그·ACK/수명 | **Closed** | EV-092·위임 로컬 수락. Foxglove 실시간·T7 정량 잔여 |
 | [REV-064](../05_verification/reviews/REV-064_TASK_031_MCAP_COMPATIBILITY.md) | TASK-031 S3 MCAP 등록 배치 | **Closed** | EV-093·위임 로컬 수락 |
 | [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) | TASK-031 S3 원격 기록 재생 | **Closed** | EV-094·위임 로컬 수락 |
+| [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | `ae3b6b3..3f8a46f` REV-059 조치·runtime D/E·.logger 예약 토픽·TASK-031 S2/S3 통합 코드리뷰 | **Open** | Conditional — P2 3·P3 1 (`RV-156~159`) 조치 대기 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-1. **TASK-031:** [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 시작한다. 로그인 가능한 Foxglove Desktop 실시간·기록 재생과 T7 LAN P4/P4-bulk·동시 쓰기 P5·정량 포화 회복을 검증한다. 이후 TASK-032 대시보드.
+1. **REV-066 조치 및 TASK-031:** [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md)의 RV-156~159를 TDD(Red→Green→회귀)로 조치·마감한 뒤, [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)(로그인 가능한 Foxglove Desktop 실시간·기록 재생, T7 LAN P4/P4-bulk·동시 쓰기 P5·정량 포화 회복)을 진행한다. 이후 TASK-032 대시보드.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -143,8 +144,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 최근 작업·이력
 
+- 2026-11-18 #004: ae3b6b3..3f8a46f 통합 코드리뷰 [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) Open(RV-156~159)([로그](../members/lim8603/workspace/session_logs/session_2026-11-18_004.md)).
 - 2026-11-18 #003: ADR-014 승인·S2/S3 로컬 검증([EV-092](../05_verification/verification_evidence.md#ev-092)~[EV-094](../05_verification/verification_evidence.md#ev-094), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_003.md)).
-- 2026-11-18 #002: .logger 호스트 예제와 native 예약 토픽·standard/2 적용([EV-090](../05_verification/verification_evidence.md#ev-090), [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).
-- 2026-11-18 #001: ADR-013 E와 TASK-033 S4 최종 수락([EV-088](../05_verification/verification_evidence.md#ev-088)·[EV-089](../05_verification/verification_evidence.md#ev-089), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)).
+- 2026-11-18 #001~002: ADR-013 E와 TASK-033 S4 수락 및 .logger 예약 토픽·standard/2 적용([EV-088](../05_verification/verification_evidence.md#ev-088)~[EV-090](../05_verification/verification_evidence.md#ev-090), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)·[REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그 #001](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)·[#002](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).
 
 완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030 및 관련 EV·세션 로그에 보존한다.

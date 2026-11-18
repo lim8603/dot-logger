@@ -1538,7 +1538,7 @@ fn offline_source_failures_map_to_stable_exit_codes() {
         m["sources"][0]["path"] = json!("broken.mcap")
     });
     assert_outcome(&query(&broken), 4, "invalid_data");
-    // A valid MCAP header whose profile is not `dot-logger/standard/1`.
+    // A valid MCAP header with a foreign profile.
     let mut foreign = b"\x89MCAP0\r\n\x01".to_vec();
     foreign.extend_from_slice(&9u64.to_le_bytes());
     foreign.extend_from_slice(&1u32.to_le_bytes());

@@ -65,13 +65,13 @@ Query 결과의 snapshot을 Replay handle로 전달한다. 제어 요청에는 �
 
 ## 오프라인 파일
 
-[offline_session.json](examples/offline_session.json)을 원본 session·생산자 수·원래 채널 등록 순서·각 source의 revision/sequence/경로와 예산으로 수정한다. schema/descriptor가 있으면 channel의 `descriptor: {"encoding": "...", "data_hex": "..."}`를 원래 값으로 지정한다. 예제 값은 사용 예이며 제품/장비 기본값이 아니다.
+[offline_session.json](examples/offline_session.json)을 호스트 프로젝트의 `.logger/session.json`에 복사하고 원본 session·생산자 수·채널 등록 순서·각 source의 revision/sequence/경로와 예산을 입력한다. 상대 source 경로는 `.logger/session.json`이 있는 디렉터리를 기준으로 해석한다. schema/descriptor가 있으면 channel의 `descriptor: {"encoding": "...", "data_hex": "..."}`를 원래 값으로 지정한다. 예제 값은 사용 예이며 제품/장비 기본값이 아니다.
 
 ```sh
-cargo run -p dot-logger-cli -- config validate --manifest session.json --json
-cargo run -p dot-logger-cli -- query --manifest session.json --from 0 --to 1000000000 --json
-cargo run -p dot-logger-cli -- replay --manifest session.json --speed 2/1 --json
-cargo run -p dot-logger-cli -- recover --manifest session.json --output recovered.mcap --json
+cargo run -p dot-logger-cli -- config validate --manifest .logger/session.json --json
+cargo run -p dot-logger-cli -- query --manifest .logger/session.json --from 0 --to 1000000000 --json
+cargo run -p dot-logger-cli -- replay --manifest .logger/session.json --speed 2/1 --json
+cargo run -p dot-logger-cli -- recover --manifest .logger/session.json --output .logger/recovered.mcap --json
 ```
 
 manifest는 `schema_version: 2`이고 전역 revision 대신 각 `sources[]`에 `revision`을 필수로 둔다. v1과 전역 `revision`·형식 선택 필드는 지원하지 않는다. 파일 Metadata의 session/revision/sequence와 등록을 대조하며, 중복 경로·같은 target/sequence·동일 receipt의 재등장을 거절한다. 서로 다른 출력의 같은 sequence는 각각 `sources[].target`을 명시해야 하며 실제 파일 target과 대조한다. loss-only 조회는 사용자 fanout receipt를 replay/index하지 않는다. standalone `SegmentWriter`의 sequence는 0이고, 회전 파일은 catalog의 실제 sequence를 사용한다. offline status는 `sources` 배열에 파일별 sequence/revision을 표시한다.
@@ -105,9 +105,9 @@ REV-022 보강: `tail`의 전체 입력/예약 검증은 연결 전에 수행한
 
 만료/세대 폐기로 handoff가 사전 거절되면 `gone_or_expired`/exit3이고 ACK는 없다. 원본 손상은 `invalid_data`/exit4, 메시지 크기 상한은 `limit`/exit3이다. 원격 config apply/check run/replay의 Gone도 이미 게시된 호스트 작업의 완료를 증명하지 않으므로 `posted_host_io: completion_unconfirmed`를 표시한다. 읽기 전용 capability Gone과 Unsupported 응답의 기존 분류는 유지한다.
 
-저장 파일은 `dot-logger/standard/1` native MCAP이며 사용자 payload와 schema를 직접 담는다. `_dot_logger/meta`가 원래 receipt·시계·설정 정보를 보존한다. 별도 `export --standard` 변환은 제공하지 않는다. 구형 파일은 지원하지 않는다.
+저장 파일은 `dot-logger/standard/2` native MCAP이며 사용자 payload와 schema를 직접 담는다. `.logger/meta`가 원래 receipt·시계·설정 정보를 보존한다. 별도 `export --standard` 변환은 제공하지 않는다. 이전 개발 파일 `dot-logger/standard/1`은 판독·복구 입력으로 지원하지 않는다.
 
 
-`loss --manifest session.json --json`은 native `_dot_logger/loss`만 별도 `loss` 행으로 출력한다. `limits.max_loss_reports`에 양수 part 상한을 지정하고 external_bytes도 그 예약에 맞춘다. 생략/0이면 일반 query는 control을 검증하고 건너뛰지만, 수집된 loss를 조회할 때는 Limit이다. 수집 비활성 파일은 summary의 unavailable_sources로 보고하며 손실 0을 증명하지 않는다.
+`loss --manifest .logger/session.json --json`은 native `.logger/loss`만 별도 `loss` 행으로 출력한다. `limits.max_loss_reports`에 양수 part 상한을 지정하고 external_bytes도 그 예약에 맞춘다. 생략/0이면 일반 query는 control을 검증하고 건너뛰지만, 수집된 loss를 조회할 때는 Limit이다. 수집 비활성 파일은 summary의 unavailable_sources로 보고하며 손실 0을 증명하지 않는다.
 
 loss의 `--from/--to`는 `observation_clock:counter_epoch_monotonic_ns` 관측 구간의 겹침이며 사용자 record 시각·손실 발생 시각이 아니다. `--channel`은 제품 채널이고 `--basis`는 mono만 지원한다. 누적값은 session/epoch/원래 assignment target별 watermark로 비교하며 출력 replica를 합산하지 않는다. part 누락·overflow·관측 감소 등에서는 delta가 null이다. tail_confirmed가 false이면 마지막 표본 뒤 꼬리는 미확인이다. summary.records는 사용자 record 줄 수이므로 0이고 loss_rows/report_parts는 별도다. 손실 수를 고유한 원본 메시지 수로 합산하지 않는다. count0/overflow=false 행은 생략한다. 사용자 복구 quota를 채운 뒤에도 남은 control allowance 안에서 control-only source를 복구하며 뒤 사용자 기록은 Limit(exit3)이다.

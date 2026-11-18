@@ -1,4 +1,4 @@
-//! Bounded management-path recovery of an immutable dot-logger/standard/1 segment.
+//! Bounded management-path recovery of an immutable dot-logger/standard/2 segment.
 use super::*;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, Ordering};

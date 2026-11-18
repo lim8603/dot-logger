@@ -6,7 +6,7 @@ use dot_logger::logger::{
     Budget, EncodeError, Logged, Logger, Record, Retention, Schema, WriterQuota,
 };
 use dot_logger::storage::NativeReader;
-const META_TOPIC: &str = "_dot_logger/meta";
+const META_TOPIC: &str = ".logger/meta";
 use prost::Message;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -193,7 +193,7 @@ fn f1_native_file_decodes_user_payloads_and_keeps_full_metadata() {
         .unwrap();
     let controls: Vec<_> = messages
         .iter()
-        .filter(|m| m.channel.topic == "_dot_logger/loss")
+        .filter(|m| m.channel.topic == ".logger/loss")
         .collect();
     assert!(
         !controls.is_empty(),
@@ -207,7 +207,7 @@ fn f1_native_file_decodes_user_payloads_and_keeps_full_metadata() {
     }));
     let (user, meta): (Vec<_>, Vec<_>) = messages
         .iter()
-        .filter(|m| m.channel.topic != "_dot_logger/loss")
+        .filter(|m| m.channel.topic != ".logger/loss")
         .partition(|m| m.channel.topic != META_TOPIC);
     assert_eq!(user.len(), 110);
     assert_eq!(meta.len(), 110);
@@ -265,7 +265,7 @@ fn f1_native_file_decodes_user_payloads_and_keeps_full_metadata() {
     // the following meta message keeps the rest (API §21.1).
     let pairs: Vec<_> = messages
         .iter()
-        .filter(|m| m.channel.topic != "_dot_logger/loss")
+        .filter(|m| m.channel.topic != ".logger/loss")
         .collect();
     for (i, stored) in originals.iter().enumerate() {
         let m = &pairs[2 * i];

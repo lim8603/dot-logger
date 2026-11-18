@@ -85,10 +85,14 @@ cargo run --locked -p dot-logger --features remote --example recipe_l3_remote
 
 기본 경로에 필요할 때만 붙이는 옵션입니다. 계약은 [API §22](.cowork/03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15)에 있습니다.
 
+호스트 프로젝트에 통합할 때는 앱이 정한 `project_root` 아래에 `.logger/`를 만들어 넘길 수 있습니다. dot-logger라는 이름에는 호스트의 `.logger/` 폴더에 기록을 모아 두고 뒤에서 조용히 지원한다는 뜻을 담았습니다.
+
 ```rust
+let log_dir = project_root.join(".logger");
+std::fs::create_dir_all(&log_dir)?;
 let logger = Logger::builder()
     .budget(budget)
-    .file_output("/data/logs", Retention::ring(4 << 30)
+    .file_output(&log_dir, Retention::ring(4 << 30)
         .events(EventWindow::new(Duration::from_secs(30), Duration::from_secs(10))
             .hold(Duration::from_secs(3600))
             .limits(8, 512 << 20)))                       // 이벤트 전후 구간 보존

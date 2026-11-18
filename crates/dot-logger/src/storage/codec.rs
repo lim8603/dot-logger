@@ -6,9 +6,10 @@ use crate::capture::{
 use prost::Message;
 
 pub(super) const OVERHEAD: usize = 512;
-pub(crate) const PROFILE: &str = "dot-logger/standard/1";
-pub(crate) const META_TOPIC: &str = "_dot_logger/meta";
-pub(crate) const LOSS_TOPIC: &str = "_dot_logger/loss";
+pub(crate) const PROFILE: &str = "dot-logger/standard/2";
+pub(crate) const FILE_FORMAT_VERSION: &str = "2";
+pub(crate) const META_TOPIC: &str = ".logger/meta";
+pub(crate) const LOSS_TOPIC: &str = ".logger/loss";
 pub(crate) const META_SCHEMA: &str = "dot_logger.RecordMeta";
 pub(crate) const META_DESCRIPTOR: &[u8] = include_bytes!("record_meta.bin");
 #[derive(Clone, PartialEq, Message)]

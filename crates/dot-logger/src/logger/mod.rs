@@ -14,13 +14,14 @@
 //! }
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! std::fs::create_dir_all(".logger")?;
 //! let logger = Logger::builder()
 //!     .budget(Budget::new()
 //!         .memory_bytes(64 << 20)
 //!         .sync_every(Duration::from_millis(100))
 //!         .drop_deadline(Duration::from_secs(3))
 //!         .writer_quota(WriterQuota::small(256, 64)))
-//!     .file_output("/data/logs", Retention::ring(1 << 30))
+//!     .file_output(".logger", Retention::ring(1 << 30))
 //!     .channel::<Pose>("robot/pose")
 //!     .writer("control")
 //!     .start()?;

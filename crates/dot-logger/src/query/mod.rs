@@ -392,7 +392,7 @@ impl QueryConfig {
 }
 impl<R: Read + Seek> Snapshot<R> {
     /// Validate and index the frozen source ranges. Sources must be independently
-    /// opened, uncompressed dot-logger/standard/1 files with the supplied original registrations.
+    /// opened, uncompressed dot-logger/standard/2 files with the supplied original registrations.
     /// Each source declares its own revision and sequence; receipts must be unique
     /// across the entire session snapshot, even across different revisions.
     /// Large payloads are decoded only in bounded scan scratch, then referenced on disk.

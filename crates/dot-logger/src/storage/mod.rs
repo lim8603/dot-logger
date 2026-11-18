@@ -49,7 +49,7 @@
 //! independent empty sink. The caller supplies the original session, revision and
 //! channel registrations, `RecoveryOptions` (input size, record/chunk limits,
 //! output `WriterConfig`) and a cancel flag. It targets the product's uncompressed
-//! `dot-logger/standard/1` format with nonzero chunk CRC and copies a complete chunk only
+//! `dot-logger/standard/2` format with nonzero chunk CRC and copies a complete chunk only
 //! after its length, CRC, references, user/meta pairs and producer sequences all check.
 //! It does not resynchronize after damage: `RecoveryReport` names the verified
 //! prefix, the excluded suffix and the cause. Original and opaque payloads are

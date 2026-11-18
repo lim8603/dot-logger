@@ -1,5 +1,5 @@
 //! Borrowed native-file iteration. A whole chunk is checked before its first record.
-use super::codec::{META_TOPIC, PROFILE};
+use super::codec::{FILE_FORMAT_VERSION, META_TOPIC, PROFILE};
 use super::recovery::{Fields, Validation, chunk_data, crc_update};
 use super::{PayloadSchema, StorageChannel, StorageError, StoredRecord};
 use crate::capture::ChannelConfig;
@@ -30,7 +30,7 @@ impl FileInfo {
         mcap::records::Metadata {
             name: "dot_logger.file".into(),
             metadata: BTreeMap::from([
-                ("format_version".into(), "1".into()),
+                ("format_version".into(), FILE_FORMAT_VERSION.into()),
                 ("session_id".into(), format!("{:032x}", self.session)),
                 ("revision".into(), self.revision.to_string()),
                 ("target_id".into(), self.target.to_string()),
@@ -76,7 +76,7 @@ impl FileInfo {
         }
         let bad = || StorageError::CorruptData;
         let get = |key: &str| metadata.get(key).copied().ok_or_else(bad);
-        if metadata.len() != 8 || get("format_version")? != "1" {
+        if metadata.len() != 8 || get("format_version")? != FILE_FORMAT_VERSION {
             return Err(bad());
         }
         let session = get("session_id")?;

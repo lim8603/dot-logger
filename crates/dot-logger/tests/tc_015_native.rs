@@ -91,15 +91,17 @@ fn file_channels(target: usize, channels: Vec<StorageChannel>) -> Vec<u8> {
 #[test]
 fn native_writer_stores_user_payload_and_adjacent_meta() {
     let bytes = file(4096);
-    let header = mcap::read::LinearReader::new(&bytes)
-        .unwrap()
-        .next()
-        .unwrap()
-        .unwrap();
+    let mut records = mcap::read::LinearReader::new(&bytes).unwrap();
+    let header = records.next().unwrap().unwrap();
     let mcap::records::Record::Header(header) = header else {
         panic!("header")
     };
-    assert_eq!(header.profile, "dot-logger/standard/1");
+    assert_eq!(header.profile, "dot-logger/standard/2");
+    let mcap::records::Record::Metadata(metadata) = records.next().unwrap().unwrap() else {
+        panic!("file metadata")
+    };
+    assert_eq!(metadata.name, "dot_logger.file");
+    assert_eq!(metadata.metadata["format_version"], "2");
     let messages: Vec<_> = mcap::MessageStream::new(&bytes)
         .unwrap()
         .collect::<Result<_, _>>()
@@ -109,7 +111,7 @@ fn native_writer_stores_user_payload_and_adjacent_meta() {
         assert_eq!(pair[0].channel.topic, "robot/a");
         assert!(pair[0].channel.schema.is_none());
         assert_eq!(&pair[0].data[..], &[if i == 1 { 1 } else { 0 }; 100]);
-        assert_eq!(pair[1].channel.topic, "_dot_logger/meta");
+        assert_eq!(pair[1].channel.topic, ".logger/meta");
         assert_eq!(
             pair[1].channel.schema.as_ref().unwrap().name,
             "dot_logger.RecordMeta"
@@ -215,15 +217,24 @@ fn reader_rejects_legacy_profiles_and_caller_limits() {
             .unwrap()
             .is_err()
     );
-    let profile = bytes
-        .windows(b"dot-logger/standard/1".len())
-        .position(|w| w == b"dot-logger/standard/1")
-        .unwrap();
-    bytes[profile] = b'x';
-    assert!(matches!(
-        NativeReader::new(&bytes, 100, 2),
-        Err(StorageError::UnsupportedFormat)
-    ));
+    let native_profile = b"dot-logger/standard/2";
+    let version = bytes
+        .windows(native_profile.len())
+        .position(|w| w == native_profile)
+        .unwrap()
+        + native_profile.len()
+        - 1;
+    for older_or_unknown in [b'1', b'x'] {
+        bytes[version] = older_or_unknown;
+        assert!(matches!(
+            NativeReader::new(&bytes, 100, 2),
+            Err(StorageError::UnsupportedFormat)
+        ));
+        assert!(matches!(
+            dot_logger::storage::LossReader::new(&bytes, 100, 2),
+            Err(StorageError::UnsupportedFormat)
+        ));
+    }
 }
 #[test]
 fn semantic_damage_anywhere_in_a_chunk_exposes_no_pair_from_it() {
@@ -401,7 +412,7 @@ fn reserved_native_topics_and_schemas_are_rejected_before_any_sink_write() {
         payload_encoding: "opaque".into(),
         schema: None,
     };
-    for topic in ["_dot_logger/meta", "_dot_logger/loss"] {
+    for topic in [".logger/meta", ".logger/loss"] {
         assert!(matches!(
             config.reservation(&[make(topic)], 2),
             Err(StorageError::InvalidConfig)

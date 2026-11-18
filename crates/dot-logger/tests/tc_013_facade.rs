@@ -2093,7 +2093,7 @@ fn f43_runtime_files_keep_revisions_and_session_cumulative_loss() {
 
 #[test]
 fn f44_native_control_topic_collisions_fail_before_creating_a_namespace() {
-    for topic in ["_dot_logger/meta", "_dot_logger/loss"] {
+    for topic in [".logger/meta", ".logger/loss"] {
         let temp = Temp::new();
         let result = Logger::builder()
             .budget(budget())

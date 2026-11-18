@@ -1,6 +1,6 @@
 // Per-message product fields kept beside user channels in a standard MCAP
 // export (API §21.1/21.2). One RecordMeta follows each user message with the
-// same log_time on the `_dot_logger/meta` topic.
+// same log_time on the `.logger/meta` topic.
 // Regenerate: protoc --include_imports --descriptor_set_out=record_meta.bin record_meta.proto
 syntax = "proto3";
 package dot_logger;

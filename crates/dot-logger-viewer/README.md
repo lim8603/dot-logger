@@ -68,4 +68,21 @@ a topic or schema, then restart the viewer.
   **Viewer Gap** counts records dropped by this socket's own queue.
   **Unknown** marks an unobserved range after an upstream termination or an
   unconfirmed handoff. The viewer retries while a subscription remains active.
-- Query/Replay and file playback are tracked separately in TASK-031 S3.
+## Opening MCAP recordings
+
+Open a closed native `dot-logger/standard/2` recording directly in the viewer app.
+New dot-logger files place registrations before message chunks for compatibility
+with Lichtblick's indexed playback.
+
+Some earlier `standard/2` files include a registration-only chunk. If Lichtblick
+reports a playback range starting at 1970 and fails to preload messages, use the
+existing CLI recovery command to write a separate compatible copy:
+
+```sh
+cargo run --locked -p dot-logger-cli -- recover \
+    --manifest .logger/session.json --output .logger/compatible.mcap --json
+```
+
+For a manifest with multiple sources, supply a new output directory. Open the
+recovered file in Lichtblick. The command reads the source files read-only and
+reports each verified prefix. Remote Query/Replay remains under TASK-031 S3.

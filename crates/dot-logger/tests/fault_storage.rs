@@ -592,17 +592,14 @@ fn missing_crc_compression_and_nested_lengths_are_never_silently_trusted() {
     }
 }
 #[test]
-fn unknown_schema_reference_is_rejected_even_when_chunk_crc_is_correct() {
+fn unknown_schema_reference_in_registration_is_rejected_before_first_chunk() {
     with_budget(|budget| {
         let mut bytes = fixture(budget.clone(), false);
-        let ch = chunks(&bytes);
-        let mut p = ch[0].0 + 9 + 40;
-        while bytes[p] != 4 {
-            let len = u64::from_le_bytes(bytes[p + 1..p + 9].try_into().unwrap()) as usize;
-            p += 9 + len;
-        }
+        let (_, p, _) = records(&bytes)
+            .into_iter()
+            .find(|(op, _, _)| *op == 4)
+            .unwrap();
         bytes[p + 9 + 2..p + 9 + 4].copy_from_slice(&999u16.to_le_bytes());
-        fix_crc(&mut bytes, ch[0]);
         let output = Buffer::default();
         let r = recover_segment(
             &mut Cursor::new(bytes),

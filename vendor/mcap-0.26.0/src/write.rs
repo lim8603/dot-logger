@@ -140,6 +140,7 @@ pub struct WriteOptions {
     library: String,
     chunk_size: Option<u64>,
     use_chunks: bool,
+    chunk_registrations: bool,
     disable_seeking: bool,
     emit_statistics: bool,
     emit_summary_offsets: bool,
@@ -170,6 +171,7 @@ impl Default for WriteOptions {
             library: crate::LIBRARY_IDENTIFIER.to_string(),
             chunk_size: Some(Self::DEFAULT_CHUNK_SIZE),
             use_chunks: true,
+            chunk_registrations: true,
             disable_seeking: false,
             emit_statistics: true,
             emit_summary_offsets: true,
@@ -246,6 +248,17 @@ impl WriteOptions {
     /// indexes for efficient processing.
     pub fn use_chunks(self, use_chunks: bool) -> Self {
         Self { use_chunks, ..self }
+    }
+
+    /// When chunking messages, place Schema and Channel records inside chunks.
+    ///
+    /// Disabling this writes registrations directly in the data section so a
+    /// flush before the first message cannot create a registration-only chunk.
+    pub fn chunk_registrations(self, chunk_registrations: bool) -> Self {
+        Self {
+            chunk_registrations,
+            ..self
+        }
     }
 
     /// Specifies whether the writer should seek or not.
@@ -628,7 +641,7 @@ impl<W: Write + Seek> Writer<W> {
             },
             data: schema.data,
         };
-        if self.options.use_chunks {
+        if self.options.use_chunks && self.options.chunk_registrations {
             self.start_chunk()?.write_record(&record)
         } else {
             Ok(write_record(&mut self.finish_chunk()?, &record)?)
@@ -761,7 +774,7 @@ impl<W: Write + Seek> Writer<W> {
     /// Write a channel record into the MCAP.
     fn write_channel(&mut self, channel: records::Channel) -> McapResult<()> {
         let record = Record::Channel(channel);
-        if self.options.use_chunks {
+        if self.options.use_chunks && self.options.chunk_registrations {
             self.start_chunk()?.write_record(&record)
         } else {
             Ok(write_record(self.finish_chunk()?, &record)?)

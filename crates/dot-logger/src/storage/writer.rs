@@ -434,6 +434,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             .compression(None)
             .disable_seeking(false)
             .chunk_size(None)
+            .chunk_registrations(false)
             .profile(codec::PROFILE)
             .library("dot-logger/0.1.0")
             .calculate_chunk_crcs(true)
@@ -461,7 +462,6 @@ impl<W: SyncSink> SegmentWriter<W> {
             }
             .metadata(),
         )?;
-        let chunk_start = signals.position.load(Ordering::Acquire);
         let meta_schema =
             writer.add_schema(codec::META_SCHEMA, "protobuf", codec::META_DESCRIPTOR)?;
         let meta_channel = (channels.len() + 1) as u16;
@@ -548,8 +548,8 @@ impl<W: SyncSink> SegmentWriter<W> {
             chunks: 0,
             pending_records: 0,
             pending_bytes: 0,
-            chunk_start,
-            open: true,
+            chunk_start: 0,
+            open: false,
             safe: 0,
             poisoned: false,
             _target: target_lease,

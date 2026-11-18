@@ -157,6 +157,15 @@ fn native_baseline_periodic_and_final_parts_preserve_attempt_counts_without_user
         }
         writer.checkpoint().unwrap();
         let bytes = writer.finish().unwrap().into_inner().0.into_inner();
+        let summary = mcap::Summary::read(&bytes).unwrap().unwrap();
+        assert!(!summary.chunk_indexes.is_empty());
+        assert!(
+            summary
+                .chunk_indexes
+                .iter()
+                .all(|chunk| !chunk.message_index_offsets.is_empty()),
+            "registration-only chunks must not contribute a playback time of zero"
+        );
         let reader = NativeReader::new(&bytes, 16, 2).unwrap();
         assert!(reader.info().loss_rows > 0);
         assert_eq!(

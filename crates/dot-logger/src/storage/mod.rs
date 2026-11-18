@@ -318,7 +318,7 @@ pub struct WriterConfig {
     /// Hard logical user-record count; each record writes two MCAP messages.
     /// Zero permits only controls when max_loss_reports is positive.
     pub max_records: usize,
-    /// Hard chunk/index count, including a metadata-only flushed chunk.
+    /// Hard message chunk/index count, including loss checkpoints.
     pub max_chunks: usize,
     /// Total caller topic/encoding/descriptor bytes. Native control metadata
     /// is included separately in the fixed portion of the reservation.

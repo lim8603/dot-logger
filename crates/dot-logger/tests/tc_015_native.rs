@@ -292,13 +292,12 @@ fn impossible_lengths_and_late_sequence_reversal_never_panic_or_leak_a_pair() {
         .collect();
     for op in [3, 4] {
         let mut bytes = original.clone();
-        let registration = frames(&bytes, chunk.1 + 49, chunk.2)
+        let registration = frames(&bytes, 8, chunk.1)
             .into_iter()
             .find(|r| r.0 == op)
             .unwrap();
         let at = registration.1 + 9 + if op == 3 { 2 } else { 4 };
         bytes[at..at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
-        fix_chunk(&mut bytes, chunk);
         assert!(
             NativeReader::new(&bytes, 100, 2).is_err(),
             "forged registration string length"
@@ -452,7 +451,7 @@ fn reader_rejects_two_file_channels_with_the_same_product_identity() {
         ],
     );
     let chunk = chunks(&bytes)[0];
-    let channel = frames(&bytes, chunk.1 + 49, chunk.2)
+    let channel = frames(&bytes, 8, chunk.1)
         .into_iter()
         .filter(|r| r.0 == 4)
         .nth(2)
@@ -467,7 +466,6 @@ fn reader_rejects_two_file_channels_with_the_same_product_identity() {
         + 4;
     assert_eq!(bytes[p], b'8');
     bytes[p] = b'7';
-    fix_chunk(&mut bytes, chunk);
     assert!(
         NativeReader::new(&bytes, 100, 2).is_err(),
         "duplicate product channel accepted"
@@ -626,9 +624,9 @@ fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_constr
     for damage in ["schema-id", "channel-id", "name", "control-alias"] {
         let mut bytes = base.clone();
         let chunk = chunks(&bytes)[0];
-        let nested = frames(&bytes, chunk.1 + 49, chunk.2);
-        let schema = nested.iter().find(|r| r.0 == 3).unwrap();
-        let channel = nested.iter().filter(|r| r.0 == 4).nth(1).unwrap();
+        let registrations = frames(&bytes, 8, chunk.1);
+        let schema = registrations.iter().find(|r| r.0 == 3).unwrap();
+        let channel = registrations.iter().filter(|r| r.0 == 4).nth(1).unwrap();
         match damage {
             "schema-id" | "channel-id" => {
                 let record = if damage == "schema-id" {
@@ -637,14 +635,7 @@ fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_constr
                     channel
                 };
                 let copy = bytes[record.1..record.2].to_vec();
-                let n = copy.len();
                 bytes.splice(channel.1..channel.1, copy);
-                for offset in [1, 25, 41] {
-                    let at = chunk.1 + offset;
-                    let old = u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap());
-                    bytes[at..at + 8].copy_from_slice(&(old + n as u64).to_le_bytes());
-                }
-                fix_chunk(&mut bytes, (6, chunk.1, chunk.2 + n));
             }
             "name" => {
                 let at = bytes
@@ -652,12 +643,10 @@ fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_constr
                     .position(|b| b == b"example.Payload")
                     .unwrap();
                 bytes[at] = b'X';
-                fix_chunk(&mut bytes, chunk);
             }
             _ => {
                 let id = bytes[schema.1 + 9..schema.1 + 11].to_vec();
                 bytes[channel.1 + 11..channel.1 + 13].copy_from_slice(&id);
-                fix_chunk(&mut bytes, chunk);
             }
         }
         assert!(
@@ -665,4 +654,22 @@ fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_constr
             "accepted {damage}"
         );
     }
+}
+
+#[test]
+fn native_reader_still_accepts_standard_v2_with_registrations_in_a_chunk() {
+    let bytes = include_bytes!(
+        "../../../.cowork/06_evolution/imported_context/dot_logger_namespace_2026-11-18/dot-namespace.mcap"
+    );
+    let records = NativeReader::new(bytes, 64, 1)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(records.len(), 10);
+    assert_eq!(records.last().unwrap().record.receipt.accepted_seq, 11);
+    let reports = dot_logger::storage::LossReader::new(bytes, 64, 1)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(reports.len(), 12);
 }

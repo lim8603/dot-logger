@@ -311,11 +311,17 @@ fn registrations(
     max_producers: usize,
 ) -> Result<(FileInfo, Vec<StorageChannel>), StorageError> {
     let mut outer = Fields(bytes);
-    let mut info = None;
+    let mut info: Option<FileInfo> = None;
     let mut schemas = HashMap::new();
     let mut channels = BTreeMap::new();
     let mut channel_ids = std::collections::BTreeSet::new();
-    while !outer.0.is_empty() {
+    while let Some(&opcode) = outer.0.first() {
+        if opcode == 15
+            || (info.is_some_and(|file| channels.len() == file.channels)
+                && !matches!(opcode, 3 | 4 | 12))
+        {
+            break;
+        }
         let (op, body) = outer.record().map_err(corrupt)?;
         if op == 12 {
             let f = FileInfo::parse(body)?;
@@ -328,15 +334,18 @@ fn registrations(
             info = Some(f);
             continue;
         }
-        let data = if op == 6 {
-            chunk_data(body).map_err(corrupt)?
-        } else {
-            continue;
+        let (mut registration, mut nested) = match op {
+            3 | 4 => (Some((op, body)), Fields(&[])),
+            6 => (None, Fields(chunk_data(body).map_err(corrupt)?)),
+            _ => continue,
         };
         let file = info.ok_or(StorageError::CorruptData)?;
-        let mut nested = Fields(data);
-        while !nested.0.is_empty() {
-            let (op, body) = nested.record().map_err(corrupt)?;
+        loop {
+            let (op, body) = match registration.take() {
+                Some(value) => value,
+                None if !nested.0.is_empty() => nested.record().map_err(corrupt)?,
+                None => break,
+            };
             // Validate all file-controlled lengths with borrowed slices before
             // MCAP constructs owned strings or a descriptor. A small record with
             // a forged u32 string length must never drive a giant allocation.
@@ -429,11 +438,12 @@ fn registrations(
                 _ => return Err(StorageError::CorruptData),
             }
         }
-        if channels.len() == file.channels {
-            let channels: Vec<_> = channels.into_values().collect();
-            super::writer::registration_bytes(&channels).map_err(corrupt)?;
-            return Ok((file, channels));
-        }
     }
-    Err(StorageError::CorruptData)
+    let file = info.ok_or(StorageError::CorruptData)?;
+    if channels.len() != file.channels {
+        return Err(StorageError::CorruptData);
+    }
+    let channels: Vec<_> = channels.into_values().collect();
+    super::writer::registration_bytes(&channels).map_err(corrupt)?;
+    Ok((file, channels))
 }

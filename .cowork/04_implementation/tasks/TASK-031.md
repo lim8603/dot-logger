@@ -9,8 +9,8 @@
 | ADR | ADR-007·009·[014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md) Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | [잔여 검증](#잔여-검증과-재개-순서) — Foxglove Desktop 실시간·기록 재생, T7 정량 실측 |
+| 마지막 갱신일 | 2026-11-19 |
+| 다음 액션 | [잔여 검증](#잔여-검증과-재개-순서) — LAN P4·P4-bulk, P3 속도 미달 확인 뒤 P5 재판정 |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
 
@@ -31,8 +31,8 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Done — 2026-11-18 Human 승인, ADR-014 |
-| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). REV-066 조치 검증(EV-095). Foxglove 실시간·T7 LAN 실측 잔여 |
-| S3 | 기록 소스 | Query/ReadBlob 기반 시간 이동·배속, 파일 열기 | 로컬 Pass — MCAP EV-093, 원격 재생 EV-094, 등록·재연결 회귀 EV-095 |
+| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). REV-066 조치 검증(EV-095). Foxglove Desktop·루프백 포화 실측 Pass(EV-096·097). T7 LAN 잔여 |
+| S3 | 기록 소스 | Query/ReadBlob 기반 시간 이동·배속, 파일 열기 | 로컬 Pass — MCAP EV-093, 원격 재생 EV-094·096, 등록·재연결 회귀 EV-095 |
 
 ## S1 기술 결정안 — 2026-11-18
 
@@ -111,6 +111,8 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 
 ## 잔여 검증과 재개 순서
 
-- [ ] 로그인 가능한 Foxglove Desktop에서 실시간 구독과 기록 재생을 확인한다. 격리 프로필에서는 로그인 화면까지 확인했다(EV-092).
-- [ ] T7의 LAN P4/P4-bulk, 동시 쓰기 P5, 정량 포화 회복을 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다. 루프백 포화 회복 기능은 EV-092에 있다.
+- [x] Foxglove Desktop 3.5.0 실시간 구독·원격 기록 재생, 되감기와 ¼배속 표시를 확인했다. [EV-096](../../05_verification/verification_evidence.md#ev-096)
+- [x] 루프백 upstream 구독 큐와 원격 연결 한도의 정량 포화 회복을 반복했다. [EV-097](../../05_verification/verification_evidence.md#ev-097)
+- [ ] T7 LAN P4·P4-bulk를 두 번째 장비에서 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다.
+- [ ] P3 수락률 미달([RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161))을 확인하고 P5를 재판정한다. 동시 쓰기 Query 12건의 p95는 5.39ms였다. [EV-097](../../05_verification/verification_evidence.md#ev-097)
 - [ ] TASK-031 수락을 정리한 뒤 [TASK-032](TASK-032.md) 운영 대시보드 S1로 진행한다.

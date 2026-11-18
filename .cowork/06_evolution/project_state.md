@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | TASK-031 In Progress — S1 승인, S2·S3 로컬 Pass. Foxglove Desktop 연결·T7 정량 검증 잔여 |
-| 미처리 리뷰 | 없음. REV-001~066 Closed. [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) RV-156~159 조치 |
-| 상태 | 29/35 Task Done. S2·S3 로컬 Pass(EV-092~094), REV-066 조치 [EV-095](../05_verification/verification_evidence.md#ev-095)에서 두 Rust 각 696 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 활성 Task | TASK-031 In Progress — Foxglove Desktop·루프백 포화 검증 완료. T7 LAN·P5 재판정 잔여 |
+| 미처리 리뷰 | [REV-067 RV-161](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) Open — P3 쓰기 부하 미달. RV-160·REV-001~066 Closed |
+| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096·097](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 697 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / REV-066 조치·개발 세션 마감 / AI |
-| 세션 상태 | **종료 — 2026-11-18 #005.** REV-066 Closed, 다음은 TASK-031 Foxglove Desktop·T7 잔여 검증 |
+| 갱신 | 2026-11-19 / TASK-031 Foxglove와 T7 실측 / AI |
+| 세션 상태 | **진행 — 2026-11-19 #001.** T7 LAN 환경 대기와 P3 부하 미달 확인 |
 | 최근 완료 세션 | 2026-11-18 #005 — REV-066 RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 
 ## 현재 결정과 제약
@@ -71,7 +71,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-18 | Foxglove Desktop 실시간·기록 재생과 T7 정량 검증 |
+| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-19 | LAN P4·P4-bulk, P3 부하 미달 분석과 P5 재판정 |
 | TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -88,12 +88,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-064](../05_verification/reviews/REV-064_TASK_031_MCAP_COMPATIBILITY.md) | TASK-031 S3 MCAP 등록 배치 | **Closed** | EV-093·위임 로컬 수락 |
 | [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) | TASK-031 S3 원격 기록 재생 | **Closed** | EV-094·위임 로컬 수락 |
 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
+| [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **In Progress** | RV-160 Closed, RV-161 Open(EV-097) |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-1. **TASK-031:** [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 재개한다. 로그인 가능한 Foxglove Desktop의 실시간·기록 재생, T7 LAN P4/P4-bulk·동시 쓰기 P5·정량 포화 회복을 확인한 뒤 TASK-032 대시보드로 진행한다.
+1. **TASK-031:** [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 재개한다. LAN P4·P4-bulk와 RV-161 P3 쓰기 부하 미달 확인·P5 재판정 뒤 TASK-032로 진행한다.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -126,7 +127,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
-**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7 포화 회복 기능은 EV-092 루프백 Pass, LAN P4/P4-bulk·P5 및 정량 포화 회복은 남았다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
+**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7 루프백 포화 회복은 EV-097에서 계측했다. LAN P4·P4-bulk 및 정식 P5 잔여. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 

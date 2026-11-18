@@ -1509,6 +1509,26 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **품질 검사:** 1.96.0·1.85.0 `cargo test --workspace --all-features --locked --no-fail-fast` 각 **696 Pass, 0 실패, 외부 DB 5 ignored**. RT 할당 20건, viewer 8건 포함. 양쪽 workspace all-targets/all-features Clippy `-D warnings`, strict rustdoc, fmt 및 표면 가드(35/60, L1~L3) 통과. `nightly-2026-10-26`의 core strict rustdoc도 통과했다.
 - **잔여:** 작업자 실패와 원격 ApplyConfig가 같은 관리 턴에 교차하는 조건은 코드 순서와 기존 종료/설정 회귀로 확인했다. Foxglove Desktop 연결 및 T7 LAN 정량 실측은 TASK-031에 남긴다.
 
+
+<a id="ev-096"></a>
+### EV-096 — TASK-031 Foxglove Desktop 실시간과 원격 기록 재생
+
+- **판정 및 환경:** Pass, `d064fb2`의 제품 코드, Ubuntu x86_64 `7.0.0-43-realtime`, Rust 1.96.0, Foxglove Desktop 패키지 3.5.0. 로그인된 일반 프로필에서 loopback WebSocket을 열었다.
+- **실시간:** `live_host`의 실제 facade → gRPC Subscribe → `dot-logger-viewer` → Foxglove WebSocket의 Raw Messages에서 `robot/pose`의 x=51·y=-7을 읽었다.
+- **기록 재생:** EV-090 원본 MCAP을 Query 호스트의 `Snapshot`으로 읽었다. 페이지당 1건·inline 0, viewer의 blob 요청은 4바이트 단위였다. 최초 x=51·y=-7을 확인한 뒤 터미널에서 `speed 1/4`와 처음 위치의 `seek`를 실행했다. 첫 x=42부터 마지막 x=51까지 y=-7을 표시했다. 첫 값에서 마지막 값까지 GUI 관측 4,012ms.
+- **근거:** [화면과 표시값](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md#foxglove-desktop).
+
+<a id="ev-097"></a>
+### EV-097 — T7 P3 시작 회귀·동시 조회 진단·루프백 포화 회복
+
+- **환경:** `8dbbe01`, Rust 1.96.0 release, Ubuntu x86_64 `7.0.0-43-realtime`의 SCHED_OTHER, Crucial T500 1 TB ext4. 기존 P3 진입점 `perf_baseline --p1-mix`로 32생산자·16출력·128채널·IO 8 스레드, raw 8 MiB × 110/s와 소형 256 B × 100,000/s, 10초 예열·60초 측정 부하를 사용했다.
+- **시작 회귀:** `d064fb2`에서 `plan()` 이후 `Storage(Storage(InvalidConfig))`로 시작 실패했다. 초기·최종 손실 체크포인트의 청크·인덱스 예산을 활성 파일 검사와 같은 계산으로 반영했다. 축소 회귀와 대표 구성 시작이 통과했다. [REV-067 RV-160](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-160)
+- **P3 부하 판정 미달:** 60초분 수락에 129.39초, 최종 동기화 포함 132.09초(430.79 MB/s). 제어 루프 miss 7회, 안전 루프 0회. 예열 포함 기록 7,007,700건은 닫힌 1,263개 파일을 별도 판독해 전부 일치했다. 원자료와 명령은 [실측 자료](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md#p3p5)를 따른다. [REV-067 RV-161](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161)
+- **P5 지연 진단:** 쓰기 세션에서 먼저 닫힌 `perf/005`가 속한 파일의 고정 snapshot을 Query 호스트에서 열었다. 클라이언트 1개가 1 Hz로 요청하고 응답 payload 전체를 대조했다. 한 페이지 630건·262,080바이트(메타데이터 포함). 쓰기 프로세스의 `wchar`가 응답 전후에 늘어난 12건의 p50 4.16ms·p95 5.39ms, 목표 200ms 이내. P3 수락률 미달로 정식 P5는 미수락이다.
+- **포화 회복:** 실제 loopback gRPC·WS 20회에서 upstream Gap 표시 p95 98.91ms, 새 기록 offer→WS 수신 p95 0.83ms, 수신 ACK p95 4.90ms, 구독 취소 후 hub 해제 p95 3.99ms. RV-049의 연결 한도 1·동시 초과 연결 16 조건 12회에서 초당 88.85–89.93건 거절, 서버 스레드 CPU 약 1–2%, 초과 연결이 모두 종료된 뒤 기존 연결을 해제하고 신규 기록 ACK까지 p95 55.36ms. 두 시험 모두 종료 후 관리 예약 0B.
+- **품질 검사:** Rust 1.85.0·1.96.0 workspace all-features 각각 **697 Pass, 실패 0, 외부 DB 5 ignored**. 양쪽 all-targets/all-features Clippy `-D warnings`, fmt 및 diff 검사 통과. [원자료와 재현 명령](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md)
+- **잔여:** 두 번째 승인 LAN 장비와 접속 정보가 필요해 P4·P4-bulk를 실행하지 않았다. 기준 TCP와 제품 양쪽의 실제 LAN 수신 확인, P3 부하 미달의 원인 분리와 정식 P5가 남았다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

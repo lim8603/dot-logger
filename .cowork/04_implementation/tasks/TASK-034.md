@@ -8,9 +8,9 @@
 | 설계 | [인터페이스 §18](../../03_design_artifacts/interface_contract.md#18-기본-실행-계층facade-계약안--2026-11-05) |
 | ADR | ADR-012 Accepted(facade 소유 모델). 실행 중 변경의 저장 계약은 [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted(2026-11-16 Human 승인) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | D runtime 로컬 Done(EV-087) → E GUI/호출 비용·최종 통합·TASK-033 재측정. 기존 결과 Human 확인 대기는 최종 마감과 함께 확인 |
+| 다음 액션 | E 최종 검증·기존 위임 수락 완료(EV-088·REV-061). 후속 TASK-033 S4 |
 | 의존 | TASK-027·TASK-029(facade·표면 가드) |
 | 예상 소요 | S1 1 + S2 3~4 + S3 1 인일, 리뷰 대기 제외 |
 
@@ -39,7 +39,7 @@ API §18 표에 계획만 있고 구현되지 않은 `Writer::try_log_with(.., M
 - [x] ①~③이 facade에서 동작하고 시험이 단언한다. 기존 RT 무대기·무할당 계약 유지(EV-087).
 - [x] NFR-008 35/60·레시피 상한 이내(EV-087).
 - [x] 대상 revision·환경·명령·결과를 EV-087에 기록.
-- [ ] Human 리뷰 완료.
+- [x] 기존 위임으로 최종 리뷰 수락(REV-061).
 
 ## REV-055 후속 조치 — 2026-11-16
 
@@ -51,3 +51,7 @@ RV-137·138은 다중 출력 전송·rollback·오류 우선순위, 실패 배�
 ## D runtime 통합 — 2026-11-18
 
 WIP36c1724를 현재 native 저장/loss에 맞춰 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). set_channel·refresh·held/tracing/반납 ack·원격 ApplyConfig와 실제 파일 r1/r2/r3·세션 누적 손실6건을 확인했다. Busy/Invalid/Closing/Failed·pending/기한·try_lock·RT0을 검증한다. 전체 Task는 E GUI/호출 비용/최종 통합·커버리지/UC 및 최종 리뷰를 남겨 In Progress다. §22.8 및 위의 「미병합」 기록은 통합 전 이력이다.
+
+## E 최종 수락 — 2026-11-18
+
+runtime 레벨·샘플링과 파일 revision·누적 손실을 [EV-088](../../05_verification/verification_evidence.md#ev-088)에서 최종 대조했다. tracing 포매터가 잠금을 쥔 동안의 설정 게시와 패닉 이후 revision 적용·저장을 새 회귀로 확인했다. [REV-061](../../05_verification/reviews/REV-061_ADR_013_E.md)의 기존 위임 수락으로 TASK-034와 MS-008을 마감했다.

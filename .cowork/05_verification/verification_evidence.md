@@ -1423,6 +1423,32 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **자가검토 조치:** RV-153 pending을 None turn에서 버리는 WIP 결함은 단일 Option slot·종료/기한 우선 확인·추가 요청 Busy로 수정했다. RV-154의 blocking ack는 try_lock과 관리 turn 재시도로 수정했다. 사용자 소유 writer를 대신 ack하지 않으며 public refresh만 RT 경로다. core required()와 facade의 두 live bank 사전 예약을 공유한다. 새 unsafe0·RT allocation/free/I/O/lock/retry 추가0.
 - **미실행/후속:** E GUI native user/meta/loss 판독·counter 추가 전후 호출 비용·TASK-033 최종 커버리지/UC 판정은 남았다. TASK-030/034/035·MS-008/009 In Progress, TASK-024/026 마지막 단계·native 공개 후 T3·Gate4/5 미완료를 유지한다.
 
+<a name="ev-088"></a>
+
+### EV-088 — ADR-013 E 최종 통합·native GUI·호출 비용
+
+- 2026-11-18. 제품 `874c27c`, tracing 회귀 시험 `be20250`. [재현 자료 및 원시 로그](../06_evolution/imported_context/adr_013_e_2026-11-18/README.md), [REV-061](reviews/REV-061_ADR_013_E.md) Closed. TASK-030/034/035를 기존 위임 범위에서 최종 수락했다.
+- Rust 1.96.0·1.85.0에서 각각 **685 passed, 0 failed, 5 ignored**(외부 DB). 두 Rust 각각 18개 feature 조합과 독립 consumer, allocator RT 20건. 두 Rust clippy, fmt, rustdoc 전체·기본, Miri 설정 적용 13건, facade 표면 35/60·레시피 통과. 파일 fault·query·replay·facade·tracing·표준·native·revision·loss 9개 스위트 별도 실행에서 134건 통과. 처음 feature 조합 실행의 `/tmp` 공간 부족은 디버그 심볼과 증분 빌드를 끈 전용 target에서 재실행해 해소했다.
+- Foxglove Desktop 3.5.0에서 facade가 쓴 native revision 2 파일을 직접 열었다. Topics에서 `robot/pose` 10건, `_dot_logger/meta` 10건, `_dot_logger/loss` 12건을 확인했다. Raw Messages에서 `x=51, y=-7`, 같은 시각의 `sequence=11, revision=2`, 채널 1의 `INTENTIONAL_SKIP / POLICY=3`을 대조했다. 원본 파일과 세 화면은 [판독 자료](../06_evolution/imported_context/adr_013_e_2026-11-18/README.md#native-mcap-판독)에 있다.
+- 수집 호출 비용은 AMD Ryzen 7 H 255, CPU 2, Linux `7.0.0-43-realtime`, `powersave`, Rust 1.96.0 release 환경에서 측정했다. 도입 직전 `fa1d498`과 현행 `874c27c`를 같은 `--p1-cost`로 12짝 비교했다(예열 1짝 제외, 256B, 경로별·실행당 수락 30,000회). 수치는 실행별 분위수의 중앙값이다.
+
+| 호출 | p50 전 → 후 | p99 전 → 후 |
+|---|---:|---:|
+| facade `try_log` | 143 → 159 ns | 175 → 191 ns |
+| `Producer::try_record_small` | 63 → 87 ns | 95 → 111 ns |
+| 시계 쌍 대조 | 21 → 21 ns | 21 → 21 ns |
+
+- 동일 현행 코어에서 손실 카운터만 끄고 켰을 때, Accepted·Capacity·Policy skip의 반복별 짝 차이 중앙값은 모두 절댓값 0.8 ns 미만이었다(256회 묶음, 경로당 1,500짝×3). 두 커밋 비교에는 런타임 설정과 native worker 변경도 포함된다. 파일 worker를 동반한 p99는 실행 간 편차가 컸다. 호출 비교는 이 호스트의 합성 부하 결과이며 native 전체 처리량·메모리·다른 환경의 지연은 별도 검증 범위다.
+- REV-061의 tracing 시험은 포매터가 lock을 쥔 상태의 설정 게시, 패닉 뒤 poisoned lock의 revision 적용, 정상 Warn 기록 저장을 검증한다. 잠금을 기다리는 변이는 timeout, poisoned lock을 건너뛰는 변이는 후속 변경 Busy로 실패했다. 제품 변경 없이 기존 구현에서 통과했다.
+
+<a name="ev-089"></a>
+
+### EV-089 — TASK-033 S4 최종 커버리지·UC 일정 판정
+
+- 2026-11-18. EV-088로 TASK-030·034·035를 수락한 뒤 동일 checkout `be20250`에서 `cargo +1.96.0 llvm-cov --workspace --all-features --locked --json`을 다시 실행했다. 최종 결과는 라인 **93.69%**(19,760/21,091), 함수 **92.67%**(1,871/2,019), 리전 **91.08%**(28,952/31,788)다. 통합 회귀와 병행한 첫 측정은 93.71%·92.67%·91.11%였다. 승인 하한 92%·92%·89%를 두 번 모두 충족했다.
+- [TASK-033](../04_implementation/tasks/TASK-033.md)의 라인 85% 미만 파일 5개를 분류했다. 경합·패닉 복구 시험을 더한 tracing sink는 87.16%다. 승인 분류 규칙에 따라 미처리 실제 동작 공백 0건. 구현된 동작이 있는 범위 내 사용 사례 28/28의 대응 시험을 확인했다. 최종 LCOV와 집계는 [재현 자료](../06_evolution/imported_context/adr_013_e_2026-11-18/README.md)에 보존했다.
+- 기준 1~4 Pass로 TASK-033과 MS-007의 일정 판정을 마쳤다. MS-007 인수·장기/native·실사용처 검증과 Gate 4·5는 계속 미완료다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

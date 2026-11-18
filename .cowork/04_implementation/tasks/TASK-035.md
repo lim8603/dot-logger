@@ -8,9 +8,9 @@
 | 설계 | [데이터](../../03_design_artifacts/data_model.md) · [인터페이스 §21](../../03_design_artifacts/interface_contract.md#21-task-030-mcap-표준-호환--2026-11-12) |
 | ADR | [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted — TASK-030 S2와 함께 Human 승인(2026-11-16) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | D runtime 로컬 Done(EV-087·REV-060 Closed, 제품874c27c). 다음 E native GUI user/meta/loss·counter 전후 호출 비용·최종 통합/커버리지·UC 판정 |
+| 다음 액션 | E 최종 검증·기존 위임 수락 완료(EV-088·REV-061). 후속 TASK-033 S4 |
 | 의존 | TASK-030 S2 ADR(같은 저장 형식 결정) |
 | 예상 소요 | S1 1 + S2 2~3 인일, 리뷰 대기 제외 |
 
@@ -29,14 +29,14 @@ Human 「모두 권고대로 진행하자」로 추가가 결정됐다(UC-04).
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 형식안 | 손실 기록의 위치(전용 topic 또는 MCAP metadata)·필드(채널·producer·개수·구간·사유)·주기, 채널별 카운터, 표준 도구·Foxglove 표시, native 단일 형식의 손실 조회/복구 → Human 승인 | **Done — ADR-013 §3, 2026-11-16 Human 승인** |
-| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | C 로컬 Done(EV-085), D runtime 로컬 Done(EV-087); 다음 E GUI/호출 비용·전체 마감 |
+| S2 | 구현 | 포화 시험에서 손실 구간이 파일에 남고 native 파일 판독·조회로 보인다. 손실 기록 자체가 넘칠 때의 상한 | Done — C/D 로컬 검증, E GUI/호출 비용·최종 통합 수락(EV-085·087·088) |
 
 ## 완료 기준
 
 - [x] 손실이 있는 기록 파일에서 손실 개수·관측 구간을 채널별로 복원할 수 있다(실제 발생 시각 아님, EV-085).
 - [x] native 파일의 손실 checkpoint 판독·복구 일관성 로컬 확인(EV-085).
 - [x] C 개발 EV 기록·위임 리뷰 마감(REV-058).
-- [ ] ADR-013 E: native GUI·counter 추가 전후 호출 비용 대조·D 통합 후 최종 회귀/커버리지 판정. TASK 전체 In Progress 유지.
+- [x] ADR-013 E: native GUI, counter 추가 전후 호출 비용 대조, D 통합 뒤 최종 회귀 확인 및 기존 위임에 따른 수락(EV-088·REV-061).
 
 ## S1 권고안 — 2026-11-16
 
@@ -60,3 +60,7 @@ RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/r
 ## D facade runtime 통합 — 2026-11-18
 
 현재 B/C 저장 계약을 소비하는 facade runtime을 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). 로컬/원격 설정 전후 파일 revision·세션 누적 손실·쉬는 writer ack 및 두 Rust 각684 Pass·5 ignored를 확인했다. D 로컬 검증·위임 마감(제품 `874c27c`, REV-060 Closed) 뒤 E GUI/호출 비용·통합/최종 커버리지·UC 판정으로 진행한다. Task 전체 In Progress와 native/장기/실앱 이월은 유지한다.
+
+## E 최종 수락 — 2026-11-18
+
+native 파일의 손실 토픽을 Foxglove에서 열어 채널 1의 Policy 생략 3건을 확인했다. 손실 카운터 전후 호출 비용, 파일 복구·조회와 전체 회귀를 [EV-088](../../05_verification/verification_evidence.md#ev-088)에 기록했다. [REV-061](../../05_verification/reviews/REV-061_ADR_013_E.md)의 기존 위임 수락으로 TASK-035를 마감했다.

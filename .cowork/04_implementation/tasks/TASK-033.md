@@ -8,9 +8,9 @@
 | 설계 | [인터페이스](../../03_design_artifacts/interface_contract.md) · [시험 전략](../../05_verification/test_strategy.md) · [추적표](../../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트) |
 | ADR | 없음 — 완료 기준은 [quality_gate](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정) |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | S4 기준 1~3 충족(2026-11-15, 라인 93.56%) → TASK-034·035 뒤 재측정으로 판정(기준 4) |
+| 상태 | Done |
+| 마지막 갱신일 | 2026-11-18 |
+| 다음 액션 | S4 최종 Pass(EV-089). TASK-025는 TASK-032 완료 뒤 진행 |
 | 의존 | 없음(기존 시험·EV-078 기준선 사용) |
 | 예상 소요 | 3~5 인일, 리뷰 대기 제외 |
 
@@ -30,7 +30,7 @@
 | S1 | 커버리지 측정 도구와 기준선 | `cargo llvm-cov` workspace all-features 측정·파일별 미실행 줄 목록, 저위 파일 분류 — [EV-078](../../05_verification/verification_evidence.md#ev-078) | Done |
 | S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — [UC 31개](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
 | S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | **Done** 2026-11-15 — 대응표, 시험 17개 신규·1개 확장, 결함 1건 수정, 기능 공백 결정 4건 반영(TASK-034·035·B1·bridge 이동), 재측정 라인 92.40% |
-| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | In Progress — 목표치 승인, 기준 1~3 충족(2026-11-15). 판정은 TASK-034·035 뒤 재측정(기준 4) |
+| S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | Done — TASK-034·035 수락 뒤 기준 1~4 최종 Pass(EV-089, 2026-11-18) |
 
 ## 커버리지 기준선과 공백 분류 — S1 (2026-11-13)
 
@@ -246,5 +246,31 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 - [x] S1 커버리지 기준선·파일별 공백 분류(EV-078).
 - [x] S2 사용 사례 목록(출처 포함) — 2026-11-15, [조사 문서](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md).
 - [x] S3 UC↔TC 대응표와 공백 시험 — 2026-11-15(EV-079). 남은 경미 분기는 S4 규칙으로 처리.
-- [ ] S4 목표치 Human 승인과 재측정 결과.
-- [ ] Human 리뷰 완료.
+- [x] S4 목표치 Human 승인과 재측정 결과(EV-089).
+- [x] 기존 위임으로 최종 검증 수락.
+
+## S4 최종 판정 — 2026-11-18
+
+TASK-030·034·035를 [EV-088](../../05_verification/verification_evidence.md#ev-088)·REV-061로 수락한 뒤 Rust 1.96.0에서 `cargo llvm-cov --workspace --all-features --locked`로 재측정했다. 최종 커버리지는 라인 **93.69%**(19,760/21,091), 함수 **92.67%**(1,871/2,019), 리전 **91.08%**(28,952/31,788)다. [EV-089](../../05_verification/verification_evidence.md#ev-089)
+
+| 라인 85% 미만 파일 | 미실행 줄의 처리 |
+|---|---|
+| `capture/types.rs` | 오류 `Display` 표현. 오류 반환 동작은 수집·설정 시험에서 확인했다. |
+| `control/types.rs` | 오류 `Display`와 `RoutingError` 단순 감싸기. routing/control의 오류 반환 경계는 TC-003·009에서 확인했다. |
+| `logger/affinity.rs` | 호스트 `sched_getaffinity` 호출 실패 응답은 OS 결함 주입이 필요한 경로다. 현재 CPU 선택·요청 실패 동작은 TC-013에 있다. |
+| `logger/writer.rs` | const schema 구성, `Clone`·`Debug`, 특수 capture 오류 변환, Drop 뒤에만 가능한 내부 상태. core가 거절하는 입력과 살아 있는 Writer의 Closing은 각각 TC-002와 logger 종료 시험에서 확인했다. `Logged::Skipped`는 f31·f38·f39에서 실행했다. |
+| `routing/types.rs` | `Display`와 `ReadError` 보존 변환. 생산자/큐의 손상 경계는 정상 API가 유지하는 불변식이다. |
+
+이전 저위 파일인 `logger/sink.rs`는 tracing lock 경합·포매터 패닉 복구 시험 추가 후 87.16%였다. 승인 규칙에 따라 미처리 실제 동작 공백은 0건이다.
+
+| 변경된 사용 사례 | 최종 대응 시험 |
+|---|---|
+| UC-03 중요 기록 우선 | TC-013 f25~f30의 facade 설정·레벨 매핑·중요 예약, TC-014 f7의 파일 메타 |
+| UC-04 채널별 손실·파일 표시 | TC-017의 Capacity·Policy·Unknown·replica/복구, TC-013 f43의 revision 회전, EV-088의 Foxglove 누적값 |
+| UC-07 샘플링 | TC-013 f39의 every-N과 Important 우회, TC-009 설정·위상 시험 |
+| UC-08 실행 중 level 변경 | TC-013 f38·f40~f43, 원격 `f13_remote_apply_config_changes_the_level_and_refuses_routes`, tracing 경합/복구 시험 |
+| UC-17 이벤트 전후 보존 | TC-013 f32~f37의 이벤트 보존·해제·한도와 정리, TC-005의 파일 보호 |
+| UC-27 표준 도구 판독 | TC-014/015, EV-088의 native 사용자·메타·손실 실제 판독 |
+| UC-28 원격 설정 | 원격 ApplyConfig 통합 시험과 기존 operations 계약 시험 |
+
+S3 대응표 31개를 다시 확인했다. 구현된 동작이 있는 범위 내 UC 28/28에서 시험 대응을 확인했다. UC-18·23·29 및 각 UC의 승인된 B1 잔여를 기존 범위에 유지한다. 기준 1~4 Pass로 **MS-007의 일정 판정을 마쳤다.** MS-007에는 TASK-025 인수, TASK-024 장기·OS 검증, TASK-026 실사용 적용이 남아 있다.

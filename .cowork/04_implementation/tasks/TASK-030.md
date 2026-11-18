@@ -8,9 +8,9 @@
 | 설계 | [데이터](../../03_design_artifacts/data_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) |
 | ADR | ADR-009·010 Accepted. [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) Accepted — S2 native 단일 형식·손실·revision 저장 계약 승인(2026-11-16) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | D runtime 로컬 Done(EV-087·REV-060 Closed, 제품874c27c). 다음 E native GUI user/meta/loss·counter 전후 호출 비용·최종 통합/커버리지·UC 판정 |
+| 다음 액션 | S2 E 최종 수락(EV-088·REV-061 Closed). MS-009의 다음 작업은 TASK-031 S1 |
 | 의존 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 |
 | 예상 소요 | S1 1~2 + S2 3~4 인일, 리뷰 대기 제외 |
 
@@ -23,7 +23,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 표준 export | `dot-logger export --standard`가 `dot-logger/1` 파일을 사용자 schema 채널로 변환, 독립 MCAP reader 대조·Foxglove/Lichtblick 판독 확인, 손실 필드 명시 | **Done** 2026-11-15 — 로컬 Pass([EV-077](../../05_verification/verification_evidence.md#ev-077)), Foxglove 판독 Human 확인(아래 S1 리뷰 기록). Lichtblick 미실행 |
-| S2 | native 표준 단일 경로 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **In Progress — ADR-013 Accepted(2026-11-16), A/B/C 로컬 Done(EV-083~085), D runtime 로컬 Done(EV-087), 다음 E 통합** |
+| S2 | native 표준 단일 경로 | ADR-013 승인안에 따라 native 단일 형식으로 기록·조회·재생·복구. 배포 전 개발 형식의 판독/legacy 쓰기 보존은 제품 범위에서 제외(ADR-013 D1 수정안). **ADR 범위에 함께 넣는 것(2026-11-15):** TASK-035 손실 기록 형식, TASK-034 실행 중 설정 변경을 위한 「revision 변경 시 출력 파일 회전」과 한 출력 안의 여러 revision 조회·복구(API §22.8) | **Done — A/B/C/D 로컬 완료(EV-083~087), E 최종 수락(EV-088)** |
 
 ## 변경 대상과 첫 검증
 
@@ -51,10 +51,10 @@
 
 ## 완료 기준
 
-- [ ] S1 완료 이력 보존·S2 native 단일 경로 검증, fixture/예제/consumer 갱신 및 구형 profile 명시 거절(ADR-013 수정안).
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] native 손상/부분 파일·복구·예산 경계와 구형 profile 거절을 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] S1 완료 이력 보존·S2 native 단일 경로 검증, fixture/예제/consumer 갱신 및 구형 profile 명시 거절(ADR-013 수정안).
+- [x] 대상 revision·환경·명령·결과/미실행을 EV-088에 기록하고 요구사항 추적표에 반영.
+- [x] native 손상/부분 파일·복구·예산 경계와 구형 profile 거절 검증(EV-083~088).
+- [x] 기존 위임으로 최종 리뷰 수락(REV-061).
 
 테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). S1 구현·검증은 EV-077, 후속 REV-055 RV-136·139·140 조치는 EV-082에 기록한다.
 
@@ -75,7 +75,7 @@
 | B revision 경계 회전·source별 조회/복구·manifest v2 | Done — 2026-11-17 EV-084, REV-057 Closed |
 | C 손실 collector/체크포인트/조회 | Done — 2026-11-17 EV-085, REV-058 Closed(전체 Task는 E 뒤) |
 | D runtime facade 설정 변경 | 로컬 Done — EV-087, set_channel/refresh·remote·native revision/loss·REV-060 Closed |
-| E 통합·커버리지·일정 판단 | TASK-033 재측정, 전체 저장 변경 뒤 |
+| E 최종 통합·GUI·호출 비용 | Done — EV-088, REV-061 Closed. 일정 판단은 TASK-033 S4에서 기록 |
 
 A 완료 당시 모든 파일은 `loss_tracking=unavailable`, 단일 revision 조회/복구였다. 현재 A/B/C 구현은 아래를 따르며 native GUI 재판독·정량 성능/커버리지 재측정·다른 OS·24h·실사용처는 미실행이다.
 
@@ -105,3 +105,7 @@ RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/r
 ## D facade runtime 통합 — 2026-11-18
 
 현재 B/C 저장 계약을 소비하는 facade runtime을 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). 로컬/원격 설정 전후 파일 revision·세션 누적 손실·쉬는 writer ack 및 두 Rust 각684 Pass·5 ignored를 확인했다. D 로컬 검증·위임 마감(제품 `874c27c`, REV-060 Closed) 뒤 E GUI/호출 비용·통합/최종 커버리지·UC 판정으로 진행한다. Task 전체 In Progress와 native/장기/실앱 이월은 유지한다.
+
+## E 최종 수락 — 2026-11-18
+
+Foxglove에서 native 사용자·메타·손실의 스키마와 값을 확인했다. 두 Rust 전체, 각 18개 feature, 실제 파일 fault/query/replay 및 호출 비용을 [EV-088](../../05_verification/verification_evidence.md#ev-088)에 기록했다. [REV-061](../../05_verification/reviews/REV-061_ADR_013_E.md) 기존 위임 수락으로 S2와 TASK-030을 마감했다. MS-009는 viewer와 대시보드가 남아 있다.

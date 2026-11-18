@@ -1,6 +1,6 @@
 # Milestone 목록과 승인된 실행 계획
 
-- 상위 Intent: INT-001(Approved). 최신 완료 기준(2026-11-13, EV-078)에 따라 MS-001~006 Done, MS-007·008·009 In Progress. MS-008은 TASK-034로 재개했다. TASK-026은 MS-007의 마지막 단계·일정 판단 밖이며 native·장기 검증은 TASK-024가 소유한다.
+- 상위 Intent: INT-001(Approved). 최신 완료 기준(2026-11-13, EV-078)에 따라 MS-001~006·008 Done, MS-007·009 In Progress. MS-008은 TASK-034 E 수락으로 마감했다(EV-088). MS-007 일정 판정은 EV-089를 따른다. TASK-026은 MS-007의 마지막 단계·일정 판단 밖이며 native·장기 검증은 TASK-024가 소유한다.
 - 1인 순차 진행 기준의 상대 일정이다. 시작일·가용 시간·검증 장비가 미정이므로 달력 날짜/납기를 확정하지 않는다.
 - 인일은 설계 추정치이며 TASK-004 수명·MCAP 복구·실제 장비 검증 후 재산정한다. 소요 범위에 리뷰/장비 대기·실제 24시간 경과 대기는 별도다.
 
@@ -13,7 +13,7 @@
 | MS-005 | 운영 관측·조절·간편 점검 | Build | Done | TASK-014·TASK-015·TASK-016·TASK-017·TASK-018 | 한계 확인→개발자 조절→전후 비교 완성 | 7~11 (+선택 1~2) | [상세](milestones/MS-005.md) |
 | MS-006 | 외부 연동과 긴급 기록 | Build | Done | TASK-019·TASK-020·TASK-021 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
 | MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025·TASK-026·TASK-033 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
-| MS-008 | 소비처 통합 접점 경량화 | Build | In Progress | TASK-027·TASK-028·TASK-029·TASK-034 | facade 기본 worker·preset/auto preset·support 없는 레시피 | 8~13 | [상세](milestones/MS-008.md) |
+| MS-008 | 소비처 통합 접점 경량화 | Build | Done | TASK-027·TASK-028·TASK-029·TASK-034 | facade 기본 worker·preset/auto preset·support 없는 레시피 | 8~13 | [상세](milestones/MS-008.md) |
 | MS-009 | 표준 호환과 원격 시각화 | Build | In Progress | TASK-030·TASK-031·TASK-032·TASK-035 | 표준 MCAP 판독·분리된 viewer 시각화·운영 대시보드 | 8~13 | [상세](milestones/MS-009.md) |
 
 필수 합계 **61~102 인일**(주 5일 전담 기준 약 12.2~20.4주; 2026-11-04 MS-008/009 16~26 인일 추가), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.

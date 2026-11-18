@@ -225,3 +225,7 @@ B revision 경계 회전·source별 조회/복구·manifest v2 구현/검증·�
 ### D 진행 기록 — 2026-11-18
 
 TASK-034 runtime WIP36c1724를 현재 native/loss에 맞춰 통합했다. 설정 게시/Writer refresh·held/tracing/반납 writer ack·원격 ApplyConfig와 실제 revision 파일·세션 누적 손실을 검증한다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md), API §23.4). D의 대기 요청 보존·기한과 무대기 ack 조치는 기존 승인 범위의 구현 세부이며 D1~D3를 변경하지 않는다. E GUI/호출 비용/최종 커버리지·UC 판정과 Task/MS 전체 완료는 후속이다.
+
+### E 최종 통합·수락 — 2026-11-18
+
+[EV-088](../../05_verification/verification_evidence.md#ev-088)에 실제 native 파일의 Foxglove 판독, 카운터 전후 호출 비용, 두 Rust·feature·RT·파일 회귀를 기록했다. [REV-061](../../05_verification/reviews/REV-061_ADR_013_E.md) Closed로 TASK-030·034·035를 기존 위임 범위에서 수락했다. 커버리지·사용 사례 최종 판정은 [EV-089](../../05_verification/verification_evidence.md#ev-089)에서 이어진다.

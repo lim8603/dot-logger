@@ -130,6 +130,82 @@ fn f12_tracing_and_log_events_are_recorded_with_level_filtering() {
 }
 
 #[test]
+fn channel_updates_bypass_a_busy_tracing_sink_and_recover_after_formatter_panic() {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+    use std::sync::mpsc;
+
+    struct InterruptedFormat {
+        entered: mpsc::Sender<()>,
+        release: mpsc::Receiver<()>,
+    }
+    impl fmt::Display for InterruptedFormat {
+        fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.entered.send(()).unwrap();
+            self.release.recv().unwrap();
+            panic!("injected formatter panic");
+        }
+    }
+
+    let temp = Temp::new();
+    let logger = Logger::builder()
+        .budget(budget().writer_quota(WriterQuota::small(64, 64)))
+        .file_output(&temp.0, Retention::ring(256 * MIB as u64))
+        .channel::<[u8]>("app/data")
+        .writer("control")
+        .tracing(
+            "app/log",
+            tracing::Level::INFO,
+            WriterQuota::small(64, 1024),
+        )
+        .start()
+        .unwrap();
+    let directory = logger.directories()[0].clone();
+    let data = logger.channel::<[u8]>("app/data").unwrap();
+    let sink = logger.tracing().unwrap();
+
+    let during_formatting = std::thread::scope(|scope| {
+        let (entered, formatting) = mpsc::channel();
+        let (release, wait_for_release) = mpsc::channel();
+        let sink = &sink;
+        scope.spawn(move || {
+            let message = InterruptedFormat {
+                entered,
+                release: wait_for_release,
+            };
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                log::Log::log(
+                    sink,
+                    &log::Record::builder()
+                        .args(format_args!("{message}"))
+                        .level(log::Level::Warn)
+                        .build(),
+                );
+            }));
+            assert!(result.is_err());
+        });
+        formatting.recv_timeout(Duration::from_secs(5)).unwrap();
+
+        let (send, posted) = mpsc::channel();
+        let logger = &logger;
+        scope.spawn(move || send.send(logger.set_channel(data, Level::Warn, 1)).ok());
+        let result = posted.recv_timeout(Duration::from_secs(2));
+        release.send(()).unwrap();
+        result
+    });
+    assert_eq!(during_formatting.unwrap(), Ok(2));
+
+    // The sink must acknowledge both updates even though its lock is poisoned.
+    assert_eq!(logger.set_channel(data, Level::Error, 1), Ok(3));
+    assert_eq!(logger.set_channel(data, Level::Info, 1), Ok(4));
+    tracing::subscriber::with_default(sink, || tracing::warn!("after formatter panic"));
+    closed(logger);
+    let records = stored(&directory);
+    assert_eq!(records.len(), 1, "{records:?}");
+    assert_eq!(records[0].0, Level::Warn);
+    assert!(records[0].1.contains("after formatter panic"));
+}
+
+#[test]
 fn f12_oversized_and_recursive_events_are_dropped_and_counted() {
     // `tracing` already suppresses nested dispatch on one thread; a `log`
     // call made while formatting (e.g. from a library's Debug impl) reaches

@@ -322,6 +322,19 @@ pub(crate) fn native_file_minimum(
         )
         .ok_or(RetentionError::InvalidConfig)
 }
+
+pub(crate) fn loss_checkpoint_bounds(rows: usize) -> Result<(usize, usize), RetentionError> {
+    let chunks = rows
+        .div_ceil(crate::loss::ROWS_PER_REPORT)
+        .checked_mul(2)
+        .ok_or(RetentionError::InvalidConfig)?;
+    let index_bytes = chunks
+        .checked_mul(576)
+        .and_then(|n| n.checked_add(usize::from(chunks > 0) * 512))
+        .ok_or(RetentionError::InvalidConfig)?;
+    Ok((chunks, index_bytes))
+}
+
 impl<S: SegmentStore> SegmentLog<S> {
     /// Validate, reserve finite metadata, and create the first active file.
     pub fn new(
@@ -335,18 +348,9 @@ impl<S: SegmentStore> SegmentLog<S> {
         retention.validate()?;
         config.reservation(&channels, budget.producers)?;
         config.validate_loss(budget.loss_rows())?;
-        let controls = budget
-            .loss_rows()
-            .div_ceil(crate::loss::ROWS_PER_REPORT)
-            .checked_mul(2)
-            .ok_or(RetentionError::InvalidConfig)?;
+        let (_, control_index_bytes) = loss_checkpoint_bounds(budget.loss_rows())?;
         let minimum = super::writer::MIN_INDEX_BYTES
-            .checked_add(
-                controls
-                    .checked_mul(576)
-                    .ok_or(RetentionError::InvalidConfig)?,
-            )
-            .and_then(|n| n.checked_add(usize::from(controls > 0) * 512))
+            .checked_add(control_index_bytes)
             .ok_or(RetentionError::InvalidConfig)?;
         if retention.max_index_bytes < minimum {
             return Err(RetentionError::InvalidConfig);

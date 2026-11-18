@@ -70,7 +70,9 @@ mod index;
 mod read;
 pub(crate) mod recovery;
 mod retention;
-pub(crate) use retention::{log_required, native_file_minimum, smallest_rotated_segment};
+pub(crate) use retention::{
+    log_required, loss_checkpoint_bounds, native_file_minimum, smallest_rotated_segment,
+};
 mod writer;
 use crate::capture::ChannelConfig;
 use crate::routing::{SharedLedger, TargetLedger};

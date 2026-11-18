@@ -14,7 +14,10 @@ use dot_logger::{
 use dot_logger_client::RemoteConfig;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
-use std::{net::SocketAddr, time::Duration};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::oneshot,
@@ -261,6 +264,7 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
     let accepted = hub
         .offer(id, record(1, payload.len()), payload, false, 0)
         .unwrap();
+    let saturated_at = Instant::now();
     let dropped = hub
         .offer(id, record(2, payload.len()), payload, false, 0)
         .unwrap();
@@ -271,20 +275,26 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
     assert_eq!(&data[5..13], &1_000_000_001u64.to_le_bytes());
     assert_eq!(&data[13..], payload);
     message(&mut socket, |m| status(m, "Upstream Gap")).await;
+    let gap_ns = saturated_at.elapsed().as_nanos();
     wait_for_ack(&accepted).await;
+    let recovery_start = Instant::now();
     let recovered = br#"{"x":43}"#;
-    hub.offer(id, record(3, recovered.len()), recovered, false, 0)
+    let recovery = hub
+        .offer(id, record(3, recovered.len()), recovered, false, 0)
         .unwrap();
     assert_eq!(
         &message(&mut socket, Message::is_binary).await.into_data()[13..],
         recovered
     );
+    let recovered_data_ns = recovery_start.elapsed().as_nanos();
+    wait_for_ack(&recovery).await;
+    let recovered_ack_ns = recovery_start.elapsed().as_nanos();
 
     host_stop.send(()).unwrap();
     timeout(WAIT, host_task).await.unwrap().unwrap().unwrap();
     message(&mut socket, |m| status(m, "Unknown")).await;
     subscriptions(&hub, 0).await;
-    drop((accepted, dropped, hub));
+    drop((accepted, dropped, recovery, hub));
     assert_eq!(budget.used_bytes(), 0);
 
     let (server, restarted) = host(&budget, upstream).await;
@@ -301,6 +311,7 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
         &message(&mut socket, Message::is_binary).await.into_data()[13..],
         recovered
     );
+    let unsubscribe_at = Instant::now();
     socket
         .send(Message::text(
             r#"{"op":"unsubscribe","subscriptionIds":[91]}"#,
@@ -308,6 +319,7 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
         .await
         .unwrap();
     subscriptions(&restarted, 0).await;
+    let unsubscribe_ns = unsubscribe_at.elapsed().as_nanos();
 
     socket.send(subscribe()).await.unwrap();
     let id = subscriptions(&restarted, 1).await[0];
@@ -348,6 +360,10 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
     timeout(WAIT, host_task).await.unwrap().unwrap().unwrap();
     drop(restarted);
     assert_eq!(budget.used_bytes(), 0);
+    println!(
+        "viewer_recovery gap_ns={gap_ns} recovered_data_ns={recovered_data_ns} \
+         recovered_ack_ns={recovered_ack_ns} unsubscribe_ns={unsubscribe_ns} budget_end=0"
+    );
 }
 
 #[tokio::test]

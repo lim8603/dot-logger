@@ -2105,3 +2105,45 @@ fn f44_native_control_topic_collisions_fail_before_creating_a_namespace() {
         assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 0);
     }
 }
+
+#[test]
+fn large_native_loss_checkpoints_fit_facade_storage_limits() {
+    let temp = Temp::new();
+    // One output still exceeds both legacy limits with this many counter rows.
+    let mut builder = Logger::builder()
+        .budget(budget().memory_bytes(256 * MIB))
+        .file_output(&temp.0, Retention::continuous(2 << 30));
+    for channel in 0..128 {
+        builder = builder.channel::<Pose>(&format!("perf/{channel:03}"));
+    }
+    for producer in 0..128 {
+        builder = builder.writer(&format!("p{producer:03}"));
+    }
+    builder.plan().unwrap();
+    let logger = builder.start().unwrap();
+    let directory = logger.directories()[0].clone();
+    let channel = logger.channel::<Pose>("perf/000").unwrap();
+    let mut writer = logger.take_writer("p000").unwrap();
+    let expected = Pose { x: 51, y: -7 };
+    assert!(matches!(
+        writer.try_log(channel, &expected),
+        Ok(Logged::Accepted(_))
+    ));
+    drop(writer);
+    assert!(
+        logger
+            .shutdown(Duration::from_secs(20))
+            .unwrap()
+            .is_success()
+    );
+    let (files, active) = closed_files(&directory);
+    assert_eq!(active, 0);
+    let mut payloads = Vec::new();
+    for file in files {
+        let bytes = std::fs::read(file).unwrap();
+        for item in NativeReader::new(&bytes, 8, 128).unwrap() {
+            payloads.push(item.unwrap().payload.to_vec());
+        }
+    }
+    assert_eq!(payloads, [vec![51, 0, 0, 0, 249, 255, 255, 255]]);
+}

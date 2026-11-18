@@ -723,23 +723,23 @@ pub(crate) fn derive(
                 })
         })
         .sum();
+    let loss_rows = crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
+        .ok_or_else(overflow)?;
+    // Keep application-record headroom after reserving the opening and final
+    // cumulative loss checkpoints. Each checkpoint part needs its own chunk.
+    let (loss_chunks, loss_index_bytes) = crate::storage::loss_checkpoint_bounds(loss_rows)?;
     let writer = WriterConfig {
-        max_loss_reports: 16384usize.max(
-            crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
-                .ok_or_else(overflow)?
-                .div_ceil(crate::loss::ROWS_PER_REPORT)
-                .checked_mul(2)
-                .ok_or_else(overflow)?,
-        ),
+        max_loss_reports: 16384usize.max(loss_chunks),
         max_payload_bytes: max_payload,
         write_buffer_bytes: 64 * 1024,
         chunk_target_bytes: 256 * 1024,
         max_records: 16384,
-        max_chunks: 4096,
+        max_chunks: 4096usize.checked_add(loss_chunks).ok_or_else(overflow)?,
         max_metadata_bytes: metadata + 1024,
     };
 
-    let loss_rows = crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
+    let max_index_bytes = (4usize * 1024 * 1024)
+        .checked_add(loss_index_bytes)
         .ok_or_else(overflow)?;
     let floor = SEGMENT_FLOOR
         .max((max_payload as u64).saturating_mul(2) + 1024 * 1024)
@@ -794,7 +794,7 @@ pub(crate) fn derive(
                 max_age_ns: u64::MAX,
                 max_segment_bytes: segment,
                 max_segment_ns: 60_000_000_000,
-                max_index_bytes: 4 * 1024 * 1024,
+                max_index_bytes,
                 protected_bytes,
                 pre_ns,
                 post_ns,

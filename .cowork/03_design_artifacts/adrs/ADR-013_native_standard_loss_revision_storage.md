@@ -1,7 +1,7 @@
 # ADR-013 — native 표준 MCAP·손실 기록·revision별 파일 회전
 
 - **상태:** Accepted — 2026-11-16 Human 「승인, 다음 할일은?」. 미배포 정정안 D1~D3 승인. 제품 구현·검증은 별도다.
-- **날짜:** 2026-11-16
+- **날짜:** 2026-11-16, 예약 토픽 개정 2026-11-18
 - **대상 기준:** `ff4fd5d`(제품 소스 `5d7fe6a`), 로컬 WIP `36c1724`는 설계 조사만 참조하고 병합하지 않음.
 - **관계:** ADR-008의 RT·소유권·완료 계약, ADR-010의 MCAP 0.26.0, ADR-012의 facade 소유 모델을 유지한다. API §21·§22.8의 다음 저장 결정을 제안한다.
 
@@ -45,6 +45,8 @@
 
 ## 승인된 결정
 
+아래 표는 2026-11-16 승인 원문이다. 최신 파일 이름과 profile은 [2026-11-18 개정](#예약-토픽과-파일-프로필-개정--2026-11-18)을 따른다.
+
 | ID | 승인 계약 | 사용자에게 보이는 영향 |
 |---|---|---|
 | **D1** | facade·core·조회·복구를 **`dot-logger/standard/1` 단일 형식**으로 전환. 구형 판독·legacy 쓰기·형식 선택 API와 호환 wrapper는 제품 범위에서 제외 | 과거 개발 파일/manifest는 명시적으로 미지원. fixture·예제·소비 코드는 새 형식으로 갱신. 필요한 과거 기록이 특정되면 별도 일회성 변환만 판단 |
@@ -59,29 +61,29 @@ D1~D3는 함께 검토할 저장 설계다. **2026-11-16 Human의 「아직 배�
 - 필요한 범위에서 저장/조회 API·manifest·등록/예산 구조를 직접 정리하고 저장소 안의 호출자·예제·시험을 함께 수정한다. 과거 Rust signature/struct literal을 보존하기 위한 wrapper는 추가하지 않는다. 기능과 무관한 API 변경을 위한 작업은 하지 않는다.
 - facade는 파일 손실 수집을 기본 활성화한다. 고급 경로는 borrow 전 명시적인 `CaptureOwner::enable_loss_tracking` 계열로 필요한 고정 메모리를 예약한다. 미활성 고급 writer는 파일에 `loss_tracking=unavailable`을 명시하며 0건으로 보이지 않는다.
 - 사용자 채널 수 C에 대해 `C+2 <= u16::MAX`를 파일 생성 전에 확인한다. user schema와 보조 descriptor·반복 등록 크기도 함께 예약한다.
-- 예약 topic은 `_dot_logger/meta`·`_dot_logger/loss`다. 충돌은 `plan/start` 또는 core 파일 생성 전에 거절한다.
+- 예약 topic은 `.logger/meta`·`.logger/loss`다. 충돌은 `plan/start` 또는 core 파일 생성 전에 거절한다.
 - StorageFormat 재수출 계획은 삭제한다. 이 변경 자체로 facade 이름 있는 항목을 늘리지 않는다(현 34/60). 실제 구현의 공개 항목은 snapshot으로 확인하고 새 레시피는 추가하지 않는다.
 
 ## 2. native 파일 계약
 
 ### 파일 식별과 등록
 
-- Header profile은 `dot-logger/standard/1`. MCAP 버전은 그대로다. library 문자열은 제품 버전/쓰기 경로를 나타낸다.
-- 첫 사용자/손실 chunk 전 MCAP Metadata `dot_logger.file`에 형식 버전·session_id·target_id·segment sequence·**사용자 revision**·producer 수·loss 수집 가용 여부를 저장한다. 자체 크기는 metadata 예산에 포함한다.
+- Header profile은 `dot-logger/standard/2`. MCAP 버전은 그대로다. library 문자열은 제품 버전/쓰기 경로를 나타낸다.
+- 첫 사용자/손실 chunk 전 MCAP Metadata `dot_logger.file`에 형식 버전(`format_version=2`)·session_id·target_id·segment sequence·**사용자 revision**·producer 수·loss 수집 가용 여부를 저장한다. 자체 크기는 metadata 예산에 포함한다.
 - 각 사용자 Channel은 payload schema/encoding을 쓴다. channel metadata에 product channel ID·schema ID/version·session·사용자 revision을 보존한다. runtime patch는 채널 등록/schema/출력 등록을 바꾸지 않으므로 등록 표는 세션 동안 고정이다.
 - descriptor 이름/FDS가 있으면 API §21의 이름·encoding을 그대로 쓴다. 없으면 schema id 0과 기존 payload encoding을 보존한다. `vendor-blob` 같은 도구 미지원 encoding 한계는 유지한다.
 
 ### 사용자 메시지와 보조 메타의 원자 단위
 
 1. 사용자 Message payload는 원문, MCAP sequence는 accepted_seq 하위 32비트, log/publish time은 real이다.
-2. 바로 다음 Message는 `_dot_logger/meta`의 기존 `dot_logger.RecordMeta`(태그 1~9 유지)다. 사용자 MCAP channel ID·producer·u64 accepted_seq·mono·real·revision·level·importance·source를 보존한다. session과 schema 등록은 파일/채널에서 복원한다.
+2. 바로 다음 Message는 `.logger/meta`의 기존 `dot_logger.RecordMeta`(태그 1~9 유지)다. 사용자 MCAP channel ID·producer·u64 accepted_seq·mono·real·revision·level·importance·source를 보존한다. session과 schema 등록은 파일/채널에서 복원한다.
 3. **두 Message는 같은 chunk에 물리적으로 인접**한다. 기록 전 pair 전체의 크기/레코드/인덱스 예산을 확인하고 필요하면 먼저 flush/rotate한다. payload만 쓴 뒤 metadata 실패 시 해당 chunk를 safe offset으로 노출하거나 Written으로 보고하지 않는다.
 4. reader는 timestamp 순서가 아닌 파일 내 pair 순서로 결합한다. 같은 채널·시각·하위 sequence를 가진 두 producer도 구분한다. orphan/중복 meta·불일치 header·file revision 불일치는 손상이다. 임의의 표준 MCAP 파일을 제품 파일로 오인하지 않는다. file Metadata·각 Channel의 session/revision/등록도 서로 일치해야 한다.
 5. 한 chunk의 모든 pair·control record·참조·길이·CRC를 먼저 검증한 뒤 query/export/recovery에 반출한다. 손상 chunk의 앞부분 메시지만 정상으로 내보내지 않는다(REV-055 계약 계승).
 
 ### 손실 topic과 논리 개수
 
-`_dot_logger/loss`는 `dot_logger.LossReport`(protobuf descriptor 포함) 전용 채널이다. RecordMeta를 추가로 붙이지 않는다. 손실 report는 사용자 CaptureReceipt·accepted sequence·completion window를 소비하지 않는다. `max_records`·회복 records·사용자 summary는 논리 사용자 기록 수이며, 실제 MCAP Statistics는 물리 Message 수(pair 2건 + loss report)를 센다.
+`.logger/loss`는 `dot_logger.LossReport`(protobuf descriptor 포함) 전용 채널이다. RecordMeta를 추가로 붙이지 않는다. 손실 report는 사용자 CaptureReceipt·accepted sequence·completion window를 소비하지 않는다. `max_records`·회복 records·사용자 summary는 논리 사용자 기록 수이며, 실제 MCAP Statistics는 물리 Message 수(pair 2건 + loss report)를 센다.
 
 ## 3. 손실 수집·파일 보존 계약
 
@@ -149,8 +151,8 @@ flowchart LR
 
 | 입력/경로 | 계약 |
 |---|---|
-| 제품 파일 | `dot-logger/standard/1`의 식별/등록·pair/LossReport를 검증한 뒤 논리 CapturedRecord로 해석 |
-| 과거 Envelope `dot-logger/1` 및 S1 빈 profile 개발 출력 | 제품 reader/recovery에서는 명시 Unsupported. 자동 fallback·구형 decoder를 유지하지 않음 |
+| 제품 파일 | `dot-logger/standard/2`의 식별/등록·pair/LossReport를 검증한 뒤 논리 CapturedRecord로 해석 |
+| 과거 `dot-logger/standard/1`, Envelope `dot-logger/1` 및 S1 빈 profile 개발 출력 | 제품 판독·복구 입력에서 거절. 자동 fallback과 구형 decoder는 제품 범위 밖 |
 | multi-revision Snapshot | 하나의 session·고정 등록, source별 expected revision·sequence·safe_offset 검증. 기존 단일 revision 생성 API를 직접 정리하며 호환 wrapper를 만들지 않음 |
 | blob/Replay | native payload byte 범위만 참조. 원 receipt·revision·mono/source·inline/blob 소유권·pin/deadline 계약 유지. Envelope 전용 locator/분기 제거 |
 | CLI manifest | source별 revision을 가진 schema_version 2로 통일. v1 adapter·format 선택 필드 없음. 중복 path/sequence·다른 session·불일치 revision·이전 version은 명시 거절 |
@@ -229,3 +231,9 @@ TASK-034 runtime WIP36c1724를 현재 native/loss에 맞춰 통합했다. 설정
 ### E 최종 통합·수락 — 2026-11-18
 
 [EV-088](../../05_verification/verification_evidence.md#ev-088)에 실제 native 파일의 Foxglove 판독, 카운터 전후 호출 비용, 두 Rust·feature·RT·파일 회귀를 기록했다. [REV-061](../../05_verification/reviews/REV-061_ADR_013_E.md) Closed로 TASK-030·034·035를 기존 위임 범위에서 수락했다. 커버리지·사용 사례 최종 판정은 [EV-089](../../05_verification/verification_evidence.md#ev-089)에서 이어진다.
+
+### 예약 토픽과 파일 프로필 개정 — 2026-11-18
+
+dot-logger는 호스트 프로젝트의 `.logger/` 폴더 아래에서 기록을 모으는 이름이다. Human 「좋아!」로 통합 예제와 native 예약 토픽에 이 이름을 반영하기로 했다. 예제는 호스트가 기존 출력 경로 인자로 `.logger/`를 지정하고 CLI manifest를 `.logger/session.json`에 둔다.
+
+최신 예약 토픽은 `.logger/meta`와 `.logger/loss`다. 새 파일은 `dot-logger/standard/2`와 `dot_logger.file.format_version=2`를 함께 사용한다. 개발용 `standard/1` 파일은 당시 검증 증거로 보존하고 현재 제품의 판독·복구 입력에서 거절한다. [EV-090](../../05_verification/verification_evidence.md#ev-090)에서 기록·조회·복구·GUI를 검증한다.

@@ -296,7 +296,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|
-| 1 | native `dot-logger/standard/1` 파일·구형 profile 거절·사용자 schema(protobuf 등), 원격 서버 loopback/TLS 설정 | 재현 가능한 설정/입력 기록 |
+| 1 | native `dot-logger/standard/2` 파일·구형 profile 거절·사용자 schema(protobuf 등), 원격 서버 loopback/TLS 설정 | 재현 가능한 설정/입력 기록 |
 | 2 | native 파일을 독립 MCAP reader·Foxglove 계열 도구로 판독, viewer 실시간 구독(느린 소비자·Gap·서버 종료·재연결)·Query/Replay, 대시보드 status/report/compare(연결 끊김·권한 없음) | 사용자 payload 원문 일치 디코딩·Envelope 필드 보존 위치/손실 명시, Gap/Unknown 표시, Unavailable/Stale을 0·정상으로 표시하지 않음, 로봇 프로세스 무변경 |
 | 3 | viewer 종료·정리·카운터 대조 | 원격 구독 자원 실제 해제, 유한 자원, 미확인 범위 명시 |
 
@@ -336,6 +336,10 @@ D runtime 후속 [EV-087](verification_evidence.md#ev-087): facade set_channel/r
 #### ADR-013 E 최종 통합 — 2026-11-18
 
 [EV-088](verification_evidence.md#ev-088)에서 facade의 runtime 설정·tracing 경합/복구(TC-013), native 파일 손상·조회·재생·손실·Foxglove 판독(TC-014) 하위를 최종 수락했다. MS-009의 viewer와 대시보드 시나리오는 TASK-031·032가 소유한다.
+
+#### ADR-013 예약 토픽 개정 — 2026-11-18
+
+[EV-090](verification_evidence.md#ev-090)은 `.logger/meta`·`.logger/loss` 및 `standard/2` 기록, 예약 토픽 충돌, 이전 개발용 `standard/1`의 판독·복구 거절, CLI와 Foxglove 실제 판독을 확인한다.
 
 ## 3. 요구사항–설계–구현–테스트 추적 체크리스트
 

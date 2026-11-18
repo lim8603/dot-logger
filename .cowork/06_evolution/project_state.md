@@ -11,15 +11,17 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | 현재 In Progress 없음. TASK-030·033·034·035 Done. 다음 TASK-031 S1(2026-11-23 주 계획) |
-| 미처리 리뷰 | 없음. [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md) **Closed**, RV-155 회귀 시험·위임 수락. REV-001~060 Closed |
-| 상태 | 29/35 Task Done. [EV-088](../05_verification/verification_evidence.md#ev-088) E 통합, Foxglove 값 판독·호출 비용 측정, 두 Rust 각685 Pass·5 ignored·18 feature. [EV-089](../05_verification/verification_evidence.md#ev-089) 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 미처리 리뷰 | 없음. [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md) **Closed**. REV-001~061 Closed |
+| 상태 | 29/35 Task Done. [EV-090](../05_verification/verification_evidence.md#ev-090) `.logger`·`standard/2` 판독, 두 Rust 각685 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / ADR-013 E·TASK-033 일정 판정 마감 / AI |
-| 세션 상태 | 2026-11-18 #001 — Human 「권고대로 시작하자」로 E 재개. E·TASK-033을 마감했고 다음은 TASK-031 S1 |
-| 최근 세션 | 2026-11-18 #001 — ADR-013 E·TASK-033 S4, EV-088·089, REV-061 Closed |
+| 갱신 | 2026-11-18 / .logger 예약 토픽·통합 예제 반영 / AI |
+| 세션 상태 | 2026-11-18 #002 — Human 「좋아!」로 .logger 예제·예약 토픽 승인·반영. 다음 TASK-031 S1 |
+| 최근 세션 | 2026-11-18 #002 — .logger·standard/2, EV-090, REV-062 Closed |
 
 ## 현재 결정과 제약
+
+- **.logger 예약 토픽·호스트 예제 개정:** 호스트가 지정하는 예제 경로는 `.logger/`, CLI 예제 manifest는 `.logger/session.json`이다. native `.logger/meta`·`.logger/loss`는 `dot-logger/standard/2` 및 Metadata 형식 버전 2로 식별한다. 이전 개발 파일은 당시 검증 증거로 보존한다. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18) · [EV-090](../05_verification/verification_evidence.md#ev-090)
 
 - **ADR-013 A~E 완료:** 제품 `874c27c`의 native 표준 저장·revision 회전·손실·runtime 변경을 최종 수락했다. Foxglove 실제 값 판독·호출 비용·회귀는 [EV-088](../05_verification/verification_evidence.md#ev-088), tracing 경합/패닉 복구 회귀 `be20250`은 [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)에 있다. TASK-030·034·035와 MS-008은 Done. [EV-089](../05_verification/verification_evidence.md#ev-089)에서 TASK-033 S4와 MS-007 일정 판정도 마쳤다. GitHub PRIVATE 및 T2/T3 미도래를 유지한다.
 
@@ -78,6 +80,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `949a74e..0270f03` 통합 코드리뷰·후속 `8b59aa6` 조치 | **Closed** | RV-149~152 전부 수용·수정·자가검토·위임 수락(EV-086). 복구 완결·손실 관측·종료 경계·등록 검증, 두 Rust 각672 Pass·5 ignored |
 | [REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md) | WIP36c1724 기반 runtime D 개발 자가검토·제품874c27c | **Closed** | RV-153 pending 보존/기한·RV-154 무대기 ack 조치·위임 수락(EV-087), 두 Rust 각684·18 feature·Miri13·표면35/60 Pass |
 | [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md) | ADR-013 E 최종 통합·tracing 경합/패닉 복구 회귀 | **Closed** | EV-088, RV-155 두 변이 Red·현행 Green, 기존 위임 수락 |
+| [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md) | .logger 예약 토픽·호스트 예제·standard/2 | **Closed** | EV-090, 두 Rust 각685 Pass·CLI/Foxglove 확인 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
@@ -134,6 +137,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 최근 작업·이력
 
+- 2026-11-18 #002: .logger 호스트 예제와 native 예약 토픽·standard/2 적용([EV-090](../05_verification/verification_evidence.md#ev-090), [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).
 - 2026-11-18 #001: ADR-013 E와 TASK-033 S4 최종 수락([EV-088](../05_verification/verification_evidence.md#ev-088)·[EV-089](../05_verification/verification_evidence.md#ev-089), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)).
 - 2026-11-17 #004~11-18: TASK-034 runtime D 구현·검증·자가검토·위임 마감(제품 `874c27c`, [EV-087](../05_verification/verification_evidence.md#ev-087)·[REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_004.md)).
 - 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `8b59aa6`, [EV-086](../05_verification/verification_evidence.md#ev-086), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_003.md)).

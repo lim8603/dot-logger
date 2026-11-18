@@ -1298,6 +1298,8 @@ TASK-034 S2c(② 이벤트 전후 구간 보존)를 구현했다. 시험은 `tc_
 
 ## 23. TASK-030 S2·TASK-035 저장 계약 — 2026-11-16
 
+§23.1~23.4는 도입 당시 단계 기록이다. 현재 예약 토픽과 파일 profile은 §23.5를 따른다.
+
 **Accepted / 2026-11-16 Human 「승인」.** 상세 설계는 [ADR-013](adrs/ADR-013_native_standard_loss_revision_storage.md)의 미배포 정정안 D1~D3다. §21·§22.8을 이 범위에서 갱신하며, 설계 승인과 제품 구현·검증을 구분한다.
 
 | 승인 항목 | 승인 계약 |
@@ -1372,3 +1374,9 @@ facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 
 | native 저장 | 기존 active revision과 다음 Delivery가 다르면 B 회전 계약으로 이전 파일을 발행하고 다음 sequence를 연다. r1/r2/r3 실제 파일의 Metadata/RecordMeta/payload를 대조한다. Policy 생략은 revision별 손실로 임의 분할하지 않고 session/epoch 누적6건을 보존한다 |
 | 원격 | telemetry off/on 모두 ApplyConfig 가능. facade는 route patch를 InvalidInput, memory 변경은 RestartRequired로 거절한다. core의 base Conflict·미전환 Busy를 유지하며 원격 Applied2 다음 로컬 게시3과 실제 파일을 검증했다. 자동 비교 snapshot/backend 추가는 없음 |
 | 마감 범위 | D 로컬 구현·회귀 단위다. E GUI native user/meta/loss·counter 전후 호출 비용·최종 커버리지/UC와 TASK-030/034/035 전체 완료는 별도 |
+
+### 23.5 .logger 예약 토픽과 파일 프로필 — 2026-11-18
+
+파일 Header profile은 `dot-logger/standard/2`, 파일 Metadata의 `dot_logger.file.format_version`은 `2`다. RecordMeta는 `.logger/meta`, LossReport는 `.logger/loss`에서 읽는다. 두 예약 이름과 충돌하는 사용자 채널은 facade 또는 core 파일 설정에서 거절한다. 제품은 `standard/1` 개발 파일을 판독·복구 입력에서 거절한다.
+
+호스트 통합 예제에서 앱이 정한 프로젝트 루트 아래 `.logger/`를 만들어 `file_output`에 넘긴다. CLI 예제는 `.logger/session.json`에 둔 manifest를 인자로 지정한다. [ADR-013 개정](adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18) · [EV-090](../05_verification/verification_evidence.md#ev-090)

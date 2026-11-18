@@ -1449,6 +1449,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - [TASK-033](../04_implementation/tasks/TASK-033.md)의 라인 85% 미만 파일 5개를 분류했다. 경합·패닉 복구 시험을 더한 tracing sink는 87.16%다. 승인 분류 규칙에 따라 미처리 실제 동작 공백 0건. 구현된 동작이 있는 범위 내 사용 사례 28/28의 대응 시험을 확인했다. 최종 LCOV와 집계는 [재현 자료](../06_evolution/imported_context/adr_013_e_2026-11-18/README.md)에 보존했다.
 - 기준 1~4 Pass로 TASK-033과 MS-007의 일정 판정을 마쳤다. MS-007 인수·장기/native·실사용처 검증과 Gate 4·5는 계속 미완료다.
 
+<a name="ev-090"></a>
+
+### EV-090 — `.logger` 예약 토픽과 native `standard/2`
+
+- 2026-11-18. 제품 `eeae5a3` 및 [ADR-013 개정](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18). [REV-062](reviews/REV-062_DOT_LOGGER_NAMESPACE.md) Closed. [판독 화면·샘플·원시 로그](../06_evolution/imported_context/dot_logger_namespace_2026-11-18/README.md).
+- Rust 1.96.0·1.85.0 workspace all-features 각 **685 passed, 0 failed, 5 ignored**(외부 DB). 기본 기능의 저장·조회·재생·복구 시험 86건, 두 Rust clippy, fmt, rustdoc, facade 표면 35/60·레시피 통과. RecordMeta protobuf descriptor를 재생성해 기존 바이트와 일치함을 확인했다.
+- 변경 전 Red에서 새 예약 토픽 충돌 허용, 새 토픽 미검출, `standard/2` 부재를 확인했다. 현행에서는 profile과 `dot_logger.file.format_version=2`, 메타·손실 토픽·등록 충돌, NativeReader·LossReader의 이전 profile 거절을 검증했다.
+- 호스트 `.logger/session.json`으로 CLI validate/query/replay/loss/recover를 실행했다. 복구 전후 조회에서 사용자 기록 10건·채널 1 Policy 누적 3건이 일치했다. EV-088의 실제 `standard/1` 파일은 query/loss에서 `unsupported`(exit 2), recover에서 실패(exit 4, `published=false`, 기록 0, 빈 출력 파일)였다.
+- Foxglove Desktop 3.5.0에서 `.logger/meta` 10건과 `.logger/loss` 12건을 나열했다. Raw Messages 표현식 `".logger/meta"`에서 sequence 11·revision 2, `".logger/loss".counts[9]`에서 채널 1의 Policy 생략 3건을 확인했다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

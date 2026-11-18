@@ -36,7 +36,7 @@ MCAP의 file-local channel/schema ID와 제품 ID를 구분한다. MCAP 필드 �
 
 파일은 `session/target/segment_seq.mcap`이며 active 파일은 `.active` 상태로 관리한다. 각 세그먼트에 schema·channel·세션/clock metadata를 반복해 다른 파일 없이 읽을 수 있게 한다. 원본·소형 데이터 모두 Message로 저장하고 시간 탐색이 필요한 원본을 단순 Attachment로 숨기지 않는다.
 
-현재 파일 profile은 **`dot-logger/standard/1` 단일 형식**이다(ADR-013). 사용자 payload를 원문 Message로 저장하고, 같은 chunk의 바로 다음 `_dot_logger/meta` protobuf `RecordMeta`가 producer/u64 sequence/mono/real/revision/level/importance/source를 보존한다. 파일 Metadata `dot_logger.file`과 사용자 Channel은 session·target·segment sequence·revision·등록 identity를 보존한다. 구형 Envelope codec/descriptor/export와 호환 판독은 제품에서 제거했다. 사용자 descriptor가 없으면 schema 0·기존 encoding을 쓴다.
+현재 파일 profile은 **`dot-logger/standard/2` 단일 형식**이다(ADR-013). 사용자 payload를 원문 Message로 저장하고, 같은 chunk의 바로 다음 `.logger/meta` protobuf `RecordMeta`가 producer/u64 sequence/mono/real/revision/level/importance/source를 보존한다. 파일 Metadata `dot_logger.file`의 형식 버전은 2다. 파일 Metadata와 사용자 Channel은 session·target·segment sequence·revision·등록 identity를 보존한다. 구형 Envelope codec/descriptor/export와 호환 판독은 제품에서 제거했다. 사용자 descriptor가 없으면 schema 0·기존 encoding을 쓴다.
 
 MCAP log_time/publish_time은 유효한 비음수 real_ns이며 MCAP sequence는 accepted_seq 하위32비트다. source time은 원 도메인으로 RecordMeta에 보존한다. 기본 재생은 session mono, 보조 chunk index는 mono/real min/max다. 한 chunk의 길이·비영 CRC·모든 pair·등록·순서 검증이 끝나기 전 어느 pair도 반출하지 않는다. `NativeReader` payload는 입력 bytes를 빌리고 writer는 payload를 Envelope scratch에 복사하지 않는다. 고정 메타 scratch·두 물리 Message index·등록·summary clone·버퍼를 보수 예약에 포함한다. 단계 A의 loss 수집은 `unavailable`이며 관측 손실 0이 아니다. 상세 [API §23.1](interface_contract.md#231-native-단일-형식-a-구현--2026-11-16).
 
@@ -142,7 +142,7 @@ Completion RecordSlot은 accepted record의 revision과 target 선택을 보존�
 
 ### 손실 누적 checkpoint — TASK-035 S2 C (2026-11-17)
 
-현재 구현은 [API §23.3](interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·ADR-013 §3을 따른다. tracked 고급 owner는 명시 활성화, facade는 항상 활성화한다. 파일 `loss_tracking=cumulative/1:N`은 session 고정 N행을 64행/8192B 이하의 `_dot_logger/loss` protobuf part로 남긴다. 비활성 고급 파일은 `unavailable`이다. 이것을 손실 0의 증거로 바꾸지 않는다.
+손실 계수 구현은 [API §23.3](interface_contract.md#233-손실-누적-checkpoint-c-구현--2026-11-17)·ADR-013 §3을 따른다. tracked 고급 owner는 명시 활성화, facade는 항상 활성화한다. 파일 `loss_tracking=cumulative/1:N`은 session 고정 N행을 64행/8192B 이하의 `.logger/loss` protobuf part로 남긴다. 비활성 고급 파일은 `unavailable`이다. 이것을 손실 0의 증거로 바꾸지 않는다.
 
 `LossReport`는 version/session(16-byte LE u128)/epoch/observer/checkpoint/part·parts/management 관측 구간/coverage/counts/별도 Unix header 시각/coalesced를 보존한다. `LossCount`는 고정 scope·cause, presence 있는 producer/channel/origin target, u64 cumulative_count/overflowed다. 원래 session 누적값이며 사용자 revision으로 분할하지 않는다. 제출·대여 시도, 의도적 skip, 원래 출력 assignment와 Unknown을 구분하고 ingress replica를 합산하지 않는다. control은 사용자 Meta/receipt/sequence·논리 max_records와 별도다.
 

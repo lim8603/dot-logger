@@ -15,8 +15,8 @@
 | 상태 | 29/35 Task Done. [EV-090](../05_verification/verification_evidence.md#ev-090) `.logger`·`standard/2` 판독, 두 Rust 각685 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / .logger 예약 토픽·통합 예제 반영 / AI |
-| 세션 상태 | 2026-11-18 #002 — Human 「좋아!」로 .logger 예제·예약 토픽 승인·반영. 다음 TASK-031 S1 |
+| 갱신 | 2026-11-18 / 세션 종료·TASK-031 S1 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-18 #002.** `.logger` 개정 검증과 리뷰 마감 완료. 다음 TASK-031 S1 |
 | 최근 세션 | 2026-11-18 #002 — .logger·standard/2, EV-090, REV-062 Closed |
 
 ## 현재 결정과 제약
@@ -86,7 +86,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **2026-11-23 주 계획:** [TASK-031 S1](../04_implementation/tasks/TASK-031.md) Foxglove WebSocket·SDK·Lichtblick 호환 및 라이선스 조사·결정부터 시작한다. 이후 TASK-031 S2/S3 → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7을 확인한다.
+1. **2026-11-23 주 계획:** [TASK-031 S1](../04_implementation/tasks/TASK-031.md) Foxglove WebSocket·SDK·Lichtblick 호환 및 라이선스 조사·결정부터 시작한다. 오프라인 MCAP 출발점은 [EV-090](../05_verification/verification_evidence.md#ev-090)의 `standard/2` 샘플이다. 이후 TASK-031 S2/S3 → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7을 확인한다.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -140,7 +140,5 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 - 2026-11-18 #002: .logger 호스트 예제와 native 예약 토픽·standard/2 적용([EV-090](../05_verification/verification_evidence.md#ev-090), [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).
 - 2026-11-18 #001: ADR-013 E와 TASK-033 S4 최종 수락([EV-088](../05_verification/verification_evidence.md#ev-088)·[EV-089](../05_verification/verification_evidence.md#ev-089), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)).
 - 2026-11-17 #004~11-18: TASK-034 runtime D 구현·검증·자가검토·위임 마감(제품 `874c27c`, [EV-087](../05_verification/verification_evidence.md#ev-087)·[REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_004.md)).
-- 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `8b59aa6`, [EV-086](../05_verification/verification_evidence.md#ev-086), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_003.md)).
-- 2026-11-17 #002: `949a74e..0270f03` 독립 리뷰 REV-059 Open 생성 후 #003에서 Closed([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_002.md)).
 
-완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #029·#028 및 관련 EV/세션 로그에 보존한다.
+완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030 및 관련 EV·세션 로그에 보존한다.

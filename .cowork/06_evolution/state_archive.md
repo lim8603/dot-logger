@@ -713,3 +713,8 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - **TASK-028 auto preset:** Done. JSON profile·측정/추정 구분과 사용자 값 우선 계약 유지. 측정 도중 취소는 미실행([API §19.8·19.9](../03_design_artifacts/interface_contract.md#198-task-028-s2-auto-preset-계약--2026-11-11), [EV-071](../05_verification/verification_evidence.md#ev-071)).
 
 - **2026-11-12 Human 결정 — TASK-029 착수·L1:** NFR-008 「facade 공개 항목」은 이름 있는 항목(타입·trait·자유 함수, variant·메서드 제외)으로 세고, 변경 감지는 rustdoc JSON(nightly-2026-10-26) + 스크립트·snapshot. L1 개념 초과는 `Shutdown::is_success()` 추가로 해소. [API §20](../03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12).
+
+## #030 — 2026-11-18 #002 세션 종료 최근 이력 이관
+
+- 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `8b59aa6`, [EV-086](../05_verification/verification_evidence.md#ev-086), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_003.md)).
+- 2026-11-17 #002: `949a74e..0270f03` 독립 리뷰 REV-059 Open 생성 후 #003에서 Closed([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_002.md)).

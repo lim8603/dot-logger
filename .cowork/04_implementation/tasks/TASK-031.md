@@ -9,7 +9,7 @@
 | ADR | ADR-007·009 Accepted. 시각화 방식 기술 결정(S1, tech_stack 또는 ADR) |
 | 담당 | AI |
 | 상태 | Planned |
-| 마지막 갱신일 | 2026-11-04 |
+| 마지막 갱신일 | 2026-11-18 |
 | 다음 액션 | S1 — Foxglove WebSocket 프로토콜·SDK crate·Lichtblick 호환/라이선스 조사와 결정 |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
@@ -20,7 +20,7 @@
 
 ```
 [로봇] 앱 + dot-logger(remote) ──gRPC──▶ [운영 PC] dot-logger-viewer ─ Foxglove WS ─▶ Foxglove / Lichtblick
-[오프라인] MCAP ─ TASK-030 export/표준 모드 ─▶ Foxglove / Lichtblick
+[오프라인] native MCAP standard/2 ─────────────▶ Foxglove / Lichtblick
 ```
 
 - viewer는 `dot-logger-client`에만 의존하고 코어 내부를 직접 쓰지 않는다(client API 충분성 검증).
@@ -33,6 +33,10 @@
 | S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Planned |
 | S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | Planned |
 | S3 | 기록 소스 | Query/Replay 기반 시간 이동·배속, 파일 열기 | Planned |
+
+## 다음 세션 시작점 — 2026-11-18
+
+11월 23일 주 계획대로 S1부터 시작한다. Foxglove WebSocket 프로토콜과 SDK 버전·라이선스, Lichtblick 호환 근거를 조사해 기술 결정안을 작성한다. 오프라인 파일의 현재 기준은 [EV-090](../../05_verification/verification_evidence.md#ev-090) `dot-logger/standard/2`와 `.logger/meta`·`.logger/loss`다. EV-090은 Foxglove의 파일 판독 근거다. 실시간 bridge 설계 시 [T7](../../06_evolution/project_state.md#이월-백로그)을 확인한다.
 
 ## 변경 대상과 첫 검증
 

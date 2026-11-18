@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | 현재 In Progress 없음. TASK-030·033·034·035 Done. 다음 TASK-031 S1(2026-11-23 주 계획) |
+| 활성 Task | TASK-031 In Progress — S1 기술 조사 및 권고안 작성, Human 승인 대기. S2·S3 Planned |
 | 미처리 리뷰 | 없음. [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md) **Closed**. REV-001~061 Closed |
 | 상태 | 29/35 Task Done. [EV-090](../05_verification/verification_evidence.md#ev-090) `.logger`·`standard/2` 판독, 두 Rust 각685 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-18 / 세션 종료·TASK-031 S1 인계 / AI |
-| 세션 상태 | **종료 — 2026-11-18 #002.** `.logger` 개정 검증과 리뷰 마감 완료. 다음 TASK-031 S1 |
-| 최근 세션 | 2026-11-18 #002 — .logger·standard/2, EV-090, REV-062 Closed |
+| 갱신 | 2026-11-18 / TASK-031 S1 착수·결정안 기록 / AI |
+| 세션 상태 | **진행 중 — 2026-11-18 #003.** TASK-031 S1 기술안 승인 대기 |
+| 최근 완료 세션 | 2026-11-18 #002 — .logger·standard/2, EV-090, REV-062 Closed |
 
 ## 현재 결정과 제약
 
@@ -69,7 +69,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031·032 | viewer·대시보드 | AI | Planned | 2026-11-04 | TASK-030 뒤 S1 조사·결정 |
+| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-18 | S1 WebSocket v1·로컬 스키마 목록 권고안 승인 대기. S2 실시간·S3 기록 소스 Planned |
+| TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -86,7 +87,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **2026-11-23 주 계획:** [TASK-031 S1](../04_implementation/tasks/TASK-031.md) Foxglove WebSocket·SDK·Lichtblick 호환 및 라이선스 조사·결정부터 시작한다. 오프라인 MCAP 출발점은 [EV-090](../05_verification/verification_evidence.md#ev-090)의 `standard/2` 샘플이다. 이후 TASK-031 S2/S3 → TASK-032 대시보드. viewer 실시간 경로 설계 시 T7을 확인한다.
+1. **TASK-031 S1:** 11월 23일 주 계획의 조사를 11월 18일 재개했다. [WebSocket v1·로컬 스키마 목록 결정안](../04_implementation/tasks/TASK-031.md#s1-기술-결정안--2026-11-18) Human 승인 후 기술 기준을 확정하고 S2/S3로 이어간다. [EV-091](../05_verification/verification_evidence.md#ev-091)의 Lichtblick 원본 MCAP 재생 실패는 S3에서 다룬다. T7 수치·시험 조건은 S2/S3 제품 검증에 연결했다. 다음 TASK-032 대시보드.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -119,7 +120,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
-**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7은 viewer 실시간 설계 시 확인한다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
+**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7은 viewer 경계 검토에서 확인했고 S2/S3 제품 경로의 P4·P5·원격 포화 회복 시험이 남았다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 

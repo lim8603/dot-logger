@@ -21,6 +21,10 @@
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
 | 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
+## TASK-031 S1 반영안 — 승인 대기
+
+운영 PC의 viewer 전용 전송으로 공개 Foxglove WebSocket v1(`foxglove.websocket.v1`)과 `tokio-tungstenite =0.30.0`(MIT, handshake 기능)을 제안한다. 하위 `tungstenite 0.30.0`은 MIT OR Apache-2.0이다. 개발 Rust 1.96.0과 MSRV 1.85는 이 안의 기준이다. 소비처 확인 프로필은 Foxglove Desktop 3.5.0과 Lichtblick Web 1.31.0이다. [후보 비교 및 검증 경계](../04_implementation/tasks/TASK-031.md#s1-기술-결정안--2026-11-18)
+
 ## 설치·실측 전 남은 작업
 
 TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-version = "1.85"`로 MSRV를 고정했다. Ubuntu 26.04.1 x86_64에서 Rust 1.85.0/1.96.0의 16가지 feature 조합·독립 consumer·clippy·개발 rustdoc/fmt를 확인했다([EV-001](../05_verification/verification_evidence.md)). `Cargo.lock`으로 patch/간접 의존성도 고정한다. 전역 rustup default는 변경하지 않고 프로젝트 toolchain으로 실행한다.

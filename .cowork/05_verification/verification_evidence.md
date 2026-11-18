@@ -1425,6 +1425,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 <a name="ev-088"></a>
 
+<a id="ev-088"></a>
 ### EV-088 — ADR-013 E 최종 통합·native GUI·호출 비용
 
 - 2026-11-18. 제품 `874c27c`, tracing 회귀 시험 `be20250`. [재현 자료 및 원시 로그](../06_evolution/imported_context/adr_013_e_2026-11-18/README.md), [REV-061](reviews/REV-061_ADR_013_E.md) Closed. TASK-030/034/035를 기존 위임 범위에서 최종 수락했다.
@@ -1443,6 +1444,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 <a name="ev-089"></a>
 
+<a id="ev-089"></a>
 ### EV-089 — TASK-033 S4 최종 커버리지·UC 일정 판정
 
 - 2026-11-18. EV-088로 TASK-030·034·035를 수락한 뒤 동일 checkout `be20250`에서 `cargo +1.96.0 llvm-cov --workspace --all-features --locked --json`을 다시 실행했다. 최종 결과는 라인 **93.69%**(19,760/21,091), 함수 **92.67%**(1,871/2,019), 리전 **91.08%**(28,952/31,788)다. 통합 회귀와 병행한 첫 측정은 93.71%·92.67%·91.11%였다. 승인 하한 92%·92%·89%를 두 번 모두 충족했다.
@@ -1451,6 +1453,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 <a name="ev-090"></a>
 
+<a id="ev-090"></a>
 ### EV-090 — `.logger` 예약 토픽과 native `standard/2`
 
 - 2026-11-18. 제품 `eeae5a3` 및 [ADR-013 개정](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18). [REV-062](reviews/REV-062_DOT_LOGGER_NAMESPACE.md) Closed. [판독 화면·샘플·원시 로그](../06_evolution/imported_context/dot_logger_namespace_2026-11-18/README.md).
@@ -1458,6 +1461,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - 변경 전 Red에서 새 예약 토픽 충돌 허용, 새 토픽 미검출, `standard/2` 부재를 확인했다. 현행에서는 profile과 `dot_logger.file.format_version=2`, 메타·손실 토픽·등록 충돌, NativeReader·LossReader의 이전 profile 거절을 검증했다.
 - 호스트 `.logger/session.json`으로 CLI validate/query/replay/loss/recover를 실행했다. 복구 전후 조회에서 사용자 기록 10건·채널 1 Policy 누적 3건이 일치했다. EV-088의 실제 `standard/1` 파일은 query/loss에서 `unsupported`(exit 2), recover에서 실패(exit 4, `published=false`, 기록 0, 빈 출력 파일)였다.
 - Foxglove Desktop 3.5.0에서 `.logger/meta` 10건과 `.logger/loss` 12건을 나열했다. Raw Messages 표현식 `".logger/meta"`에서 sequence 11·revision 2, `".logger/loss".counts[9]`에서 채널 1의 Policy 생략 3건을 확인했다.
+
+<a id="ev-091"></a>
+### EV-091 — TASK-031 S1 viewer 호환성 조사
+
+- 2026-11-18, 기준 `a977c6e`, Ubuntu Linux 7.0.0-43-realtime x86_64, Node 24.22.2. [EV-090 샘플](../06_evolution/imported_context/dot_logger_namespace_2026-11-18/dot-namespace.mcap)의 SHA-256은 `ba1d16fe7e35783949b1eac6088c8d27996100123f73b3ec765bcf02d4c0886c`이다. Lichtblick Web v1.31.0 [릴리즈](https://github.com/lichtblick-suite/lichtblick/releases/tag/v1.31.0)의 `lichtblick-web.tar.gz`(SHA-256 `53e82b04c887cba89e6cb382128943929c13eedce5e80578f4a11c98cb5610df`)를 headless Chromium 159.0.8154.6에서 루프백으로 호스팅했다.
+- **루프백 WS Pass:** Node fixture(`ws 8.23.0`, `@mcap/core 2.4.0`, Playwright 1.65.1)가 원본 MCAP의 schema/channel과 각 토픽 마지막 protobuf 메시지 바이트로 advertise/subscribe를 제공했다. 두 협상 이름 `foxglove.websocket.v1`·`foxglove.sdk.v1` 각각에서 Lichtblick이 채널 ID 1·2·3을 구독했다. Raw Messages에서 `robot/pose` x=51·y=-7, `.logger/meta` sequence 11, `.logger/loss` Policy 누적 3을 확인했다. SDK v1 실험은 같은 최소 메시지 집합의 협상·판독 확인이다.
+- **Lichtblick 원본 MCAP 직접 재생 Fail:** Topics는 `robot/pose` 10·`.logger/meta` 10·`.logger/loss` 12를 나열했다. 첫 Chunk Index의 시각이 `0/0`이고 message index map이 비어 있다. Statistics의 메시지 범위는 `1794997329083676855..1794997330087073937` ns(약 1초)다. [MCAP 규격](https://mcap.dev/spec#chunk-index-op0x08)은 메시지 없는 청크에 시각 0을 지정한다. [Lichtblick v1.31.0](https://github.com/lichtblick-suite/lichtblick/blob/v1.31.0/packages/suite-base/src/players/IterablePlayer/Mcap/McapIndexedIterableSource.ts#L48)은 전체 Chunk Index 최솟값을 사용한다. 원본 파일을 열면 1970년부터 2026년까지로 시간 범위를 계산해 `Failed to initialize message preloading`을 표시한다.
+- **대조 파일 재생 Pass:** `@mcap/core 2.4.0` Writer로 진단용 사본을 생성해 메시지가 없는 청크 인덱스를 없앴다. 다시 읽어 schema/channel/metadata와 32개 Message의 시간·payload가 모두 동일함을 대조했다. Lichtblick은 사본에서 첫 `robot/pose` x=42·y=-7을 표시했다. 제품 파일 재생 개선은 S3에 남았다.
+- **전송 crate 독립 컴파일 Pass:** `tokio-tungstenite =0.30.0`(`default-features = false`, `handshake`)과 Tokio 1.51.6의 임시 crate에서 `accept_hdr_async` 사용을 `cargo +1.85.0 check`와 `cargo +1.96.0 check --locked`로 컴파일했다. 해당 임시 lock의 `cargo audit --no-fetch`는 exit 0이다.
+- **후속:** 제품 gRPC→WS, Foxglove 실시간, 포화·취소·자원 반환·P4/P5, 원본 Lichtblick 파일 재생 개선과 원격 Query/Replay는 S2/S3에서 다룬다. 제품 workspace/lock 또는 EV-090 원본 파일의 변경은 없다.
 
 ## Open Evidence Gaps
 

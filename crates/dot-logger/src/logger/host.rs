@@ -535,6 +535,10 @@ fn run(
                         sampled = Some(now);
                     }
                 }
+                // Observe an IO failure before remote configuration can publish.
+                if config.flags.worker_failed.load(Ordering::Acquire) {
+                    core.control().close();
+                }
                 remote.serve(
                     telemetry,
                     core.config_updates(),

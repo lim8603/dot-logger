@@ -673,3 +673,35 @@ fn native_reader_still_accepts_standard_v2_with_registrations_in_a_chunk() {
         .unwrap();
     assert_eq!(reports.len(), 12);
 }
+
+#[test]
+fn registration_metadata_and_required_control_are_checked_before_iteration() {
+    let base = file(4096);
+    let chunk = chunks(&base)[0];
+    let registrations = frames(&base, 8, chunk.1);
+    let user = registrations.iter().filter(|r| r.0 == 4).nth(1).unwrap();
+    let control = registrations.iter().find(|r| r.0 == 4).unwrap();
+    let mut no_control = base[..control.1].to_vec();
+    no_control.extend_from_slice(&base[control.2..]);
+    assert!(NativeReader::new(&no_control, 100, 2).is_err());
+    assert!(dot_logger::storage::LossReader::new(&no_control, 100, 2).is_err());
+
+    for key in [b"session_id".as_slice(), b"revision", b"payload_encoding"] {
+        let mut bad = base.clone();
+        let offset = base[user.1..user.2]
+            .windows(key.len())
+            .position(|w| w == key)
+            .unwrap();
+        bad[user.1 + offset + key.len() + 4] = b'X';
+        assert!(NativeReader::new(&bad, 100, 2).is_err());
+        assert!(dot_logger::storage::LossReader::new(&bad, 100, 2).is_err());
+    }
+
+    let mut late = base[..chunk.2].to_vec();
+    late.extend_from_slice(&base[control.1..control.2]);
+    let records = NativeReader::new(&late, 100, 2)
+        .unwrap()
+        .collect::<Vec<_>>();
+    assert!(records.last().unwrap().is_err());
+    assert_eq!(records.iter().filter(|record| record.is_ok()).count(), 3);
+}

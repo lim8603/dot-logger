@@ -11,6 +11,7 @@ use futures_util::{
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
+    future::Future,
     net::IpAddr,
     sync::Arc,
     time::Duration,
@@ -35,7 +36,7 @@ const COMMAND_BYTES: usize = 16 * 1024;
 const MAX_SUBSCRIPTIONS: usize = 128;
 const WRITE_DEADLINE: Duration = Duration::from_secs(2);
 const HANDSHAKE_DEADLINE: Duration = Duration::from_secs(5);
-const STATUS_INTERVAL: Duration = Duration::from_millis(100);
+pub(crate) const STATUS_INTERVAL: Duration = Duration::from_millis(100);
 const GREETING: &str = r#"{"op":"serverInfo","name":"dot-logger-viewer","capabilities":[]}"#;
 
 pub(crate) type Socket = WebSocketStream<TcpStream>;
@@ -80,7 +81,11 @@ pub(crate) async fn session(
     let (commands, control) = mpsc::channel(8);
     tokio::select! {
         _ = read(reader, &catalog, &commands, |channel, id| {
-            bridge.subscribe(channel, id, &outbox).ok_or("upstream channel limit reached")
+            let bridge = &bridge;
+            let outbox = &outbox;
+            async move {
+                bridge.subscribe(&channel, id, outbox).await.ok_or("upstream channel limit reached")
+            }
         }) => {},
         _ = write(writer, data, notices, control, &catalog) => {},
     }
@@ -175,16 +180,17 @@ fn reject(status: StatusCode) -> ErrorResponse {
     response
 }
 
-pub(crate) async fn read<L>(
+pub(crate) async fn read<L, F: Future<Output = Result<L, &'static str>>>(
     mut reader: SplitStream<Socket>,
     catalog: &Catalog,
     controls: &mpsc::Sender<Control>,
-    mut subscribe: impl FnMut(&Channel, u32) -> Result<L, &'static str>,
+    mut subscribe: impl FnMut(Channel, u32) -> F,
 ) {
     let mut leases = HashMap::new();
     while let Some(Ok(message)) = reader.next().await {
         let control = match message {
             Message::Text(text) => handle(&text, catalog, &mut leases, &mut subscribe)
+                .await
                 .map(|reason| Control::Status(status("request-rejected", 1, reason))),
             Message::Ping(_) => Some(Control::Flush),
             Message::Close(_) => {
@@ -208,11 +214,11 @@ pub(crate) async fn read<L>(
     }
 }
 
-fn handle<L>(
+async fn handle<L, F: Future<Output = Result<L, &'static str>>>(
     text: &str,
     catalog: &Catalog,
     leases: &mut HashMap<u32, L>,
-    subscribe: &mut impl FnMut(&Channel, u32) -> Result<L, &'static str>,
+    subscribe: &mut impl FnMut(Channel, u32) -> F,
 ) -> Option<&'static str> {
     match serde_json::from_str(text) {
         Ok(Command::Subscribe { subscriptions }) if subscriptions.len() <= MAX_SUBSCRIPTIONS => {
@@ -225,7 +231,7 @@ fn handle<L>(
                         error =
                             Some("channel schema changed; update the local catalog and restart");
                     } else {
-                        match subscribe(channel, subscription.id) {
+                        match subscribe(channel.clone(), subscription.id).await {
                             Ok(lease) => {
                                 leases.insert(subscription.id, lease);
                             }
@@ -268,16 +274,11 @@ async fn write(
                 if !apply_control(&mut writer, control).await { break; }
             }
             _ = tick.tick() => {
-                let current = *notices.borrow();
-                for message in current.statuses(&mut previous) {
+                let messages = notices.borrow().statuses(&mut previous);
+                for message in messages {
                     if !send(&mut writer, message).await { return; }
                 }
-                let ids: Vec<_> = catalog.retired_ids().filter(|id| retired.insert(*id)).collect();
-                if !ids.is_empty()
-                    && !send(&mut writer, Message::text(
-                        serde_json::json!({"op":"unadvertise","channelIds":ids}).to_string()
-                    )).await
-                {
+                if !send_retired(&mut writer, catalog, &mut retired).await {
                     break;
                 }
             }
@@ -289,6 +290,23 @@ async fn write(
             }
         }
     }
+}
+
+pub(crate) async fn send_retired(
+    writer: &mut Writer,
+    catalog: &Catalog,
+    retired: &mut HashSet<u32>,
+) -> bool {
+    let ids: Vec<_> = catalog
+        .retired_ids()
+        .filter(|id| retired.insert(*id))
+        .collect();
+    ids.is_empty()
+        || send(
+            writer,
+            Message::text(serde_json::json!({"op":"unadvertise","channelIds":ids}).to_string()),
+        )
+        .await
 }
 
 pub(crate) async fn apply_control(writer: &mut Writer, control: Option<Control>) -> bool {

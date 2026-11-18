@@ -105,7 +105,7 @@ impl Options {
             || !(1..=16 * MIB).contains(&self.record_bytes)
             || !(1..=3_600_000).contains(&self.receiver_age_ms)
             || !(1..=1024).contains(&self.queue_records)
-            || !(1..=16 * MIB).contains(&self.replay_blob_bytes)
+            || !(1..=16 * MIB - 1024).contains(&self.replay_blob_bytes)
             || !(self.record_bytes + output::DATA_HEADER..=64 * MIB).contains(&self.queue_bytes)
             || self.clients.saturating_mul(self.queue_bytes) > 256 * MIB
             || self
@@ -157,13 +157,14 @@ async fn serve(
 
 async fn serve_replay(
     listener: TcpListener,
-    upstream: RemoteConfig,
+    mut upstream: RemoteConfig,
     catalog: Catalog,
     options: Options,
     playback: Playback,
     stop: impl Future<Output = ()>,
 ) -> io::Result<()> {
     options.validate()?;
+    upstream.message_bytes = upstream.message_bytes.max(options.replay_blob_bytes + 1024);
     let catalog = Arc::new(catalog);
     let options = Arc::new(options);
     listen(&listener, options.clients, stop, |socket| {

@@ -148,7 +148,9 @@ async fn message(socket: &mut ClientSocket, matches: impl Fn(&Message) -> bool) 
 
 fn status(message: &Message, text: &str) -> bool {
     message.to_text().ok().is_some_and(|content| {
-        let event: Value = serde_json::from_str(content).unwrap();
+        let Ok(event) = serde_json::from_str::<Value>(content) else {
+            return false;
+        };
         event["op"] == "status"
             && event["message"]
                 .as_str()
@@ -313,10 +315,12 @@ async fn live_bridge_reports_gap_recovers_from_host_exit_and_releases_its_subscr
     changed.metadata.schema_version += 1;
     let refused = restarted.offer(id, changed, recovered, false, 0).unwrap();
     message(&mut socket, |m| {
+        assert!(!status(m, "no viewer accepted a record"));
         status(m, "local schema mapping does not match")
     })
     .await;
     let retired = message(&mut socket, |m| {
+        assert!(!status(m, "no viewer accepted a record"));
         m.to_text().ok().is_some_and(|text| {
             serde_json::from_str::<Value>(text).unwrap()
                 == json!({
@@ -367,8 +371,8 @@ async fn a_full_socket_queue_does_not_hold_the_shared_feed_or_ack_a_rejected_rec
     let frame_bytes = payload.len() + crate::output::DATA_HEADER;
     let (slow, mut slow_data, slow_notices) = Outbox::new(2, frame_bytes);
     let (fast, mut fast_data, _) = Outbox::new(1, frame_bytes);
-    let slow_lease = bridge.subscribe(channel, 1, &slow).unwrap();
-    let fast_lease = bridge.subscribe(channel, 2, &fast).unwrap();
+    let slow_lease = bridge.subscribe(channel, 1, &slow).await.unwrap();
+    let fast_lease = bridge.subscribe(channel, 2, &fast).await.unwrap();
     let id = subscriptions(&hub, 1).await[0];
 
     for sequence in 1..=2 {
@@ -426,6 +430,74 @@ async fn a_full_socket_queue_does_not_hold_the_shared_feed_or_ack_a_rejected_rec
     assert_eq!(budget.used_bytes(), 0);
 }
 
+#[tokio::test]
+async fn last_lease_can_be_replaced_at_the_feed_limit() {
+    let budget = budget();
+    let (server, hub) = host(&budget, "127.0.0.1:0".parse().unwrap()).await;
+    let address = server.local_addr().unwrap();
+    let (stop, done) = oneshot::channel();
+    let host_task = tokio::spawn(server.serve(async {
+        let _ = done.await;
+    }));
+    let options = Options {
+        feeds: 1,
+        receiver_records: 1,
+        ..Options::default()
+    };
+    let bridge = Bridge::new(RemoteConfig::new(format!("http://{address}")), &options).unwrap();
+    let catalog = Catalog::parse(CATALOG.as_bytes()).unwrap();
+    let pose = catalog.channel(17).unwrap();
+    let health = catalog.channel(18).unwrap();
+    let (outbox, _, _) = Outbox::new(1, 1024);
+    let first = bridge.subscribe(pose, 1, &outbox).await.unwrap();
+    let id = subscriptions(&hub, 1).await[0];
+    assert!(bridge.subscribe(health, 2, &outbox).await.is_none());
+    drop(first);
+    let replacement = bridge.subscribe(pose, 3, &outbox).await.unwrap();
+    assert_eq!(subscriptions(&hub, 1).await[0], id);
+    drop(replacement);
+    let switched = bridge.subscribe(health, 4, &outbox).await.unwrap();
+    timeout(WAIT, async {
+        loop {
+            let current = subscriptions(&hub, 1).await[0];
+            if current != id {
+                break;
+            }
+            sleep(Duration::from_millis(2)).await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(switched);
+    subscriptions(&hub, 0).await;
+    bridge.shutdown().await;
+    stop.send(()).unwrap();
+    timeout(WAIT, host_task).await.unwrap().unwrap().unwrap();
+    drop(hub);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn notices_keep_each_channel_in_the_same_status_interval() {
+    use crate::output::{Destination, Notice, Notices};
+    let catalog = Catalog::parse(CATALOG.as_bytes()).unwrap();
+    let (outbox, _, watcher) = Outbox::new(1, 1024);
+    for (id, channel) in [(17, 7), (18, 8)] {
+        let destination = Destination {
+            subscription: id,
+            active: true.into(),
+            channel: catalog.channel(id).unwrap().clone(),
+            outbox: outbox.clone(),
+        };
+        destination.notice(Notice::QueueGap { channel });
+    }
+    let mut previous = Notices::default();
+    let messages = watcher.borrow().statuses(&mut previous);
+    assert!(messages.iter().any(|m| status(m, "channel 7")));
+    assert!(messages.iter().any(|m| status(m, "channel 8")));
+    assert!(watcher.borrow().statuses(&mut previous).is_empty());
+}
+
 #[test]
 fn catalog_rejects_ambiguous_mappings_and_definitions() {
     let valid: Value = serde_json::from_str(CATALOG).unwrap();
@@ -451,7 +523,17 @@ fn catalog_rejects_ambiguous_mappings_and_definitions() {
 #[tokio::test]
 async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_snapshot() {
     use crate::replay::{Playback, Rate};
-    use dot_logger::adapters::remote::{ManagementReply, ManagementRequest, RemoteItem};
+    use dot_logger::adapters::remote::{
+        ManagementReply, ManagementRequest, RemoteError, RemoteItem,
+    };
+
+    let mut limits = Options {
+        replay_blob_bytes: 16 * 1024 * 1024 - 1024,
+        ..Options::default()
+    };
+    assert!(limits.validate().is_ok());
+    limits.replay_blob_bytes += 1;
+    assert!(limits.validate().is_err());
 
     let budget = budget();
     let (hub, mut inbox) = RemoteHub::new(
@@ -460,7 +542,7 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
             connections: 2,
             subscriptions: 1,
             commands: 2,
-            message_bytes: 32 * 1024,
+            message_bytes: 512 * 1024,
             record_bytes: 4096,
             subscription_records: 1,
             subscription_bytes: 4096,
@@ -491,7 +573,11 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
         listener,
         RemoteConfig::new(format!("http://{upstream}")),
         Catalog::parse(CATALOG.as_bytes()).unwrap(),
-        Options::default(),
+        Options {
+            replay_blob_bytes: 300 * 1024,
+            record_bytes: 320 * 1024,
+            ..Options::default()
+        },
         playback.clone(),
         async {
             let _ = viewer_done.await;
@@ -507,7 +593,17 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
     );
     message(&mut socket, Message::is_text).await;
     assert!(inbox.try_next().is_none());
-    socket.send(subscribe()).await.unwrap();
+    socket
+        .send(Message::text(
+            json!({
+                "op": "subscribe", "subscriptions": [
+                    {"id": 91, "channelId": 17}, {"id": 92, "channelId": 18}
+                ]
+            })
+            .to_string(),
+        ))
+        .await
+        .unwrap();
 
     async fn command(
         inbox: &mut dot_logger::adapters::remote::CommandInbox,
@@ -559,7 +655,7 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
             ..
         }
     ));
-    let payload = br#"{"x":51}"#;
+    let payload = vec![51; 280 * 1024];
     next.respond(Ok(ManagementReply::Page {
         snapshot: 44,
         cursor: 0,
@@ -586,7 +682,7 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
     .into_data();
     assert_eq!(&data[1..5], &91u32.to_le_bytes());
     assert_eq!(&data[5..13], &120u64.to_le_bytes());
-    assert_eq!(&data[13..], payload);
+    assert_eq!(&data[13..], payload.as_slice());
     message(&mut socket, |m| status(m, "Replay ended")).await;
 
     assert!(playback.seek(300));
@@ -623,8 +719,8 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
         snapshot: 44,
         cursor: 0,
         items: vec![RemoteItem {
-            record: record(420, payload.len()),
-            inline: payload.to_vec(),
+            record: record(420, discarded.len()),
+            inline: discarded.to_vec(),
             blob: 0,
         }],
     }));
@@ -634,8 +730,56 @@ async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_
     .await
     .into_data();
     assert_eq!(&data[5..13], &420u64.to_le_bytes());
-    assert_eq!(&data[13..], payload);
+    assert_eq!(&data[13..], discarded);
     message(&mut socket, |m| status(m, "Replay ended")).await;
+
+    assert!(playback.seek(500));
+    let expired = command(&mut inbox).await;
+    expired.respond(Err(RemoteError::Gone));
+    message(&mut socket, |m| status(m, "Replay failed")).await;
+
+    assert!(playback.seek(600));
+    let reopened = command(&mut inbox).await;
+    assert!(matches!(
+        reopened.request(),
+        ManagementRequest::Query {
+            snapshot: 0,
+            cursor: 0,
+            ..
+        }
+    ));
+    let mut mismatch = record(610, discarded.len());
+    mismatch.metadata.schema_version = 2;
+    let mut healthy = record(620, discarded.len());
+    healthy.metadata.channel_id = 8;
+    healthy.metadata.schema_id = 100;
+    reopened.respond(Ok(ManagementReply::Page {
+        snapshot: 45,
+        cursor: 0,
+        items: [mismatch, healthy]
+            .into_iter()
+            .map(|record| RemoteItem {
+                record,
+                inline: discarded.to_vec(),
+                blob: 0,
+            })
+            .collect(),
+    }));
+    let mut unsupported = false;
+    let mut unadvertised = false;
+    let mut delivered = false;
+    while !(unsupported && unadvertised && delivered) {
+        let frame = message(&mut socket, |_| true).await;
+        unsupported |= status(&frame, "Unsupported record: channel 7");
+        unadvertised |= frame.to_text().is_ok_and(|text| {
+            serde_json::from_str::<Value>(text)
+                .is_ok_and(|op| op["op"] == "unadvertise" && op["channelIds"] == json!([17]))
+        });
+        if frame.is_binary() && frame.clone().into_data().first() == Some(&1) {
+            assert_eq!(&frame.into_data()[1..5], &92u32.to_le_bytes());
+            delivered = true;
+        }
+    }
     subscriptions(&hub, 0).await;
     stop_viewer.send(()).unwrap();
     timeout(WAIT, viewer).await.unwrap().unwrap().unwrap();

@@ -35,7 +35,7 @@
 //!
 //! The detailed modules remain the advanced path. Ownership follows ADR-012:
 //! the shared capture core lives behind one management-held `Arc`; each
-//! [`Writer`](crate::logger::Writer) owns its endpoint and only builds borrowed views of the core.
+//! [`crate::logger::Writer`] owns its endpoint and only builds borrowed views of the core.
 
 mod affinity;
 mod budget;

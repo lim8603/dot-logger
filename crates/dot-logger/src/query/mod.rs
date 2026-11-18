@@ -583,8 +583,7 @@ impl<R: Read + Seek> Snapshot<R> {
                         return Err(QueryError::CorruptData);
                     }
                 }
-                3 => validation.schema(body).map_err(invalid)?,
-                4 => validation.channel(body).map_err(invalid)?,
+                3 | 4 => validation.registration(op, body).map_err(invalid)?,
                 6 => {
                     validation.chunk(body).map_err(|e| match e {
                         crate::storage::RecoveryStop::UnsupportedCompression => {
@@ -644,9 +643,7 @@ impl<R: Read + Seek> Snapshot<R> {
             }
             crc = crc_update(crc_update(crc, &header), body);
         }
-        if validation.file_sequence() != Some(sequence) {
-            return Err(QueryError::CorruptData);
-        }
+        validation.registrations_complete().map_err(invalid)?;
         self.sources[index].loss_rows = validation.file_info().map_or(0, |file| file.loss_rows);
         self.sources[index].actual_target = validation.file_info().map(|file| file.target);
         Ok(())

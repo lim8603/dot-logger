@@ -942,3 +942,48 @@ fn uncompressed_chunks_keep_exact_chunk_and_data_section_crcs() {
         assert_eq!(stored, crc32(&bytes[..data_end.1]));
     });
 }
+
+#[test]
+fn incomplete_duplicate_and_late_registrations_are_invalid_records() {
+    with_budget(|budget| {
+        let base = fixture(budget.clone(), true);
+        let frames = records(&base);
+        let metadata = frames.iter().find(|r| r.0 == 12).unwrap();
+        let schema = frames.iter().find(|r| r.0 == 3).unwrap();
+        let meta = frames.iter().find(|r| r.0 == 4).unwrap();
+        let chunk = frames.iter().find(|r| r.0 == 6).unwrap();
+        let mut early_end = base[..metadata.2].to_vec();
+        early_end.extend_from_slice(&[15, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let mut duplicate_schema = base[..schema.2].to_vec();
+        duplicate_schema.extend_from_slice(&base[schema.1..schema.2]);
+        duplicate_schema.extend_from_slice(&base[schema.2..]);
+        let mut duplicate_channel = base[..meta.2].to_vec();
+        duplicate_channel.extend_from_slice(&base[meta.1..meta.2]);
+        duplicate_channel.extend_from_slice(&base[meta.2..]);
+        let mut no_control = base[..meta.1].to_vec();
+        no_control.extend_from_slice(&base[meta.2..]);
+        let mut late = base[..chunk.2].to_vec();
+        late.extend_from_slice(&base[meta.1..meta.2]);
+        late.extend_from_slice(&base[chunk.2..]);
+        for (bytes, valid_records) in [
+            (base[..metadata.2].to_vec(), 0),
+            (early_end, 0),
+            (duplicate_schema, 0),
+            (duplicate_channel, 0),
+            (no_control, 0),
+            (late, 2),
+        ] {
+            let recovered = recover_segment(
+                &mut Cursor::new(bytes),
+                budget.clone(),
+                channels(),
+                options(),
+                Buffer::default(),
+                &AtomicBool::new(false),
+            )
+            .unwrap();
+            assert_eq!(recovered.report.stop, RecoveryStop::InvalidRecord);
+            assert_eq!(recovered.report.records, valid_records);
+        }
+    });
+}

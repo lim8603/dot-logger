@@ -211,13 +211,13 @@ impl<'a> NativeReader<'a> {
                     .map_err(corrupt);
             }
             if self.frames.0.is_empty() {
+                self.validation.registrations_complete().map_err(corrupt)?;
                 return Ok(None);
             }
             let before = self.frames.0;
             let (op, body) = self.frames.record().map_err(corrupt)?;
             match op {
-                3 => self.validation.schema(body).map_err(corrupt)?,
-                4 => self.validation.channel(body).map_err(corrupt)?,
+                3 | 4 => self.validation.registration(op, body).map_err(corrupt)?,
                 12 => self.validation.metadata(body).map_err(corrupt)?,
                 6 => {
                     self.validation.chunk(body).map_err(corrupt)?;
@@ -226,6 +226,7 @@ impl<'a> NativeReader<'a> {
                 }
                 7 => {}
                 15 => {
+                    self.validation.registrations_complete().map_err(corrupt)?;
                     if body.len() != 4 || (body != [0; 4] && body != (!self.crc).to_le_bytes()) {
                         return Err(StorageError::CorruptData);
                     }
@@ -311,15 +312,13 @@ fn registrations(
     max_producers: usize,
 ) -> Result<(FileInfo, Vec<StorageChannel>), StorageError> {
     let mut outer = Fields(bytes);
-    let mut info: Option<FileInfo> = None;
+    let mut info = None;
+    let mut registrations = Vec::new();
     let mut schemas = HashMap::new();
     let mut channels = BTreeMap::new();
     let mut channel_ids = std::collections::BTreeSet::new();
     while let Some(&opcode) = outer.0.first() {
-        if opcode == 15
-            || (info.is_some_and(|file| channels.len() == file.channels)
-                && !matches!(opcode, 3 | 4 | 12))
-        {
+        if opcode == 15 || (opcode == 6 && !registrations.is_empty()) {
             break;
         }
         let (op, body) = outer.record().map_err(corrupt)?;
@@ -331,7 +330,7 @@ fn registrations(
             {
                 return Err(StorageError::CorruptData);
             }
-            info = Some(f);
+            info = Some((f, body));
             continue;
         }
         let (mut registration, mut nested) = match op {
@@ -339,7 +338,7 @@ fn registrations(
             6 => (None, Fields(chunk_data(body).map_err(corrupt)?)),
             _ => continue,
         };
-        let file = info.ok_or(StorageError::CorruptData)?;
+        let (file, _) = info.ok_or(StorageError::CorruptData)?;
         loop {
             let (op, body) = match registration.take() {
                 Some(value) => value,
@@ -374,6 +373,7 @@ fn registrations(
             if !bounds.0.is_empty() {
                 return Err(StorageError::CorruptData);
             }
+            registrations.push((op, body));
             match mcap::parse_record(op, body).map_err(corrupt)? {
                 Record::Schema { header, data } => {
                     if schemas.len() >= file.channels + 2 || schemas.contains_key(&header.id) {
@@ -438,12 +438,31 @@ fn registrations(
                 _ => return Err(StorageError::CorruptData),
             }
         }
+        if op == 6 {
+            break;
+        }
     }
-    let file = info.ok_or(StorageError::CorruptData)?;
+    let (file, metadata) = info.ok_or(StorageError::CorruptData)?;
     if channels.len() != file.channels {
         return Err(StorageError::CorruptData);
     }
     let channels: Vec<_> = channels.into_values().collect();
     super::writer::registration_bytes(&channels).map_err(corrupt)?;
+    // Use the same contract as streaming read and recovery, including control
+    // channels and the raw metadata keys that are not used for discovery.
+    let mut validation = Validation::new(
+        file.session,
+        file.revision,
+        Cow::Borrowed(&channels),
+        file.producers,
+        0,
+    );
+    validation.metadata(metadata).map_err(corrupt)?;
+    for (op, body) in registrations {
+        validation
+            .validate_registration(op, body)
+            .map_err(corrupt)?;
+    }
+    validation.registrations_complete().map_err(corrupt)?;
     Ok((file, channels))
 }

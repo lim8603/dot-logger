@@ -384,8 +384,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                     Err(RecoveryStop::InvalidRecord)
                 }
             }),
-            3 => state.schema(body),
-            4 => state.channel(body),
+            3 | 4 => state.registration(op, body),
             6 => {
                 if report.chunks == options.limits.max_chunks {
                     report.stop = RecoveryStop::Limit;
@@ -491,7 +490,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
     if matches!(
         report.stop,
         RecoveryStop::EndOfInput | RecoveryStop::DataEnd
-    ) && state.file_sequence() != Some(options.source_sequence)
+    ) && state.registrations_complete().is_err()
     {
         report.stop = RecoveryStop::InvalidRecord;
     }
@@ -584,6 +583,8 @@ pub(crate) struct Validation<'a> {
     payload_schemas: Vec<Option<u16>>,
     seen: Vec<bool>,
     last: Vec<u64>,
+    top_level_registrations: bool,
+    chunk_seen: bool,
     max_payload: usize,
     file: Option<super::FileInfo>,
 }
@@ -613,6 +614,8 @@ impl<'a> Validation<'a> {
             payload_schemas: vec![None; n],
             seen: vec![false; n],
             last: vec![0; producers],
+            top_level_registrations: false,
+            chunk_seen: false,
             max_payload,
             file: None,
         }
@@ -638,7 +641,37 @@ impl<'a> Validation<'a> {
         self.file = Some(file);
         Ok(())
     }
-    pub(crate) fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+    pub(crate) fn registration(&mut self, op: u8, body: &[u8]) -> Result<(), RecoveryStop> {
+        if self.chunk_seen {
+            return Err(RecoveryStop::InvalidRecord);
+        }
+        self.top_level_registrations = true;
+        self.validate_registration(op, body)
+    }
+    pub(crate) fn validate_registration(
+        &mut self,
+        op: u8,
+        body: &[u8],
+    ) -> Result<(), RecoveryStop> {
+        match op {
+            3 => self.schema(body),
+            4 => self.channel(body),
+            _ => Err(RecoveryStop::InvalidRecord),
+        }
+    }
+    pub(crate) fn registrations_complete(&self) -> Result<(), RecoveryStop> {
+        if self
+            .file
+            .is_some_and(|file| self.loss_seen == (file.loss_rows > 0))
+            && self.meta_seen
+            && self.seen.iter().all(|seen| *seen)
+        {
+            Ok(())
+        } else {
+            Err(RecoveryStop::InvalidRecord)
+        }
+    }
+    fn schema(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         use super::codec::{META_DESCRIPTOR, META_SCHEMA};
         if self.file.is_none() {
             return Err(RecoveryStop::InvalidRecord);
@@ -656,7 +689,7 @@ impl<'a> Validation<'a> {
             && data == crate::loss::DESCRIPTOR
         {
             if self.file.is_none_or(|file| file.loss_rows == 0)
-                || self.loss_schema.is_some_and(|old| old != id)
+                || self.loss_schema.is_some()
                 || self.meta_schema == Some(id)
                 || self.payload_schemas.contains(&Some(id))
             {
@@ -667,7 +700,7 @@ impl<'a> Validation<'a> {
         }
         if name == META_SCHEMA.as_bytes() && encoding == b"protobuf" && data == META_DESCRIPTOR {
             if self.loss_schema == Some(id)
-                || self.meta_schema.is_some_and(|old| old != id)
+                || self.meta_schema.is_some()
                 || self.payload_schemas.contains(&Some(id))
             {
                 return Err(RecoveryStop::InvalidRecord);
@@ -675,7 +708,10 @@ impl<'a> Validation<'a> {
             self.meta_schema = Some(id);
             return Ok(());
         }
-        if self.meta_schema == Some(id) || self.loss_schema == Some(id) {
+        if self.meta_schema == Some(id)
+            || self.loss_schema == Some(id)
+            || self.payload_schemas.contains(&Some(id))
+        {
             return Err(RecoveryStop::InvalidRecord);
         }
         let mut found = false;
@@ -693,11 +729,8 @@ impl<'a> Validation<'a> {
                 };
                 named && encoding == s.encoding.as_bytes() && data == s.descriptor
             });
-            if self.payload_schemas[i] == Some(id) && !matches {
-                return Err(RecoveryStop::InvalidRecord);
-            }
             if matches {
-                if self.payload_schemas[i].is_some_and(|old| old != id) {
+                if self.payload_schemas[i].is_some() {
                     return Err(RecoveryStop::InvalidRecord);
                 }
                 self.payload_schemas[i] = Some(id);
@@ -710,12 +743,13 @@ impl<'a> Validation<'a> {
             Err(RecoveryStop::InvalidRecord)
         }
     }
-    pub(crate) fn channel(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
+    fn channel(&mut self, body: &[u8]) -> Result<(), RecoveryStop> {
         let mut f = Fields(body);
         let id = f.u16()?;
         let schema = f.u16()?;
         if usize::from(id) == self.channels.len() + 2 {
-            if self.file.is_none_or(|file| file.loss_rows == 0)
+            if self.loss_seen
+                || self.file.is_none_or(|file| file.loss_rows == 0)
                 || Some(schema) != self.loss_schema
                 || f.string()? != super::codec::LOSS_TOPIC.as_bytes()
                 || f.string()? != b"protobuf"
@@ -728,7 +762,8 @@ impl<'a> Validation<'a> {
             return Ok(());
         }
         if usize::from(id) == self.channels.len() + 1 {
-            if Some(schema) != self.meta_schema
+            if self.meta_seen
+                || Some(schema) != self.meta_schema
                 || f.string()? != super::codec::META_TOPIC.as_bytes()
                 || f.string()? != b"protobuf"
                 || !f.string()?.is_empty()
@@ -748,7 +783,9 @@ impl<'a> Validation<'a> {
         } else {
             0
         };
-        if schema != expected_schema
+        if self.seen[i]
+            || self.file.is_none()
+            || schema != expected_schema
             || f.string()? != c.topic.as_bytes()
             || f.string()? != c.payload_encoding.as_bytes()
         {
@@ -882,6 +919,10 @@ impl<'a> Validation<'a> {
         Ok(Some(report))
     }
     pub(crate) fn chunk(&mut self, body: &[u8]) -> Result<usize, RecoveryStop> {
+        if self.top_level_registrations && !self.chunk_seen {
+            self.registrations_complete()?;
+        }
+        let legacy_prefix = !self.top_level_registrations && !self.chunk_seen;
         let data = chunk_data(body)?;
         let mut f = Fields(data);
         let mut count = 0;
@@ -889,9 +930,13 @@ impl<'a> Validation<'a> {
         while !f.0.is_empty() {
             let (op, body) = f.record()?;
             match op {
-                3 => self.schema(body)?,
-                4 => self.channel(body)?,
+                3 | 4 if legacy_prefix && range.is_none() => {
+                    self.validate_registration(op, body)?
+                }
                 5 => {
+                    if legacy_prefix && range.is_none() {
+                        self.registrations_complete()?;
+                    }
                     if let Some(report) = self.loss_report(body)? {
                         let time = report.publish_time_unix_ns;
                         range =
@@ -915,6 +960,10 @@ impl<'a> Validation<'a> {
                 _ => return Err(RecoveryStop::InvalidRecord),
             }
         }
+        if legacy_prefix {
+            self.registrations_complete()?;
+        }
+        self.chunk_seen = true;
         let mut h = Fields(body);
         if range.unwrap_or((0, 0)) != (h.u64()?, h.u64()?) {
             return Err(RecoveryStop::InvalidRecord);

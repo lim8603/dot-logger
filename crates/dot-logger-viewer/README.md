@@ -67,7 +67,9 @@ a topic or schema, then restart the viewer.
   The **Upstream Gap** status counts reported upstream transfer gaps.
   **Viewer Gap** counts records dropped by this socket's own queue.
   **Unknown** marks an unobserved range after an upstream termination or an
-  unconfirmed handoff. The viewer retries while a subscription remains active.
+  unconfirmed handoff. Status counts are tracked per channel. The viewer
+  retries while a subscription remains active and withdraws the affected
+  channel when its schema no longer matches the local catalog.
 
 ## Remote recorded playback
 
@@ -90,7 +92,7 @@ seek 1000000000
 ```
 
 The controls apply to this viewer process. Each connected socket gets its own
-query cursor and keeps the same snapshot across seeks. The WebSocket replay
+query cursor and keeps the same snapshot across successful seeks. The replay
 clock and message timestamps both use the session monotonic clock. The viewer
 discards pending records from old seek positions and sends a new clock marker.
 Bytes already sent before that marker may still appear in the visualization
@@ -98,9 +100,11 @@ history. A seek after the end of playback starts another pass in the same range.
 
 Playback limits each socket to one page and one blob assembly at a time, with
 4,096 pages per pass and one queued WebSocket output frame. Set
-`--replay-blob-bytes` to fit the host's per-read limit and `--record-bytes` to
-fit the largest selected record. The host owns snapshot expiry. Reconnect to
-open a fresh snapshot if the host expires the existing one.
+`--replay-blob-bytes` to fit the host's per-read limit, up to 16 MiB minus
+1 KiB, and set `--record-bytes` to fit the largest selected record. After a
+playback error, the next `seek` opens a fresh connection and snapshot. If a
+channel's schema stops matching its catalog entry, the viewer withdraws that
+channel and keeps playing the other subscribed channels.
 
 ## Opening MCAP recordings
 

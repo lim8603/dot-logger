@@ -16,8 +16,8 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    sync::{Notify, Semaphore},
-    task::JoinSet,
+    sync::{Mutex as AsyncMutex, Notify},
+    task::JoinHandle,
     time::sleep,
 };
 
@@ -26,8 +26,8 @@ const RETRY_MAX: Duration = Duration::from_secs(5);
 
 pub(crate) struct Bridge {
     upstream: Arc<Upstream>,
-    capacity: Arc<Semaphore>,
-    registry: Mutex<Registry>,
+    capacity: usize,
+    workers: AsyncMutex<HashMap<u32, Worker>>,
 }
 
 struct Upstream {
@@ -36,9 +36,15 @@ struct Upstream {
     limits: ReceiverConfig,
 }
 
-struct Registry {
-    feeds: HashMap<u32, Arc<Feed>>,
-    workers: JoinSet<()>,
+struct Worker {
+    feed: Arc<Feed>,
+    task: JoinHandle<()>,
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
 }
 
 struct Feed {
@@ -52,6 +58,20 @@ struct FeedState {
     next: u64,
     listeners: BTreeMap<u64, Arc<Destination>>,
     connected: bool,
+    stopping: bool,
+}
+
+impl FeedState {
+    fn notify(&mut self, notice: Notice) {
+        match notice {
+            Notice::Connected { .. } => self.connected = true,
+            Notice::Unknown { .. } => self.connected = false,
+            _ => {}
+        }
+        for destination in self.listeners.values() {
+            destination.notice(notice);
+        }
+    }
 }
 
 pub(crate) struct Lease {
@@ -81,22 +101,19 @@ impl Bridge {
                     ttl: Duration::from_millis(options.receiver_age_ms),
                 },
             }),
-            capacity: Arc::new(Semaphore::new(options.feeds)),
-            registry: Mutex::new(Registry {
-                feeds: HashMap::new(),
-                workers: JoinSet::new(),
-            }),
+            capacity: options.feeds,
+            workers: AsyncMutex::new(HashMap::new()),
         })
     }
 
-    pub(crate) fn subscribe(
+    pub(crate) async fn subscribe(
         &self,
         channel: &Channel,
         subscription: u32,
         outbox: &Outbox,
     ) -> Option<Lease> {
-        let mut registry = lock(&self.registry);
-        while registry.workers.try_join_next().is_some() {}
+        let mut workers = self.workers.lock().await;
+        workers.retain(|_, worker| !worker.task.is_finished());
         if channel.retired() {
             return None;
         }
@@ -106,43 +123,76 @@ impl Bridge {
             channel: channel.clone(),
             outbox: outbox.clone(),
         });
-        if let Some(feed) = registry.feeds.get(&channel.native_id) {
-            let mut state = lock(&feed.state);
-            if !state.listeners.is_empty() {
-                return feed.add(&mut state, destination);
+        let channel_id = channel.native_id;
+        let mut reclaim = None;
+        if let Some(worker) = workers.get(&channel_id) {
+            let mut state = lock(&worker.feed.state);
+            if channel.retired() {
+                return None;
             }
+            if !state.stopping {
+                return worker.feed.add(&mut state, destination);
+            }
+            reclaim = Some(channel_id);
+        } else if workers.len() == self.capacity {
+            reclaim = Some(workers.iter().find_map(|(&id, worker)| {
+                let state = lock(&worker.feed.state);
+                (state.listeners.is_empty() || worker.feed.channel.retired()).then_some(id)
+            })?);
         }
-        let permit = self.capacity.clone().try_acquire_owned().ok()?;
+        if let Some(id) = reclaim {
+            let worker = workers.get_mut(&id)?;
+            worker.task.abort();
+            // The task owns the subscription and receiver reservation. Wait for
+            // both to drop before reusing its slot, even on a channel switch.
+            let _ = (&mut worker.task).await;
+            workers.remove(&id);
+        }
+        if channel.retired() {
+            return None;
+        }
         let feed = Arc::new(Feed {
             channel: channel.clone(),
             state: Mutex::new(FeedState::default()),
             stop: Notify::new(),
         });
         let lease = feed.add(&mut lock(&feed.state), destination)?;
-        registry.feeds.insert(channel.native_id, feed.clone());
         let upstream = self.upstream.clone();
-        registry.workers.spawn(async move {
-            let _permit = permit;
+        let running = feed.clone();
+        let task = tokio::spawn(async move {
             tokio::select! {
                 biased;
-                _ = feed.stop.notified() => {},
-                _ = upstream.run(&feed) => {},
+                _ = running.wait_until_idle() => {},
+                _ = upstream.run(&running) => {},
             }
         });
+        workers.insert(channel_id, Worker { feed, task });
         Some(lease)
     }
 
     pub(crate) async fn shutdown(&self) {
-        let mut workers = {
-            let mut registry = lock(&self.registry);
-            registry.feeds.clear();
-            std::mem::take(&mut registry.workers)
-        };
-        workers.shutdown().await;
+        let mut workers = std::mem::take(&mut *self.workers.lock().await);
+        for worker in workers.values() {
+            worker.task.abort();
+        }
+        for worker in workers.values_mut() {
+            let _ = (&mut worker.task).await;
+        }
     }
 }
 
 impl Feed {
+    async fn wait_until_idle(&self) {
+        loop {
+            self.stop.notified().await;
+            let mut state = lock(&self.state);
+            if state.listeners.is_empty() {
+                state.stopping = true;
+                return;
+            }
+        }
+    }
+
     fn add(
         self: &Arc<Self>,
         state: &mut FeedState,
@@ -165,22 +215,15 @@ impl Feed {
     }
 
     fn notify(&self, notice: Notice) {
-        let mut state = lock(&self.state);
-        match notice {
-            Notice::Connected { .. } => state.connected = true,
-            Notice::Unknown { .. } => state.connected = false,
-            _ => {}
-        }
-        for destination in state.listeners.values() {
-            destination.notice(notice);
-        }
+        lock(&self.state).notify(notice);
     }
 
     fn offer(&self, record: LiveRecord, payload: &[u8]) -> bool {
         let channel = self.channel.native_id;
         if !self.channel.matches(record) {
+            let mut state = lock(&self.state);
             self.channel.retire();
-            self.notify(Notice::Unsupported {
+            state.notify(Notice::Unsupported {
                 channel,
                 reason: "local schema mapping does not match",
             });
@@ -237,13 +280,13 @@ impl Upstream {
                     });
                     let end = Self::forward(&mut subscription, feed, &cancel).await;
                     drop(subscription);
+                    if feed.channel.retired() {
+                        return;
+                    }
                     feed.notify(Notice::Unknown {
                         channel,
                         reason: end,
                     });
-                    if feed.channel.retired() {
-                        return;
-                    }
                     delay = RETRY_FIRST;
                 }
                 Err(_) => feed.notify(Notice::Unknown {

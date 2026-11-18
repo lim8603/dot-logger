@@ -1,13 +1,13 @@
 use crate::{
     Options,
     catalog::{Catalog, Channel},
-    output::{data_message, status},
-    websocket::{self, Control, Writer},
+    output::{Notice, data_message, status},
+    websocket::{self, Control, STATUS_INTERVAL, Writer},
 };
 use dot_logger_client::{Cancellation, RecordedItem, RemoteConfig, RemoteRecording};
 use futures_util::StreamExt;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt, io,
     io::{BufRead, Read},
     num::NonZeroU32,
@@ -18,7 +18,7 @@ use std::{
 use tokio::{
     net::TcpStream,
     sync::{mpsc, watch},
-    time::{Instant, sleep},
+    time::{Instant, MissedTickBehavior, interval, sleep},
 };
 use tokio_tungstenite::tungstenite::Message;
 
@@ -226,10 +226,10 @@ pub(crate) async fn session(
     };
     tokio::select! {
         _ = websocket::read(reader, &catalog, &commands, |channel, id| {
-            channels.send_modify(|active| { active.insert(id, Arc::new(channel.clone())); });
-            Ok(Interest { id, channels: channels.clone() })
+            channels.send_modify(|active| { active.insert(id, Arc::new(channel)); });
+            std::future::ready(Ok(Interest { id, channels: channels.clone() }))
         }) => {},
-        _ = write(writer, controls, output, interests, position) => {},
+        _ = write(writer, controls, output, interests, position, &catalog) => {},
         _ = driver.run(remote, options.replay_blob_bytes) => {},
     }
 }
@@ -240,12 +240,19 @@ async fn write(
     mut output: mpsc::Receiver<Output>,
     interests: watch::Receiver<Interests>,
     position: watch::Receiver<Position>,
+    catalog: &Catalog,
 ) {
+    let mut tick = interval(STATUS_INTERVAL);
+    tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    let mut retired = HashSet::new();
     loop {
         tokio::select! {
             biased;
             command = controls.recv() => {
                 if !websocket::apply_control(&mut writer, command).await { break; }
+            }
+            _ = tick.tick() => {
+                if !websocket::send_retired(&mut writer, catalog, &mut retired).await { break; }
             }
             frame = output.recv() => {
                 let Some(frame) = frame else { break; };
@@ -254,7 +261,9 @@ async fn write(
                 }
                 if let Some((id, expected)) = &frame.subscription {
                     let active = interests.borrow();
-                    if !active.get(id).is_some_and(|entry| Arc::ptr_eq(entry, expected)) {
+                    if expected.retired()
+                        || !active.get(id).is_some_and(|entry| Arc::ptr_eq(entry, expected))
+                    {
                         continue;
                     }
                 }
@@ -329,6 +338,9 @@ impl Driver {
                     }
                 }
                 Err(error) => {
+                    // A failed playback may have an unusable connection or snapshot.
+                    // Open a fresh one when the operator next seeks.
+                    recording = None;
                     if !self.failed(position.generation, &error).await {
                         return;
                     }
@@ -368,11 +380,13 @@ impl Driver {
             }
             // Let an in-flight first page return its snapshot capability even
             // after a seek. Drop its records, then reuse the same snapshot.
-            let page = connection.page(start.from, self.end, cursor, cancel).await;
+            let page = connection
+                .page(start.from, self.end, cursor, cancel)
+                .await
+                .map_err(|error| error.to_string())?;
             if self.position.borrow().generation != generation {
                 return Ok(Progress::Seek);
             }
-            let page = page.map_err(|error| error.to_string())?;
             for item in page.items {
                 let key = item.order_key();
                 if previous.is_some_and(|last| key <= last) {
@@ -407,20 +421,24 @@ impl Driver {
     ) -> Result<Option<Progress>, String> {
         let metadata = item.metadata();
         let mono = item.order_key().0;
-        {
-            let interests = self.interests.borrow();
-            let Some(channel) = interests
-                .values()
-                .find(|channel| channel.native_id == metadata.channel_id)
-            else {
-                return Ok(None);
+        let channel = self
+            .interests
+            .borrow()
+            .values()
+            .find(|channel| channel.native_id == metadata.channel_id && !channel.retired())
+            .cloned();
+        let Some(channel) = channel else {
+            return Ok(None);
+        };
+        if !channel.matches(metadata) {
+            channel.retire();
+            let notice = Notice::Unsupported {
+                channel: metadata.channel_id,
+                reason: "local schema mapping does not match",
             };
-            if !channel.matches(metadata) {
-                return Err(format!(
-                    "local schema mapping does not match channel {}",
-                    metadata.channel_id
-                ));
-            }
+            return Ok(
+                (!self.emit(generation, notice.message(1), None).await).then_some(Progress::Closed)
+            );
         }
         let mut seek = self.position.clone();
         let payload = tokio::select! {

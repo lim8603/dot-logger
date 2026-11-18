@@ -27,6 +27,7 @@ use tonic::{
 
 /// Explicit remote endpoint and finite operation/codec limits. Deliberately not
 /// Debug: the bearer token and CA bytes must not appear in diagnostics.
+#[derive(Clone)]
 pub struct RemoteConfig {
     /// Absolute HTTP(S) authority, with no userinfo, query or RPC path.
     pub endpoint: String,

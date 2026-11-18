@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/dot-logger", "crates/dot-logger-client", "crates/dot-logger-cli", "tests/api-consumer", "tests/rt-allocation"]
+members = ["crates/dot-logger", "crates/dot-logger-client", "crates/dot-logger-cli", "crates/dot-logger-viewer", "tests/api-consumer", "tests/rt-allocation"]
 default-members = ["crates/dot-logger"]
 exclude = ["vendor"]
 resolver = "3"

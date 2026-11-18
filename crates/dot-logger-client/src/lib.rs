@@ -8,6 +8,10 @@ pub use offline::{OfflineConfig, OfflineSource, open_loss_snapshot, open_snapsho
 #[cfg(feature = "remote")]
 mod codec;
 #[cfg(feature = "remote")]
+mod live;
+#[cfg(feature = "remote")]
+pub use live::{LiveBudget, LiveRecord, LiveSubscription};
+#[cfg(feature = "remote")]
 mod transport;
 #[cfg(feature = "remote")]
 mod wire;

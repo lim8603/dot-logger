@@ -1391,3 +1391,7 @@ facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 
 | 자원·인증 | 접속·상류 구독 수, WS 프레임/바이트, 파일·광고와 메시지 크기를 제한한다. 쓰기 기한 2초. upstream은 기존 TLS와 read credential을 이용한다. 브라우저 Origin은 loopback 또는 명시적으로 허용한 값만 수락한다. |
 
 [ADR-014](adrs/ADR-014_viewer_live_websocket.md) · [실행 가이드](../../crates/dot-logger-viewer/README.md) · [EV-092](../05_verification/verification_evidence.md#ev-092)
+
+### 24.1 TASK-031 S3 MCAP 파일 호환 — 2026-11-18
+
+새 `standard/2` 파일의 등록은 첫 메시지 청크 앞 data section에 둔다. baseline·초기 flush에서 메시지 없는 청크가 생성되지 않는다. 읽기/복구는 기존 청크 안 등록과 새 data section 등록을 지원한다. Lichtblick 1.31.0에서 이전 등록 전용 청크 때문에 재생에 실패하는 파일은 CLI `recover`로 별도 사본을 만들어 재생할 수 있다. [EV-093](../05_verification/verification_evidence.md#ev-093)

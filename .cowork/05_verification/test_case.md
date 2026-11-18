@@ -292,7 +292,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: In Progress. TASK-030·035의 export·native·손실·revision·복구는 EV-077·082~088, Foxglove Desktop 원본 `standard/2` 판독은 [EV-090](verification_evidence.md#ev-090)에 있다. TASK-031 S1 Lichtblick 원본 MCAP 직접 재생 Fail([EV-091](verification_evidence.md#ev-091)). S2 실제 viewer와 Lichtblick 라이브, 구독·종료/포화/자원 반환 로컬 Pass([EV-092](verification_evidence.md#ev-092)). Foxglove 실시간·T7 정량·Query/Replay·대시보드는 남아 있다.
+- 상태: In Progress. TASK-030·035의 파일·손실은 EV-077·082~090. TASK-031 S2 실제 viewer와 Lichtblick 라이브, 종료/포화/자원 반환 로컬 Pass([EV-092](verification_evidence.md#ev-092)). S3 새 native 파일 및 기존 파일 복구 사본의 Lichtblick 재생 Pass([EV-093](verification_evidence.md#ev-093)). Foxglove 실시간·T7 정량·원격 재생·대시보드는 남아 있다.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

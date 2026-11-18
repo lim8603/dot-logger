@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | S3 — Query/Replay 경로와 Lichtblick 원본 MCAP 재생 방안 확인. S2 Foxglove·T7 추가 검증 |
+| 다음 액션 | S3 — 원격 기록 재생 경로 결정. 새 MCAP과 기존 파일의 복구 사본은 Lichtblick 로컬 Pass(EV-093) |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
 
@@ -32,7 +32,7 @@
 |---|---|---|---|
 | S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Done — 2026-11-18 Human 승인, ADR-014 |
 | S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). Foxglove 실시간·T7 LAN 실측 잔여 |
-| S3 | 기록 소스 | Query/Replay 기반 시간 이동·배속, 파일 열기 | Planned |
+| S3 | 기록 소스 | Query/Replay 기반 시간 이동·배속, 파일 열기 | In Progress — MCAP 호환 로컬 Pass, 원격 재생 경로 결정 대기 |
 
 ## S1 기술 결정안 — 2026-11-18
 
@@ -66,6 +66,21 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 오프라인 native `dot-logger/standard/2` 파일 직접 열기는 Foxglove에서 확인했다. Lichtblick Web 1.31.0은 동일 파일의 토픽은 열거하지만, 메시지가 없는 첫 청크의 시각 0을 재생 시작으로 계산해 재생에 실패했다. S3에서 이 호환 문제를 처리하고 원본 파일 직접 판독을 다시 검증한다. [EV-090](../../05_verification/verification_evidence.md#ev-090) · [EV-091](../../05_verification/verification_evidence.md#ev-091)
 
 원격 Query/Replay는 기존 RPC를 제공하는 host에서 검증한다. 현재 기본 facade 연결에서는 Query/Replay가 Unsupported라, facade 자체의 원격 재생을 목표로 추가하려면 별도 설계 판단이 필요하다. [기존 facade 계약](../../03_design_artifacts/interface_contract.md#1811-s3c-remote-선택-연결--2026-11-07)
+
+### S3 파일 호환 구현 — 2026-11-18
+
+`a3296dc`부터 Schema/Channel 등록은 MCAP data section, 사용자 기록·RecordMeta·LossReport는 인덱스가 있는 메시지 청크에 기록한다. `standard/2`에서 두 등록 방식의 판독을 지원한다. Lichtblick 1.31.0의 새 파일 직접 재생과 기존 EV-090 원본을 `recover`로 만든 별도 사본의 재생을 확인했다. 기존 파일을 직접 열면 같은 Lichtblick 문제를 만날 수 있다. [명령 예제](../../../crates/dot-logger-viewer/README.md) · [EV-093](../../05_verification/verification_evidence.md#ev-093)
+
+### S3 원격 재생 경로 — 결정 대기
+
+실제 TCP의 기존 호스트 통합 시험은 파일 Query, `ReadBlob`, replay 제어를 검증한다. 제품 facade는 이 명령의 백엔드가 없다. 기존 `Replay` 요청에는 handle/세대가 있지만 `Subscribe`에는 그 handle을 선택하는 필드가 없고, 응답 Frame의 generation은 데이터 소스 식별자가 아니다. 같은 채널의 live/source별 Replay를 수신 쪽에서 구별할 결합 계약이 필요하다. [gRPC 정의](../../../proto/logger.proto) · [실제 호스트 통합 시험](../../../crates/dot-logger/src/adapters/remote/tests.rs#L762)
+
+| 경로 | 범위와 제약 |
+|---|---|
+| **권고 — viewer에서 Query/ReadBlob을 읽어 재생** | 기존 read RPC, 고정 snapshot/cursor·페이지·blob 상한 사용. viewer가 시간 이동·배속을 관리하므로 호스트의 Query 백엔드는 필요하며 gRPC wire 변경은 없다. |
+| 호스트 Replay가 생성한 스트림을 전달 | 호스트가 기존 Replay 시계를 관리한다. replay handle과 WS 사용자의 gRPC 구독을 연결할 계약, 권한·세대·수명 검증, 실제 호스트 구현이 추가로 필요하다. |
+
+시간 이동과 배속 제어를 어느 쪽에 둘지 Human 결정 후 원격 재생을 구현한다.
 
 ## 변경 대상과 첫 검증
 

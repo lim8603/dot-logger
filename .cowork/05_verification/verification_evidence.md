@@ -1481,6 +1481,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀:** `cargo +1.85.0 test --locked --workspace --all-features`, `cargo +1.96.0 test --locked --workspace --all-features` 각각 688 Pass, 0 실패, 외부 DB 5 ignored. Viewer 3건 및 예제 빌드 통과. 두 Rust `clippy --locked --workspace --all-targets --all-features -- -D warnings`, `fmt --all --check`, `git diff --check` 통과. cached `cargo audit --no-fetch`는 기존 `paste 1.0.15` 경고 1건, 취약점/unsound 0. `cargo tree --locked -p dot-logger-viewer -e normal --depth 1`에서 프로젝트 직접 의존은 client만 확인했다.
 - **미실행:** Foxglove Desktop 3.5.0 실시간은 격리 프로필의 로그인 화면까지 확인했다. LAN 내구/성능의 P4·P4-bulk·P5와 정량 포화 회복은 T7, native GitHub 실행은 T3다. SDK 프로토콜·Query/Replay·Lichtblick 원본 MCAP 재생은 이 판정에 포함되지 않는다.
 
+<a id="ev-093"></a>
+### EV-093 — TASK-031 S3 MCAP 파일 재생 호환
+
+- **대상:** 제품 `a3296dc`, Ubuntu x86_64, Lichtblick Web 1.31.0/Chromium 159.0.8154.6. 등록 전용 청크가 남는 조건을 TC-017 baseline 시험에서 Red로 재현했다. 새 파일은 Schema/Channel을 data section에 기록해 청크마다 실제 Message index를 갖는다. TC-015의 등록 검증은 두 배치를 읽고 중복·위조 길이·잘못된 스키마를 검증한다. [(MCAP 배치 규격)](https://mcap.dev/spec#use-of-chunk-records) · [REV-064](reviews/REV-064_TASK_031_MCAP_COMPATIBILITY.md)
+- **GUI Pass:** 수정 writer를 사용한 `dot-logger-viewer --example live_host`의 새 MCAP `0.mcap`을 Lichtblick Raw Messages에서 직접 열어 `robot/pose` x=51·y=-7을 확인했다. CLI `recover --manifest <EV-090의 session.json> --output <새 경로> --json`의 기존 파일 복구 사본도 직접 열어 첫 pose x=42·y=-7을 확인했다.
+- **원본 대조:** `@mcap/core 2.4.0`으로 EV-090 원본 및 CLI 사본의 header, schema·channel, file Metadata와 CRC 검증한 32개 Message(사용자 10·RecordMeta 10·LossReport 12)의 payload/sequence/시각을 대조해 일치했다. Message index 없는 청크 1→0이다. 원본 SHA-256은 EV-091과 같다. 기존 파일의 직접 재생 문제는 해당 Lichtblick 릴리즈에서 계속 재현된다.
+- **회귀:** 두 Rust `cargo test --locked --workspace --all-features --no-fail-fast` 각 689 Pass, 0 실패, 외부 DB 5 ignored. 두 Rust workspace all-features/all-targets Clippy `-D warnings`와 fmt 통과. NativeReader/LossReader가 기존 EV-090 파일의 10/12건을 판독하는 회귀를 추가했다.
+- **원격 경계:** `host_bridge_queries_real_file_replays_and_preserves_completion` 및 기존 seek/generation 회귀는 통과했다. 원격 호스트의 replay handle과 수신 스트림을 결합하는 제품 계약은 결정 대기다. Foxglove 실시간·T7 LAN 실측은 후속이다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -4,7 +4,7 @@ use crate::{
 };
 use dot_logger::{
     adapters::remote::{OverflowPolicy, RemoteError, SubscriptionFilter},
-    capture::Level,
+    capture::{Level, RecordMetadata},
     config::{
         ImportancePolicy, MemoryBudget, PoolQuota, ProducerQuota, SessionBuilder, SessionConfig,
         WorkerThreadingConfig,
@@ -65,6 +65,17 @@ pub struct LiveRecord {
     pub schema_version: u32,
     /// Original signed Unix time, in nanoseconds.
     pub real_ns: i64,
+}
+
+impl LiveRecord {
+    pub(crate) fn from_metadata(metadata: RecordMetadata) -> Self {
+        Self {
+            channel_id: metadata.channel_id,
+            schema_id: metadata.schema_id,
+            schema_version: metadata.schema_version,
+            real_ns: metadata.real_ns,
+        }
+    }
 }
 
 /// Own a filtered subscription and the remote connection that backs it.
@@ -129,18 +140,7 @@ impl LiveSubscription {
         self.stream
             .handoff(
                 record,
-                |record, bytes| {
-                    let meta = record.metadata;
-                    consumer(
-                        LiveRecord {
-                            channel_id: meta.channel_id,
-                            schema_id: meta.schema_id,
-                            schema_version: meta.schema_version,
-                            real_ns: meta.real_ns,
-                        },
-                        bytes,
-                    )
-                },
+                |record, bytes| consumer(LiveRecord::from_metadata(record.metadata), bytes),
                 cancel,
             )
             .await

@@ -447,3 +447,200 @@ fn catalog_rejects_ambiguous_mappings_and_definitions() {
     duplicate["channels"].as_array_mut().unwrap().push(first);
     assert!(Catalog::parse(duplicate.to_string().as_bytes()).is_err());
 }
+
+#[tokio::test]
+async fn replay_discards_an_inflight_page_on_seek_and_reads_blobs_from_the_same_snapshot() {
+    use crate::replay::{Playback, Rate};
+    use dot_logger::adapters::remote::{ManagementReply, ManagementRequest, RemoteItem};
+
+    let budget = budget();
+    let (hub, mut inbox) = RemoteHub::new(
+        &budget,
+        RemoteLimits {
+            connections: 2,
+            subscriptions: 1,
+            commands: 2,
+            message_bytes: 32 * 1024,
+            record_bytes: 4096,
+            subscription_records: 1,
+            subscription_bytes: 4096,
+            max_age: WAIT,
+            request_timeout: WAIT,
+        },
+    )
+    .unwrap();
+    let host = RemoteServer::bind(
+        ServerConfig {
+            enabled: true,
+            ..ServerConfig::default()
+        },
+        hub.clone(),
+    )
+    .await
+    .unwrap();
+    let upstream = host.local_addr().unwrap();
+    let (stop_host, host_done) = oneshot::channel();
+    let host_task = tokio::spawn(host.serve(async {
+        let _ = host_done.await;
+    }));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let playback = Playback::new(0, 1000, "2/1".parse::<Rate>().unwrap()).unwrap();
+    let (stop_viewer, viewer_done) = oneshot::channel();
+    let viewer = tokio::spawn(crate::serve_replay(
+        listener,
+        RemoteConfig::new(format!("http://{upstream}")),
+        Catalog::parse(CATALOG.as_bytes()).unwrap(),
+        Options::default(),
+        playback.clone(),
+        async {
+            let _ = viewer_done.await;
+        },
+    ));
+    let mut socket = socket(address, "foxglove.websocket.v1", None)
+        .await
+        .unwrap();
+    let server_info = message(&mut socket, Message::is_text).await;
+    assert_eq!(
+        serde_json::from_str::<Value>(server_info.to_text().unwrap()).unwrap()["capabilities"],
+        json!(["time"])
+    );
+    message(&mut socket, Message::is_text).await;
+    assert!(inbox.try_next().is_none());
+    socket.send(subscribe()).await.unwrap();
+
+    async fn command(
+        inbox: &mut dot_logger::adapters::remote::CommandInbox,
+    ) -> dot_logger::adapters::remote::Command {
+        timeout(WAIT, async {
+            loop {
+                if let Some(command) = inbox.try_next() {
+                    return command;
+                }
+                sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .unwrap()
+    }
+
+    let first = command(&mut inbox).await;
+    assert!(
+        matches!(first.request(), ManagementRequest::Query { snapshot: 0, cursor: 0, query } if query.from == 0)
+    );
+    assert!(!playback.seek(1000));
+    assert!(playback.seek(100));
+    let discarded = br#"{"x":1}"#;
+    first.respond(Ok(ManagementReply::Page {
+        snapshot: 44,
+        cursor: 88,
+        items: vec![RemoteItem {
+            record: record(1, discarded.len()),
+            inline: discarded.to_vec(),
+            blob: 0,
+        }],
+    }));
+
+    let after_seek = command(&mut inbox).await;
+    assert!(
+        matches!(after_seek.request(), ManagementRequest::Query { snapshot: 44, cursor: 0, query } if query.from == 100 && query.to == 1000)
+    );
+    after_seek.respond(Ok(ManagementReply::Page {
+        snapshot: 44,
+        cursor: 77,
+        items: vec![],
+    }));
+    let next = command(&mut inbox).await;
+    assert!(matches!(
+        next.request(),
+        ManagementRequest::Query {
+            snapshot: 44,
+            cursor: 77,
+            ..
+        }
+    ));
+    let payload = br#"{"x":51}"#;
+    next.respond(Ok(ManagementReply::Page {
+        snapshot: 44,
+        cursor: 0,
+        items: vec![RemoteItem {
+            record: record(120, payload.len()),
+            inline: vec![],
+            blob: 55,
+        }],
+    }));
+    let blob = command(&mut inbox).await;
+    assert!(
+        matches!(blob.request(), ManagementRequest::ReadBlob { snapshot: 44, blob: 55, offset: 0, length } if *length as usize == payload.len())
+    );
+    blob.respond(Ok(ManagementReply::Blob(payload[..3].to_vec())));
+    let blob = command(&mut inbox).await;
+    assert!(
+        matches!(blob.request(), ManagementRequest::ReadBlob { snapshot: 44, blob: 55, offset: 3, length } if *length as usize == payload.len() - 3)
+    );
+    blob.respond(Ok(ManagementReply::Blob(payload[3..].to_vec())));
+    let data = message(&mut socket, |message| {
+        message.is_binary() && message.clone().into_data().first() == Some(&1)
+    })
+    .await
+    .into_data();
+    assert_eq!(&data[1..5], &91u32.to_le_bytes());
+    assert_eq!(&data[5..13], &120u64.to_le_bytes());
+    assert_eq!(&data[13..], payload);
+    message(&mut socket, |m| status(m, "Replay ended")).await;
+
+    assert!(playback.seek(300));
+    let page = command(&mut inbox).await;
+    assert!(
+        matches!(page.request(), ManagementRequest::Query { snapshot: 44, cursor: 0, query } if query.from == 300)
+    );
+    page.respond(Ok(ManagementReply::Page {
+        snapshot: 44,
+        cursor: 0,
+        items: vec![RemoteItem {
+            record: record(320, discarded.len()),
+            inline: vec![],
+            blob: 56,
+        }],
+    }));
+    let stale_blob = command(&mut inbox).await;
+    assert!(matches!(
+        stale_blob.request(),
+        ManagementRequest::ReadBlob {
+            snapshot: 44,
+            blob: 56,
+            offset: 0,
+            ..
+        }
+    ));
+    assert!(playback.seek(400));
+    let fresh = command(&mut inbox).await;
+    assert!(
+        matches!(fresh.request(), ManagementRequest::Query { snapshot: 44, cursor: 0, query } if query.from == 400)
+    );
+    stale_blob.respond(Ok(ManagementReply::Blob(discarded.to_vec())));
+    fresh.respond(Ok(ManagementReply::Page {
+        snapshot: 44,
+        cursor: 0,
+        items: vec![RemoteItem {
+            record: record(420, payload.len()),
+            inline: payload.to_vec(),
+            blob: 0,
+        }],
+    }));
+    let data = message(&mut socket, |message| {
+        message.is_binary() && message.clone().into_data().first() == Some(&1)
+    })
+    .await
+    .into_data();
+    assert_eq!(&data[5..13], &420u64.to_le_bytes());
+    assert_eq!(&data[13..], payload);
+    message(&mut socket, |m| status(m, "Replay ended")).await;
+    subscriptions(&hub, 0).await;
+    stop_viewer.send(()).unwrap();
+    timeout(WAIT, viewer).await.unwrap().unwrap().unwrap();
+    stop_host.send(()).unwrap();
+    timeout(WAIT, host_task).await.unwrap().unwrap().unwrap();
+    drop((inbox, hub));
+    assert_eq!(budget.used_bytes(), 0);
+}

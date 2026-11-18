@@ -1,6 +1,6 @@
 # dot-logger-viewer
 
-The viewer mirrors live gRPC subscriptions to the read-only Foxglove WebSocket
+The viewer sends live or recorded gRPC data over the read-only Foxglove WebSocket
 v1 protocol. Run it on the operator PC with Foxglove or Lichtblick. The
 WebSocket listener binds only to loopback and prints its URL at startup.
 
@@ -51,7 +51,7 @@ fully qualified message name for protobuf. Set `originals: true` in a channel
 entry to subscribe to raw originals. The catalog is loaded at startup and has
 a 1 MiB limit and a maximum of 128 channels.
 
-The viewer forwards the original encoded bytes and the record's Unix
+Live mode forwards the original encoded bytes and the record's Unix
 nanoseconds. If the upstream schema ID or version changes, the stale advertisement
 is withdrawn. Update the catalog and assign a new advertisement ID when changing
 a topic or schema, then restart the viewer.
@@ -68,6 +68,40 @@ a topic or schema, then restart the viewer.
   **Viewer Gap** counts records dropped by this socket's own queue.
   **Unknown** marks an unobserved range after an upstream termination or an
   unconfirmed handoff. The viewer retries while a subscription remains active.
+
+## Remote recorded playback
+
+Use an upstream host that serves the gRPC `Query` and `ReadBlob` RPCs from a
+frozen snapshot. The basic facade returns `Unsupported` for these calls.
+
+```sh
+cargo run --locked -p dot-logger-viewer -- \
+    --upstream http://127.0.0.1:PORT --catalog viewer-catalog.json \
+    --replay-from-ns 0 --replay-to-ns 60000000000 --replay-speed 1/1
+```
+
+The range is half-open and uses the session monotonic clock in nanoseconds.
+Open the printed WebSocket URL and subscribe to a topic to start playback.
+Type the following controls in the terminal where the viewer is running:
+
+```text
+speed 2/1
+seek 1000000000
+```
+
+The controls apply to this viewer process. Each connected socket gets its own
+query cursor and keeps the same snapshot across seeks. The WebSocket replay
+clock and message timestamps both use the session monotonic clock. The viewer
+discards pending records from old seek positions and sends a new clock marker.
+Bytes already sent before that marker may still appear in the visualization
+history. A seek after the end of playback starts another pass in the same range.
+
+Playback limits each socket to one page and one blob assembly at a time, with
+4,096 pages per pass and one queued WebSocket output frame. Set
+`--replay-blob-bytes` to fit the host's per-read limit and `--record-bytes` to
+fit the largest selected record. The host owns snapshot expiry. Reconnect to
+open a fresh snapshot if the host expires the existing one.
+
 ## Opening MCAP recordings
 
 Open a closed native `dot-logger/standard/2` recording directly in the viewer app.
@@ -85,4 +119,4 @@ cargo run --locked -p dot-logger-cli -- recover \
 
 For a manifest with multiple sources, supply a new output directory. Open the
 recovered file in Lichtblick. The command reads the source files read-only and
-reports each verified prefix. Remote Query/Replay remains under TASK-031 S3.
+reports each verified prefix.

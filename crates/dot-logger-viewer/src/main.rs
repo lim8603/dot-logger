@@ -3,6 +3,7 @@
 mod bridge;
 mod catalog;
 mod output;
+mod replay;
 #[cfg(test)]
 mod tests;
 mod websocket;
@@ -11,13 +12,17 @@ use bridge::Bridge;
 use catalog::{Catalog, MAX_CATALOG_BYTES, read_file};
 use clap::{Args, Parser};
 use dot_logger_client::RemoteConfig;
+use replay::{Playback, Rate};
 use std::{error::Error, io, net::SocketAddr, path::PathBuf, process::ExitCode, sync::Arc};
-use tokio::{net::TcpListener, task::JoinSet};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    task::JoinSet,
+};
 
 const MIB: usize = 1024 * 1024;
 
 #[derive(Parser)]
-#[command(about = "Bridge read-only dot-logger live data to a local Foxglove WebSocket")]
+#[command(about = "Bridge live or recorded dot-logger data to a local Foxglove WebSocket")]
 struct Command {
     /// Robot's authenticated HTTPS endpoint or explicit loopback HTTP endpoint.
     #[arg(long)]
@@ -34,6 +39,15 @@ struct Command {
     /// Override the upstream TLS certificate name.
     #[arg(long)]
     tls_domain: Option<String>,
+    /// Start recorded playback at this session-monotonic nanosecond position.
+    #[arg(long, requires = "replay_to_ns")]
+    replay_from_ns: Option<u64>,
+    /// Exclusive end of the recorded playback range in session-monotonic nanoseconds.
+    #[arg(long, requires = "replay_from_ns")]
+    replay_to_ns: Option<u64>,
+    /// Initial positive rational playback rate, for example 2/1. Defaults to 1/1.
+    #[arg(long, requires = "replay_from_ns")]
+    replay_speed: Option<Rate>,
     #[command(flatten)]
     options: Options,
 }
@@ -61,6 +75,9 @@ struct Options {
     /// Per-WebSocket byte budget covering queued data frames and the active write.
     #[arg(long, default_value_t = 2 * MIB)]
     queue_bytes: usize,
+    /// Maximum bytes requested per remote replay ReadBlob RPC.
+    #[arg(long, default_value_t = 16 * 1024)]
+    replay_blob_bytes: usize,
     /// Also allow this exact WebSocket Origin, for a trusted frontend.
     #[arg(long)]
     allow_origin: Option<String>,
@@ -88,6 +105,7 @@ impl Options {
             || !(1..=16 * MIB).contains(&self.record_bytes)
             || !(1..=3_600_000).contains(&self.receiver_age_ms)
             || !(1..=1024).contains(&self.queue_records)
+            || !(1..=16 * MIB).contains(&self.replay_blob_bytes)
             || !(self.record_bytes + output::DATA_HEADER..=64 * MIB).contains(&self.queue_bytes)
             || self.clients.saturating_mul(self.queue_bytes) > 256 * MIB
             || self
@@ -126,15 +144,52 @@ async fn serve(
     stop: impl Future<Output = ()>,
 ) -> io::Result<()> {
     options.validate()?;
+    let bridge = Arc::new(Bridge::new(upstream, &options).map_err(io::Error::other)?);
+    let catalog = Arc::new(catalog);
+    let options = Arc::new(options);
+    let result = listen(&listener, options.clients, stop, |socket| {
+        websocket::session(socket, bridge.clone(), catalog.clone(), options.clone())
+    })
+    .await;
+    bridge.shutdown().await;
+    result
+}
+
+async fn serve_replay(
+    listener: TcpListener,
+    upstream: RemoteConfig,
+    catalog: Catalog,
+    options: Options,
+    playback: Playback,
+    stop: impl Future<Output = ()>,
+) -> io::Result<()> {
+    options.validate()?;
+    let catalog = Arc::new(catalog);
+    let options = Arc::new(options);
+    listen(&listener, options.clients, stop, |socket| {
+        replay::session(
+            socket,
+            upstream.clone(),
+            catalog.clone(),
+            options.clone(),
+            playback.clone(),
+        )
+    })
+    .await
+}
+
+async fn listen<Fut: Future<Output = ()> + Send + 'static>(
+    listener: &TcpListener,
+    clients: usize,
+    stop: impl Future<Output = ()>,
+    session: impl Fn(TcpStream) -> Fut,
+) -> io::Result<()> {
     if !listener.local_addr()?.ip().is_loopback() {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "viewer listener must be loopback",
         ));
     }
-    let bridge = Arc::new(Bridge::new(upstream, &options).map_err(io::Error::other)?);
-    let catalog = Arc::new(catalog);
-    let options = Arc::new(options);
     let mut sockets = JoinSet::new();
     let mut stop = std::pin::pin!(stop);
     let result = loop {
@@ -142,12 +197,10 @@ async fn serve(
             biased;
             _ = &mut stop => break Ok(()),
             _ = sockets.join_next(), if !sockets.is_empty() => {},
-            accepted = listener.accept(), if sockets.len() < options.clients => {
+            accepted = listener.accept(), if sockets.len() < clients => {
                 match accepted {
                     Ok((socket, _)) => {
-                        sockets.spawn(websocket::session(
-                            socket, bridge.clone(), catalog.clone(), options.clone(),
-                        ));
+                        sockets.spawn(session(socket));
                     }
                     Err(error) => break Err(error),
                 }
@@ -155,7 +208,6 @@ async fn serve(
         }
     };
     sockets.shutdown().await;
-    bridge.shutdown().await;
     result
 }
 
@@ -176,9 +228,21 @@ async fn run(command: Command) -> Result<(), Box<dyn Error>> {
         .map(|path| read_file(path, 65_536))
         .transpose()?;
     upstream.tls_domain = command.tls_domain;
+    let playback = command
+        .replay_from_ns
+        .zip(command.replay_to_ns)
+        .map(|(from, to)| Playback::new(from, to, command.replay_speed.unwrap_or(Rate::REALTIME)))
+        .transpose()?;
     let listener = TcpListener::bind(command.listen).await?;
+    let stop = termination()?;
     println!("ws://{}", listener.local_addr()?);
-    serve(listener, upstream, catalog, command.options, termination()?).await?;
+    if let Some(playback) = playback {
+        playback.start_terminal()?;
+        eprintln!("Replay controls: seek MONO_NS or speed N/D");
+        serve_replay(listener, upstream, catalog, command.options, playback, stop).await?;
+    } else {
+        serve(listener, upstream, catalog, command.options, stop).await?;
+    }
     Ok(())
 }
 

@@ -9,6 +9,15 @@ use tokio_tungstenite::tungstenite::Message;
 
 pub(crate) const DATA_HEADER: usize = 13;
 
+pub(crate) fn data_message(subscription: u32, timestamp: u64, payload: &[u8]) -> Message {
+    let mut data = Vec::with_capacity(DATA_HEADER + payload.len());
+    data.push(1);
+    data.extend_from_slice(&subscription.to_le_bytes());
+    data.extend_from_slice(&timestamp.to_le_bytes());
+    data.extend_from_slice(payload);
+    Message::binary(data)
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum Notice {
     Connected { channel: u32, resumed: bool },
@@ -160,14 +169,9 @@ impl Destination {
             self.notice(Notice::QueueGap { channel });
             return false;
         };
-        let mut data = Vec::with_capacity(size);
-        data.push(1);
-        data.extend_from_slice(&self.subscription.to_le_bytes());
-        data.extend_from_slice(&timestamp.to_le_bytes());
-        data.extend_from_slice(payload);
         slot.send(Frame {
             destination: self.clone(),
-            message: Message::binary(data),
+            message: data_message(self.subscription, timestamp, payload),
             _permit: permit,
         });
         true

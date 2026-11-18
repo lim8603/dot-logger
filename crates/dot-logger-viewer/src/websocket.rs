@@ -1,7 +1,7 @@
 use crate::{
     Options,
-    bridge::{Bridge, Lease},
-    catalog::{Catalog, MAX_CATALOG_BYTES},
+    bridge::Bridge,
+    catalog::{Catalog, Channel, MAX_CATALOG_BYTES},
     output::{DATA_HEADER, Frame, Notices, Outbox, status},
 };
 use futures_util::{
@@ -38,7 +38,8 @@ const HANDSHAKE_DEADLINE: Duration = Duration::from_secs(5);
 const STATUS_INTERVAL: Duration = Duration::from_millis(100);
 const GREETING: &str = r#"{"op":"serverInfo","name":"dot-logger-viewer","capabilities":[]}"#;
 
-type Socket = WebSocketStream<TcpStream>;
+pub(crate) type Socket = WebSocketStream<TcpStream>;
+pub(crate) type Writer = SplitSink<Socket, Message>;
 
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
@@ -59,7 +60,7 @@ struct Subscription {
     channel_id: u32,
 }
 
-enum Control {
+pub(crate) enum Control {
     Status(Message),
     Flush,
     Close,
@@ -71,8 +72,28 @@ pub(crate) async fn session(
     catalog: Arc<Catalog>,
     options: Arc<Options>,
 ) {
-    if tcp.set_nodelay(true).is_err() {
+    let Some(socket) = open(tcp, &catalog, &options, GREETING).await else {
         return;
+    };
+    let (writer, reader) = socket.split();
+    let (outbox, data, notices) = Outbox::new(options.queue_records, options.queue_bytes);
+    let (commands, control) = mpsc::channel(8);
+    tokio::select! {
+        _ = read(reader, &catalog, &commands, |channel, id| {
+            bridge.subscribe(channel, id, &outbox).ok_or("upstream channel limit reached")
+        }) => {},
+        _ = write(writer, data, notices, control, &catalog) => {},
+    }
+}
+
+pub(crate) async fn open(
+    tcp: TcpStream,
+    catalog: &Catalog,
+    options: &Options,
+    server_info: &'static str,
+) -> Option<Socket> {
+    if tcp.set_nodelay(true).is_err() {
+        return None;
     }
     let config = WebSocketConfig::default()
         .read_buffer_size(4096)
@@ -88,26 +109,13 @@ pub(crate) async fn session(
         },
         Some(config),
     );
-    let Ok(Ok(mut socket)) = timeout(HANDSHAKE_DEADLINE, handshake).await else {
-        return;
-    };
+    let mut socket = timeout(HANDSHAKE_DEADLINE, handshake).await.ok()?.ok()?;
     let greeting = async {
-        socket.send(Message::text(GREETING)).await?;
+        socket.send(Message::text(server_info)).await?;
         socket.send(Message::text(catalog.advertisement())).await
     };
-    if !timeout(WRITE_DEADLINE, greeting)
-        .await
-        .is_ok_and(|result| result.is_ok())
-    {
-        return;
-    }
-    let (writer, reader) = socket.split();
-    let (outbox, data, notices) = Outbox::new(options.queue_records, options.queue_bytes);
-    let (commands, control) = mpsc::channel(8);
-    tokio::select! {
-        _ = read(reader, &bridge, &catalog, &outbox, &commands) => {},
-        _ = write(writer, data, notices, control, &catalog) => {},
-    }
+    timeout(WRITE_DEADLINE, greeting).await.ok()?.ok()?;
+    Some(socket)
 }
 
 #[allow(clippy::result_large_err)] // The handshake callback returns tungstenite's HTTP response.
@@ -167,17 +175,16 @@ fn reject(status: StatusCode) -> ErrorResponse {
     response
 }
 
-async fn read(
+pub(crate) async fn read<L>(
     mut reader: SplitStream<Socket>,
-    bridge: &Bridge,
     catalog: &Catalog,
-    outbox: &Outbox,
     controls: &mpsc::Sender<Control>,
+    mut subscribe: impl FnMut(&Channel, u32) -> Result<L, &'static str>,
 ) {
     let mut leases = HashMap::new();
     while let Some(Ok(message)) = reader.next().await {
         let control = match message {
-            Message::Text(text) => handle(&text, bridge, catalog, outbox, &mut leases)
+            Message::Text(text) => handle(&text, catalog, &mut leases, &mut subscribe)
                 .map(|reason| Control::Status(status("request-rejected", 1, reason))),
             Message::Ping(_) => Some(Control::Flush),
             Message::Close(_) => {
@@ -201,12 +208,11 @@ async fn read(
     }
 }
 
-fn handle(
+fn handle<L>(
     text: &str,
-    bridge: &Bridge,
     catalog: &Catalog,
-    outbox: &Outbox,
-    leases: &mut HashMap<u32, Lease>,
+    leases: &mut HashMap<u32, L>,
+    subscribe: &mut impl FnMut(&Channel, u32) -> Result<L, &'static str>,
 ) -> Option<&'static str> {
     match serde_json::from_str(text) {
         Ok(Command::Subscribe { subscriptions }) if subscriptions.len() <= MAX_SUBSCRIPTIONS => {
@@ -218,10 +224,13 @@ fn handle(
                     if channel.retired() {
                         error =
                             Some("channel schema changed; update the local catalog and restart");
-                    } else if let Some(lease) = bridge.subscribe(channel, subscription.id, outbox) {
-                        leases.insert(subscription.id, lease);
                     } else {
-                        error = Some("upstream channel limit reached");
+                        match subscribe(channel, subscription.id) {
+                            Ok(lease) => {
+                                leases.insert(subscription.id, lease);
+                            }
+                            Err(reason) => error = Some(reason),
+                        }
                     }
                 } else {
                     error = Some("unknown advertised channel ID");
@@ -242,7 +251,7 @@ fn handle(
 }
 
 async fn write(
-    mut writer: SplitSink<Socket, Message>,
+    mut writer: Writer,
     mut data: mpsc::Receiver<Frame>,
     notices: watch::Receiver<Notices>,
     mut controls: mpsc::Receiver<Control>,
@@ -255,21 +264,9 @@ async fn write(
     loop {
         tokio::select! {
             biased;
-            control = controls.recv() => match control {
-                Some(Control::Status(message)) => {
-                    if !send(&mut writer, message).await { break; }
-                }
-                Some(Control::Flush) => {
-                    if !timeout(WRITE_DEADLINE, writer.flush()).await.is_ok_and(|result| result.is_ok()) {
-                        break;
-                    }
-                }
-                Some(Control::Close) => {
-                    let _ = timeout(WRITE_DEADLINE, writer.flush()).await;
-                    break;
-                }
-                None => break,
-            },
+            control = controls.recv() => {
+                if !apply_control(&mut writer, control).await { break; }
+            }
             _ = tick.tick() => {
                 let current = *notices.borrow();
                 for message in current.statuses(&mut previous) {
@@ -294,7 +291,21 @@ async fn write(
     }
 }
 
-async fn send(writer: &mut SplitSink<Socket, Message>, message: Message) -> bool {
+pub(crate) async fn apply_control(writer: &mut Writer, control: Option<Control>) -> bool {
+    match control {
+        Some(Control::Status(message)) => send(writer, message).await,
+        Some(Control::Flush) => timeout(WRITE_DEADLINE, writer.flush())
+            .await
+            .is_ok_and(|result| result.is_ok()),
+        Some(Control::Close) => {
+            let _ = timeout(WRITE_DEADLINE, writer.flush()).await;
+            false
+        }
+        None => false,
+    }
+}
+
+pub(crate) async fn send(writer: &mut Writer, message: Message) -> bool {
     timeout(WRITE_DEADLINE, writer.send(message))
         .await
         .is_ok_and(|result| result.is_ok())

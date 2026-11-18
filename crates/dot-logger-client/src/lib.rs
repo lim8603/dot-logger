@@ -12,6 +12,10 @@ mod live;
 #[cfg(feature = "remote")]
 pub use live::{LiveBudget, LiveRecord, LiveSubscription};
 #[cfg(feature = "remote")]
+mod recording;
+#[cfg(feature = "remote")]
+pub use recording::{RecordedItem, RecordedPage, RemoteRecording};
+#[cfg(feature = "remote")]
 mod transport;
 #[cfg(feature = "remote")]
 mod wire;

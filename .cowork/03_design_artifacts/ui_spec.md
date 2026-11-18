@@ -59,3 +59,5 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
 ## 6. TASK-031 S2 실시간 화면 연결 — 2026-11-18
 
 운영 PC에서 `dot-logger-viewer --upstream <URL> --catalog <JSON>`을 실행하고 출력된 loopback URL을 Foxglove WebSocket 종류로 연다. Raw Messages나 Plot에서 광고된 토픽을 구독한다. 화면 상태에 Upstream Gap(상류 transfer 순번), Viewer Gap(해당 소켓에서 버린 건), Unknown(범위 미확인), 재연결을 표시한다. 스키마 불일치가 관측되면 토픽 광고를 회수하고 로컬 목록 수정·재시작이 필요하다. [실행 예제](../../crates/dot-logger-viewer/README.md) · [API §24](interface_contract.md#24-task-031-s2-실시간-viewer--2026-11-18)
+
+기록 모드는 `--replay-from-ns`·`--replay-to-ns`로 범위를 지정하고 토픽을 구독해 시작한다. viewer 터미널에 `seek MONO_NS`와 `speed N/D`를 입력한다. 시각화 앱은 같은 WS 주소에서 기록과 재생 시각을 받는다. [API §24.2](interface_contract.md#242-task-031-s3-원격-기록-재생--2026-11-18)

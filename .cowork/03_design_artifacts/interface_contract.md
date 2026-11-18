@@ -1395,3 +1395,9 @@ facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 
 ### 24.1 TASK-031 S3 MCAP 파일 호환 — 2026-11-18
 
 새 `standard/2` 파일의 등록은 첫 메시지 청크 앞 data section에 둔다. baseline·초기 flush에서 메시지 없는 청크가 생성되지 않는다. 읽기/복구는 기존 청크 안 등록과 새 data section 등록을 지원한다. Lichtblick 1.31.0에서 이전 등록 전용 청크 때문에 재생에 실패하는 파일은 CLI `recover`로 별도 사본을 만들어 재생할 수 있다. [EV-093](../05_verification/verification_evidence.md#ev-093)
+
+### 24.2 TASK-031 S3 원격 기록 재생 — 2026-11-18
+
+viewer는 read 권한으로 `Query`·`ReadBlob`만 열고, 각 WS 소켓은 고정 snapshot과 mono 반열린 구간을 가진다. viewer가 처리하는 `seek`는 cursor를 0으로 되돌리고 세대를 올린다. 최초 응답이 늦어도 snapshot은 유지하고 이전 페이지/출력은 폐기한다. 같은 세대의 blob을 논리 레코드 크기 상한 안에서 부분 읽기한다. 시간 및 데이터 프레임은 모두 session mono ns다. 터미널 `speed N/D`는 현재 재생 위치에서 양수 유리수 배속을 바꾼다.
+
+소켓당 페이지 하나, blob 하나, WS 대기 프레임 하나를 보유하며 한 재생 구간은 최대 4,096페이지다. WS 쓰기 기한은 S2와 같다. 이미 보낸 바이트는 시각 이동 뒤에도 소비처 이력에 남을 수 있다. 원격 스냅샷 TTL 및 실제 reader 수명은 기존 host 계약을 따른다. [ADR-014](adrs/ADR-014_viewer_live_websocket.md#s3-기록-재생-개정--2026-11-18) · [실행 가이드](../../crates/dot-logger-viewer/README.md#remote-recorded-playback)

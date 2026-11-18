@@ -1490,6 +1490,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀:** 두 Rust `cargo test --locked --workspace --all-features --no-fail-fast` 각 689 Pass, 0 실패, 외부 DB 5 ignored. 두 Rust workspace all-features/all-targets Clippy `-D warnings`와 fmt 통과. NativeReader/LossReader가 기존 EV-090 파일의 10/12건을 판독하는 회귀를 추가했다.
 - **원격 경계:** `host_bridge_queries_real_file_replays_and_preserves_completion` 및 기존 seek/generation 회귀는 통과했다. 원격 호스트의 replay handle과 수신 스트림을 결합하는 제품 계약은 결정 대기다. Foxglove 실시간·T7 LAN 실측은 후속이다.
 
+<a id="ev-094"></a>
+### EV-094 — TASK-031 S3 Query/ReadBlob 원격 재생
+
+- **대상:** `753794f`, Ubuntu x86_64, [ADR-014 S3 개정](../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md#s3-기록-재생-개정--2026-11-18), [REV-065](reviews/REV-065_TASK_031_QUERY_REPLAY.md). 제품 경로는 client의 기존 TCP/TLS/Read 권한을 사용한다.
+- **통합:** 시험을 먼저 작성했을 때 viewer 재생 진입점이 없어 Red였다. Green에서는 실제 TCP/gRPC·WS에서 무구독 Query 없음, 이동 후 늦은 최초 페이지와 blob 응답 폐기, 동일 스냅샷에서 커서 재시작과 여러 페이지, partial blob 조립, 종료 및 viewer 소켓 정리를 검증했다. 속도 변경은 현재 위치를 보존하며 늦은 전송 이후에는 기록 간격을 유지한다. 잘못된 범위·0 배속은 기존 제어값을 보존한다.
+- **사용자 경로:** EV-090의 원본 `dot-namespace.mcap`을 테스트 Query 호스트의 실제 `Snapshot`으로 읽었다. 호스트 페이지당 1개, inline 0, viewer `--replay-blob-bytes 4`. 빌드한 viewer를 Lichtblick Web 1.31.0/Chromium 159.0.8154.6으로 열어 pose 끝 값 x=51·y=-7, 터미널 `speed 1/4` 및 처음 위치 `seek` 후 x=42→51 재생을 확인했다.
+- **독립 WS 수신:** 같은 원본에서 두 번 모두 10개 protobuf 메시지 x=42~51과 mono 시각 일치. 1/1 평균 프레임 간격 101.3 ms, 1/4에서 401.9 ms를 루프백에서 관측했다. TC-012 LAN/P4/P5 실측 판정은 별도다.
+- **회귀:** Rust 1.85.0·1.96.0 `cargo test --locked --workspace --all-features` 각각 **692 Pass, 0 실패, 5 ignored**. 양쪽 `clippy --locked --workspace --all-targets --all-features -- -D warnings`와 fmt·문서 링크 검사 통과. Foxglove Desktop 연결과 T7 LAN/동시 쓰기는 미실행이다. 제품 기본 facade의 Query/ReadBlob은 Unsupported 상태다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

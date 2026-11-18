@@ -1,7 +1,7 @@
 # ADR-014 — 원격 viewer의 WebSocket v1과 로컬 스키마 목록
 
 - **상태:** Accepted — 2026-11-18 Human 「승인」
-- **범위:** INT-001 / MS-009 / TASK-031 S1·S2
+- **범위:** INT-001 / MS-009 / TASK-031 S1~S3의 viewer 전송 및 재생
 - **관련:** [ADR-007](ADR-007_embedded_ports_adapters_pipeline.md) · [ADR-009](ADR-009_storage_transport_toolchain.md) · [TASK-031](../../04_implementation/tasks/TASK-031.md)
 
 ## 맥락과 결정 요인
@@ -18,3 +18,9 @@
 
 - 공식 SDK 0.31.0은 MIT이며 Rust 1.88이 필요하다. SDK 0.25.3은 1.85를 표기하지만 내부 큐의 오래된 데이터 폐기와 viewer의 손실 표시 연동을 더 검증해야 한다. 권고안은 공개 v1의 유지 부담을 가지며 대상 앱을 고정해 회귀를 확인한다. [S1 비교·라이선스](../../04_implementation/tasks/TASK-031.md#s1-기술-결정안--2026-11-18) · [EV-091](../../05_verification/verification_evidence.md#ev-091)
 - Query/Replay, 원본 MCAP의 Lichtblick 직접 재생은 TASK-031 S3 범위다. 실시간 검증에서는 원격 서버의 기존 버퍼·lease 상한이 그대로 적용된다.
+
+## S3 기록 재생 개정 — 2026-11-18
+
+Human 「제안대로 진행」에 따라 기존 `Query`·`ReadBlob`을 사용하고 운영 PC의 viewer에서 시간 이동과 배속을 제어한다. 호스트가 제공하는 고정 snapshot과 해당 cursor/blob capability를 그대로 사용한다. 원격 `Replay`와 WS 구독을 연결하려면 별도 결합 계약이 필요하다. [TASK-031 경로 비교](../../04_implementation/tasks/TASK-031.md#s3-원격-재생-경로--검토)
+
+재생 모드는 viewer 프로세스의 터미널에서 제어한다. 영상 도구에는 표준 WS `time`과 데이터 메시지를 같은 session mono 시간축으로 보낸다. 이동 시 기존 viewer 출력/페이지를 세대로 무효화하며 연결당 스냅샷과 RPC는 유한하다. 호스트가 스냅샷을 만료하면 화면에 실패를 표시한다. Query 백엔드가 있는 호스트를 대상으로 한다. [실행 가이드](../../../crates/dot-logger-viewer/README.md#remote-recorded-playback)

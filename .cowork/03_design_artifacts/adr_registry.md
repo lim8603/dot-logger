@@ -38,6 +38,7 @@
 | ADR-011 | 현재 PC 실측·UPS 시뮬레이션 수락과 공개 후 native 검증 | Accepted | 2026-10-31 | INT-001 | MS-002~007 | [상세](adrs/ADR-011_local_pc_simulated_ups_verification.md) | Human 승인, 장비/UPS 수락 방법·native 시점 갱신 |
 | ADR-012 | facade 소유 모델: 공유 core + 소유 endpoint 핸들 + 빌림 뷰 | Accepted | 2026-11-05 | INT-001 | MS-008 | [상세](adrs/ADR-012_facade_owned_writer_handles.md) | Human 승인(리뷰 포인트 5개 권고안). ADR-008 borrowed core 유지 |
 | ADR-013 | native 표준 MCAP·손실 기록·revision별 파일 회전 | Accepted | 2026-11-16 | INT-001 | MS-008·009 | [상세](adrs/ADR-013_native_standard_loss_revision_storage.md) | TASK-030 S2·TASK-035 S1 설계 승인. D1 배포 전 native 단일 형식(legacy 지원 제외)·D2 누적 손실·D3 교차 revision 회전, 2026-11-16 Human 「승인」. 2026-11-18 개정은 `.logger` 토픽 및 `standard/2` |
+| ADR-014 | 원격 viewer의 WebSocket v1과 로컬 스키마 목록 | Accepted | 2026-11-18 | INT-001 | MS-009 | [상세](adrs/ADR-014_viewer_live_websocket.md) | TASK-031 S1 Human 승인. 읽기 전용 loopback WS·채널별 구독 공유·유한 큐와 손실 표시 |
 
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`

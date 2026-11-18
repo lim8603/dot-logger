@@ -55,3 +55,7 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
 [dot_probe_tail](../../crates/dot-logger-client/examples/dot_probe_tail.rs)은 유한 화면 이력을 한국어 구분선과 JSON으로 표시한다. 대기 만료는 `Unconfirmed`, 종료/취소/오류는 종료 구분선, 명시 재구독은 새 segment다. 화면은 새 구독과 이전 구독의 선을 연결하지 않으며 누락 건수/범위를 추정하지 않는다. 구독 내 overflow만 transfer 범위와 새 span으로 표시한다. chart 계열은 segment/span과 원 source identity로 구분한다.
 
 화면 이력 포화 시 기록 인계를 거절해 ACK하지 않고 종료 전용행을 남긴다. 소비 큐 인계/ACK와 그 뒤 렌더링은 별도이므로 이 예제의 stdout 실패는 이미 받은 기록/확인 ACK를 소급 취소하지 않는다. 실제 CLI tail의 stdout 인계 계약은 위 §4 그대로다. source ID는 hex, 큰 정수/시각은 문자열이며 원 receipt·revision·clock·payload를 보존한다. 실제 지속 화면 적용·장기 tail/복원·환경/성능 검증은 TASK-026/022 후속이다.
+
+## 6. TASK-031 S2 실시간 화면 연결 — 2026-11-18
+
+운영 PC에서 `dot-logger-viewer --upstream <URL> --catalog <JSON>`을 실행하고 출력된 loopback URL을 Foxglove WebSocket 종류로 연다. Raw Messages나 Plot에서 광고된 토픽을 구독한다. 화면 상태에 Upstream Gap(상류 transfer 순번), Viewer Gap(해당 소켓에서 버린 건), Unknown(범위 미확인), 재연결을 표시한다. 스키마 불일치가 관측되면 토픽 광고를 회수하고 로컬 목록 수정·재시작이 필요하다. [실행 예제](../../crates/dot-logger-viewer/README.md) · [API §24](interface_contract.md#24-task-031-s2-실시간-viewer--2026-11-18)

@@ -17,13 +17,10 @@
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query; 로컬 기능 pin OSS2.9.1/Linux amd64 | ADR-009·EV-038 | digest/health version 고정 실제 DB write/query·중복/partial 및 Delivery/완료·로컬 파일 격리 EV-039. 다른 버전/OS·실앱·정량 성능/native 잔여, v3 호환 미선언 |
 | 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4.6.6·serde 1.0.229/serde_json 1.0.154 | Human 선택·ADR-009·EV-025 | 로컬 CLI10/transport7·두 Rust Pass, 실제 dot-probe/다른 OS 후속 |
+| 원격 viewer | 공개 Foxglove WebSocket v1, 운영 PC의 로컬 스키마 목록 | `tokio-tungstenite =0.30.0` (MIT, handshake), 개발 Rust 1.96.0 / 하한 1.85 | [ADR-014](adrs/ADR-014_viewer_live_websocket.md) | Foxglove Desktop 3.5.0·Lichtblick Web 1.31.0 대상, 파일과 실시간 검증은 각 증거 참조 |
 | Linux 공간 관측 구현 | rustix | =1.1.4, std/fs·Linux target 한정; linux-raw-sys0.12.1 lock | TASK-017 S3·API §15.5·EV-033, 승인된 OS probe의 내부 구현 | 일반 경로 statvfs·원 OS 오류, 다른 OS는 Unsupported; 실제 성능 인증 아님 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
 | 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
-
-## TASK-031 S1 반영안 — 승인 대기
-
-운영 PC의 viewer 전용 전송으로 공개 Foxglove WebSocket v1(`foxglove.websocket.v1`)과 `tokio-tungstenite =0.30.0`(MIT, handshake 기능)을 제안한다. 하위 `tungstenite 0.30.0`은 MIT OR Apache-2.0이다. 개발 Rust 1.96.0과 MSRV 1.85는 이 안의 기준이다. 소비처 확인 프로필은 Foxglove Desktop 3.5.0과 Lichtblick Web 1.31.0이다. [후보 비교 및 검증 경계](../04_implementation/tasks/TASK-031.md#s1-기술-결정안--2026-11-18)
 
 ## 설치·실측 전 남은 작업
 

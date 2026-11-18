@@ -1380,3 +1380,14 @@ facade의 L 기본 하한은 16384 part이며 파생 메모리에 포함한다. 
 파일 Header profile은 `dot-logger/standard/2`, 파일 Metadata의 `dot_logger.file.format_version`은 `2`다. RecordMeta는 `.logger/meta`, LossReport는 `.logger/loss`에서 읽는다. 두 예약 이름과 충돌하는 사용자 채널은 facade 또는 core 파일 설정에서 거절한다. 제품은 `standard/1` 개발 파일을 판독·복구 입력에서 거절한다.
 
 호스트 통합 예제에서 앱이 정한 프로젝트 루트 아래 `.logger/`를 만들어 `file_output`에 넘긴다. CLI 예제는 `.logger/session.json`에 둔 manifest를 인자로 지정한다. [ADR-013 개정](adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18) · [EV-090](../05_verification/verification_evidence.md#ev-090)
+
+## 24. TASK-031 S2 실시간 viewer — 2026-11-18
+
+| 경계 | 구현 계약 |
+|---|---|
+| 구독 | 운영 PC의 loopback WebSocket v1. 운영 PC에서 기존 client의 read 구독을 열고 native 채널별로 하나를 공유한다. 마지막 수요를 해제하면 gRPC stream과 connection을 닫는다. |
+| 광고와 데이터 | 기동 시 JSON 목록 버전 1을 최대 1 MiB·128채널로 읽는다. native 채널·광고 ID·토픽은 각각 고유하다. 기록의 schema ID/버전과 일치할 때 payload 원문·Unix ns를 전송한다. 스키마 불일치는 광고를 회수하며 새 목록·광고 ID는 재시작 시 적용한다. |
+| ACK·불연속 | 한 downstream 큐 이상의 수락을 기존 gRPC ACK의 인계 경계로 사용한다. 소켓별 큐 포화·상류 Gap·Unknown을 각각 표시한다. GUI 렌더링은 ACK 밖이다. 상류 실패 후 구독 수요가 유지되면 지연을 두고 다시 연결한다. |
+| 자원·인증 | 접속·상류 구독 수, WS 프레임/바이트, 파일·광고와 메시지 크기를 제한한다. 쓰기 기한 2초. upstream은 기존 TLS와 read credential을 이용한다. 브라우저 Origin은 loopback 또는 명시적으로 허용한 값만 수락한다. |
+
+[ADR-014](adrs/ADR-014_viewer_live_websocket.md) · [실행 가이드](../../crates/dot-logger-viewer/README.md) · [EV-092](../05_verification/verification_evidence.md#ev-092)

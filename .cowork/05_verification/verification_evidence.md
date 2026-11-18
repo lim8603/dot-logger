@@ -1472,6 +1472,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **전송 crate 독립 컴파일 Pass:** `tokio-tungstenite =0.30.0`(`default-features = false`, `handshake`)과 Tokio 1.51.6의 임시 crate에서 `accept_hdr_async` 사용을 `cargo +1.85.0 check`와 `cargo +1.96.0 check --locked`로 컴파일했다. 해당 임시 lock의 `cargo audit --no-fetch`는 exit 0이다.
 - **후속:** 제품 gRPC→WS, Foxglove 실시간, 포화·취소·자원 반환·P4/P5, 원본 Lichtblick 파일 재생 개선과 원격 Query/Replay는 S2/S3에서 다룬다. 제품 workspace/lock 또는 EV-090 원본 파일의 변경은 없다.
 
+<a id="ev-092"></a>
+### EV-092 — TASK-031 S2 실시간 viewer 로컬 검증
+
+- **대상:** 제품 `f1444d4`, [ADR-014](../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md), Ubuntu Linux 7.0.0-43-realtime x86_64. [REV-063](reviews/REV-063_TASK_031_LIVE_VIEWER.md) Closed. 제품 Rust 라이브러리 코어와 wire 정의 변경 없음.
+- **TDD 및 포화/수명:** 제품 진입점이 없던 상태에서 TCP/gRPC→WebSocket 통합 시험이 컴파일 단계에서 Red였다. Green에서 실제 gRPC 호스트와 WS의 subprotocol·Origin 거절, 광고·구독·원문 바이트·Unix ns, upstream Gap/복구, 종료 Unknown·재연결, 구독 취소와 viewer 종료 시 서버 구독 반환을 확인했다. 스키마 버전 불일치는 미지원·Unadvertise·ACK 없음으로 관측했다. 하나의 공유 gRPC 구독에서 느린 대상의 바이트 상한을 채워도 다른 대상은 계속 수신/ACK했다. 모든 대상이 가득 찬 기록은 ACK하지 않았고 재연결 후 수신했다. 마지막 소유자 종료 후 호스트 예약 0을 확인했다.
+- **실제 GUI Pass:** `cargo build --locked -p dot-logger-viewer --bins --examples`의 `live_host`와 viewer 실행 파일을 서로 다른 루프백 포트에 띄웠다. Lichtblick Web 1.31.0(Chromium 159.0.8154.6)의 Foxglove WebSocket으로 접속해 Raw Messages에서 JSON `robot/pose` x=51·y=-7을 판독했다.
+- **회귀:** `cargo +1.85.0 test --locked --workspace --all-features`, `cargo +1.96.0 test --locked --workspace --all-features` 각각 688 Pass, 0 실패, 외부 DB 5 ignored. Viewer 3건 및 예제 빌드 통과. 두 Rust `clippy --locked --workspace --all-targets --all-features -- -D warnings`, `fmt --all --check`, `git diff --check` 통과. cached `cargo audit --no-fetch`는 기존 `paste 1.0.15` 경고 1건, 취약점/unsound 0. `cargo tree --locked -p dot-logger-viewer -e normal --depth 1`에서 프로젝트 직접 의존은 client만 확인했다.
+- **미실행:** Foxglove Desktop 3.5.0 실시간은 격리 프로필의 로그인 화면까지 확인했다. LAN 내구/성능의 P4·P4-bulk·P5와 정량 포화 회복은 T7, native GitHub 실행은 T3다. SDK 프로토콜·Query/Replay·Lichtblick 원본 MCAP 재생은 이 판정에 포함되지 않는다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

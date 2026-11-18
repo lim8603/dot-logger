@@ -6,11 +6,11 @@
 | Story | US-003·004 |
 | 요구사항 | FR-005 FR-006 FR-010 NFR-001 NFR-007 NFR-008 |
 | 설계 | [인터페이스](../../03_design_artifacts/interface_contract.md) · [CLI/화면](../../03_design_artifacts/ui_spec.md) |
-| ADR | ADR-007·009 Accepted. 시각화 방식 기술 결정(S1, tech_stack 또는 ADR) |
+| ADR | ADR-007·009·[014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md) Accepted |
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-18 |
-| 다음 액션 | S1 — WebSocket v1·로컬 스키마 목록 권고안 Human 승인 |
+| 다음 액션 | S3 — Query/Replay 경로와 Lichtblick 원본 MCAP 재생 방안 확인. S2 Foxglove·T7 추가 검증 |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
 
@@ -30,13 +30,13 @@
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | In Progress — 조사 및 권고안 작성, Human 승인 대기 |
-| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | Planned |
+| S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Done — 2026-11-18 Human 승인, ADR-014 |
+| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). Foxglove 실시간·T7 LAN 실측 잔여 |
 | S3 | 기록 소스 | Query/Replay 기반 시간 이동·배속, 파일 열기 | Planned |
 
 ## S1 기술 결정안 — 2026-11-18
 
-이전 세션에서 11월 23일 주로 잡은 S1을 Human의 재개 요청에 따라 11월 18일에 착수했다. 아래는 승인 대기 중인 기술 및 설계안이다.
+이전 세션에서 11월 23일 주로 잡은 S1을 Human의 재개 요청에 따라 11월 18일에 착수했다. Human 「승인」을 [ADR-014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md)에 반영했다. 아래는 승인 전 조사 기록이다.
 
 | 방식 | 근거와 선택 기준 |
 |---|---|
@@ -48,12 +48,18 @@ Lichtblick Web v1.31.0은 공개 v1과 SDK v1을 모두 제안하며, SDK v1.1�
 
 [EV-091](../../05_verification/verification_evidence.md#ev-091)의 루프백 실험에서 Lichtblick은 두 협상 이름으로 같은 3개 protobuf 토픽을 구독하고 값을 표시했다. Foxglove Desktop 3.5.0의 원본 파일 판독은 EV-090, 제품 실시간 검증은 S2에서 수행한다.
 
-### S2 경계 제안
+### S2 설계 근거
 
 - 운영 PC에서 기본 loopback으로 시작한다. 로봇 연결은 기존 `dot-logger-client`의 TLS·read 권한을 따른다. WS는 `serverInfo`, 채널 광고/해제, 구독/취소, 메시지·상태만 다룬다. 사용자 payload 바이트는 보존한다.
 - [현재 wire](../../../proto/logger.proto)의 `Record`에는 채널 ID·스키마 ID/버전·설정 revision이 있다. 기존 구독·상태 응답에 토픽 이름·인코딩·descriptor를 제공하는 카탈로그는 없다. viewer에 명시적인 크기 상한이 있는 로컬 목록을 제공해 채널 ID·스키마 ID/버전을 토픽·인코딩·메시지 타입·descriptor에 매핑한다. 스키마가 바뀌면 새 광고 ID를 사용하고, 매핑이 없거나 맞지 않으면 해당 채널을 미지원으로 표시한다. 구체적인 파일 형식과 갱신 방법은 S2 설계에서 정한다.
 - 클라이언트 수·광고 크기·레코드 크기·소켓별 큐의 건수/바이트·쓰기 기한을 제한한다. viewer 큐에 소비자 전달이 수락된 시점에만 기존 구독 handoff로 ACK하며, 이 결과는 GUI 디코딩·렌더링 확인을 의미하지 않는다. 소켓 포화로 실제 버린 건, upstream Gap, 연결 단절 후 범위를 알 수 없는 Unknown을 구분한다. 마지막 수요 해제·종료 시 구독을 Drop하고 서버 측 예약 반환을 시험한다.
 - T7 검증은 기존 기준을 사용한다. P4 정상 LAN 소형 10,000건/s와 소비자 1개에서 수신 전달 확인 p99 ≤100 ms, P4-bulk 검증 후 소비 가능 전달 처리량이 같은 장비 TCP 기준의 ≥80%, P5는 P3 쓰기 중 요청한 제한 조회 한 페이지 응답 p95 ≤200 ms다. 원격 포화 후 새 기록 수신과 자원 반환도 확인한다. S2/S3 제품 경로에서 실행할 항목이며 S1 호환 실험에서는 실행하지 않았다. [요구 §12](../../02_project_definition/requirement_spec.md#123-성능-목표-제안) · [TASK-023](TASK-023.md) · [TC-012](../../05_verification/test_case.md#tc-012) · [TC-014](../../05_verification/test_case.md#tc-014)
+
+### S2 실시간 구현과 로컬 검증 — 2026-11-18
+
+제품 `f1444d4`의 [사용법과 예제](../../../crates/dot-logger-viewer/README.md), [EV-092](../../05_verification/verification_evidence.md#ev-092), [REV-063](../../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md)을 따른다. 하나의 native 채널에 한 gRPC 구독을 공유하며 WebSocket의 건수/바이트와 2초 쓰기 기한을 각각 제한한다. 채널당 ACK는 순차 처리된다. 새 카탈로그는 viewer 재시작 시 적용한다. 스키마 불일치가 관측되면 이전 광고를 회수하고 상태를 표시한다.
+
+Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `robot/pose` x=51·y=-7과 Rust 통합 시험에서 포화 회복·세션 종료/재연결·구독 반환을 확인했다. Foxglove Desktop 3.5.0의 격리 프로필은 로그인 화면에서 실시간 검증을 멈췄다. P4/P4-bulk·P5의 LAN·기준 TCP 부하 실측은 T7에 유지한다.
 
 ### S3 경계
 
@@ -63,13 +69,13 @@ Lichtblick Web v1.31.0은 공개 v1과 SDK v1을 모두 제안하며, SDK v1.1�
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger-viewer/`. 아직 생성된 코드 경로가 아니다.
+제품 경로는 `crates/dot-logger-viewer/`다. 일반 실행의 프로젝트 직접 의존은 `dot-logger-client`이며 통합 시험과 데모는 실제 코어 host를 사용한다.
 
 첫 실패/리뷰 조건: **viewer가 느린 WS 소비자·원격 Gap·서버 종료에서 유한 자원으로 Gap/Unknown을 표시하고, 로봇 측 구독 자원을 실제 해제**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-014`의 viewer 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] S2 실제 TCP/gRPC·WS 통합 시험을 먼저 추가해 제품 진입점이 빠진 Red를 확인했다.
+- [x] S2 최소 구현 후 `TC-014`의 실시간 제품 경로·포화와 해제 하위를 로컬 확인했다.
+- [x] S2 두 Rust workspace 회귀와 Lichtblick 사용자 경로를 확인했다.
 
 ## 완료 기준
 
@@ -78,4 +84,4 @@ Lichtblick Web v1.31.0은 공개 v1과 SDK v1을 모두 제안하며, SDK v1.1�
 - [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). 제품 코드·테스트 실행 결과: 없음.
+테스트 정의는 [TC-014](../../05_verification/test_case.md#tc-014), S2 증거는 [EV-092](../../05_verification/verification_evidence.md#ev-092)를 따른다.

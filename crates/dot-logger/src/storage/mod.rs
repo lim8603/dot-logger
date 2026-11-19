@@ -316,6 +316,7 @@ pub struct WriterConfig {
     /// Explicit management-path write buffer capacity; zero selects direct IO.
     pub write_buffer_bytes: usize,
     /// Chunk target; a single larger permitted record uses its own chunk.
+    /// Loss-report parts are grouped separately within this target, capped at 8 KiB.
     pub chunk_target_bytes: usize,
     /// Hard logical user-record count; each record writes two MCAP messages.
     /// Zero permits only controls when max_loss_reports is positive.

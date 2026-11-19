@@ -12,7 +12,11 @@ use std::time::Instant;
 pub const ROWS_PER_REPORT: usize = 64;
 /// Maximum encoded report bytes, checked before protobuf allocation/decoding.
 pub const MAX_REPORT_BYTES: usize = 8192;
-pub(crate) const CONTROL_CHARGE: u64 = MAX_REPORT_BYTES as u64 + 1024;
+// A canonical count uses at most 35 bytes (including present zero-valued
+// identifiers), plus two bytes to frame the nested message. The fixed report
+// fields, including the 16-byte session, fit within 128 bytes.
+pub(crate) const ENCODED_REPORT_BOUND: usize = ROWS_PER_REPORT * 37 + 128;
+pub(crate) const CONTROL_CHARGE: u64 = ENCODED_REPORT_BOUND as u64 + 1024;
 pub(crate) const DESCRIPTOR: &[u8] = include_bytes!("storage/loss_report.bin");
 pub(crate) const SCHEMA: &str = "dot_logger.LossReport";
 const INGRESS: usize = 12;
@@ -486,7 +490,7 @@ impl LossReport {
                 .collect(),
         };
         out.clear();
-        if report.encoded_len() > MAX_REPORT_BYTES {
+        if report.encoded_len() > ENCODED_REPORT_BOUND {
             return Err(crate::storage::StorageError::InvalidRecord);
         }
         report
@@ -915,6 +919,36 @@ mod tests {
         let mut bytes = Vec::new();
         report.encode(&mut bytes).unwrap();
         bytes
+    }
+    #[test]
+    fn widest_canonical_report_fits_the_storage_charge() {
+        let report = LossReport {
+            session: u128::MAX,
+            epoch: u64::MAX,
+            observer: u32::MAX,
+            checkpoint: u64::MAX,
+            part: u32::MAX - 1,
+            parts: u32::MAX,
+            observed_from_ns: u64::MAX - 1,
+            observed_to_ns: u64::MAX,
+            publish_time_unix_ns: u64::MAX,
+            coalesced: true,
+            coverage: Coverage::Coalesced,
+            counts: (0..ROWS_PER_REPORT as u32)
+                .map(|index| LossCount {
+                    scope: Scope::OutputUnknown,
+                    cause: Cause::Unconfirmed,
+                    producer: Some(u32::MAX),
+                    channel: Some(u32::MAX),
+                    target: Some(u32::MAX - index),
+                    count: u64::MAX,
+                    overflowed: true,
+                })
+                .collect(),
+        };
+        let bytes = report_to_bytes(&report);
+        assert!(bytes.len() <= ENCODED_REPORT_BOUND);
+        assert_eq!(LossReport::decode(&bytes).unwrap(), report);
     }
     #[test]
     fn incomplete_overflow_and_decreasing_checkpoints_never_extend_an_exact_delta() {

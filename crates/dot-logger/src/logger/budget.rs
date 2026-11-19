@@ -725,14 +725,16 @@ pub(crate) fn derive(
         .sum();
     let loss_rows = crate::loss::Bank::rows(quotas.len(), channels.len(), targets.len())
         .ok_or_else(overflow)?;
-    // Keep application-record headroom after reserving the opening and final
-    // cumulative loss checkpoints. Each checkpoint part needs its own chunk.
-    let (loss_chunks, loss_index_bytes) = crate::storage::loss_checkpoint_bounds(loss_rows)?;
+    // Budget two periodic observations in addition to the baseline and final
+    // observations, so large sessions can sync without immediately rotating.
+    const CHUNK_TARGET_BYTES: usize = 256 * 1024;
+    let (loss_parts, loss_chunks, loss_index_bytes) =
+        crate::storage::loss_checkpoint_bounds(loss_rows, CHUNK_TARGET_BYTES, 4)?;
     let writer = WriterConfig {
-        max_loss_reports: 16384usize.max(loss_chunks),
+        max_loss_reports: 16384usize.max(loss_parts),
         max_payload_bytes: max_payload,
         write_buffer_bytes: 64 * 1024,
-        chunk_target_bytes: 256 * 1024,
+        chunk_target_bytes: CHUNK_TARGET_BYTES,
         max_records: 16384,
         max_chunks: 4096usize.checked_add(loss_chunks).ok_or_else(overflow)?,
         max_metadata_bytes: metadata + 1024,

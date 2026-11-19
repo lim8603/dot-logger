@@ -323,16 +323,24 @@ pub(crate) fn native_file_minimum(
         .ok_or(RetentionError::InvalidConfig)
 }
 
-pub(crate) fn loss_checkpoint_bounds(rows: usize) -> Result<(usize, usize), RetentionError> {
-    let chunks = rows
-        .div_ceil(crate::loss::ROWS_PER_REPORT)
-        .checked_mul(2)
+pub(crate) fn loss_checkpoint_bounds(
+    rows: usize,
+    chunk_target_bytes: usize,
+    checkpoints: usize,
+) -> Result<(usize, usize, usize), RetentionError> {
+    let parts = rows.div_ceil(crate::loss::ROWS_PER_REPORT);
+    let chunks = super::writer::loss_chunks(parts, chunk_target_bytes)
+        .checked_mul(checkpoints)
+        .ok_or(RetentionError::InvalidConfig)?;
+    let parts = parts
+        .checked_mul(checkpoints)
         .ok_or(RetentionError::InvalidConfig)?;
     let index_bytes = chunks
-        .checked_mul(576)
+        .checked_mul(512)
+        .and_then(|n| n.checked_add(parts.checked_mul(64)?))
         .and_then(|n| n.checked_add(usize::from(chunks > 0) * 512))
         .ok_or(RetentionError::InvalidConfig)?;
-    Ok((chunks, index_bytes))
+    Ok((parts, chunks, index_bytes))
 }
 
 impl<S: SegmentStore> SegmentLog<S> {
@@ -348,7 +356,8 @@ impl<S: SegmentStore> SegmentLog<S> {
         retention.validate()?;
         config.reservation(&channels, budget.producers)?;
         config.validate_loss(budget.loss_rows())?;
-        let (_, control_index_bytes) = loss_checkpoint_bounds(budget.loss_rows())?;
+        let (_, _, control_index_bytes) =
+            loss_checkpoint_bounds(budget.loss_rows(), config.chunk_target_bytes, 2)?;
         let minimum = super::writer::MIN_INDEX_BYTES
             .checked_add(control_index_bytes)
             .ok_or(RetentionError::InvalidConfig)?;

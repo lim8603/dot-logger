@@ -172,13 +172,25 @@ pub(super) fn registration_bytes(channels: &[StorageChannel]) -> Result<usize, S
 // The smallest nonempty native file needs two message indexes, one chunk,
 // and one application-channel/chunk auxiliary entry in the conservative model.
 pub(super) const MIN_INDEX_BYTES: usize = 128 + 512 + 512;
+const LOSS_MESSAGE_BOUND: usize = crate::loss::ENCODED_REPORT_BOUND + 31;
+
+pub(super) fn loss_chunks(parts: usize, chunk_target_bytes: usize) -> usize {
+    parts.div_ceil(loss_parts_per_chunk(chunk_target_bytes))
+}
+
+fn loss_parts_per_chunk(chunk_target_bytes: usize) -> usize {
+    // Keep these control chunks within the existing report decoder's scale,
+    // even when the writer uses a much larger target for application payloads.
+    (chunk_target_bytes.min(crate::loss::MAX_REPORT_BYTES) / LOSS_MESSAGE_BOUND).max(1)
+}
+
 impl WriterConfig {
     pub(crate) fn validate_loss(&self, rows: usize) -> Result<(), StorageError> {
         let parts = rows.div_ceil(crate::loss::ROWS_PER_REPORT);
         if rows > 0
             && (self.max_loss_reports < parts.checked_mul(2).ok_or(StorageError::InvalidConfig)?
                 || self.max_chunks
-                    < parts
+                    < loss_chunks(parts, self.chunk_target_bytes)
                         .checked_mul(2)
                         .and_then(|n| n.checked_add(2))
                         .ok_or(StorageError::InvalidConfig)?)
@@ -276,8 +288,10 @@ pub struct SegmentWriter<W: SyncSink> {
     meta_channel: u16,
     loss_channel: u16,
     loss_parts: usize,
-    reserved_final: usize,
+    reserved_final_parts: usize,
+    reserved_final_chunks: usize,
     loss_count: usize,
+    pending_loss_parts: usize,
     sample_start: u64,
     deferred: bool,
     records: usize,
@@ -394,6 +408,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         let bytes = config.reservation(&channels, budget.producers)?;
         let loss_rows = budget.loss_rows();
         let loss_parts = loss_rows.div_ceil(crate::loss::ROWS_PER_REPORT);
+        let reserved_final_parts = if budget.loss.is_some() { loss_parts } else { 0 };
         if budget.recovered_file.is_some() {
             if loss_rows > 0 && config.max_loss_reports == 0 {
                 return Err(StorageError::NeedRotation);
@@ -540,8 +555,10 @@ impl<W: SyncSink> SegmentWriter<W> {
             meta_channel,
             loss_channel,
             loss_parts,
-            reserved_final: if budget.loss.is_some() { loss_parts } else { 0 },
+            reserved_final_parts,
+            reserved_final_chunks: loss_chunks(reserved_final_parts, config.chunk_target_bytes),
             loss_count: 0,
+            pending_loss_parts: 0,
             sample_start: 0,
             deferred: false,
             records: 0,
@@ -587,16 +604,20 @@ impl<W: SyncSink> SegmentWriter<W> {
         }
         if self.records == self.config.max_records
             || (!self.open
-                && self.chunks.saturating_add(1 + self.reserved_final) > self.config.max_chunks)
+                && self.chunks.saturating_add(1 + self.reserved_final_chunks)
+                    > self.config.max_chunks)
         {
             return Err(StorageError::NeedRotation);
         }
         codec::validate_record(record, payload, self.config.max_payload_bytes)?;
         codec::encode_meta(record, (channel + 1) as u16, &mut self.encoder)?;
         let bytes = payload.len() + self.encoder.len() + 62;
-        let split = self.pending_records > 0
-            && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
-        if split && self.chunks.saturating_add(2 + self.reserved_final) > self.config.max_chunks {
+        let split = self.pending_loss_parts > 0
+            || (self.pending_records > 0
+                && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes);
+        if split
+            && self.chunks.saturating_add(2 + self.reserved_final_chunks) > self.config.max_chunks
+        {
             return Err(StorageError::NeedRotation);
         }
         if split {
@@ -681,6 +702,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         let target = budget.target;
         let parts = bank.parts();
         let reserve = if final_sample { 0 } else { parts };
+        let chunks = loss_chunks(parts, self.config.chunk_target_bytes);
         if self
             .loss_count
             .checked_add(parts)
@@ -689,8 +711,8 @@ impl<W: SyncSink> SegmentWriter<W> {
             || self
                 .chunks
                 .checked_add(usize::from(self.open))
-                .and_then(|n| n.checked_add(parts))
-                .and_then(|n| n.checked_add(reserve))
+                .and_then(|n| n.checked_add(chunks))
+                .and_then(|n| n.checked_add(if final_sample { 0 } else { chunks }))
                 .is_none_or(|n| n > self.config.max_chunks)
         {
             self.deferred = true;
@@ -710,6 +732,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             report.coalesced = self.deferred;
             self.append_loss_report(&report)?;
         }
+        self.flush_chunk()?;
         self.sample_start = started;
         self.deferred = false;
         Ok(())
@@ -724,8 +747,9 @@ impl<W: SyncSink> SegmentWriter<W> {
         use super::recovery::Fields;
         let mut nested = Fields(data);
         let mut chunks = self.chunks;
-        let mut open = self.open;
         let mut pending = self.pending_records;
+        let mut pending_loss = self.pending_loss_parts;
+        let parts_per_chunk = loss_parts_per_chunk(self.config.chunk_target_bytes);
         let mut bytes = self.pending_bytes;
         let mut controls = self.loss_count;
         let mut records = self.records;
@@ -739,11 +763,14 @@ impl<W: SyncSink> SegmentWriter<W> {
                 .map_err(|_| StorageError::CorruptData)?
                 .is_some()
             {
-                chunks = chunks.saturating_add(usize::from(open)).saturating_add(1);
+                if pending > 0 || pending_loss == parts_per_chunk {
+                    chunks = chunks.saturating_add(1);
+                    pending_loss = 0;
+                }
                 controls = controls.saturating_add(1);
-                open = false;
                 pending = 0;
                 bytes = 0;
+                pending_loss += 1;
             } else {
                 let (_, meta) = nested.record().map_err(|_| StorageError::CorruptData)?;
                 let stored = state
@@ -753,17 +780,20 @@ impl<W: SyncSink> SegmentWriter<W> {
                 let channel = fields.u16().map_err(|_| StorageError::CorruptData)?;
                 codec::encode_meta(stored.record, channel, &mut self.encoder)?;
                 let size = stored.payload.len() + self.encoder.len() + 62;
-                if pending > 0 && bytes.saturating_add(size) > self.config.chunk_target_bytes {
+                if pending_loss > 0
+                    || (pending > 0 && bytes.saturating_add(size) > self.config.chunk_target_bytes)
+                {
                     chunks = chunks.saturating_add(1);
+                    pending_loss = 0;
                     pending = 0;
                     bytes = 0;
                 }
-                open = true;
                 pending += 1;
                 bytes = bytes.saturating_add(size);
                 records = records.saturating_add(1);
             }
-            if chunks.saturating_add(usize::from(open)) > self.config.max_chunks
+            if chunks.saturating_add(usize::from(pending > 0 || pending_loss > 0))
+                > self.config.max_chunks
                 || controls > self.config.max_loss_reports
                 || records > self.config.max_records
             {
@@ -780,15 +810,18 @@ impl<W: SyncSink> SegmentWriter<W> {
         if self.poisoned {
             return Err(StorageError::Poisoned);
         }
+        let split = self.pending_records > 0
+            || self.pending_loss_parts == loss_parts_per_chunk(self.config.chunk_target_bytes);
         if self.loss_parts == 0
             || self.loss_count >= self.config.max_loss_reports
-            || self.chunks + usize::from(self.open) + 1 > self.config.max_chunks
+            || self.chunks + usize::from(split) + 1 > self.config.max_chunks
         {
             return Err(StorageError::NeedRotation);
         }
         report.encode(&mut self.encoder)?;
-        self.flush_chunk()?;
-        self.chunk_start = self.signals.position.load(Ordering::Acquire);
+        if split {
+            self.flush_chunk()?;
+        }
         let header = mcap::records::MessageHeader {
             channel_id: self.loss_channel,
             sequence: report.checkpoint as u32,
@@ -806,7 +839,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         }
         self.open = true;
         self.loss_count += 1;
-        self.flush_chunk()?;
+        self.pending_loss_parts += 1;
         Ok(())
     }
 
@@ -837,6 +870,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             self.chunks += 1;
             self.open = false;
             self.pending_records = 0;
+            self.pending_loss_parts = 0;
             self.pending_bytes = 0;
         }
         self.safe = self.signals.position.load(Ordering::Acquire);
@@ -844,14 +878,16 @@ impl<W: SyncSink> SegmentWriter<W> {
     }
     // Include both this observation and the already reserved final sample.
     pub(super) fn projected_loss_index_bytes(&self) -> usize {
-        let reports = self.loss_parts.saturating_add(self.reserved_final);
+        let reports = self.loss_parts.saturating_add(self.reserved_final_parts);
+        let control_chunks = loss_chunks(self.loss_parts, self.config.chunk_target_bytes)
+            .saturating_add(self.reserved_final_chunks);
         self.records
             .saturating_mul(128)
             .saturating_add(self.loss_count.saturating_add(reports).saturating_mul(64))
             .saturating_add(
                 self.chunks
                     .saturating_add(usize::from(self.open))
-                    .saturating_add(reports)
+                    .saturating_add(control_chunks)
                     .saturating_mul(512),
             )
             .saturating_add(
@@ -889,12 +925,12 @@ impl<W: SyncSink> SegmentWriter<W> {
             .saturating_mul(128)
             .saturating_add(
                 self.loss_count
-                    .saturating_add(self.reserved_final)
+                    .saturating_add(self.reserved_final_parts)
                     .saturating_mul(64),
             )
             .saturating_add(
                 self.chunks
-                    .saturating_add(1 + usize::from(split) + self.reserved_final)
+                    .saturating_add(1 + usize::from(split) + self.reserved_final_chunks)
                     .saturating_mul(512),
             )
             .saturating_add(pairs.saturating_mul(512))

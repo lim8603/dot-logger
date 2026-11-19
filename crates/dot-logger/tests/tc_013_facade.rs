@@ -2141,6 +2141,20 @@ fn large_native_loss_checkpoints_fit_facade_storage_limits() {
     let mut payloads = Vec::new();
     for file in files {
         let bytes = std::fs::read(file).unwrap();
+        let summary = mcap::Summary::read(&bytes).unwrap().unwrap();
+        let loss = summary
+            .channels
+            .values()
+            .find(|channel| channel.topic == ".logger/loss")
+            .unwrap();
+        assert!(
+            summary.chunk_indexes.iter().any(|chunk| summary
+                .read_message_indexes(&bytes, chunk)
+                .unwrap()
+                .get(loss)
+                .is_some_and(|entries| entries.len() > 1)),
+            "multiple parts of a large checkpoint should share a chunk"
+        );
         for item in NativeReader::new(&bytes, 8, 128).unwrap() {
             payloads.push(item.unwrap().payload.to_vec());
         }

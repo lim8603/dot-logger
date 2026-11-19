@@ -212,6 +212,14 @@ fn loss_plan() -> dot_logger::config::ValidatedConfig {
         .unwrap()
 }
 fn recorded_files(observers: &[u32], periodic: bool, user: bool) -> Vec<Vec<u8>> {
+    recorded_files_with_writer(observers, periodic, user, writer_config())
+}
+fn recorded_files_with_writer(
+    observers: &[u32],
+    periodic: bool,
+    user: bool,
+    config: dot_logger::storage::WriterConfig,
+) -> Vec<Vec<u8>> {
     use dot_logger::storage::SegmentWriter;
     let plan = loss_plan();
     let routes = support::routing();
@@ -234,7 +242,7 @@ fn recorded_files(observers: &[u32], periodic: bool, user: bool) -> Vec<Vec<u8>>
         for (index, target) in observers.iter().enumerate() {
             let mut writer = SegmentWriter::new(
                 router.writer_budget(*target).unwrap(),
-                writer_config(),
+                config,
                 storage(),
                 Memory::default(),
             )
@@ -410,6 +418,84 @@ fn recovery_preserves_original_reports_and_incomplete_parts_never_make_an_exact_
                 let summary = dot_logger::loss::summarize(&reports, 512).unwrap();
                 assert!(summary.iter().all(|row| row.delta.is_none()));
             }
+        }
+    });
+}
+
+#[test]
+fn recovery_keeps_grouped_loss_chunks_whole_at_report_and_chunk_limits() {
+    use dot_logger::storage::*;
+    use std::{io::Cursor, sync::atomic::AtomicBool};
+    let grouped = WriterConfig {
+        chunk_target_bytes: 8192,
+        ..writer_config()
+    };
+    let source = recorded_files_with_writer(&[10], false, true, grouped).remove(0);
+    let original = LossReader::new(&source, 16, 2)
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    assert_eq!(original.len(), 4);
+    let plan = loss_plan();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    owner.scope(|scope| {
+        let router =
+            Router::new(&plan, scope.map(|(_, r)| r).collect(), support::routing()).unwrap();
+        for (writer, expected) in [
+            (
+                WriterConfig {
+                    max_chunks: 3,
+                    ..grouped
+                },
+                4,
+            ),
+            (
+                WriterConfig {
+                    max_loss_reports: 3,
+                    ..grouped
+                },
+                2,
+            ),
+            (
+                WriterConfig {
+                    max_chunks: 4,
+                    ..writer_config()
+                },
+                2,
+            ),
+        ] {
+            let recovered = recover_segment(
+                &mut Cursor::new(&source),
+                router.writer_budget(10).unwrap(),
+                storage(),
+                RecoveryOptions {
+                    source_target: Some(10),
+                    source_sequence: 0,
+                    writer,
+                    limits: RecoveryConfig {
+                        max_source_bytes: 1_000_000,
+                        max_record_bytes: 65_536,
+                        max_chunks: 32,
+                    },
+                },
+                Memory::default(),
+                &AtomicBool::new(false),
+            )
+            .unwrap();
+            assert_eq!(recovered.report.records, 1);
+            assert_eq!(recovered.report.loss_reports, expected);
+            let stop = if expected == original.len() {
+                RecoveryStop::DataEnd
+            } else {
+                RecoveryStop::Limit
+            };
+            assert_eq!(recovered.report.stop, stop);
+            let bytes = recovered.segment.into_inner().0.into_inner();
+            let reports = LossReader::new(&bytes, 16, 2)
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert_eq!(reports, &original[..expected]);
         }
     });
 }

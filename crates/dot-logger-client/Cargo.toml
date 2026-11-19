@@ -47,3 +47,7 @@ required-features = ["integration-example"]
 [[example]]
 name = "dot_probe_tail"
 required-features = ["remote"]
+
+[[example]]
+name = "lan_probe"
+required-features = ["remote"]

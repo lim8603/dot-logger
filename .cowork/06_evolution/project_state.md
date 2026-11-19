@@ -12,12 +12,12 @@
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | TASK-031 In Progress — Windows LAN 직접 연결 확인, P4 루프백 부하 진단 완료. P4·P4-bulk는 Windows 브리지 수신 재개 대기 |
 | 미처리 리뷰 | [REV-067 RV-161](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) In Progress — 저장 조치 반입. 8 GiB 제한에서 P3 부하 미달. RV-160·REV-001~066 Closed |
-| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~098](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 699 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~100](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 699 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-19 / TASK-031 T7 P4 ACK 루프백 대조 / AI |
-| 세션 상태 | **진행 — 2026-11-19 #001.** Windows 브리지 수신 재개 대기. 8 GiB 제한에서 P3 부하 미달 |
-| 최근 완료 세션 | 2026-11-18 #005 — REV-066 RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095)) |
+| 갱신 | 2026-11-20 / TASK-031 세션 마감 및 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-19 #001을 2026-11-20에 마감.** |
+| 최근 완료 세션 | 2026-11-19 #001 — Foxglove·RV-161 조치·P4 루프백 대조([EV-096~100](../05_verification/verification_evidence.md#ev-096)) |
 
 ## 현재 결정과 제약
 
@@ -94,7 +94,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **TASK-031:** [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 재개한다. RV-161의 8 GiB P3 부하 미달은 같은 제한의 P0 대조가 다음이며, P3 충족 시 P5를 재판정한다. LAN P4·P4-bulk 뒤 TASK-032를 진행한다.
+1. **TASK-031.** Windows 브리지 수신을 확인한 뒤 같은 유선·Wi-Fi LAN에서 TCP 기준, P4·P4-bulk의 기준·`TCP_NODELAY` 대조를 실행한다. RV-161은 8 GiB P0 대조 뒤 P3 충족 시 P5를 재판정한다. [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -145,8 +145,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 최근 작업·이력
 
+- 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다. [EV-098~100](../05_verification/verification_evidence.md#ev-098)
 - 2026-11-18 #005: [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_005.md)).
 - 2026-11-18 #004: ae3b6b3..3f8a46f 통합 코드리뷰 [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) Open(RV-156~159)([로그](../members/lim8603/workspace/session_logs/session_2026-11-18_004.md)).
-- 2026-11-18 #003: ADR-014 승인·S2/S3 로컬 검증([EV-092](../05_verification/verification_evidence.md#ev-092)~[EV-094](../05_verification/verification_evidence.md#ev-094), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_003.md)).
 
 완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031 및 관련 EV·세션 로그에 보존한다.

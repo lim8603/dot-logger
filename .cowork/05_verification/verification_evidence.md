@@ -1542,6 +1542,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - 신규 시험에서 여러 part가 같은 청크에 저장돼야 한다는 검사의 Red와, report·청크 한도가 걸릴 때 원본 청크 전체를 채택하거나 제외하는 복구 검사의 Green을 확인했다. Rust 1.85.0·1.96.0 workspace all-features 각각 699 Pass·5 ignored. 양쪽 Clippy `-D warnings`, fmt·diff 검사, 실시간 시계 접근을 허용한 Miri의 복구 경계 시험을 통과했다.
 - 같은 8 GiB 제한에서 P0와 제품 쓰기를 대조해 장치·writeback 지연과 남은 제품 비용을 분리한다. LAN P4·P4-bulk에는 두 번째 승인 장비가 필요하다.
 
+<a id="ev-099"></a>
+### EV-099 — T7 Ubuntu·Windows LAN 도구와 연결 확인
+
+- Ubuntu x86_64 `7.0.0-43-realtime`에서 유선 1 GbE full-duplex와 MTU 1500을 확인했다. Windows x64는 Intel Wi-Fi 6 AX201 160 MHz의 같은 LAN에 연결됐다. Windows가 보고한 1.2 Gbps는 PHY 링크 속도다. 이 환경의 측정 범위는 실제 두 호스트이며 R1의 10 GbE 조건은 별도로 남는다.
+- Windows가 Ubuntu 시험 포트에 직접 TCP 접속해 `dot-logger LAN ready`를 읽었다. Windows native Rust 1.96.0에서 `dot-logger-client --features remote` release 빌드가 통과했다.
+- `7edae2a`의 [LAN 시험 예제](../../crates/dot-logger-client/examples/lan_probe.rs)는 소형 256 B를 10,000건/s로 공급하고, 대용량 8 MiB는 최대 4건을 진행 중에 유지한다. 수신 측에서 전체 payload와 순서를 검증하고 ACK를 보낸다. gRPC는 제품의 TLS·read 인증·수신 handoff를 사용하며, 기준 TCP는 같은 payload와 수신 확인을 사용한다. 송신 측 동일 시계로 offer부터 ACK까지를 관찰했다.
+- Ubuntu release 루프백에서 소형 500건, 대용량 gRPC 8건, TCP 8건의 대조와 ACK를 확인했다. Rust 1.85.0 check, Rust 1.96.0 Clippy와 원격 클라이언트 47건 회귀가 통과했다.
+- 첫 LAN TCP 기준 실행은 180초 내 측정 클라이언트 연결이 없어 종료했다. P4·P4-bulk 수치는 Windows 측정 예제와 임시 TLS 자격 파일을 준비한 뒤 수집한다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

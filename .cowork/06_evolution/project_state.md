@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | TASK-031 In Progress — Foxglove Desktop·루프백 포화 검증 완료. Windows LAN 직접 연결과 측정 도구 확인, P4·P4-bulk 수신 예제 준비 대기 |
+| 활성 Task | TASK-031 In Progress — Windows LAN 직접 연결 확인, P4 루프백 부하 진단 완료. P4·P4-bulk는 Windows 브리지 수신 재개 대기 |
 | 미처리 리뷰 | [REV-067 RV-161](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) In Progress — 저장 조치 반입. 8 GiB 제한에서 P3 부하 미달. RV-160·REV-001~066 Closed |
 | 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~098](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 699 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-19 / TASK-031 T7 LAN 도구와 연결 확인 / AI |
-| 세션 상태 | **진행 — 2026-11-19 #001.** Windows LAN 수신 예제 준비 대기. 8 GiB 제한에서 P3 부하 미달 |
+| 갱신 | 2026-11-19 / TASK-031 T7 P4 ACK 루프백 대조 / AI |
+| 세션 상태 | **진행 — 2026-11-19 #001.** Windows 브리지 수신 재개 대기. 8 GiB 제한에서 P3 부하 미달 |
 | 최근 완료 세션 | 2026-11-18 #005 — REV-066 RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 
 ## 현재 결정과 제약

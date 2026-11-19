@@ -114,5 +114,6 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 - [x] Foxglove Desktop 3.5.0 실시간 구독·원격 기록 재생, 되감기와 ¼배속 표시를 확인했다. [EV-096](../../05_verification/verification_evidence.md#ev-096)
 - [x] 루프백 upstream 구독 큐와 원격 연결 한도의 정량 포화 회복을 반복했다. [EV-097](../../05_verification/verification_evidence.md#ev-097)
 - [ ] T7 LAN P4·P4-bulk를 두 번째 장비에서 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다.
-- [ ] P3 수락률 미달([RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161))을 확인하고 P5를 재판정한다. 동시 쓰기 Query 12건의 p95는 5.39ms였다. [EV-097](../../05_verification/verification_evidence.md#ev-097)
+- [x] [RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) 조치를 반입해 작은 loss part를 묶어 저장하고 주기 checkpoint 예산을 확보했다. [EV-098](../../05_verification/verification_evidence.md#ev-098)
+- [ ] 8 GiB 제한의 전체 P3 부하와 함께 P5를 재판정한다. 제한을 적용한 재측정에서 예열 포함 70초분 수락에 76.93초가 걸렸고, 쓰기와 겹친 Query의 p95는 4.72ms였다. [EV-098](../../05_verification/verification_evidence.md#ev-098)
 - [ ] TASK-031 수락을 정리한 뒤 [TASK-032](TASK-032.md) 운영 대시보드 S1로 진행한다.

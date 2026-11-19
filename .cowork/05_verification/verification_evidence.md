@@ -1523,11 +1523,24 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 - **환경:** `8dbbe01`, Rust 1.96.0 release, Ubuntu x86_64 `7.0.0-43-realtime`의 SCHED_OTHER, Crucial T500 1 TB ext4. 기존 P3 진입점 `perf_baseline --p1-mix`로 32생산자·16출력·128채널·IO 8 스레드, raw 8 MiB × 110/s와 소형 256 B × 100,000/s, 10초 예열·60초 측정 부하를 사용했다.
 - **시작 회귀:** `d064fb2`에서 `plan()` 이후 `Storage(Storage(InvalidConfig))`로 시작 실패했다. 초기·최종 손실 체크포인트의 청크·인덱스 예산을 활성 파일 검사와 같은 계산으로 반영했다. 축소 회귀와 대표 구성 시작이 통과했다. [REV-067 RV-160](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-160)
-- **P3 부하 판정 미달:** 60초분 수락에 129.39초, 최종 동기화 포함 132.09초(430.79 MB/s). 제어 루프 miss 7회, 안전 루프 0회. 예열 포함 기록 7,007,700건은 닫힌 1,263개 파일을 별도 판독해 전부 일치했다. 원자료와 명령은 [실측 자료](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md#p3p5)를 따른다. [REV-067 RV-161](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161)
+- **P3 부하 판정 미달:** 예열 포함 70초분 수락에 129.39초, 최종 동기화 포함 132.09초(430.79 MB/s). 제어 루프 miss 7회, 안전 루프 0회. 예열 포함 기록 7,007,700건은 닫힌 1,263개 파일을 별도 판독해 전부 일치했다. 원자료와 명령은 [실측 자료](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md#p3p5)를 따른다. [REV-067 RV-161](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161)
 - **P5 지연 진단:** 쓰기 세션에서 먼저 닫힌 `perf/005`가 속한 파일의 고정 snapshot을 Query 호스트에서 열었다. 클라이언트 1개가 1 Hz로 요청하고 응답 payload 전체를 대조했다. 한 페이지 630건·262,080바이트(메타데이터 포함). 쓰기 프로세스의 `wchar`가 응답 전후에 늘어난 12건의 p50 4.16ms·p95 5.39ms, 목표 200ms 이내. P3 수락률 미달로 정식 P5는 미수락이다.
 - **포화 회복:** 실제 loopback gRPC·WS 20회에서 upstream Gap 표시 p95 98.91ms, 새 기록 offer→WS 수신 p95 0.83ms, 수신 ACK p95 4.90ms, 구독 취소 후 hub 해제 p95 3.99ms. RV-049의 연결 한도 1·동시 초과 연결 16 조건 12회에서 초당 88.85–89.93건 거절, 서버 스레드 CPU 약 1–2%, 초과 연결이 모두 종료된 뒤 기존 연결을 해제하고 신규 기록 ACK까지 p95 55.36ms. 두 시험 모두 종료 후 관리 예약 0B.
 - **품질 검사:** Rust 1.85.0·1.96.0 workspace all-features 각각 **697 Pass, 실패 0, 외부 DB 5 ignored**. 양쪽 all-targets/all-features Clippy `-D warnings`, fmt 및 diff 검사 통과. [원자료와 재현 명령](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md)
 - **잔여:** 두 번째 승인 LAN 장비와 접속 정보가 필요해 P4·P4-bulk를 실행하지 않았다. 기준 TCP와 제품 양쪽의 실제 LAN 수신 확인, P3 부하 미달의 원인 분리와 정식 P5가 남았다.
+
+<a id="ev-098"></a>
+### EV-098 — RV-161 손실 저장 조치와 P3·P5 재측정
+
+- 제품 `0be4bfe`는 checkpoint의 protobuf part를 청크당 최대 3개 묶는다. 일반 경로의 인코딩 가능한 part 최대치를 디스크 예약에 쓰고, facade는 baseline·final 외 두 주기 관측을 위한 part·청크·인덱스를 예약한다. 기존 파일의 보고 단위와 신규 묶음 청크를 모두 판독한다. [REV-067](reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161)
+- EV-097과 같은 Crucial T500 1 TB ext4, Ubuntu `7.0.0-43-realtime`의 SCHED_OTHER, release Rust 1.96.0을 사용했다. 32생산자·16출력·128채널·IO 8 스레드에 8 MiB 원본 110건/s와 256 B 기록 100,000건/s를 공급했다. 60초 측정 전 10초 예열을 수행했다. 4초 조치 후와 별도 cgroup 제한 없는 60초 회차는 final 청크 수를 생성 시점에 계산하도록 정리하기 전의 초안을 사용했다. [원자료·명령](../06_evolution/imported_context/task_031_t7_2026-11-19/README.md#rv-161-재측정)
+- **4초 비교.** 예열 1초 포함 수락 9.11 → 5.00초, 최종 sync까지 12.15 → 6.41초, 파일 135 → 69개, 수락 재시도 409,539 → 0회. 두 회차에서 각각 500,550건을 판독 대조했다.
+- **별도 cgroup 제한 없는 60초 회차.** 예열 포함 수락 70.00초, 종료 반환 71.13초, 제어·안전 loop miss 0. 50회 쓰기 겹침 조회 p95 4.87ms. 닫힌 787개 파일의 기록 7,007,700건을 별도 판독으로 대조했다.
+- **8 GiB cgroup 60초 회차.** 예열 포함 수락 76.93초, 종료 반환 77.82초, 제어·안전 loop miss 0. 예열 뒤 조회 45건 중 쓰기 바이트 증가와 겹친 40건은 p95 4.72ms. 페이지 630건·262,080 B의 사용자 payload와 닫힌 760개 파일의 기록 7,007,700건을 대조했다. 해당 환경의 P3 부하 미달로 정식 P5는 보류한다.
+- 60초 두 회차 모두 순차 자동 판독이 10분 기한을 맞지 못했다. 기록이 끝난 뒤 병렬 판독으로 ID·순서·파일·채널·payload를 대조했다. 자동 로그에서 최종 수락 재시도 횟수와 주기 sync 결과는 확보하지 못했다. 재현 도구의 판독 대기 기한은 20분으로 늘렸다. [판독 결과](../06_evolution/imported_context/task_031_t7_2026-11-19/rv161/)
+- 8 GiB 회차에서 출력별 첫·마지막 32개 파일의 loss part 1,069,358개가 청크 356,524개에 저장됐다. 청크당 헤더와 MCAP Message framing으로 생긴 부가 바이트는 part당 80.00 → 47.34 B였다. 주기 관측으로 표본당 part 수가 달라졌으므로 part당 비용을 비교했다. [표본 원자료](../06_evolution/imported_context/task_031_t7_2026-11-19/rv161/cgroup-loss-sample.jsonl)
+- 신규 시험에서 여러 part가 같은 청크에 저장돼야 한다는 검사의 Red와, report·청크 한도가 걸릴 때 원본 청크 전체를 채택하거나 제외하는 복구 검사의 Green을 확인했다. Rust 1.85.0·1.96.0 workspace all-features 각각 699 Pass·5 ignored. 양쪽 Clippy `-D warnings`, fmt·diff 검사, 실시간 시계 접근을 허용한 Miri의 복구 경계 시험을 통과했다.
+- 같은 8 GiB 제한에서 P0와 제품 쓰기를 대조해 장치·writeback 지연과 남은 제품 비용을 분리한다. LAN P4·P4-bulk에는 두 번째 승인 장비가 필요하다.
 
 ## Open Evidence Gaps
 

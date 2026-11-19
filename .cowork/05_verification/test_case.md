@@ -237,7 +237,7 @@ TASK-021 [EV-043](verification_evidence.md#ev-043): TC-011 신규11개·정상 �
 ### TC-012 — 플랫폼·실사용 성능·장시간 종합
 
 - 관련: MS-007 / NFR-001~007 / 주요 FR 종단
-- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 최신 P3 부하 미달·P5 진단·루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097). LAN P4·P4-bulk와 정식 P5가 남아 있다.
+- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097), P3·P5 재측정은 [EV-098](verification_evidence.md#ev-098). LAN P4·P4-bulk와 정식 P5가 남아 있다.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

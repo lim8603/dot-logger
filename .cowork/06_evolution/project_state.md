@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | TASK-031 In Progress — Foxglove Desktop·루프백 포화 검증 완료. T7 LAN·P5 재판정 잔여 |
-| 미처리 리뷰 | [REV-067 RV-161](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) Open — P3 쓰기 부하 미달. RV-160·REV-001~066 Closed |
-| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096·097](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 697 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 미처리 리뷰 | [REV-067 RV-161](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) In Progress — 저장 조치 반입. 8 GiB 제한에서 P3 부하 미달. RV-160·REV-001~066 Closed |
+| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~098](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 699 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-19 / TASK-031 Foxglove와 T7 실측 / AI |
-| 세션 상태 | **진행 — 2026-11-19 #001.** T7 LAN 환경 대기와 P3 부하 미달 확인 |
+| 갱신 | 2026-11-19 / TASK-031 RV-161 반입과 P3·P5 재측정 / AI |
+| 세션 상태 | **진행 — 2026-11-19 #001.** T7 LAN 환경 대기와 8 GiB 제한의 P3 미달 확인 |
 | 최근 완료 세션 | 2026-11-18 #005 — REV-066 RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 
 ## 현재 결정과 제약
@@ -88,13 +88,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-064](../05_verification/reviews/REV-064_TASK_031_MCAP_COMPATIBILITY.md) | TASK-031 S3 MCAP 등록 배치 | **Closed** | EV-093·위임 로컬 수락 |
 | [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) | TASK-031 S3 원격 기록 재생 | **Closed** | EV-094·위임 로컬 수락 |
 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
-| [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **In Progress** | RV-160 Closed, RV-161 Open(EV-097) |
+| [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **In Progress** | RV-160 Closed, RV-161 저장 조치 반입. 8 GiB P3 미달·P5 보류(EV-098) |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-1. **TASK-031:** [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 재개한다. LAN P4·P4-bulk와 RV-161 P3 쓰기 부하 미달 확인·P5 재판정 뒤 TASK-032로 진행한다.
+1. **TASK-031:** [TASK-031 잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)부터 재개한다. RV-161의 8 GiB P3 부하 미달은 같은 제한의 P0 대조가 다음이며, P3 충족 시 P5를 재판정한다. LAN P4·P4-bulk 뒤 TASK-032를 진행한다.
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 

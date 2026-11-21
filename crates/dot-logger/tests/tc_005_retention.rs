@@ -787,7 +787,6 @@ fn a_dropped_unsynced_log_keeps_its_records_owed_to_a_later_log() {
 }
 
 #[cfg(all(unix, not(miri)))]
-#[cfg(unix)]
 #[test]
 fn filesystem_store_rotates_into_independently_readable_files_and_refuses_reuse() {
     use std::sync::atomic::{AtomicU64, Ordering};

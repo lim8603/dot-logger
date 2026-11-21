@@ -8,9 +8,9 @@
 #[cfg(target_os = "linux")]
 use dot_logger::calibrate::Stop;
 use dot_logger::calibrate::{CalibrateError, Calibration, Fact, Profile, ProfileError};
-use dot_logger::logger::{
-    EncodeError, Logger, LoggerBuilder, PlanWarning, Preset, Record, Retention, Schema, Shutdown,
-};
+use dot_logger::logger::{EncodeError, Logger, LoggerBuilder, Preset, Record, Retention, Schema};
+#[cfg(target_os = "linux")]
+use dot_logger::logger::{PlanWarning, Shutdown};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

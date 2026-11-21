@@ -1179,6 +1179,91 @@ fn stream_end_with_unsettled_acks_reports_unknown_not_a_clean_end() {
     });
 }
 
+// REV-071 RV-191: a connection that closes while handed-off ACKs are still
+// queued reports them as unknown from next and handoff, not as a plain
+// disconnect.
+#[test]
+fn a_closed_connection_with_queued_acks_reports_unknown_not_disconnected() {
+    runtime().block_on(async {
+        let budget = budget();
+        let (hub, _inbox, addr, _stop, _server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let subscribe = async || {
+            let mut client =
+                RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                    .await
+                    .unwrap();
+            let stream = client
+                .subscribe(
+                    &budget,
+                    SubscriptionFilter {
+                        channel: None,
+                        minimum_level: Level::Trace,
+                        originals: false,
+                        overflow: OverflowPolicy::Gap,
+                    },
+                    ReceiverConfig {
+                        records: 2,
+                        record_bytes: 8,
+                        ttl: Duration::from_secs(10),
+                    },
+                    &cancel,
+                )
+                .await
+                .unwrap();
+            (client, stream)
+        };
+        // next: one handed-off ACK queued, then the connection closes.
+        let (mut client, mut stream) = subscribe().await;
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let _first = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+        let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+            panic!("record")
+        };
+        stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+        client.disconnect();
+        let end = stream.next(&cancel).await.map(|_| ());
+        assert!(
+            matches!(end, Err(ClientError::AcknowledgementUnknown)),
+            "next after a close with a queued ACK returned {end:?}"
+        );
+        drop(stream);
+        // handoff: the second record arrives, then the connection closes.
+        let (mut client, mut stream) = subscribe().await;
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let _first = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+        let _second = hub.offer(ids[0], record(2, 1), &[2], false, 1).unwrap();
+        let mut ready = Vec::new();
+        for _ in 0..2 {
+            let RemoteEvent::Record(record) = stream.next(&cancel).await.unwrap().unwrap() else {
+                panic!("record")
+            };
+            ready.push(record);
+        }
+        let second = ready.pop().unwrap();
+        stream
+            .handoff(ready.pop().unwrap(), |_, _| true, &cancel)
+            .await
+            .unwrap();
+        client.disconnect();
+        let end = stream.handoff(second, |_, _| true, &cancel).await;
+        assert!(
+            matches!(end, Err(ClientError::AcknowledgementUnknown)),
+            "handoff after a close with a queued ACK returned {end:?}"
+        );
+    });
+}
+
 // ADR-015: handoff queues the ACK and returns without waiting for the server;
 // flush sends what is queued and waits for every ACK RPC, and a failure after
 // handoff surfaces on a later call as AcknowledgementUnknown.

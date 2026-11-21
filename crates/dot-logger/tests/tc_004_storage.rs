@@ -808,11 +808,34 @@ fn file_session<R>(
         std::time::Instant,
     ) -> R,
 ) -> R {
+    file_session_at(
+        dot_logger::completion::Boundary::Written,
+        window,
+        retention,
+        run,
+    )
+}
+/// One tracked session with the given completion contract on both targets.
+fn file_session_at<R>(
+    completion: dot_logger::completion::Boundary,
+    window: usize,
+    retention: std::time::Duration,
+    run: impl for<'a> FnOnce(
+        dot_logger::completion::Completion<'a>,
+        dot_logger::capture::Producer<'a>,
+        Router<'a>,
+        dot_logger::control::ControlOwner<'a>,
+        std::time::Instant,
+    ) -> R,
+) -> R {
     use dot_logger::control::{ControlConfig, ControlOwner};
     let plan = support::plan();
     let route = support::routing();
     let mut tracking = support::tracking(window);
     tracking.history_retention = retention;
+    for target in &mut tracking.targets {
+        target.completion = completion;
+    }
     let mut owner = CaptureOwner::new_tracked(
         &plan,
         42,
@@ -963,6 +986,45 @@ fn an_unknown_written_record_cannot_let_a_new_segment_claim_its_sync() {
     use dot_logger::storage::StorageError;
     use std::time::Duration;
     file_session(
+        4,
+        Duration::from_secs(60),
+        |c, mut producer, mut router, control, now| {
+            let budget = router.writer_budget(10).unwrap();
+            let (_old, old) = Temp::new();
+            let (_new, new) = Temp::new();
+            let mut first = SegmentWriter::new(budget.clone(), small(), channels(), old).unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let receipt =
+                    write_one(&mut producer, &mut dispatch, &mut outputs, &mut first, now);
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                drop(work);
+                assert!(!succeeded(&control, token, now));
+                assert_eq!(
+                    c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                    QueryOutcome::Unknown
+                );
+                let older = first.finish().unwrap();
+                let mut second = SegmentWriter::new(budget, small(), channels(), new).unwrap();
+                write_one(&mut producer, &mut dispatch, &mut outputs, &mut second, now);
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                let rejected = second.sync_work(work).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                drop(rejected);
+                drop(older);
+                assert!(!succeeded(&control, token, now));
+            });
+        },
+    );
+}
+/// REV-071 RV-190: the same under a Synced contract. The record ended Unknown
+/// after reaching only Written, so it is not proven synced anywhere.
+#[test]
+fn under_a_synced_contract_an_unknown_written_record_still_blocks_a_new_segment() {
+    use dot_logger::completion::{Boundary, QueryOutcome};
+    use dot_logger::storage::StorageError;
+    use std::time::Duration;
+    file_session_at(
+        Boundary::Synced,
         4,
         Duration::from_secs(60),
         |c, mut producer, mut router, control, now| {

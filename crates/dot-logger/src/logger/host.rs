@@ -1186,7 +1186,8 @@ fn drain_failed(
     }
 }
 
-#[cfg(all(test, unix))]
+// Uses the Linux-only `logger::tests` helpers (REV-071 RV-189).
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;

@@ -990,7 +990,7 @@ fn incomplete_duplicate_and_late_registrations_are_invalid_records() {
 }
 
 /// Removes a temporary path even when the test panics (REV-071 RV-188).
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+#[cfg_attr(not(all(unix, not(miri))), allow(dead_code))]
 struct Cleanup(std::path::PathBuf);
 impl Drop for Cleanup {
     fn drop(&mut self) {

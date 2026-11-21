@@ -592,6 +592,11 @@ impl RemoteSubscription {
         self.close();
         ClientError::AcknowledgementUnknown
     }
+    // Whether handed-off ACKs are not yet settled (or one already failed).
+    // These outrank a stream or connection error (REV-071 RV-177, RV-191).
+    fn unsettled(&mut self) -> bool {
+        self.reap().is_err() || !self.acks.is_empty() || !self.in_flight.is_empty()
+    }
     // Check finished ACK RPCs without waiting; the first failure is reported.
     fn reap(&mut self) -> Result<(), ClientError> {
         while self.in_flight.front().is_some_and(|rpc| rpc.is_finished()) {
@@ -715,6 +720,9 @@ impl RemoteSubscription {
             return Err(self.unknown());
         }
         if self.state.closed.load(Ordering::Acquire) {
+            if self.unsettled() {
+                return Err(self.unknown());
+            }
             self.close();
             return Err(ClientError::Disconnected);
         }
@@ -732,8 +740,7 @@ impl RemoteSubscription {
             Ok(Err(error)) | Err(error) => {
                 // Unsettled handoffs outrank the stream's own error: report
                 // that their ACKs are unknown (REV-071 RV-177).
-                let reaped = self.reap();
-                if reaped.is_err() || !self.acks.is_empty() || !self.in_flight.is_empty() {
+                if self.unsettled() {
                     return Err(self.unknown());
                 }
                 self.close();
@@ -845,6 +852,9 @@ impl RemoteSubscription {
             return Err(self.unknown());
         }
         if self.stream.is_none() || self.state.closed.load(Ordering::Acquire) {
+            if self.unsettled() {
+                return Err(self.unknown());
+            }
             return Err(ClientError::Disconnected);
         }
         let mut called = false;

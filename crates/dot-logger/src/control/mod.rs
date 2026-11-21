@@ -980,14 +980,6 @@ impl SyncWork<'_, '_> {
         if first.len() != slot.ranges.len() || last.len() != slot.ranges.len() {
             return Ok(false);
         }
-        // Under a Synced contract a record ends only once Synced or failed,
-        // so an ended (expired, reused) record owes no file anything. Under
-        // Written it may have ended unsynced in another file (REV-052 RV-128).
-        let ended_is_synced = completion
-            .targets()
-            .iter()
-            .find(|contract| contract.id == self.target)
-            .is_some_and(|contract| contract.completion == Boundary::Synced);
         let window = completion.registry.limits.window as u64;
         for (p, range) in slot.ranges.iter().enumerate() {
             let start = range.first.load(Ordering::Acquire);
@@ -1013,15 +1005,15 @@ impl SyncWork<'_, '_> {
                 }
                 // Another file's share: every record must be proven Synced,
                 // not routed here, or ended without a write. Details older
-                // than the window are gone, so such a span is unproven.
-                if !ended_is_synced {
-                    for (lo, hi) in foreign.spans(from, to, last[p]) {
-                        if hi - lo >= window {
-                            return Ok(false);
-                        }
-                        if !self.settled(p, lo, hi, true)? {
-                            return Ok(false);
-                        }
+                // than the window are gone, so such a span is unproven. This
+                // holds under a Synced contract too: a record there may end
+                // Unknown or Failed after only Written (REV-071 RV-190).
+                for (lo, hi) in foreign.spans(from, to, last[p]) {
+                    if hi - lo >= window {
+                        return Ok(false);
+                    }
+                    if !self.settled(p, lo, hi, true)? {
+                        return Ok(false);
                     }
                 }
                 // Never appended by any file: a completion slot is reused only

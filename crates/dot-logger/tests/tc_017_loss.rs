@@ -1141,7 +1141,8 @@ fn saturated_control_budget_keeps_the_active_file_and_coalesces_its_final_sample
     }
 }
 
-#[cfg(unix)]
+// The facade's file output needs Linux free-space reads (REV-071 RV-189).
+#[cfg(target_os = "linux")]
 #[test]
 fn facade_encode_failures_are_persisted_and_only_returned_writers_confirm_the_tail() {
     use dot_logger::logger::{Budget, EncodeError, Logger, Record, Retention, Schema, WriterQuota};

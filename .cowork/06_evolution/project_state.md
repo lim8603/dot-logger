@@ -9,17 +9,22 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — 일정 판정·인수(TASK-025) 완료, 장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | 없음 — [TASK-025](../04_implementation/tasks/TASK-025.md) Done(2026-11-21 수락). 다음은 공개 전환(T2 잔여), 그 뒤 TASK-024·026 |
+| 활성 Milestone | MS-007 In Progress — 장기/native(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 Planned(2026-11-21). MS-009 Done |
+| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) Planned — 배포 가능화(외부 소비자 빌드 실패 해소). T3 native CI 재실행(Windows·macOS) 병행 |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
-| 상태 | 32/35 Task Done, MS-009 Done. 최신 회귀 [EV-112](../05_verification/verification_evidence.md#ev-112): 두 Rust 각 741 Pass·5 ignored, Clippy(Linux와 macOS·Windows 교차)·feature 조합·CI 범위 Miri 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089). **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 상태 | 32/36 Task Done, MS-009 Done. 최신 회귀 [EV-112](../05_verification/verification_evidence.md#ev-112): 두 Rust 각 741 Pass·5 ignored, Clippy(Linux와 macOS·Windows 교차)·feature 조합·CI 범위 Miri 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089). **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / #006 Gate 4 수락·Phase Verify / AI |
-| 세션 상태 | **2026-11-21 #006(개발) — REV-071 보충 조치, Gate 4 수락·Phase Verify 전환.** 다음은 공개 전환(T2 잔여) |
+| 갱신 | 2026-11-21 / #006 T3 첫 실행·릴리즈 계획 / AI |
+| 세션 상태 | **2026-11-21 #006(개발) — Gate 4·Phase Verify, public 전환, T3 첫 실행(EV-113), 릴리즈 계획 MS-010.** Human: `delete_repo` 권한 회수 |
 | 최근 완료 세션 | 2026-11-21 #006 — REV-071 보충 조치(`9622e94`, EV-112), REV-071 Closed·TASK-025 Done·Gate 4 Pass·Phase Verify |
 
 ## 현재 결정과 제약
+
+- **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
+- **2026-11-21 T3 첫 실행([EV-113](../05_verification/verification_evidence.md#ev-113)):** Linux·audit·integration-surface·raw-memory Pass. Windows는 시험 하네스의 소켓 non-blocking 상속 차이로 실패 → 5곳 수정. macOS는 `macos-14` 러너 지원 종료로 미실행 → `macos-15`. 재실행으로 판정한다.
+
+- **2026-11-21 Human 「지금 공개」·「그대로 공개」 — 공개 전환(T2 해소):** 공개 전 재점검: gitleaks(커밋 369개) 1건은 기존 시험 전용 TLS 키, 커밋 주소 전부 noreply, gmail 0, `imported_context` 추적은 `.gitkeep`만, 의존성 197개 라이선스 모두 허용형(`cargo metadata` 집계). 문서·perf 결과의 로컬 경로(`/home/lim8603`·`/data/build`)와 사설 IP 1곳(총 205곳, #004 시점 196곳)은 비밀이 아니므로 그대로 둔다(Human 선택, 이력 재정리 안 함). `ae22f9d`에서 저장소를 public으로 전환했다(gh 구버전이라 REST API로 변경). T3 트리거 도래.
 
 - **2026-11-21 Human 「승인, Gate 4 수락 진행하자」 — Gate 4 Pass·Phase Verify:** REV-071 1차·보충 조치(EV-111·112)와 Gate 4 판정안(이 PC 로컬 범위)을 수락했다. REV-071 Closed, TASK-025 Done(추적표 구현 칸 5개 체크), Phase Verify. 전환 전 F-09(무근거 반전 0, 낡은 문서 3건 정정)·F-12(OQ 분기 없음) 점검. Gate 5는 Not Ready(24h·native·3 OS·실사용처 Not Run, 공식 산출물 미생성). [판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)
 
@@ -86,6 +91,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
+| TASK-036 | 배포 가능화(MS-010 0단계) | AI | Planned | 2026-11-21 | S1 외부 소비자 빌드 재현부터 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
@@ -113,18 +119,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **공개 전환(T2 잔여) — 다음 작업:** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
-   - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
-     - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).
-     - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
-     - 그 밖: 사설 LAN IP 19곳, `.cowork/README.md`에 Human 본인 gmail 주소, `members/lim8603/`(profile·my_state) 추적, `.cowork` 안 dot-probe 언급 242곳, AI 도구 설정 파일(CLAUDE.md·AGENTS.md·GEMINI.md·`.agents/`·copilot-instructions).
-   - **권장 방식:**
-     1. `.cowork`는 공개하되 `imported_context`는 제외한다(Human 확인). EV·문서에서 그 원시 파일을 가리키는 링크는 "원시 근거 비공개"로 표시한다.
-     2. 남는 문서의 로컬 경로 약 190곳과 `.cowork` 밖 4곳을 자리표시로 바꾸고, LAN IP는 문서용 주소(`192.0.2.x`)로 바꾼다. gmail은 GitHub 아이디로 바꾼다. `members/`와 AI 도구 설정 파일의 공개 여부를 정한다.
-     3. 원시 로그와 경로가 커밋 342개 전체에 있으므로, 공개 저장소는 새 이력으로 시작한다. 현재 저장소는 비공개 작업용으로 유지한다.
-     4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
-     5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
-   - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.
+0. **T3 native CI 재실행:** 첫 실행([EV-113](../05_verification/verification_evidence.md#ev-113))의 Windows 시험 하네스 수정과 macOS 러너 변경(`macos-15`)을 푸시해 다시 실행한다. 결과로 GAP-004를 판정하고, 실패는 원인별로 조치한다.
+0-1. **TASK-036 배포 가능화(MS-010 0단계):** 워크스페이스 밖 소비자 빌드 재현 시험 → MCAP 별칭 crate → 의존성 `^` 범위 → README·회귀. 끝나면 T3 통과와 함께 v0.1.0 미리보기(MS-010 1단계).
+   - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
+   - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
 1. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약
@@ -146,8 +144,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
-| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 #004: 정리 이력을 비공개로 올림. 남은 MS·Task를 마친 뒤 공개 전환** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
-| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
+| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 — **2026-11-21 도래, run `44907519022` 진행 중** | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 
 범위 밖 백로그 B:
@@ -155,7 +152,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
-**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. **T7 해소**(포화 회복 EV-097, P5 EV-103, LAN P4 EV-104, 유선 P4-bulk EV-105). native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
+**T2 해소**(2026-11-21 공개 전환), **T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1·T4는 미도래(T3은 2026-11-21 도래)이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. **T7 해소**(포화 회복 EV-097, P5 EV-103, LAN P4 EV-104, 유선 P4-bulk EV-105). native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 

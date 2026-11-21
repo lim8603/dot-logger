@@ -222,4 +222,6 @@ F-11 소비자 목록(최근 계약 강화와 영향 경로):
 | 문서 최종 업데이트 | Partial | 공개 README와 `07_delivery` 작업 문서(TASK-025 S2·S3) 완료. 릴리즈 노트는 미배포 초안이고 TASK-024·026 결과 반영 전 |
 | 산출물 범위 충족 | Not Ready | deliverable_plan의 필수 산출물 다수가 수집중이고 공식 `docs/`는 만들지 않았다 |
 
+**Gate 5 예외(2026-11-21 Human 결정 3 「미리보기」):** v0.1.0은 Gate 5 Pass 전에 GitHub 미리보기(pre-release)로 낸다. 릴리즈 노트에 검증 범위(이 PC Linux 로컬, native CI 결과, 24h·실사용처 미실행)를 적는다. crates.io 게시(TASK-026 뒤)와 1.0(Gate 5 Pass 뒤)은 이 예외에 포함되지 않는다. [MS-010](../04_implementation/milestones/MS-010.md)
+
 Gate 5 재판정 경로: 저장소 공개 전환 → TASK-024(T3 native·3 OS, 24h·전원 차단) → TASK-026(첫 실사용처 적용) → 릴리즈 노트·운영서 갱신과 공식 산출물 생성 → Gate 5 재판정. 미실행 시험은 Pass로 바꾸지 않는다.

@@ -722,3 +722,20 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 ## #031 — 2026-11-18 #005 세션 종료 최근 이력 이관
 
 - 2026-11-18 #001~002: ADR-013 E와 TASK-033 S4 수락 및 .logger 예약 토픽·standard/2 적용([EV-088](../05_verification/verification_evidence.md#ev-088)~[EV-090](../05_verification/verification_evidence.md#ev-090), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)·[REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), 로그 #001(비공개 세션 로그: `session_logs/session_2026-11-18_001.md`)·#002(비공개 세션 로그: `session_logs/session_2026-11-18_002.md`)).
+
+## #032 — 2026-11-21 #006 공개 전환 뒤 공개 준비 기록 이관
+
+공개 전환(2026-11-21, `ae22f9d`)으로 project_state 「다음 시작점」 0에 있던 공개 준비 기록을 옮겼다. 결정은 project_state 「현재 결정과 제약」의 #004·#006 항목이 우선한다.
+
+0. **공개 전환(T2 잔여) — 다음 작업:** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
+   - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
+     - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).
+     - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
+     - 그 밖: 사설 LAN IP 19곳, `.cowork/README.md`에 Human 본인 gmail 주소, `members/lim8603/`(profile·my_state) 추적, `.cowork` 안 dot-probe 언급 242곳, AI 도구 설정 파일(CLAUDE.md·AGENTS.md·GEMINI.md·`.agents/`·copilot-instructions).
+   - **권장 방식:**
+     1. `.cowork`는 공개하되 `imported_context`는 제외한다(Human 확인). EV·문서에서 그 원시 파일을 가리키는 링크는 "원시 근거 비공개"로 표시한다.
+     2. 남는 문서의 로컬 경로 약 190곳과 `.cowork` 밖 4곳을 자리표시로 바꾸고, LAN IP는 문서용 주소(`192.0.2.x`)로 바꾼다. gmail은 GitHub 아이디로 바꾼다. `members/`와 AI 도구 설정 파일의 공개 여부를 정한다.
+     3. 원시 로그와 경로가 커밋 342개 전체에 있으므로, 공개 저장소는 새 이력으로 시작한다. 현재 저장소는 비공개 작업용으로 유지한다.
+     4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
+     5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
+   - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.

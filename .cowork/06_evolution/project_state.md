@@ -15,9 +15,9 @@
 | 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / TASK-025 S1·S2 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #003.** TASK-032 수락·MS-009 Done, TASK-025 S1·S2 Done. 다음 S3 |
-| 최근 완료 세션 | 2026-11-21 — TASK-032 S2·S3 독립 코드리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) |
+| 갱신 | 2026-11-21 / 세션 마감·공개 범위 논의 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-21 #003 마감.** 다음 세션 브리핑에서 공개 범위(T2) 권장 방식을 먼저 논의한 뒤 TASK-025 S3 |
+| 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
 
 ## 현재 결정과 제약
 
@@ -105,6 +105,18 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
+0. **다음 세션 브리핑에서 먼저 논의 — 공개 범위(T2 사전, 2026-11-21 Human 「권장방식 다음 세션 브리핑때 다시 이야기해줘」):** Human은 `.cowork`도 공개하는 방향을 생각하고 있고, `imported_context`는 공개 대상이 아니라고 확인했다. 아직 결정이나 작업은 하지 않았다. 브리핑에서 아래 권장 방식을 다시 제시하고 결정을 받는다.
+   - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
+     - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `0a153b5`에서 정리), dot-probe 언급 65곳(대부분 예제).
+     - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
+     - 그 밖: 사설 LAN IP 19곳, `.cowork/README.md`에 Human 본인 gmail 주소, `members/lim8603/`(profile·my_state) 추적, `.cowork` 안 dot-probe 언급 242곳, AI 도구 설정 파일(CLAUDE.md·AGENTS.md·GEMINI.md·`.agents/`·copilot-instructions).
+   - **권장 방식:**
+     1. `.cowork`는 공개하되 `imported_context`는 제외한다(Human 확인). EV·문서에서 그 원시 파일을 가리키는 링크는 "원시 근거 비공개"로 표시한다.
+     2. 남는 문서의 로컬 경로 약 190곳과 `.cowork` 밖 4곳을 자리표시로 바꾸고, LAN IP는 문서용 주소(`192.0.2.x`)로 바꾼다. gmail은 GitHub 아이디로 바꾼다. `members/`와 AI 도구 설정 파일의 공개 여부를 정한다.
+     3. 원시 로그와 경로가 커밋 342개 전체에 있으므로, 공개 저장소는 새 이력으로 시작한다. 현재 저장소는 비공개 작업용으로 유지한다.
+     4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
+     5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
+   - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.
 1. **TASK-025 S3·S4:** S1 문서 검토(F1~F10)와 S2 공개용 영어 README(`0a153b5`·`3b0044d`)를 마쳤다. 다음은 S3 `07_delivery` 사용자 매뉴얼·운영서·릴리즈 노트 작업 문서, 그다음 S4 MS별 추적표와 Gate 4·5 판정이다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -127,7 +139,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
-| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1) | 공개 전환 또는 첫 외부 배포를 요청할 때 | INT-001 / 공개 준비 | 2026-10-28 Human 논의 |
+| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 Human 요청: 다음 세션 브리핑에서 권장 방식을 다시 논의** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
 | T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 

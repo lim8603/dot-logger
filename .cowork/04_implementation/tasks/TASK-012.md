@@ -57,7 +57,7 @@ F-11 소비자: remote feature 서버/수신 재조립/관리 요청·query/repl
 
 ## 세션 마감·게시 — 2026-10-31
 
-Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 EV-022 source70개/검사11개·Miri48·원본/뷰 로그16쌍의 hash 일치를 확인하고 동일 성공 시험은 반복하지 않았다. 소스 `5f0ad83`를 source/docs 분리·[skip ci] 커밋으로 origin/main 게시했으며 EV-022 commit blob70개와 원격 hash가 일치한다. [commit 대조](../../06_evolution/imported_context/task_012_2026-10-31/commit.json)·[게시 근거](../../06_evolution/imported_context/task_012_2026-10-31/source-push.json). 검증/승인/마감 문서는 별도 docs(cowork) 커밋으로 게시한다. 앞선 미커밋/미게시 본문은 검증 당시 이력이다.
+Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 EV-022 source70개/검사11개·Miri48·원본/뷰 로그16쌍의 hash 일치를 확인하고 동일 성공 시험은 반복하지 않았다. 소스 `d63fdea`를 source/docs 분리·[skip ci] 커밋으로 origin/main 게시했으며 EV-022 commit blob70개와 원격 hash가 일치한다. commit 대조(비공개 원시 근거)·게시 근거(비공개 원시 근거). 검증/승인/마감 문서는 별도 docs(cowork) 커밋으로 게시한다. 앞선 미커밋/미게시 본문은 검증 당시 이력이다.
 
 공유/개인 상태와 세션 로그를 종료로 동기화했다. 마감/게시 요청을 별도 최종 구현 승인으로 확대하지 않아 REV-018 Resolved·TASK-012/MS-004 In Progress·Human 리뷰·native/실측 이월·Gate4/5 Not Ready를 유지한다. 다음 시작점은 TASK-012 최종 구현 리뷰이며 승인 뒤 TASK-013으로 진행한다. 새 Task는 자동 착수하지 않는다.
 
@@ -69,7 +69,7 @@ Human 「프로젝트 브리핑하고, 리뷰 반입하고, 승인 해야 하는
 
 ## REV-019 조치·수락 및 TASK-013 전환 — 2026-10-31 #007
 
-Human 기존 로컬 구현 승인·모든 권한 위임·다음 착수 요청으로 REV-018 Closed를 반영하고, RV-036 timer 대기·RV-037 고정 credential 비교·RV-038 연결 수명 지침을 조치했다. [EV-023](../../05_verification/verification_evidence.md#ev-023) source70개/검사9개 exit0·두 Rust16feature·Miri25 Pass·commit blob70개 일치(`4f79119`) 후 AI의 위임된 마감 판단으로 REV-019도 Closed다. 이전 승인 대기/미구현 문구는 당시 이력이다. 로컬 Human 리뷰 완료를 전체 Task/TC·native/PC 수락 완료로 확대하지 않는다. 다음 TASK-013에 착수한다.
+Human 기존 로컬 구현 승인·모든 권한 위임·다음 착수 요청으로 REV-018 Closed를 반영하고, RV-036 timer 대기·RV-037 고정 credential 비교·RV-038 연결 수명 지침을 조치했다. [EV-023](../../05_verification/verification_evidence.md#ev-023) source70개/검사9개 exit0·두 Rust16feature·Miri25 Pass·commit blob70개 일치(`ca1694a`) 후 AI의 위임된 마감 판단으로 REV-019도 Closed다. 이전 승인 대기/미구현 문구는 당시 이력이다. 로컬 Human 리뷰 완료를 전체 Task/TC·native/PC 수락 완료로 확대하지 않는다. 다음 TASK-013에 착수한다.
 
 ## REV-022 반입 — 2026-10-31 #010
 
@@ -79,7 +79,7 @@ Human 기존 로컬 구현 승인·모든 권한 위임·다음 착수 요청으
 
 ## REV-022 조치 수락 — 2026-10-31 #011
 
-Human 「권고대로 진행하자」에 따라 EV-026 source92개/검사14개·Miri32·소스b3c08bd를 로컬 검증/위임 수락했다. REV-022 Closed이며 상세는 REV §8과 API§14.5를 따른다. RV-049 포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성과 화면 불연속 표시는 TASK-020 후속이다. heartbeat wire 변경은 하지 않았다. 기존 EV-023/025는 이전 형상 근거로 보존하고 현재 조치는 EV-026을 사용한다. native T3·실앱/성능·Gate4/5 미완료는 유지한다. TASK-014는 이번 지시에 따라 착수한다.
+Human 「권고대로 진행하자」에 따라 EV-026 source92개/검사14개·Miri32·소스eb39cb2를 로컬 검증/위임 수락했다. REV-022 Closed이며 상세는 REV §8과 API§14.5를 따른다. RV-049 포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성과 화면 불연속 표시는 TASK-020 후속이다. heartbeat wire 변경은 하지 않았다. 기존 EV-023/025는 이전 형상 근거로 보존하고 현재 조치는 EV-026을 사용한다. native T3·실앱/성능·Gate4/5 미완료는 유지한다. TASK-014는 이번 지시에 따라 착수한다.
 
 ## 완료 판정 — 2026-11-13
 

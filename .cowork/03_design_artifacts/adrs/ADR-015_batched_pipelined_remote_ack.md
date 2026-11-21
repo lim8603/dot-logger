@@ -25,4 +25,4 @@
 
 ## 구현 기록 — 2026-11-21
 
-제품 `4ac9bf1`에서 묶음 상한 64건, 지연 상한 5 ms, 동시 ACK RPC 4개로 구현했다. 진행 중인 RPC가 없으면 즉시 보낸다. 서버 소켓에는 `TCP_NODELAY`를 함께 설정했다. LAN P4 소형은 60,000건 전부 ACK, p99 10.86 ms였다. [EV-104](../../05_verification/verification_evidence.md#ev-104)
+제품 `c0f23bb`에서 묶음 상한 64건, 지연 상한 5 ms, 동시 ACK RPC 4개로 구현했다. 진행 중인 RPC가 없으면 즉시 보낸다. 서버 소켓에는 `TCP_NODELAY`를 함께 설정했다. LAN P4 소형은 60,000건 전부 ACK, p99 10.86 ms였다. [EV-104](../../05_verification/verification_evidence.md#ev-104)

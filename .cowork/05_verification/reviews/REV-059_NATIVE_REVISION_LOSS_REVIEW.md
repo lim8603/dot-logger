@@ -6,12 +6,12 @@
 |---|---|
 | 회차 / 일자 | REV-059 / 2026-11-17 |
 | 리뷰어 | Antigravity AI — 리뷰 전용 세션 |
-| 대상 | REV-055 이후 누적 코드 커밋 `949a74e..0270f03` (5개 코드 커밋: `5d7fe6a`, `048cdf3`, `2dff5f0`, `70d2f6a`, `0270f03`) |
-| 범위 | REV-055 결함 조치(`5d7fe6a`), TASK-030 S2 A native 표준 MCAP pair 저장/읽기(`048cdf3`), B revision 경계 회전·source별 조회/복구·manifest v2(`2dff5f0`, `70d2f6a`), TASK-035 S2 C 누적 손실 카운터·native `_dot_logger/loss` 체크포인트·오프라인 조회/복구(`0270f03`) |
+| 대상 | REV-055 이후 누적 코드 커밋 `fa72a1a..5be17b5` (5개 코드 커밋: `3e6dcb5`, `ecc00e0`, `91ac496`, `63a9c87`, `5be17b5`) |
+| 범위 | REV-055 결함 조치(`3e6dcb5`), TASK-030 S2 A native 표준 MCAP pair 저장/읽기(`ecc00e0`), B revision 경계 회전·source별 조회/복구·manifest v2(`91ac496`, `63a9c87`), TASK-035 S2 C 누적 손실 카운터·native `_dot_logger/loss` 체크포인트·오프라인 조회/복구(`5be17b5`) |
 | 종합 판정 | 초기 **Conditional**(P1 1·P2 2·P3 1) → 조치 후 **Pass**([EV-086](../verification_evidence.md#ev-086)) |
 | 상태 | **Closed** — 2026-11-17, RV-149~152 조치·위임 수락 |
 
-워크스페이스 전체 테스트(665 passed·5 ignored), RT 무할당 시험(20 passed), `clippy`, `fmt`, strict `rustdoc`, NFR-008 표면/레시피 가드(`34/60`)는 모두 통과했다. 그러나 `949a74e..0270f03` 변경분을 ADR-013 및 API §22~23 계약과 대조해 정밀 검토한 결과 다음 4건을 확인했다:
+워크스페이스 전체 테스트(665 passed·5 ignored), RT 무할당 시험(20 passed), `clippy`, `fmt`, strict `rustdoc`, NFR-008 표면/레시피 가드(`34/60`)는 모두 통과했다. 그러나 `fa72a1a..5be17b5` 변경분을 ADR-013 및 API §22~23 계약과 대조해 정밀 검토한 결과 다음 4건을 확인했다:
 1. **P1 (`RV-149`):** `recover_segment` / `recover_to_store`가 chunk 내부 레코드를 복사하기 전에 `options.writer.max_records`(및 출력 chunk 상한)를 chunk 단위로 선검사하지 않아, 단일 chunk 내 2건 이상의 사용자 레코드 중 일부만 출력에 쓴 뒤 중간에 `NeedRotation`으로 실패(부분 chunk 반출)하고, `writer.append`의 `?` 조기 반환으로 인해 앞선 chunk에서 이미 검증·복구된 `Baseline` loss report나 사용자 레코드가 `writer.finish()`·`sync_recovered()` 없이 미완결 파일로 남는다. 또한 루트 `dot_logger.file` 선행 peek(`recovery.rs:308`)의 `?`가 손상된 메타데이터를 `RecoveryStop::InvalidRecord` 대신 `RecoveryStop::Failed`로 조기 실패시키며, CLI `recover` 성공 JSON 행에 `"target"` 필드가 누락되어 있다.
 2. **P2 (`RV-150`):** `SegmentWriter`가 회전된 후속 세그먼트(`sequence >= 1`)에서도 `sample_start = 0`을 `Coverage::Baseline`의 `observed_from_ns`로 기록하여, 회전 파일의 `LossDelta.observed_from_ns`가 항상 `0`으로 왜곡되고 CLI `loss --from/--to` 필터가 파일 개설 이전 구간과 거짓 매칭된다. 또한 다중 출력이 모두 첫 주기 체크포인트 전에 고장났을 때 각 파일의 초기 `Baseline`끼리 합산(`complete_count >= 2`)되어 `delta = Some(0)`이 만들어지는 문제와 다중 part 체크포인트의 개별 part 시간 필터링 문제가 있다.
 3. **P2 (`RV-151`):** 종료(`closing`) 경계에서 `GeneralProducer::record_until`의 `Deadline` 분기와 `CaptureCore::loss_before_submit`(`Writer::try_log_at`의 `Encode`/`InvalidInput` 경로)이 `ActiveCall` 가드 내부의 `closing`(`Ordering::SeqCst`) 확인을 거치지 않아, 로거 종료 후에도 `Encode`/`InvalidInput`/`Deadline` 손실 카운터가 증가하고 `LogError::Closing` 대신 `LogError::Encode`/`InvalidInput`이 반환될 수 있다.
@@ -23,7 +23,7 @@
 
 | 구분 | 파일 | 변경 내용 |
 |---|---|---|
-| 생성 | [REV-059](REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `949a74e..0270f03` 독립 코드리뷰 결과(`RV-149~152`) 및 처리담당 영역 기록 (`Open`) |
+| 생성 | [REV-059](REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `fa72a1a..5be17b5` 독립 코드리뷰 결과(`RV-149~152`) 및 처리담당 영역 기록 (`Open`) |
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | 미처리 리뷰 목록·코드리뷰 현황에 REV-059 (`Open`, P1 1·P2 2·P3 1) 등록 및 다음 시작점 동기화 |
 
 검토 대상 코드 파일은 [loss.rs](../../../crates/dot-logger/src/loss.rs), [capture/mod.rs](../../../crates/dot-logger/src/capture/mod.rs), [completion/mod.rs](../../../crates/dot-logger/src/completion/mod.rs), [routing/mod.rs](../../../crates/dot-logger/src/routing/mod.rs), [storage/mod.rs](../../../crates/dot-logger/src/storage/mod.rs), [storage/codec.rs](../../../crates/dot-logger/src/storage/codec.rs), [storage/writer.rs](../../../crates/dot-logger/src/storage/writer.rs), [storage/read.rs](../../../crates/dot-logger/src/storage/read.rs), [storage/retention.rs](../../../crates/dot-logger/src/storage/retention.rs), [storage/recovery.rs](../../../crates/dot-logger/src/storage/recovery.rs), [query/mod.rs](../../../crates/dot-logger/src/query/mod.rs), [logger/writer.rs](../../../crates/dot-logger/src/logger/writer.rs), [logger/budget.rs](../../../crates/dot-logger/src/logger/budget.rs), [logger/host.rs](../../../crates/dot-logger/src/logger/host.rs), [offline.rs](../../../crates/dot-logger-client/src/offline.rs), [commands.rs](../../../crates/dot-logger-cli/src/commands.rs), [model.rs](../../../crates/dot-logger-cli/src/model.rs), [linear_reader.rs](../../../vendor/mcap-0.26.0/src/sans_io/linear_reader.rs) 및 관련 통합 시험(`tc_015_native.rs`, `tc_016_revision.rs`, `tc_017_loss.rs`, `cli.rs`, `rt-allocation`)이다.
@@ -189,7 +189,7 @@
 
 ## 6. 개발 세션 최종 처리 — 2026-11-17
 
-Human의 브리핑·리뷰 지적사항 수정 요청과 기존 위임에 따라 `Open → In Progress → Resolved → Closed`로 처리했다. 제품/시험 커밋은 `8b59aa6`, 검증은 [EV-086](../verification_evidence.md#ev-086)이다. 앞의 리뷰어 원문·최초 검증은 당시 이력으로 보존한다.
+Human의 브리핑·리뷰 지적사항 수정 요청과 기존 위임에 따라 `Open → In Progress → Resolved → Closed`로 처리했다. 제품/시험 커밋은 `ca89b69`, 검증은 [EV-086](../verification_evidence.md#ev-086)이다. 앞의 리뷰어 원문·최초 검증은 당시 이력으로 보존한다.
 
 | 구분 | 변경 파일 | 내용 |
 |---|---|---|

@@ -51,4 +51,4 @@
 
 상태는 **Done**이다. Human 리뷰는 2026-10-27 승인됐고, 변경분 [native CI](https://github.com/lim8603/dot-logger/actions/runs/40512793054)의 6개 OS/Rust 조합과 audit 모두 Pass다. GAP-004를 hosted native CI 범위에서 Closed로 갱신했다. 다음은 TASK-004다.
 
-Human 리뷰 승인: 2026-10-27 / 코드 `39f9c72` / CI 대상 `902043b`와 검증 소스 hash 일치. 원본/분배/완료·실장비 검증은 후속 Task다.
+Human 리뷰 승인: 2026-10-27 / 코드 `8f8d2dc` / CI 대상 `2b90b3e`와 검증 소스 hash 일치. 원본/분배/완료·실장비 검증은 후속 Task다.

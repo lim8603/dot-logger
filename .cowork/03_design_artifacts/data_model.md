@@ -102,7 +102,7 @@ HTTP 성공은 DB API 확인 경계이며 SSD 영속 완료나 조회 결과 검
 - 입력 길이/압축 해제 크기/레코드 수/파일 offset 산술을 검증한다. 경로 traversal·과도한 압축 확장·무한 스캔을 막는 읽기 예산을 둔다.
 - DB token·TLS key는 설정 참조로만 연결하고 파일 metadata·CLI JSON·리포트에 저장하지 않는다.
 
-근거: [MCAP 명세](https://mcap.dev/spec), [Rust writer 설정](https://docs.rs/mcap/latest/mcap/write/struct.WriteOptions.html), [InfluxDB 3 호환 API 범위](https://docs.influxdata.com/influxdb3/core/write-data/http-api/compatibility-apis/). 기술 조사의 사실·해석은 별도 [조사 기록](../06_evolution/imported_context/research_2026-10-26_detailed_design.md)에 둔다.
+근거: [MCAP 명세](https://mcap.dev/spec), [Rust writer 설정](https://docs.rs/mcap/latest/mcap/write/struct.WriteOptions.html), [InfluxDB 3 호환 API 범위](https://docs.influxdata.com/influxdb3/core/write-data/http-api/compatibility-apis/). 기술 조사의 사실·해석은 별도 조사 기록(비공개 원시 근거)에 둔다.
 
 ### DB 충돌 검출의 제한된 상태
 

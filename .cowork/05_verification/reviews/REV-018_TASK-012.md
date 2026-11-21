@@ -19,21 +19,21 @@
 
 ### [처리담당] RV-032
 
-실제 gRPC 요청 `Authorization: Basic malformed`에서 기대 PermissionDenied 대신 DeadlineExceeded(host dispatch 후 timeout) 행동 Red를 확인했다. token parse 실패를 익명 허용으로 처리한 것이 원인이다. 익명 허용은 Authorization 헤더 자체가 없을 때로 한정했다. 정상 익명 loopback read·read/manage·TLS·오류 secret 비노출을 회귀한다. 근거: [Red](../../06_evolution/imported_context/task_012_2026-10-31/red-malformed-auth.log).
+실제 gRPC 요청 `Authorization: Basic malformed`에서 기대 PermissionDenied 대신 DeadlineExceeded(host dispatch 후 timeout) 행동 Red를 확인했다. token parse 실패를 익명 허용으로 처리한 것이 원인이다. 익명 허용은 Authorization 헤더 자체가 없을 때로 한정했다. 정상 익명 loopback read·read/manage·TLS·오류 secret 비노출을 회귀한다. 근거: Red(비공개 원시 근거).
 
 ### [처리담당] RV-033
 
-`discard_generations(1,2)` 뒤 generation1 chunk가 들어오면 기대 Gone 대신 성공했던 행동 Red다. receiver permit이 소유하는 bounded generation 목록을 추가해 미래 조각과 이미 ready지만 미인계인 owner도 검사한다. generation을 낮추는 요청은 상태를 보존해 Gone으로 거절한다. 실제 소비자/네트워크에 이미 전달된 데이터는 취소했다고 주장하지 않는다. 근거: [Red](../../06_evolution/imported_context/task_012_2026-10-31/red-stale-generation.log).
+`discard_generations(1,2)` 뒤 generation1 chunk가 들어오면 기대 Gone 대신 성공했던 행동 Red다. receiver permit이 소유하는 bounded generation 목록을 추가해 미래 조각과 이미 ready지만 미인계인 owner도 검사한다. generation을 낮추는 요청은 상태를 보존해 Gone으로 거절한다. 실제 소비자/네트워크에 이미 전달된 데이터는 취소했다고 주장하지 않는다. 근거: Red(비공개 원시 근거).
 
 ### [처리담당] RV-034 — 호스트 reply의 숨은 할당 용량
 
 - P2 / 작은 길이의 Vec라도 capacity가 wire cap보다 큰 상태로 host 응답 큐에 들어갈 수 있었다. encoded_len 검사만으로는 소유한 heap 용량을 제한하지 못한다.
-- `Blob` 길이1/capacity4097을 max4096 응답으로 넘기는 반례에서 Limit 기대 대비 성공 Red를 확인했다. [Red](../../06_evolution/imported_context/task_012_2026-10-31/red-reply-capacity.log).
+- `Blob` 길이1/capacity4097을 max4096 응답으로 넘기는 반례에서 Limit 기대 대비 성공 Red를 확인했다. Red(비공개 원시 근거).
 - `Command::respond`가 oneshot reply queue에 넣기 전에 native payload capacity와 Page의 Vec/inline capacity 합을 검사하고, wire 변환도 동일 검사를 사용한다. 과대 응답은 Limit으로 종결하며 실제 host IO 완료/Command 수명 조건은 유지한다. 최초 matrix/Miri Pass는 interim-before-reply-capacity에 보존하고 최종 source70개로 다시 검증한다.
 
 ### [처리담당] RV-035 — 요청한 blob 범위 초과 응답
 
-실제 gRPC ReadBlob(length=1) 요청에 host가 Blob2bytes를 반환하는 반례에서 기대 ResourceExhausted 대신 성공했던 [Red](../../06_evolution/imported_context/task_012_2026-10-31/red-blob-range.log)를 확인했다. Command::respond는 native ReadBlob 요청의 length도 검사해 과대 결과를 Limit으로 종결한다. 실제 File→고정 Snapshot→Query blob capability→ReadBlob3bytes 경로 및 ACK/Unknown 두 terminal 경로를 함께 회귀했다. 최초 시험들은 interim-before-blob-range에 이력으로 보존하고 최종 소스로 전체 gate를 다시 수행했다.
+실제 gRPC ReadBlob(length=1) 요청에 host가 Blob2bytes를 반환하는 반례에서 기대 ResourceExhausted 대신 성공했던 Red(비공개 원시 근거)를 확인했다. Command::respond는 native ReadBlob 요청의 length도 검사해 과대 결과를 Limit으로 종결한다. 실제 File→고정 Snapshot→Query blob capability→ReadBlob3bytes 경로 및 ACK/Unknown 두 terminal 경로를 함께 회귀했다. 최초 시험들은 interim-before-blob-range에 이력으로 보존하고 최종 소스로 전체 gate를 다시 수행했다.
 
 ## 자가 점검·검증 경계
 
@@ -70,7 +70,7 @@ RT 입력·원본 private unsafe·기존 파일/완료 의미를 변경하지 �
 
 ## 최종 검증·수락 경계 — EV-022
 
-- [EV-022](../verification_evidence.md#ev-022)·[source70개/검사11개·로그 hash](../../06_evolution/imported_context/task_012_2026-10-31/results.json)·[검증 script](../../06_evolution/imported_context/task_012_2026-10-31/verify.py). 두 Rust1.85.0/1.96.0 각16feature·core/remote 독립 consumer·RT allocator11·clippy/rustdoc `-D warnings`·fmt·proto9message/83field/선택 protoc Pass다.
+- [EV-022](../verification_evidence.md#ev-022)·source70개/검사11개·로그 hash(비공개 원시 근거)·검증 script(비공개 원시 근거). 두 Rust1.85.0/1.96.0 각16feature·core/remote 독립 consumer·RT allocator11·clippy/rustdoc `-D warnings`·fmt·proto9message/83field/선택 protoc Pass다.
 - 원격 전용 unit10+public integration3=13개. 실제 loopback/TLS 및 8MiB32조각 CRC/소비 인계 후 ACK·Gap/Unknown·read/manage/secret 오류 비노출·host timeout 뒤 command permit 유지·request/encoded/native capacity 한도·실제 파일Query/ReadBlob/Replay·completion ACK 전 Pending/후 Complete 또는 미확인 Unknown·독립 파일Written 유지.
 - 영향 Miri는 public3+receiver2+hub1=6×8 seeds=48 Pass, strict provenance. socket/TLS/실제 파일 시험은 native 로컬 시험이며 Miri로 확대하지 않는다. 기존 unsafe 영역 전체 Miri는 변경하지 않아 반복하지 않았다.
 - 원격 코어 hub 초기화+receiver256B/8MiB requested-byte peak5744/8655984 ≤ 예약2668288/27833344B·잔여0. runtime/TLS/HTTP2 전체 heap/RSS나 LAN throughput 상한 증거는 아니다. 기존 RT guard 할당/해제0/0 유지.
@@ -79,7 +79,7 @@ RT 입력·원본 private unsafe·기존 파일/완료 의미를 변경하지 �
 
 제품 구현/조치 최종 Human 리뷰 전 Closed로 올리지 않는다. 서버/SDK 입력은 opaque handle을 받지만 handle별 host 권한/실제 Snapshot 수명·관리 기능 backend의 구현은 host와 후속 Task 경계다. 실제 dot-probe 보안/운영 연동·CLI·P4/LAN 성능/전체RSS·다른 OS/native 공개 후(T3)·PC 성능/UPS·fresh online audit는 미실행이며 Gate4/5 Not Ready 유지. 소스/문서는 미커밋·미게시다.
 
-세션 마감·게시(2026-10-31): 소스 `5f0ad83` origin/main 게시·EV-022 source70개 commit blob 일치. 문서는 별도 [skip ci] 커밋으로 게시한다. 게시/마감 요청은 최종 구현 승인으로 해석하지 않아 Resolved·Human 리뷰 대기를 유지한다. 앞선 미커밋/미게시 표기는 검증 당시 이력이다.
+세션 마감·게시(2026-10-31): 소스 `d63fdea` origin/main 게시·EV-022 source70개 commit blob 일치. 문서는 별도 [skip ci] 커밋으로 게시한다. 게시/마감 요청은 최종 구현 승인으로 해석하지 않아 Resolved·Human 리뷰 대기를 유지한다. 앞선 미커밋/미게시 표기는 검증 당시 이력이다.
 
 ## Human 수락 — 2026-10-31 후속 세션
 

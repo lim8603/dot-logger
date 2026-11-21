@@ -67,7 +67,7 @@ AI 자가 리뷰 **Conditional** — 현재 검토에서 미해결 P1/P2는 확�
 
 ## 로컬 커밋·세션 마감 — 2026-10-30
 
-Human 「커밋하고 세션 마무리하자」에 따라 소스 `73881452f9442e4cc38167d1a83e7fcf59a68110`를 로컬 커밋했다. EV-012 source49개와 commit blob의 SHA-256이 전부 일치하며 시험은 반복하지 않았다. [커밋 근거](../../06_evolution/imported_context/task_008_2026-10-30/commit.json)를 보존하고 마감/근거 문서는 소스와 별도 커밋한다. 푸시는 요청되지 않아 수행하지 않았다. TASK-008 Human 최종 구현 리뷰·REV-009 Resolved·native GAP-004·장비 이월을 유지한다. 다음 시작점은 TASK-008/REV-009/EV-012 구현 리뷰이며 TASK-009는 미착수다.
+Human 「커밋하고 세션 마무리하자」에 따라 소스 `e6669ac0b4ab1e6ee824e4b571afbd25e49295e7`를 로컬 커밋했다. EV-012 source49개와 commit blob의 SHA-256이 전부 일치하며 시험은 반복하지 않았다. 커밋 근거(비공개 원시 근거)를 보존하고 마감/근거 문서는 소스와 별도 커밋한다. 푸시는 요청되지 않아 수행하지 않았다. TASK-008 Human 최종 구현 리뷰·REV-009 Resolved·native GAP-004·장비 이월을 유지한다. 다음 시작점은 TASK-008/REV-009/EV-012 구현 리뷰이며 TASK-009는 미착수다.
 
 ## REV-010 처리 — 2026-10-30
 
@@ -79,7 +79,7 @@ Human 「프로젝트 브리핑해주고, 리뷰 지적사항 처리하고, TASK
 
 변경 파일/타입은 `catalog.rs`(`ReadPin`), `retention.rs`(`SegmentLog`, `FileStore`), `tc_005_retention.rs`(test `State`·신규 행동2개)다. 보존 통합17개·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt·보존 Miri16×8=128회 Pass다. REV-010은 Resolved로 갱신했다. 최종 명령·source49개 hash·원본 로그·결과/미실행 범위는 [EV-013](../../05_verification/verification_evidence.md#ev-013)에 기록했다. dependency/lock·RT 입력·unsafe 경계·worker 기동은 유지하며 TASK-008/MS-003 In Progress, TC-005 부분 실행·Gate4/5 Not Ready다.
 
-2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 EV-013 소스 `14fd1a4`를 커밋했다(source49개/commit blob hash 일치). `.cowork` 문서와 분리해 게시하며 TASK-009 후속 착수는 승인됐다. TASK-008 최종 구현 리뷰·REV-009/010 Resolved·native GAP-004는 유지한다.
+2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 EV-013 소스 `7102d93`를 커밋했다(source49개/commit blob hash 일치). `.cowork` 문서와 분리해 게시하며 TASK-009 후속 착수는 승인됐다. TASK-008 최종 구현 리뷰·REV-009/010 Resolved·native GAP-004는 유지한다.
 
 ## 검증 환경·시점 변경 — 2026-10-31
 

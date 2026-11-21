@@ -9,8 +9,8 @@ reservation has a declared limit, and every record that does not make it is
 counted rather than silently lost.
 
 > **Status:** pre-release (0.1). The API may still change. Linux is the
-> verified platform; see [Verification](#verification). The license has not
-> been chosen yet; see [License](#license).
+> verified platform; see [Verification](#verification). Licensed under MIT or
+> Apache-2.0; see [License](#license).
 
 ## Features
 
@@ -291,8 +291,19 @@ limits. When it reports a surface change, review it, update the snapshot with
 
 ## License
 
-Not yet chosen. Until a license is added, no license is granted.
+Licensed under either of
 
-The vendored [`mcap`](vendor/mcap-0.26.0) 0.26.0 crate is MIT-licensed by its
-authors; see [`VENDORED.md`](vendor/mcap-0.26.0/VENDORED.md) for the local
-changes.
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this work by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.
+
+The vendored [`mcap`](vendor/mcap-0.26.0) 0.26.0 crate is MIT-licensed by
+Foxglove Technologies Inc; its license text is in
+[`vendor/mcap-0.26.0/LICENSE`](vendor/mcap-0.26.0/LICENSE), and
+[`VENDORED.md`](vendor/mcap-0.26.0/VENDORED.md) lists the local changes.

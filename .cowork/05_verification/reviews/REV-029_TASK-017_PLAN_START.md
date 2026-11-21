@@ -4,7 +4,7 @@
 
 - 일자/담당: 2026-11-01 #004 / AI 개발 자가 점검. 독립 리뷰로 표현하지 않는다.
 - 요청: Human 「프로젝트 진행 파악하고, 리뷰 반입사항이 있다면 수정 반영 후, 다음 작업 시작」. 기존 구현·검증·리뷰 마감·분리 커밋/푸시 위임 적용.
-- 대상 형상: 0622a90, `diagnostics/mod.rs`·`lib.rs`·`tc_010_diagnostics.rs`. S1 계획/예산 순수 판정만 대상이며 RunCheck 전체 수락이 아니다.
+- 대상 형상: 75c6096, `diagnostics/mod.rs`·`lib.rs`·`tc_010_diagnostics.rs`. S1 계획/예산 순수 판정만 대상이며 RunCheck 전체 수락이 아니다.
 - 스킬: [code-review](../../../.agents/skills/code-review/SKILL.md) 체크리스트 적용.
 - 상태/판정: Closed / Pass — 신규 미해결 P1/P2/P3 없음. [EV-031](../verification_evidence.md#ev-031), 기존 위임 S1 로컬 수락.
 

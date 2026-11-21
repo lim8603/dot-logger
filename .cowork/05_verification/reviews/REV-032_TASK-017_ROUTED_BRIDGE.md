@@ -6,7 +6,7 @@
 - 대상: client 실행 예제/host 흐름·통합 시험·manifest/lock/사용법, TASK-017 S3 첫 생산 모듈 연결 단위.
 - 기준: [code-review 스킬](../../../.agents/skills/code-review/SKILL.md)·API §15.6·TC-010·coding convention. 신규 기능/불명 경계 시험을 먼저 작성해 compile Red를 확인하고 구현했다.
 - 상태/판정: Closed / Pass. Open → In Progress → Resolved → Closed를 개발 자가 점검 및 기존 위임 수락으로 이 회차에 처리했다. 신규 미해결 P1/P2/P3 없음.
-- 근거: [EV-034](../verification_evidence.md#ev-034)·[결과/형상](../../06_evolution/imported_context/task_017_routed_2026-11-01/results.json). source commit은 결과의 `source_commit`/`sources` 대조를 따른다.
+- 근거: [EV-034](../verification_evidence.md#ev-034)·결과/형상(비공개 원시 근거). source commit은 결과의 `source_commit`/`sources` 대조를 따른다.
 
 ## 요약표
 

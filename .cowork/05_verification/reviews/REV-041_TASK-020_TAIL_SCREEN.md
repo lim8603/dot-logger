@@ -6,7 +6,7 @@
 - 대상: `dot_probe_tail`·shared `support/tail`·`tail_screen` 시험·client Cargo 예제 등록·README. core/client 제품 src·wire·의존 버전·lock 변경 없음.
 - 상태: **Closed** — Open → In Progress → RV-083 조치/검증으로 Resolved → 기존 2026-10-31 위임에 따라 S3 로컬 수락/마감.
 - 종합 판정: **Pass — S3 로컬 화면 예제 범위**, 새 미해결 지적 없음. 실제 지속 앱/정량 성능/native는 범위 밖이다.
-- 근거: [EV-042](../verification_evidence.md#ev-042)·[명령/로그](../../06_evolution/imported_context/task_020_s3_2026-11-02/checks.json).
+- 근거: [EV-042](../verification_evidence.md#ev-042)·명령/로그(비공개 원시 근거).
 
 ## 리뷰 요약
 
@@ -24,10 +24,10 @@
 
 ## [처리담당] RV-083
 
-- 판정: 수용. 큰 schema ID에서 serde_json json! 내부 number out of range panic을 실제 재현했다([Red](../../06_evolution/imported_context/task_020_s3_2026-11-02/red-identity.log)).
+- 판정: 수용. 큰 schema ID에서 serde_json json! 내부 number out of range panic을 실제 재현했다(Red(비공개 원시 근거)).
 - 조치: schema/session은 32자리 hex, sequence/revision/mono/real/source ticks/domain·transfer 위치는 문자열로 출력한다. source_time은 ticks/domain 구조 또는 null이며 원래 시각을 재해석하지 않는다.
 - 검증: `large_native_identifiers_and_signed_source_clocks_are_exact_in_screen_json` Green. 신규8개에는 종료/재구독·local wait·Gap/span·stale 화면 호출·history full·실제 lease/새 TCP/취소·실제 미ACK/Unknown·예약0·한글 출력·취소/중첩 runtime 거절이 포함된다.
-- 최종 검증: source `0b02274`·검증파일134개 commit blob 일치, 두 Rust workspace각421개(DB5개 ignore)·default/remote·fmt/clippy/doc·CLI0/4·default graph Pass. EV-042로 S3 로컬 수락/Closed. 실제 지속 dot-probe/화면·장기 무손실 tail/재구독 복원·LAN/RSS/PC/RT/UPS/native는 후속이다.
+- 최종 검증: source `a48b80d`·검증파일134개 commit blob 일치, 두 Rust workspace각421개(DB5개 ignore)·default/remote·fmt/clippy/doc·CLI0/4·default graph Pass. EV-042로 S3 로컬 수락/Closed. 실제 지속 dot-probe/화면·장기 무손실 tail/재구독 복원·LAN/RSS/PC/RT/UPS/native는 후속이다.
 
 ## 변경표
 

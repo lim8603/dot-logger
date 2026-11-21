@@ -5,7 +5,7 @@
 - 일자: 2026-10-31 #012 / AI 개발 세션 자가 점검. 독립 리뷰 세션이 아니다.
 - 대상: telemetry/{capacity,report,mod}.rs·TC-009 리포트/실제 window 연결·공개 consumer·allocator·README.
 - 근거: 승인된 API§15·TASK-015 착수/로컬 수락·게시 위임. 새 stack/프로토콜·설정 자동 변경 없음.
-- 상태: Closed — EV-028 source100개/검사13개·Miri168·소스a247d01·commit blob 일치 후 기존 위임으로 AI 로컬 수락.
+- 상태: Closed — EV-028 source100개/검사13개·Miri168·소스95a63a6·commit blob 일치 후 기존 위임으로 AI 로컬 수락.
 - 판정: 로컬 Pass. 아래 지적은 실패 재현 후 조치·회귀 검증했으며 신규 미해결 P1/P2 없음. 독립 리뷰/Human 직접 재리뷰·실측을 주장하지 않는다.
 
 ## 요약표
@@ -54,4 +54,4 @@ PC/RT 실제 IO 예측 오차≤20%·계측 비용≤5%·다른 OS/native(T3)·�
 
 ## 최종 검증·수락
 
-[EV-028](../verification_evidence.md#ev-028) 소스a247d01·source100개/검사13개 exit0·Miri168·디스크/commit blob hash 일치. 두 Rust 각16feature/workspace·core-client·공개 consumer/RT allocator·clippy/rustdoc/fmt Pass. 위임으로 RV-056~059 및 본 개발 자가 점검을 Closed로 마감한다. 새 H/J/ADR 승격 대상 없음, 실제 PC/RT 오차·비용/native/실앱 후속 유지.
+[EV-028](../verification_evidence.md#ev-028) 소스95a63a6·source100개/검사13개 exit0·Miri168·디스크/commit blob hash 일치. 두 Rust 각16feature/workspace·core-client·공개 consumer/RT allocator·clippy/rustdoc/fmt Pass. 위임으로 RV-056~059 및 본 개발 자가 점검을 Closed로 마감한다. 새 H/J/ADR 승격 대상 없음, 실제 PC/RT 오차·비용/native/실앱 후속 유지.

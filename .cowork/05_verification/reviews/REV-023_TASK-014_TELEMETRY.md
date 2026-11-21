@@ -4,7 +4,7 @@
 
 - 2026-10-31 #011 / AI 개발 세션 자가 점검. 독립 리뷰 세션으로 가장하지 않는다. Human 「권고대로 진행하자」와 기존 수락/게시 위임 범위.
 - 대상: telemetry/{mod,counters,aggregate}.rs, CaptureOwner/Scope/Producer, Completion의 session/revision/target_totals, TC-009·RT allocator 추가2개·overhead fixture.
-- 상태: Closed — EV-027/소스d99ba3b·source97개 commit blob 확인 후 위임된 AI 로컬 수락.
+- 상태: Closed — EV-027/소스3164f0d·source97개 commit blob 확인 후 위임된 AI 로컬 수락.
 - 판정: 로컬 정적 점검에서 신규 P1/P2 지적 없음. 기존 성능/실앱/OS·RT/native 공백은 유지한다.
 
 ## 검토 결과

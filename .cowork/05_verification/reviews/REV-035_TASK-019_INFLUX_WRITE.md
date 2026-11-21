@@ -3,10 +3,10 @@
 ## 개요
 
 - 일자/담당: 2026-11-01 #010 / AI 개발 세션 자가 점검. [code-review 스킬](../../../.agents/skills/code-review/SKILL.md) 적용, 독립 리뷰 세션과 구분한다.
-- 대상: 소스 `0ef1395`, 선택 `influxdb` 모듈·TC-008 로컬 대역 시험·Cargo·README.
+- 대상: 소스 `03c6c35`, 선택 `influxdb` 모듈·TC-008 로컬 대역 시험·Cargo·README.
 - 종합 판정: **Pass — S1 로컬 구현/검증 범위**. 미해결 P1/P2/P3 없음. Task 전체는 In Progress.
 - 상태: **Closed** — Open → In Progress → Resolved → 2026-10-31 위임 범위 로컬 수락. 실제 DB/query·Delivery·실앱/환경 수락을 대체하지 않는다.
-- 검증: [EV-037](../verification_evidence.md#ev-037)·[명령/소스/commit blob 대조](../../06_evolution/imported_context/task_019_2026-11-01/results.json).
+- 검증: [EV-037](../verification_evidence.md#ev-037)·명령/소스/commit blob 대조(비공개 원시 근거).
 
 ## 요약표
 
@@ -26,7 +26,7 @@
 
 ## [처리담당] 판정/검증
 
-- **RV-073 수용:** `Writer::encode`에서 integer/float/boolean/event field key 사용. `heterogeneous_channels_use_distinct_field_types_in_one_measurement`가 기존 value key에서 실패한 [Red](../../06_evolution/imported_context/task_019_2026-11-01/red-field-types.log)를 보존하고 최종 통과했다. DB 엔진의 실제 type-conflict 동작은 S2에서 대조한다.
+- **RV-073 수용:** `Writer::encode`에서 integer/float/boolean/event field key 사용. `heterogeneous_channels_use_distinct_field_types_in_one_measurement`가 기존 value key에서 실패한 Red(비공개 원시 근거)를 보존하고 최종 통과했다. DB 엔진의 실제 type-conflict 동작은 S2에서 대조한다.
 - **RV-074 수용:** `BodyData`/`BodyOwner`가 `Arc<Reservation>`을 HTTP-owned bytes에 연결하며 Writer는 `Weak`로 이전 body 유무를 검사한다. 순수 수명 시험에서 local owner 해제 뒤에도 transport clone이 남으면 예약4096B/원문/slot을 유지하고 마지막 clone Drop 뒤0을 확인했다. 실제 TCP 진행 중 취소·timeout은 Unknown, 같은 timestamp 재제출은 Collision, runtime/peer 종료 뒤 공유 예약0을 확인했다. 사전 수명 검토 보강이며 기존 제품에서 누수를 관측했다고 주장하지 않는다.
 - 기능 부재 compile Red, 신규10개 TCP/입력/상한 시나리오+1개 body 수명 시험 Pass. 두 Rust workspace각385, 개발 Rust16 feature 조합/독립 core consumer/RT allocator·fmt/clippy/core·client API rustdoc(-D warnings) Pass. 전체 회귀 뒤 테스트만 취소+실제 timeout으로 확장했고 두 Rust 해당10개와 fmt/clippy를 재실행했다(생산 source 불변).
 - 새 unsafe 없음·Miri/native 미실행. 실제 DB version pin/제한 수치 query·write/query·Router Delivery/완료·파일 장애 격리 계측·실앱/실측/native는 후속이며 S1 Pass를 확대하지 않는다.

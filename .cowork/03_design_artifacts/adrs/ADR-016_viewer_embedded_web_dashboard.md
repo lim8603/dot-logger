@@ -32,15 +32,15 @@ TASK-032는 Foxglove 계열 도구가 보여주지 않는 dot-logger 고유의 �
 
 ## 구현 기록 — 2026-11-21
 
-제품 `704d055`(TASK-032 S2)는 다음과 같다.
+제품 `c876395`(TASK-032 S2)는 다음과 같다.
 
 - **HTTP 처리:** hyper 대신 이미 잠긴 `httparse`(hyper가 쓰는 파서)로 GET만 받는 작은 처리부를 두었다. 연결마다 요청 하나를 처리하고 닫는다. keep-alive·chunked 같은 기능이 필요 없어 표면이 더 작다. 외부 crate 수는 그대로(lockfile 패키지 203개)이며 의존 관계 한 줄만 추가됐다.
 - **의존성:** viewer는 GetStatus 요청 타입 때문에 workspace의 `dot-logger`를 일반 의존성으로 쓴다(이전에는 개발 의존성).
 - **경로·형식:** [화면 §7.1](../ui_spec.md#71-s2-구현--2026-11-21)에 있다. [EV-107](../../05_verification/verification_evidence.md#ev-107)
 
-S3(`277de2d`)에서는 Compare·PlanCheck 조회를 같은 상류 작업자로 보낸다. 상태 조회와 합쳐 동시에 하나만 진행하므로 결정 2의 상한(명령 슬롯 1개)을 유지한다. 대기열은 4개이고, 넘치면 `viewer_busy`다. 형식은 [화면 §7.2](../ui_spec.md#72-s3-구현--2026-11-21)에 있다. [EV-108](../../05_verification/verification_evidence.md#ev-108)
+S3(`97ece7f`)에서는 Compare·PlanCheck 조회를 같은 상류 작업자로 보낸다. 상태 조회와 합쳐 동시에 하나만 진행하므로 결정 2의 상한(명령 슬롯 1개)을 유지한다. 대기열은 4개이고, 넘치면 `viewer_busy`다. 형식은 [화면 §7.2](../ui_spec.md#72-s3-구현--2026-11-21)에 있다. [EV-108](../../05_verification/verification_evidence.md#ev-108)
 
-REV-070 조치(`6b736c9`)로 다음이 바뀌었다.
+REV-070 조치(`007b25c`)로 다음이 바뀌었다.
 
 - 결정 2의 조회 간격은 "이전 GetStatus 종료 1초 뒤"로 구현한다.
 - 결정 4의 Host 검사는 포트가 생략되면 80으로 본다.

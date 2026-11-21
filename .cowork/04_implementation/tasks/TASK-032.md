@@ -27,8 +27,8 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | UI 방식·화면 범위 결정 | 권고안(viewer 내장 웹: 단일 바이너리·브라우저·3 OS)과 대안 비교, ui_spec 반영안 Human 승인 | Done — 2026-11-21 ADR-016·[화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21) |
-| S2 | 상태·리포트·완료 화면 | Status/Report/Completion 표시, 값 구분·갱신 실패 표시 | Done — 2026-11-21 `704d055`, [EV-107](../../05_verification/verification_evidence.md#ev-107) |
-| S3 | 전후 비교·점검 화면 | Compare 결과·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시(변경 동작 없음) | Done — 2026-11-21 `277de2d`, [EV-108](../../05_verification/verification_evidence.md#ev-108) |
+| S2 | 상태·리포트·완료 화면 | Status/Report/Completion 표시, 값 구분·갱신 실패 표시 | Done — 2026-11-21 `c876395`, [EV-107](../../05_verification/verification_evidence.md#ev-107) |
+| S3 | 전후 비교·점검 화면 | Compare 결과·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시(변경 동작 없음) | Done — 2026-11-21 `97ece7f`, [EV-108](../../05_verification/verification_evidence.md#ev-108) |
 
 ## 변경 대상과 첫 검증
 
@@ -62,23 +62,23 @@ Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)�
 
 - `--dashboard ADDR`로 loopback HTTP 대시보드를 연다. `/api/status`는 `dot_logger.viewer.dashboard.v1`이다. 상류 `status.v1`을 그대로 넘기고, 마지막 성공 값과 최근 실패 사유·시각을 분리해 담는다.
 - 화면은 연결 머리줄, 최근 표본(Capture·전체·필수 출력), 10/60/300초 window, snapshot 목록을 보여준다. `status.v1`에 대상별 분해가 없어 출력은 전체·필수 합계로 표시한다([화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)).
-- 시험 5건(값 상태 보존, 지표 없음, 실패 뒤 마지막 값 유지, HTTP 경계, 실제 hub 응답·권한 거절·호스트 종료)이 stub에서 Red였고 구현 뒤 Green이다. 브라우저 확인 캡처 3종은 [근거](../../06_evolution/imported_context/task_032_s2_2026-11-21/README.md)에 있다.
+- 시험 5건(값 상태 보존, 지표 없음, 실패 뒤 마지막 값 유지, HTTP 경계, 실제 hub 응답·권한 거절·호스트 종료)이 stub에서 Red였고 구현 뒤 Green이다. 브라우저 확인 캡처 3종은 근거(비공개 원시 근거)에 있다.
 
 ## S3 결과 — 2026-11-21
 
 - `/api/compare?before=&after=`와 `/api/plan?id=`는 호스트의 `compare.v1`·`check.v1` plan을 그대로 담거나, 이름 있는 실패(gone·unsupported·viewer_busy 등)를 돌려준다.
 - 상태 조회와 조회 요청은 작업자 하나가 한 번에 하나씩 처리한다(상류 명령 슬롯 1개).
 - 화면은 보유 snapshot 두 개의 비교(양쪽 조건, 다른 조건, 변화 8항목)와 계획 미리보기를 보여준다. 실행 버튼은 없다.
-- 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. [근거](../../06_evolution/imported_context/task_032_s3_2026-11-21/README.md)
+- 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. 근거(비공개 원시 근거)
 
 ## 독립 리뷰 REV-070 — 2026-11-21
 
-Codex의 독립 리뷰가 P1 1건과 P2 4건(RV-166~170)을 냈다. `6b736c9`에서 모두 수용해 조치했고(RV-170은 기준 조정), 위임 범위에서 Closed로 마감했다. 상류 주소 노출 방지, 렌더링 실패 뒤 갱신 계속, 포트 80 Host, 최신 조회 결과만 반영, 호스트 기준 1초 간격이 바뀌었다. [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) · [EV-109](../../05_verification/verification_evidence.md#ev-109)
+Codex의 독립 리뷰가 P1 1건과 P2 4건(RV-166~170)을 냈다. `007b25c`에서 모두 수용해 조치했고(RV-170은 기준 조정), 위임 범위에서 Closed로 마감했다. 상류 주소 노출 방지, 렌더링 실패 뒤 갱신 계속, 포트 80 Host, 최신 조회 결과만 반영, 호스트 기준 1초 간격이 바뀌었다. [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) · [EV-109](../../05_verification/verification_evidence.md#ev-109)
 
 ## 수락 — 2026-11-21
 
 Human 「승인」으로 TASK-032를 수락하고 Done으로 마감했다.
 
-- **근거:** S1 [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), S2 `704d055`([EV-107](../../05_verification/verification_evidence.md#ev-107)), S3 `277de2d`([EV-108](../../05_verification/verification_evidence.md#ev-108)), 독립 리뷰 [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) 조치 `6b736c9`([EV-109](../../05_verification/verification_evidence.md#ev-109)).
+- **근거:** S1 [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), S2 `c876395`([EV-107](../../05_verification/verification_evidence.md#ev-107)), S3 `97ece7f`([EV-108](../../05_verification/verification_evidence.md#ev-108)), 독립 리뷰 [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) 조치 `007b25c`([EV-109](../../05_verification/verification_evidence.md#ev-109)).
 - **회귀:** 마지막 상태에서 Rust 1.85.0·1.96.0 각 724 Pass·5 ignored.
 - **남은 범위(이 Task 밖):** native 실행(T3·GAP-004), 실사용처 화면(TASK-026), 브라우저 렌더링 자동 시험. 원격 `CheckHost` 데모가 없어 PlanCheck 성공 화면은 하네스로만 확인했다.

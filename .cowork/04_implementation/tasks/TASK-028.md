@@ -31,8 +31,8 @@ Human이 리뷰 포인트 3건을 모두 권고안으로 정했다. preset은 `c
 
 | 하위 | 범위 | 상태 |
 |---|---|---|
-| S1a | core 예약 공식을 생성자와 공유하는 순수 함수로 추출하고 facade `derive`를 정확 요구량 배정으로 교체(RV-097) | 로컬 Pass — 소스 `21cc198`, F14 |
-| S1b | `Sizing`·`Preset` 3종·builder `.preset`·`plan()`과 근거, 사용자 값 우선, 부족 항목·부족량 | 로컬 Pass — 소스 `4465be3`, F15, [EV-052](../../05_verification/verification_evidence.md#ev-052), [REV-050](../../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) Closed, API §19.3 |
+| S1a | core 예약 공식을 생성자와 공유하는 순수 함수로 추출하고 facade `derive`를 정확 요구량 배정으로 교체(RV-097) | 로컬 Pass — 소스 `c92fb98`, F14 |
+| S1b | `Sizing`·`Preset` 3종·builder `.preset`·`plan()`과 근거, 사용자 값 우선, 부족 항목·부족량 | 로컬 Pass — 소스 `d23de85`, F15, [EV-052](../../05_verification/verification_evidence.md#ev-052), [REV-050](../../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md) Closed, API §19.3 |
 
 ## S2 Human 결정과 계획 — 2026-11-11
 

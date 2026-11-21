@@ -3,7 +3,7 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-10-31 / AI ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md))
-- **대상:** TASK-011 리뷰 조치 커밋 [`9660d7d`](../../../crates/dot-logger/src/replay/mod.rs) (`crates/dot-logger/src/replay/mod.rs`, `crates/dot-logger/tests/tc_006_replay.rs`) 및 관련 쿼리 모듈
+- **대상:** TASK-011 리뷰 조치 커밋 [`c6cc5a5`](../../../crates/dot-logger/src/replay/mod.rs) (`crates/dot-logger/src/replay/mod.rs`, `crates/dot-logger/tests/tc_006_replay.rs`) 및 관련 쿼리 모듈
 - **종합 판정:** Pass (권고사항 P2 1건, P3 2건)
   - **Safe Rust 100%**: `replay/mod.rs` 내 `unsafe` 0건, 원소유권 및 라이프타임(`&mut self` 바운드)에 의한 동기식 메모리/버퍼 배타성 완벽 보장
   - **RT 경로 제로 오염**: 오프라인 전용 모듈로 RT 캡처 스레드 오염 및 힙 할당 전이 없음 (`tests/rt-allocation` 0건 유지)
@@ -101,7 +101,7 @@
 
 - 판정: 대안 수용(A — 기존 MSRV/예약 알고리즘 유지). 설치된 nightly 표준 라이브러리 소스는 `try_update` stable since 1.95.0, `fetch_update` deprecation since 1.99.0을 명시한다. 개발1.96의 clippy Pass와 nightly 경고는 서로 다른 툴체인 관측이다.
 - `try_update` 직접 교체는 MSRV1.85에 맞지 않으므로 `QueryBudget::reserve` 한 함수에서만 `#[allow(deprecated)]`를 적용했다. AcqRel/Acquire·checked_add·한도·permit 반환은 변경하지 않았다. 문서/경고 처리 전용 형식적 Red는 만들지 않았다.
-- 근거: [설치 툴체인 원문 발췌](../../06_evolution/imported_context/task_011_final_review_fixes_2026-10-31/toolchain-atomic-evidence.txt), EV-020의 두 Rust 회귀 및 `RUSTFLAGS=-D deprecated` Miri Pass.
+- 근거: 설치 툴체인 원문 발췌(비공개 원시 근거), EV-020의 두 Rust 회귀 및 `RUSTFLAGS=-D deprecated` Miri Pass.
 
 ### [처리담당] RV-030
 
@@ -116,7 +116,7 @@
 
 ### 검증·수락 경계
 
-[EV-020](../verification_evidence.md#ev-020)·[source54개/검사10개·로그 hash](../../06_evolution/imported_context/task_011_final_review_fixes_2026-10-31/results.json): 두 Rust workspace all-features/consumer/clippy/rustdoc·fmt 및 replay14 Miri 단일 seed Pass. RT guard10·할당/해제0/0, query/replay 예약 내 peak·잔여0 유지. RT/unsafe·의존성/lock·소유권·오류 분류/terminal 정리 변경 없음. code-review 스킬 기준 자가 점검에서 새 P1/P2 미해결 사항은 확인하지 못했다.
+[EV-020](../verification_evidence.md#ev-020)·source54개/검사10개·로그 hash(비공개 원시 근거): 두 Rust workspace all-features/consumer/clippy/rustdoc·fmt 및 replay14 Miri 단일 seed Pass. RT guard10·할당/해제0/0, query/replay 예약 내 peak·잔여0 유지. RT/unsafe·의존성/lock·소유권·오류 분류/terminal 정리 변경 없음. code-review 스킬 기준 자가 점검에서 새 P1/P2 미해결 사항은 확인하지 못했다.
 
 원 리뷰 §1~5의 Read-Only/시험 수치는 이전 리뷰 세션의 기록이며 이번 개발 검증은 EV-020으로 구분한다. 상태 이력은 Open → In Progress → Resolved다. 기존 EV-018/019·REV-015/016 Human 승인은 유지하며 이번 추가 조치만 최종 승인 대기다. native 공개 후(T3)·PC 성능/실제 timer·UPS 시뮬레이션·다른 OS는 미실행, TASK-011/MS-004 In Progress·Gate4/5 Not Ready 유지. 소스/문서는 미커밋·미게시다.
 

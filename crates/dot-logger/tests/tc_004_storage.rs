@@ -1036,7 +1036,7 @@ fn a_finished_segment_cannot_skip_a_later_files_expired_unsynced_records() {
     );
 }
 
-/// TASK-023 S2c finding (regression of RV-128 `97e2b12`): a record routed
+/// TASK-023 S2c finding (regression of RV-128 `a4b9bcb`): a record routed
 /// only to another target before this file's first record was never owed to
 /// any file of this target, even after its completion slot was reused. Only
 /// records after the file's last one can sit in a later file.

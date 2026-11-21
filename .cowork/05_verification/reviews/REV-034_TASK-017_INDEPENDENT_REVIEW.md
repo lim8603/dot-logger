@@ -3,8 +3,8 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-11-01 / AI 리뷰 전용 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
-- **성격:** 독립 Read-Only 코드리뷰. REV-033은 개발 세션 자가 점검이었으므로, TASK-017 고정 routed RunCheck 커밋(`56e7b9a`) 전체에 대해 독립적 관점에서 심층 검토를 수행했다. 제품 코드는 전혀 수정하지 않았다.
-- **대상 형상:** 커밋 `56e7b9a` (15개 파일 변경, +1645 / -521)
+- **성격:** 독립 Read-Only 코드리뷰. REV-033은 개발 세션 자가 점검이었으므로, TASK-017 고정 routed RunCheck 커밋(`bb1df93`) 전체에 대해 독립적 관점에서 심층 검토를 수행했다. 제품 코드는 전혀 수정하지 않았다.
+- **대상 형상:** 커밋 `bb1df93` (15개 파일 변경, +1645 / -521)
   - 코어 호스트/트레이트: [`diagnostics/routed.rs`](../../../crates/dot-logger/src/diagnostics/routed.rs) (신규), [`diagnostics/host.rs`](../../../crates/dot-logger/src/diagnostics/host.rs), [`diagnostics/mod.rs`](../../../crates/dot-logger/src/diagnostics/mod.rs), [`diagnostics/run.rs`](../../../crates/dot-logger/src/diagnostics/run.rs)
   - 클라이언트 스냅샷 점검/브리지: [`src/diagnostics/mod.rs`](../../../crates/dot-logger-client/src/diagnostics/mod.rs) (신규), [`src/diagnostics/bridge.rs`](../../../crates/dot-logger-client/src/diagnostics/bridge.rs) (신규), [`src/lib.rs`](../../../crates/dot-logger-client/src/lib.rs), [`examples/dot_probe_check.rs`](../../../crates/dot-logger-client/examples/dot_probe_check.rs)
   - 테스트 및 CLI 검증: [`tests/routed_host.rs`](../../../crates/dot-logger-client/tests/routed_host.rs) (신규), [`tests/routed_check_host.rs`](../../../crates/dot-logger-cli/tests/routed_check_host.rs) (신규), [`tests/check_host.rs`](../../../crates/dot-logger-cli/tests/check_host.rs)
@@ -65,7 +65,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·Closed (Open → In Progress → Resolved → 위임 수락).
 - **처리 내용:** `SnapshotCheck::TARGET_ID`를 공개하고 trait·공용 bridge·고정 host 예제가 같은 상수를 소비한다. 독립 컴파일되는 bridge fixture에서도 `dot_logger_client` 경로로 접근한다.
-- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `a972229`; workspace374·MSRV routed host7·fmt/clippy/rustdoc·무부하 preview Pass. 문서/상수 보강이며 동작 결함을 수정하지 않아 신규 재현 시험은 추가하지 않았다.
+- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `6cc91bb`; workspace374·MSRV routed host7·fmt/clippy/rustdoc·무부하 preview Pass. 문서/상수 보강이며 동작 결함을 수정하지 않아 신규 재현 시험은 추가하지 않았다.
 
 ---
 
@@ -83,7 +83,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·Closed (Open → In Progress → Resolved → 위임 수락).
 - **처리 내용:** struct rustdoc에 16MiB logger+8MiB input/JSON/receiver/runtime=24MiB 요구량과 RSS/OS hard limit이 아님을 명시했다. `REQUIRED_MEMORY_BYTES`를 공개하여 trait·예제 plan과 실제 등록이 공유한다.
-- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `a972229`; 기존 메모리 부족 등록 거절/슬롯 미소비 시험과 32MiB 실제 routed 실행 회귀, rustdoc Pass.
+- **검증 근거:** [EV-036](../verification_evidence.md#ev-036), 소스 `6cc91bb`; 기존 메모리 부족 등록 거절/슬롯 미소비 시험과 32MiB 실제 routed 실행 회귀, rustdoc Pass.
 
 ---
 

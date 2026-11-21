@@ -6,18 +6,18 @@
 |---|---|
 | 회차 / 일자 | REV-066 / 2026-11-18 |
 | 리뷰어 | Antigravity AI — 리뷰 전용 세션 |
-| 대상 | REV-059 이후 누적 커밋 `ae3b6b3..3f8a46f` (7개 코드 커밋: `8b59aa6`, `874c27c`, `be20250`, `eeae5a3`, `f1444d4`, `a3296dc`, `753794f`) |
-| 범위 | REV-059 결함 조치(`8b59aa6`), TASK-034 D/E runtime 채널 설정·native/loss 통합 및 tracing 회귀(`874c27c`, `be20250`), ADR-013 `.logger` 예약 토픽·`standard/2` 개정(`eeae5a3`), TASK-031 S2 실시간 Foxglove WS v1 viewer(`f1444d4`), S3 MCAP 최상위 등록 배치(`a3296dc`), S3 Query/ReadBlob 원격 기록 재생(`753794f`) |
+| 대상 | REV-059 이후 누적 커밋 `0c82bcf..54a2653` (7개 코드 커밋: `ca89b69`, `3254b81`, `e69aee3`, `aaf8bdc`, `b319fe1`, `4be7240`, `bc51394`) |
+| 범위 | REV-059 결함 조치(`ca89b69`), TASK-034 D/E runtime 채널 설정·native/loss 통합 및 tracing 회귀(`3254b81`, `e69aee3`), ADR-013 `.logger` 예약 토픽·`standard/2` 개정(`aaf8bdc`), TASK-031 S2 실시간 Foxglove WS v1 viewer(`b319fe1`), S3 MCAP 최상위 등록 배치(`4be7240`), S3 Query/ReadBlob 원격 기록 재생(`bc51394`) |
 | 최초 판정 | **Conditional** — P1 0 · P2 3 · P3 1 (`RV-156~159`) |
 | 조치 후 판정 | **Pass** — RV-156~159 검증 완료 |
 | 상태 | **Closed** — 2026-11-18 #005, 위임 수락 |
 
 정적 분석(`cargo +1.96.0 fmt --all --check`, `clippy --workspace --all-targets --all-features --locked -- -D warnings`), 워크스페이스 전체 테스트(`cargo +1.96.0 test --workspace --all-features --locked`: 692 passed, 0 failed, 5 ignored — RT 할당 20 passed, viewer 6 passed, doctests 24 passed 포함), strict `rustdoc`(`1.96.0`, `1.85.0` 모두 Pass), `scripts/check-integration-surface.py`(facade 이름 있는 항목 35/60, L1~L3 레시피·실행·README 일치)는 모두 통과했다.
 
-`ae3b6b3..3f8a46f` 구간의 제품 코드를 ADR-013·ADR-014·API §22~24 및 RT/동시성/예산 계약과 대조해 정밀 검토한 결과 다음 4건(P2 3건, P3 1건)을 확인했다:
+`0c82bcf..54a2653` 구간의 제품 코드를 ADR-013·ADR-014·API §22~24 및 RT/동시성/예산 계약과 대조해 정밀 검토한 결과 다음 4건(P2 3건, P3 1건)을 확인했다:
 1. **P2 (`RV-156`):** `dot-logger-viewer` 실시간 bridge에서 `Bridge::subscribe`와 `Lease::drop` 간 동기 해제·즉시 재구독 레이스(`options.feeds` 경계에서 불필요한 구독 거절 및 `LiveBudget` 경합), 스키마 불일치 은퇴 시 `Upstream::run`이 오해 소지 `Notice::Unknown`을 추가 발행하는 문제, 그리고 `Notices`의 채널 구분 없는 단일 슬롯 덮어쓰기 문제를 확인했다.
 2. **P2 (`RV-157`):** `dot-logger-viewer` 원격 기록 재생(`replay.rs`)에서 `play` 실패 후 닫히거나 미바인딩·만료된 `RemoteRecording`을 `None`으로 초기화하지 않아 이후 `seek`가 영구 실패하는 문제, 단일 채널 스키마 불일치 시 해당 채널 은퇴·`unadvertise` 대신 전체 재생이 중단되는 문제, 그리고 `--replay-blob-bytes` 허용 상한(`16 MiB`)이 `RemoteConfig.message_bytes`(기본 `256 KiB + 1024`)에 반영되지 않아 무음 절삭되는 문제를 확인했다.
-3. **P2 (`RV-158`):** 최상위 MCAP 등록 배치(`a3296dc`) 전환 이후 `storage/recovery.rs`의 `recover_inner`가 등록 레코드 누락·절단 파일의 `EndOfInput`/`DataEnd`를 `InvalidRecord`로 거절하지 못하는 문제, `storage/read.rs`의 `registrations`가 `.logger/meta`·`.logger/loss` 제어 채널 및 사용자 채널 `metadata` 일부를 즉시 검증하지 않는 문제, 그리고 `Validation::schema`/`channel`의 중복 등록 차단이 불완전한 문제를 확인했다.
+3. **P2 (`RV-158`):** 최상위 MCAP 등록 배치(`4be7240`) 전환 이후 `storage/recovery.rs`의 `recover_inner`가 등록 레코드 누락·절단 파일의 `EndOfInput`/`DataEnd`를 `InvalidRecord`로 거절하지 못하는 문제, `storage/read.rs`의 `registrations`가 `.logger/meta`·`.logger/loss` 제어 채널 및 사용자 채널 `metadata` 일부를 즉시 검증하지 않는 문제, 그리고 `Validation::schema`/`channel`의 중복 등록 차단이 불완전한 문제를 확인했다.
 4. **P3 (`RV-159`):** `logger/mod.rs:38`의 `rustdoc` `redundant_explicit_links` 경고 1건(pinned nightly doc 체크 시 발생)과 `logger/host.rs:538-552`의 `worker_failed` 종료 감지 순서 정렬을 권고한다.
 
 리뷰 전용 세션 원칙(Strict Read-Only)에 따라 제품 코드·저장소 테스트는 수정하지 않았다.
@@ -28,7 +28,7 @@
 
 | 구분 | 파일 | 변경 내용 |
 |---|---|---|
-| 생성 | [REV-066](REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | `ae3b6b3..3f8a46f` 통합 코드리뷰 결과(`RV-156~159`) 및 처리담당 영역 기록 (`Open`) |
+| 생성 | [REV-066](REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | `0c82bcf..54a2653` 통합 코드리뷰 결과(`RV-156~159`) 및 처리담당 영역 기록 (`Open`) |
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | 미처리 리뷰 목록·코드리뷰 현황에 REV-066 (`Open`, P2 3·P3 1) 등록 및 다음 시작점 동기화 |
 | 수정 | [my_state.md](../../members/lim8603/workspace/my_state.md) | 개인 상태 인덱스 리뷰·세션·다음 시작점 동기화 |
 | 생성 | [session_2026-11-18_004.md](../../members/lim8603/workspace/session_logs/session_2026-11-18_004.md) | 코드리뷰 세션 로그 (`2026-11-18 #004`) |
@@ -97,7 +97,7 @@
 
 - **판정 결과:** 수용 → `Resolved` → 위임 수락으로 `Closed` (**2026-11-18 #005**).
 - **처리 내용:** 같은 채널은 즉시 재구독 시 기존 상류 연결을 재사용한다. 다른 채널로 교체할 때는 이전 작업을 취소하고 수신 예약이 반환된 뒤 슬롯을 사용한다. 채널별 상태와 WebSocket 상태 ID를 분리하고 스키마 불일치에는 Unsupported와 광고 회수를 적용한다.
-- **검증 근거:** 실제 TCP/gRPC에서 feeds 1의 같은 채널 재사용·다른 채널 교체·최종 반납, 두 채널의 같은 틱 상태, 광고 회수에서 추가 Unknown이 없는지 확인했다. 제품 `bd02d49`. [EV-095](../verification_evidence.md#ev-095)
+- **검증 근거:** 실제 TCP/gRPC에서 feeds 1의 같은 채널 재사용·다른 채널 교체·최종 반납, 두 채널의 같은 틱 상태, 광고 회수에서 추가 Unknown이 없는지 확인했다. 제품 `b016fe8`. [EV-095](../verification_evidence.md#ev-095)
 
 ---
 
@@ -129,11 +129,11 @@
 
 - **판정 결과:** 수용 → `Resolved` → 위임 수락으로 `Closed` (**2026-11-18 #005**).
 - **처리 내용:** 재생 실패 후 다음 seek가 연결과 스냅샷을 새로 연다. 성공한 이동은 기존 스냅샷을 보존한다. 스키마 불일치 채널을 은퇴시키고, 나머지 채널의 재생을 계속한다. ReadBlob 옵션에 전송 여유 1 KiB를 반영했다.
-- **검증 근거:** 실제 TCP/gRPC·WebSocket에서 만료 후 snapshot 0 요청, 한 채널의 Unsupported/광고 회수와 다른 채널의 프레임, 280 KiB ReadBlob·부분 응답 조립·옵션 상한을 확인했다. 제품 `bd02d49`. [EV-095](../verification_evidence.md#ev-095)
+- **검증 근거:** 실제 TCP/gRPC·WebSocket에서 만료 후 snapshot 0 요청, 한 채널의 Unsupported/광고 회수와 다른 채널의 프레임, 280 KiB ReadBlob·부분 응답 조립·옵션 상한을 확인했다. 제품 `b016fe8`. [EV-095](../verification_evidence.md#ev-095)
 
 ---
 
-### RV-158 — 최상위 MCAP 등록 배치(`a3296dc`) 전환 이후 `recovery.rs`·`read.rs`의 등록 완결성·제어 채널·중복 등록 검증 공백 (P2)
+### RV-158 — 최상위 MCAP 등록 배치(`4be7240`) 전환 이후 `recovery.rs`·`read.rs`의 등록 완결성·제어 채널·중복 등록 검증 공백 (P2)
 
 #### [리뷰어]
 
@@ -143,7 +143,7 @@
   - 계약: ADR-013 §2·§5 ("임의의 표준 MCAP 파일을 제품 파일로 오인하지 않는다. file Metadata·각 Channel의 session/revision/등록도 서로 일치해야 한다"), API §23.1.
 - **원인 및 영향:**
   1. **등록 미완료 파일이 `recover_inner`에서 정상 종료(`EndOfInput`/`DataEnd`)로 통과 (`recovery.rs:491-497`):**
-     `a3296dc`에서 `SegmentWriter`가 `Schema`/`Channel` 등록을 청크 외부의 최상위 data section에 쓰도록 바뀌면서, 파일에 `dot_logger.file`(`op == 12`)만 있고 `Schema`/`Channel` 일부 또는 `.logger/meta`/`.logger/loss` 채널 등록이 누락·절단된 상태로 `EndOfInput` 또는 `DataEnd`(`op == 15`)에 도달할 수 있다. 그러나 `recover_inner`(`491-497행`)는 `state.file_sequence() != Some(options.source_sequence)`만 확인하고 필수 등록(`meta_seen`, 모든 `seen`, `file.loss_rows > 0`일 때 `loss_seen`) 완결 여부를 확인하지 않는다. 그 결과 등록이 잘린 불완전 입력도 `RecoveryStop::EndOfInput`/`DataEnd`(CLI `recover` 성공 종료)로 수락된다.
+     `4be7240`에서 `SegmentWriter`가 `Schema`/`Channel` 등록을 청크 외부의 최상위 data section에 쓰도록 바뀌면서, 파일에 `dot_logger.file`(`op == 12`)만 있고 `Schema`/`Channel` 일부 또는 `.logger/meta`/`.logger/loss` 채널 등록이 누락·절단된 상태로 `EndOfInput` 또는 `DataEnd`(`op == 15`)에 도달할 수 있다. 그러나 `recover_inner`(`491-497행`)는 `state.file_sequence() != Some(options.source_sequence)`만 확인하고 필수 등록(`meta_seen`, 모든 `seen`, `file.loss_rows > 0`일 때 `loss_seen`) 완결 여부를 확인하지 않는다. 그 결과 등록이 잘린 불완전 입력도 `RecoveryStop::EndOfInput`/`DataEnd`(CLI `recover` 성공 종료)로 수락된다.
   2. **`read::registrations`의 제어 채널 및 사용자 메타데이터 검증 공백 (`read.rs:384-448`):**
      `read::registrations`는 `c.topic == META_TOPIC || c.topic == super::codec::LOSS_TOPIC`(`388-390행`)에서 즉시 `continue`한다. 이로 인해 `NativeReader::new` / `LossReader::new`는 다음 손상·위조를 초기 검증에서 놓친다:
      - `.logger/meta` 채널(ID가 `file.channels + 1`인지, `schema_id`가 `META_SCHEMA`·`META_DESCRIPTOR`인지, `message_encoding == "protobuf"`인지, `metadata`가 비어 있는지) 및 `.logger/loss` 채널(`file.loss_rows > 0`일 때 필수 존재 여부·ID `file.channels + 2`·`loss::SCHEMA`/`DESCRIPTOR`, 반대로 `file.loss_rows == 0`일 때 `.logger/loss` 등록 금지) 여부. (특히 메시지 청크가 0개이거나 손상 전까지 청크를 만나지 않으면 제어 채널이 전혀 없어도 `NativeReader::new`와 순회가 `Ok`로 끝남.)
@@ -160,7 +160,7 @@
 
 - **판정 결과:** 수용 → `Resolved` → 위임 수락으로 `Closed` (**2026-11-18 #005**).
 - **처리 내용:** 판독·복구·Query가 등록 완결과 중복 판정을 공유한다. 필수 제어 채널, 사용자 metadata, 첫 청크 뒤의 재등록을 검사하고 이전 standard/2의 첫 청크 안 등록을 지원한다.
-- **검증 근거:** 불완전 EOF/DataEnd·중복·늦은 등록·제어 채널 누락·사용자 metadata 변경을 시험했다. 이전 MCAP을 CLI로 조회·재생·복구해 사용자 10건, 손실 보고 12건을 확인했다. 제품 `bd02d49`. [EV-095](../verification_evidence.md#ev-095)
+- **검증 근거:** 불완전 EOF/DataEnd·중복·늦은 등록·제어 채널 누락·사용자 metadata 변경을 시험했다. 이전 MCAP을 CLI로 조회·재생·복구해 사용자 10건, 손실 보고 12건을 확인했다. 제품 `b016fe8`. [EV-095](../verification_evidence.md#ev-095)
 
 ---
 
@@ -181,7 +181,7 @@
 
 - **판정 결과:** 수용 → `Resolved` → 위임 수락으로 `Closed` (**2026-11-18 #005**).
 - **처리 내용:** 관리 루프는 원격 요청을 처리하기 전에 IO 작업자 실패를 반영한다. Rust 버전별 링크 해석을 위해 rustdoc에 정규 경로를 사용했다.
-- **검증 근거:** 기존 작업자 실패·runtime config 회귀와 1.85.0·1.96.0·pinned nightly의 strict rustdoc을 통과했다. 동일 턴의 원격 ApplyConfig와 작업자 실패는 별도 타이밍 시험 없이 제어 흐름을 대조했다. 제품 `bd02d49`. [EV-095](../verification_evidence.md#ev-095)
+- **검증 근거:** 기존 작업자 실패·runtime config 회귀와 1.85.0·1.96.0·pinned nightly의 strict rustdoc을 통과했다. 동일 턴의 원격 ApplyConfig와 작업자 실패는 별도 타이밍 시험 없이 제어 흐름을 대조했다. 제품 `b016fe8`. [EV-095](../verification_evidence.md#ev-095)
 
 ---
 
@@ -202,7 +202,7 @@
 ### 체크리스트 대조 요약
 
 1. **RT(실시간) 경로 제약:** `Writer::refresh`·`Writer::try_log_at`·`Producer::apply_pending_config`·`CaptureCore::loss_before_submit`·`GeneralProducer::record_until` 경로에 동적 메모리 할당/해제, 블로킹 lock, I/O, 문자열 포맷팅, CAS 무한 루프가 없음을 코드와 `dot-logger-rt-allocation` 20개 시험으로 확인했다. `Held::acknowledge`/`SinkState::acknowledge`는 일반 관리 경로에서 `try_lock`으로 접근해 애플리케이션/포매터 lock을 대기하지 않으며 `WouldBlock`은 다음 관리 턴에 재시도한다.
-2. **Rust 언어 및 동시성/메모리 안전성:** `ae3b6b3..3f8a46f` 범위의 제품 코드에 신규 `unsafe` 블록은 추가되지 않았다. `ConfigUpdates`의 bank 전환(`posted` `Release` / producer `Acquire`)과 `loss_before_submit`/`record_until`의 `ActiveCall` + `closing`(`SeqCst`) 경계는 일관되나, `dot-logger-viewer`의 `Lease::drop` 동기 재구독 자원 경합(`RV-156`) 및 `replay.rs`의 실패 후 연결 수명 처리(`RV-157`) 보완이 필요하다.
+2. **Rust 언어 및 동시성/메모리 안전성:** `0c82bcf..54a2653` 범위의 제품 코드에 신규 `unsafe` 블록은 추가되지 않았다. `ConfigUpdates`의 bank 전환(`posted` `Release` / producer `Acquire`)과 `loss_before_submit`/`record_until`의 `ActiveCall` + `closing`(`SeqCst`) 경계는 일관되나, `dot-logger-viewer`의 `Lease::drop` 동기 재구독 자원 경합(`RV-156`) 및 `replay.rs`의 실패 후 연결 수명 처리(`RV-157`) 보완이 필요하다.
 3. **아키텍처·API 경계 및 유한 예산:** `dot-logger-viewer`는 일반 실행 경로에서 `dot-logger-client`(`LiveBudget`, `LiveSubscription`, `RemoteRecording`, `RemoteConfig`)만 소비하며 `dot-logger` 코어에 직접 의존하지 않는다(`dev-dependencies` 통합 시험·예제 한정). `mcap` `WriteOptions::chunk_registrations(false)` 변경은 최상위 등록 배치에만 영향을 주며 chunk/data CRC·인덱스 불변식을 유지하지만, `recovery.rs`·`read.rs`의 등록 완결성/제어 채널/중복 등록 검증 공백은 `RV-158`로 보완해야 한다.
 
 ### 초기 개발 인계 — 2026-11-18 #004
@@ -211,4 +211,4 @@
 
 ### 조치 마감 — 2026-11-18 #005
 
-제품 `bd02d49`의 RV-156~159는 로컬 회귀·자가검토 후 위임 범위에서 수락했다. **조치 판정 Pass**, 미해결 리뷰 항목 0건이다. 다음 세션은 TASK-031 Foxglove Desktop 실시간·기록 재생과 T7 LAN 정량 검증부터 진행한다. [EV-095](../verification_evidence.md#ev-095) · [TASK-031](../../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
+제품 `b016fe8`의 RV-156~159는 로컬 회귀·자가검토 후 위임 범위에서 수락했다. **조치 판정 Pass**, 미해결 리뷰 항목 0건이다. 다음 세션은 TASK-031 Foxglove Desktop 실시간·기록 재생과 T7 LAN 정량 검증부터 진행한다. [EV-095](../verification_evidence.md#ev-095) · [TASK-031](../../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)

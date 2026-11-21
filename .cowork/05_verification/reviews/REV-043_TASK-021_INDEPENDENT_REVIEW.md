@@ -4,7 +4,7 @@
 
 - **일자 / 리뷰어:** 2026-11-02 / AI 독립 코드리뷰 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
 - **성격:** 독립 Read-Only 코드리뷰. REV-042는 개발 세션 내 자가 점검이었으므로, TASK-021 UPS 긴급 계획·원자 알람 메일박스·순위 파일 동기화·프로세스 중단 및 복구 시뮬레이션의 전체 구현 형상에 대해 독립적 관점에서 심층 검토를 수행했다. 제품 코드는 전혀 수정하지 않았다.
-- **대상 형상:** 커밋 `a5fafcd` 및 TASK-021 S1~S3 구현 파일 전체
+- **대상 형상:** 커밋 `3a82ce3` 및 TASK-021 S1~S3 구현 파일 전체
   - 코어 제어 및 전원 알람 계약:
     - [`crates/dot-logger/src/control/emergency.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/control/emergency.rs)
     - [`crates/dot-logger/src/platform/power.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/platform/power.rs)
@@ -82,7 +82,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `enable_emergency` rustdoc에 `# Preconditions`(계획 미설치·셧다운 전, 동일 memory 설정, 활성 제출/수락 producer/점유 slot 없음, 비어있지 않은 고유 Synced 지원 타깃, 필수 Synced 타깃 포함, `protected_bytes` 0/`u64::MAX` 금지·payload 예산 이내, control 예산)과 `# Errors`(`InvalidConfig`·`InvalidDeadline`·`ConfigError::BudgetExceeded{Control}` 구분)를 명시했다. 새 오류 variant나 동작 변경은 없다.
-- **검증 근거:** 소스 `9cbbfb8`; `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps` exit0, tc_011 11/11·doctest 17/17 Pass, 전체 `cargo test` Pass. [rustdoc/검증 원문](../../06_evolution/imported_context/rev043_2026-11-03/rev043-doc.log). 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
+- **검증 근거:** 소스 `dd7aaaf`; `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps` exit0, tc_011 11/11·doctest 17/17 Pass, 전체 `cargo test` Pass. rustdoc/검증 원문(비공개 원시 근거). 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
 
 ---
 
@@ -101,5 +101,5 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `observe_protected_bytes` rustdoc에 타깃당 1회 관측(재호출 비멱등·첫 값 유지), `u64::MAX` 미관측 센티널 거부, 한도 초과 값은 기록되나 `unachievable=true`·`protected_complete=false`가 됨을 명시하고 `# Errors`(미설치/비보호 타깃 `InvalidConfig`, cutoff 미동결·센티널·중복 `Busy`)를 추가했다. 동작 변경은 없다.
-- **검증 근거:** 소스 `9cbbfb8`; RV-086과 같은 명령 exit0. [rustdoc/검증 원문](../../06_evolution/imported_context/rev043_2026-11-03/rev043-doc.log).
+- **검증 근거:** 소스 `dd7aaaf`; RV-086과 같은 명령 exit0. rustdoc/검증 원문(비공개 원시 근거).
 

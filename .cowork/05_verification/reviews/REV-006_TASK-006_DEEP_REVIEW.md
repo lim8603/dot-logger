@@ -2,7 +2,7 @@
 
 ## 1. 리뷰 개요
 * **일자 / 리뷰어:** 2026-10-28 / Gemini (심층 코드리뷰)
-* **대상 Task / 기준 커밋:** [TASK-006](../04_implementation/tasks/TASK-006.md) / commit `d57c2e3` (RV-001~004 수정분, [EV-007](../05_verification/verification_evidence.md#ev-007))
+* **대상 Task / 기준 커밋:** [TASK-006](../04_implementation/tasks/TASK-006.md) / commit `16f58de` (RV-001~004 수정분, [EV-007](../05_verification/verification_evidence.md#ev-007))
 * **종합 판정:** Note/Suggestion (P2 권고 2건, P3 제안 3건)
 * **진행 상태:** Closed (EV-008 검토 및 rustdoc 보강 완료, 장비 측정 과제는 TASK-022로 연결)
 

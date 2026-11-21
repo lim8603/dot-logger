@@ -6,10 +6,10 @@
 |---|---|
 | 회차 / 일자 | REV-054 / 2026-11-12 |
 | 리뷰어 | Codex AI — 리뷰 전용 세션 |
-| 대상 | REV-053 이후 누적 변경 `8dbd999..2fe4e49`, 시작 작업 트리 clean |
+| 대상 | REV-053 이후 누적 변경 `da908a0..00ecb78`, 시작 작업 트리 clean |
 | 범위 | 40파일: REV-053 완료 추적·비 Linux calibration 조치, TASK-029 S1~S4의 공개 API 검사·레시피·README/rustdoc·facade 예제 |
 | 종합 판정 | **Conditional — P1 0건·P2 2건·P3 0건** |
-| 상태 | **Closed** — RV-134~135 수용·조치 [EV-076](../verification_evidence.md#ev-076) `64e9d69`, 2026-11-12 Human 「승인」 |
+| 상태 | **Closed** — RV-134~135 수용·조치 [EV-076](../verification_evidence.md#ev-076) `a536486`, 2026-11-12 Human 「승인」 |
 
 현재 제품 회귀는 통과했지만, 새 NFR-008 가드가 API 계약 변경과 레시피 개념 상한 초과를 놓치는 두 경로를 재현했다. 제품 코드·저장소 테스트는 수정하지 않았다. 기존 TASK-029 수락·EV-072~075의 실행 사실과 native T3 이월은 유지한다.
 
@@ -37,7 +37,7 @@
 
 #### [리뷰어]
 
-- **위치:** [Surface.lines](../../../scripts/check-integration-surface.py:204), [trait 연관 항목](../../../scripts/check-integration-surface.py:232), [impl 출력](../../../scripts/check-integration-surface.py:240). 도입 `79d376e`.
+- **위치:** [Surface.lines](../../../scripts/check-integration-surface.py:204), [trait 연관 항목](../../../scripts/check-integration-surface.py:232), [impl 출력](../../../scripts/check-integration-surface.py:240). 도입 `681acd7`.
 - **원인:** trait 선언은 `inner.generics`만 출력하며 `inner.bounds`를 쓰지 않는다. 연관 상수·타입은 종류와 이름만 출력한다. impl은 대상·제네릭 제약을 생략하고 trait 이름 또는 메서드 자체 시그니처만 남긴다. 따라서 같은 이름을 유지한 채 소비자 구현·호출 조건이 바뀌어도 snapshot이 같을 수 있다.
 - **실제 rustdoc 재현:** 저장소 밖 최소 crate `pub mod logger { pub trait Record { const SCHEMA: u64; fn encode(&self); } }`를 고정 `nightly-2026-10-26`의 `rustdoc -Z unstable-options --output-format json`으로 추출하고 원본 `Surface`로 직렬화했다. 각각 독립적으로 `Record: 'static`을 추가하거나 `SCHEMA: u64`를 `u32`로 바꿔 다시 추출해도 세 줄이 완전히 같다: `trait logger::Record`, `assoc_const SCHEMA`, `fn encode(&Self)`. 두 경우 모두 차이 감지 **False**다.
 - **현재 제품 JSON 대조:** 원본 `Record`의 bounds에 `'static`을 추가한 복사본, `Channel`의 `Copy` impl에 `T: 'static` where 조건을 넣은 복사본도 기존 301줄과 동일하다. 이 두 검사는 JSON 변이이며 실제 제품 소스를 바꾸거나 재컴파일한 결과로 주장하지 않는다.
@@ -48,13 +48,13 @@
 
 - 판정 결과: **수용** (2026-11-12, 처리담당 AI).
 - 처리 내용: `Surface.lines`를 계약 요소별 렌더러로 나눴다. trait는 `unsafe`/`auto`·제네릭·상위 제약(`bounds`)·where, 연관 항목은 `const NAME: 타입`(기본값 있으면 ` = ..`)·`type NAME<..>: 제약 where .. = 기본`·메서드는 기본 구현 여부(` { .. }`). trait impl은 `impl<제약> Trait for 대상 where ..`(`unsafe`·부정 impl 포함), 고유 impl은 제네릭·where가 있으면 머리줄 `impl<T: Record + ?Sized> Channel<T>`을 출력한다. where 술어(bound·lifetime·eq, HRTB)와 연관 타입 제약은 JSON 덤프 대신 Rust 표기로 정규화했다. 리뷰 범위 밖이지만 같은 공백이라 struct/union 비공개 필드·enum 숨은 variant 표시(`field .. (private)`, `variant ..`), `#[non_exhaustive]`, type alias·const·static의 대상 타입도 넣었다. 렌더러가 모르는 항목 종류(macro 등)·연관 항목 종류는 축약하지 않고 실패한다. 리뷰어 최소 crate를 `scripts/test_check_integration_surface.py`의 시험 11개(계약 변경 10종은 차이, 본문만 변경은 동일)로 옮겼고 CI `integration-surface` job에서 실행한다. 제품 snapshot 301 → 314줄 재승인(bless).
-- 검증 근거(EV·시험·커밋): [EV-076](../verification_evidence.md#ev-076). Red 10/11 → Green 11/11, 제품 JSON 변이 2건(`Record: 'static`, `Copy for Channel` where `T: 'static`) 차이 감지 False → True. 커밋 `64e9d69`.
+- 검증 근거(EV·시험·커밋): [EV-076](../verification_evidence.md#ev-076). Red 10/11 → Green 11/11, 제품 JSON 변이 2건(`Record: 'static`, `Copy for Channel` where `T: 'static`) 차이 감지 False → True. 커밋 `a536486`.
 
 ### RV-135 — 모듈 import로 레시피 개념 한도를 우회함 (P2)
 
 #### [리뷰어]
 
-- **위치:** [concepts](../../../scripts/check-integration-surface.py:348), [상한 판정](../../../scripts/check-integration-surface.py:430). 도입 `79d376e`.
+- **위치:** [concepts](../../../scripts/check-integration-surface.py:348), [상한 판정](../../../scripts/check-integration-surface.py:430). 도입 `681acd7`.
 - **원인:** `use dot_logger::...`와 본문의 `dot_logger::...`만 수집한다. `use dot_logger::logger; use logger::{...};`의 두 번째 import와 `logger::Shutdown` 같은 모듈 상대 경로는 추적하지 않는다. 첫 import는 모듈이라 개념에서 제외되어 결과가 빈 집합이 된다. 지원하지 않는 import 형태를 막는 검사도 없다.
 - **재현:** 원본 L1을 임시 디렉터리에 복사한 뒤 import를 아래와 같이 바꾸고 종료 조건만 `shutdown if logger::Shutdown::is_success(&shutdown) => Ok(())`로 바꿨다. 이름으로 도입하는 타입·trait은 기존 6개 + `Shutdown` = **7개**, 연동 줄은 **20줄**이다.
 
@@ -71,7 +71,7 @@
 
 - 판정 결과: **수용** (2026-11-12, 처리담당 AI).
 - 처리 내용: `concepts()`가 주석·문자열을 지운 뒤 모든 `use` 트리(중첩·`self`·`as` 별칭·`extern crate dot_logger as ..`)를 고정점까지 풀어 이름 → crate 공개 경로 binding을 만들고, 본문의 `a::b::..` 경로를 binding으로 해석한다. 경로는 공개 트리에서 가장 긴 접두사로 찾고 모듈이 아닌 첫 항목(타입·trait·자유 함수)을 개념으로 센다(`Shutdown::is_success` → `Shutdown`). 같은 항목은 rustdoc id로 한 번만 센다. glob import(`dot_logger::..::*`, binding 모듈의 `*`)는 계수 불가로 실패, 풀리지 않는 `dot_logger` 경로도 실패하며 `check_recipes`가 이 오류를 최종 결과에 전파한다(기존에는 `FAIL:` 출력만 하고 개념 1개로 셌다). 한도 판정은 `limit_verdict()`로 분리했다. 리뷰어 변이본(모듈 import + `logger::Shutdown::is_success`)은 7개념으로 L1 `concepts 7 > 6` 실패, 원본은 6개념 통과를 시험으로 남겼다. 별칭·중첩·crate 별칭·glob·미해석·주석/문자열 무시 시험 포함 7개.
-- 검증 근거(EV·시험·커밋): [EV-076](../verification_evidence.md#ev-076). 네 레시피 계수 불변(L1 6·L2 7·L3 7/7). 커밋 `64e9d69`.
+- 검증 근거(EV·시험·커밋): [EV-076](../verification_evidence.md#ev-076). 네 레시피 계수 불변(L1 6·L2 7·L3 7/7). 커밋 `a536486`.
 
 ## 5. 검증 및 인계
 

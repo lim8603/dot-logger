@@ -3,10 +3,10 @@
 ## 개요
 
 - 일자/담당: 2026-11-01 #015 / AI 개발 세션 자가 점검. [code-review 스킬](../../../.agents/skills/code-review/SKILL.md) 적용, 독립 리뷰 세션과 구분한다.
-- 대상: `dot_probe_pipeline`·shared example support·pipeline 시험·client Cargo/lock·DB harness·README. 최종 소스와 실행 형상은 [결과](../../06_evolution/imported_context/task_020_s2_2026-11-01/results.json)에서 고정한다.
+- 대상: `dot_probe_pipeline`·shared example support·pipeline 시험·client Cargo/lock·DB harness·README. 최종 소스와 실행 형상은 결과(비공개 원시 근거)에서 고정한다.
 - 종합 판정: **Pass — S2 로컬 기능 예제 범위**. 미해결 P1/P2/P3 지적 없음.
 - 상태: **Closed** — Open → In Progress → 검증/자가 점검 Resolved → 기존 위임으로 S2 로컬 수락. Task/MS/TC 전체 완료가 아니다.
-- 소스: `aab94f4` (136개 파일/commit blob 대조).
+- 소스: `4584629` (136개 파일/commit blob 대조).
 - 근거: [EV-041](../verification_evidence.md#ev-041).
 
 ## 리뷰 요약
@@ -37,7 +37,7 @@
 
 ## [처리담당] 검증/수락
 
-- RV-082 수용: [직렬화 출처 누락 Red](../../06_evolution/imported_context/task_020_s2_2026-11-01/red-provenance.log)(Null/session mismatch) 뒤 원 Snapshot에서 JSON session/epoch·비교 조건을 내보내도록 수정했다. 일반/실제 DB·CLI를 최종 형상으로 재검증했다.
+- RV-082 수용: 직렬화 출처 누락 Red(비공개 원시 근거)(Null/session mismatch) 뒤 원 Snapshot에서 JSON session/epoch·비교 조건을 내보내도록 수정했다. 일반/실제 DB·CLI를 최종 형상으로 재검증했다.
 - API/공유 모듈 부재 compile Red(exit101) → 최소 wiring → 일반4개/실제 DB1개 Green. 일반 시험은 DB transport 실패·마지막 큐 Full/Unknown·초기 cancel/0기한·잘못된 DB 설정/비밀값 비노출·nested runtime 거절을 검증했다.
 - Rust1.96/MSRV1.85 workspace각396개+doctest17개 Pass, 기존 실제 DB4개+새 실제 DB1개는 일반 회귀 ignore. 별도 각 toolchain의 고정 OSS2.9.1 harness에서 core4개+pipeline1개와 CLI 실행 Pass·cleanup0.
 - 실제 정상 CLI: before 입력30/파일30/DB20/수신30, after 입력15·skip15/파일15/DB0/수신15. 독립 파일45·수신45·numeric receipt/time/value10·raw 회수20·external0, functional_pass=true.

@@ -1,8 +1,8 @@
 # REV-070 — TASK-032 운영 대시보드 독립 코드리뷰
 
-2026-11-21 · Codex · **Conditional → Pass / Closed** · P1 1건, P2 4건 — 2026-11-21 #003 `6b736c9` 조치·위임 수락([EV-109](../verification_evidence.md#ev-109))
+2026-11-21 · Codex · **Conditional → Pass / Closed** · P1 1건, P2 4건 — 2026-11-21 #003 `007b25c` 조치·위임 수락([EV-109](../verification_evidence.md#ev-109))
 
-제품 범위는 `5daf22b..277de2d`의 S2 상태 화면·HTTP(`704d055`)와 S3 Compare·PlanCheck(`277de2d`)다. [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), [화면 명세 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21), [viewer README](../../../crates/dot-logger-viewer/README.md#operations-dashboard)의 사용 계약과 대조했다.
+제품 범위는 `0a9bc4d..97ece7f`의 S2 상태 화면·HTTP(`c876395`)와 S3 Compare·PlanCheck(`97ece7f`)다. [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), [화면 명세 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21), [viewer README](../../../crates/dot-logger-viewer/README.md#operations-dashboard)의 사용 계약과 대조했다.
 
 ## 리뷰 항목
 
@@ -32,7 +32,7 @@
 
 ## 처리담당 기록
 
-2026-11-21 #003, 제품 `6b736c9`. 다섯 건 모두 수용했다(RV-170은 기준 조정). 수정 전 Red와 수정 후 Green을 확인했다.
+2026-11-21 #003, 제품 `007b25c`. 다섯 건 모두 수용했다(RV-170은 기준 조정). 수정 전 Red와 수정 후 Green을 확인했다.
 
 - **RV-166 — 수용.**
   - client에 `RemoteConfig::checked_endpoint()`(추가형 공개 API)를 두었다. `connect`와 같은 문법 검사(`parse_endpoint`)를 공유하고, 검증된 `scheme://host:port`만 돌려준다.

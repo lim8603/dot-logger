@@ -2,7 +2,7 @@
 
 ## 1. 리뷰 개요
 * **일자 / 리뷰어:** 2026-10-28 / AI 요약보고 및 Human 승인
-* **대상 Task / 기준 커밋:** [TASK-005](../04_implementation/tasks/TASK-005.md) / commit `9a4f34c` ([EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산))
+* **대상 Task / 기준 커밋:** [TASK-005](../04_implementation/tasks/TASK-005.md) / commit `4a9ae56` ([EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산))
 * **종합 판정:** Pass (결함 없음)
 * **진행 상태:** Closed (Human 구현 리뷰 승인 완료, native CI는 GAP-004 이월)
 
@@ -29,4 +29,4 @@
 #### [처리담당 / 승인 (2026-10-28 #001)]
 * **판정 결과:** 수용 (Pass — Human 리뷰 승인)
 * **처리 내용:** routing 통합 테스트 19개, compile-fail 3개, Miri 및 allocator 512건 포화 테스트 통과. Human 리뷰 승인 완료.
-* **검증 근거:** [EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산), commit `c98b7fa`.
+* **검증 근거:** [EV-004](../05_verification/verification_evidence.md#ev-004--task-005-분배출력-격리예산), commit `550185f`.

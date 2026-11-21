@@ -4,10 +4,10 @@
 |---|---|
 | 상태 | Closed — RV-141~144 수정·회귀·위임 수락 / 로컬 Pass |
 | 날짜·검토자 | 2026-11-16 / AI(개발 세션 자가검토) |
-| 기준 | `3a78494`, ADR-013 Accepted D1~D3 중 A |
+| 기준 | `8fa742d`, ADR-013 Accepted D1~D3 중 A |
 | 범위 | native payload/RecordMeta pair writer/reader, 단일 revision query/recovery 정렬, 구형 경로·fixture/export 제거, 소비 경로 이관 |
 | 범위 밖 | B 다중 revision·manifest v2, TASK-035 loss 수집, TASK-034 runtime WIP, 커버리지/성능/GUI 재측정 |
-| 검증 | [EV-083](../verification_evidence.md#ev-083), 제품 커밋 048cdf3 |
+| 검증 | [EV-083](../verification_evidence.md#ev-083), 제품 커밋 ecc00e0 |
 
 ## 요약표
 

@@ -10,28 +10,28 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1 문서 검토·S2 공개용 영어 README(`3b0044d`) Done. 다음 S3 `07_delivery` 작업 문서 |
+| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1 문서 검토·S2 공개용 영어 README(`dca35d2`) Done. 다음 S3 `07_delivery` 작업 문서 |
 | 미처리 리뷰 | 없음 — REV-001~070 Closed. 최근 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치·수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-21 / #004 공개 범위 논의·imported_context 비공개 처리 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #004.** 공개 범위 논의 중 `imported_context` 추적 해제. 공개 방식(이력 유지/새 이력)은 미결정 |
+| 세션 상태 | **진행 — 2026-11-21 #004.** 공개 준비 — 이력 정리·라이선스를 마치고 비공개 단일 저장소로 교체. 공개 전환은 남은 MS·Task 뒤 |
 | 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
 
 ## 현재 결정과 제약
 
-- **2026-11-21 #004 Human 결정 — 공개 준비(T2):** 공개 방식은 이력을 유지하되 `git filter-repo`로 `imported_context`만 이력 전체에서 제거한다. 라이선스는 권장대로 `MIT OR Apache-2.0`이고 vendor `mcap` MIT 고지를 보완한다. dot-probe 언급은 둘 다 Human 프로젝트라 그대로 둔다. `imported_context` 링크는 "비공개 원시 근거"로 표시한다. `wip/task-034-s2b-runtime-config`는 공개 저장소에 올리지 않는다. 내용은 이미 `874c27c`로 main에 반영돼 있다. GitHub 저장소는 하나만 둔다(이름을 바꿔 보관하는 안은 기각). 단일 저장소 절차는 Human 확인 대기이고, gitleaks 8.30.1과 git-filter-repo 2.47.0은 `~/.local/bin`에 설치했다.
+- **2026-11-21 #004 Human 결정 — 공개 준비(T2):** 공개 방식은 이력을 유지하되 `git filter-repo`로 `imported_context`만 이력 전체에서 제거한다. 라이선스는 권장대로 `MIT OR Apache-2.0`이고 vendor `mcap` MIT 고지를 보완한다. dot-probe 언급은 둘 다 Human 프로젝트라 그대로 둔다. `imported_context` 링크는 "비공개 원시 근거"로 표시한다. `wip/task-034-s2b-runtime-config`는 공개 저장소에 올리지 않는다. 내용은 이미 `3254b81`로 main에 반영돼 있다. GitHub 저장소는 하나만 둔다(이름을 바꿔 보관하는 안은 기각). Human이 「레포는 하나만」을 결정했다. 기존 GitHub 저장소를 삭제하고 같은 이름으로 다시 만들어 정리된 이력을 올린다. 원본 전체 이력은 로컬 `~/backup/dot-logger-original-2026-11-21.bundle`(wip 포함)로만 보관한다. 도구는 gitleaks 8.30.1과 git-filter-repo 2.47.0(`~/.local/bin`)을 쓴다. 정리 내용은 다음과 같다. ① `filter-repo` 한 번으로 `imported_context`를 이력 전체에서 지우고, gmail을 GitHub 주소로 바꾸고, 사실과 달라진 커밋 메시지 2개(추적 해제 커밋, WIP 해시 언급)를 고쳤다. 커밋 345개는 유지했다. ② 문서의 옛 커밋 해시 참조를 새 해시로 치환했다. 보관 WIP `36c1724`는 공개 이력에 없다. ③ `imported_context` 링크 466개(52개 파일)를 「(비공개 원시 근거)」 표시로 바꿨다. ④ `MIT OR Apache-2.0`(LICENSE-MIT·LICENSE-APACHE, Cargo `license`)을 적용하고 vendor `mcap` MIT 전문(`vendor/mcap-0.26.0/LICENSE`)을 추가했다. gitleaks 이력 검사 결과 정리 전 29건 중 28건은 `imported_context`의 파일별 sha256 오탐이었고, 남은 1건은 시험 전용 TLS 키다. Human 결정(같은 날)에 따라 비공개로 먼저 올리고 남은 MS·Task를 마친 뒤 공개로 전환한다. T3(native)는 공개 전환 뒤에 진행한다.
 
 - **2026-11-21 Human 「dot-logger에서는 비공개로 .gitignore에만 넣자」 — `imported_context` 비공개:** `imported_context`는 비공개 입력으로 의도했으나 `.gitignore`에 들어간 적이 없어 첫 커밋부터 추적되고 있었다. `.gitignore`에 `.cowork/06_evolution/imported_context/*`(`.gitkeep` 제외)를 추가하고 1,997개 파일의 추적을 해제했다. 로컬 파일은 남아 있고 과거 커밋에는 계속 있다. 새 자료는 git으로 백업되지 않는다. 프레임워크 규칙 보완은 dot-cowork 프로젝트 몫으로 넘기고 여기서는 하지 않는다. dot-tools(공개 저장소)는 공개해도 되는 내용이라 그대로 둔다.
 
 - **2026-11-21 Human 「영어 통일」·「README만, T2는 나중에」 — TASK-025 README:** GitHub 공개를 고려해 루트와 crate README 3개를 영어로 다시 썼다. 라이선스는 미정으로 두고 `.cowork` 내부 링크에 의존하지 않는다. T2(라이선스·공개 범위)는 실제 공개 전환을 요청할 때 진행한다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 
-- **2026-11-21 Human 「승인」 — TASK-032 수락·MS-009 마감:** 운영 대시보드(ADR-016, S1~S3)와 독립 리뷰 REV-070 조치(`6b736c9`, [EV-109](../05_verification/verification_evidence.md#ev-109))를 수락했다. MS-009의 소속 Task 네 개가 모두 Done이 되어 MS-009를 Done으로 마감했다. native(T3)·실사용처·장기 잔여는 MS-007 쪽에 유지하며 Gate 4·5는 Not Ready다. [MS-009](../04_implementation/milestones/MS-009.md#마감--2026-11-21)
+- **2026-11-21 Human 「승인」 — TASK-032 수락·MS-009 마감:** 운영 대시보드(ADR-016, S1~S3)와 독립 리뷰 REV-070 조치(`007b25c`, [EV-109](../05_verification/verification_evidence.md#ev-109))를 수락했다. MS-009의 소속 Task 네 개가 모두 Done이 되어 MS-009를 Done으로 마감했다. native(T3)·실사용처·장기 잔여는 MS-007 쪽에 유지하며 Gate 4·5는 Not Ready다. [MS-009](../04_implementation/milestones/MS-009.md#마감--2026-11-21)
 
 - **2026-11-21 Human 「A. viewer 내장 웹」·「읽기 전용」 — [ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md):** TASK-032 대시보드는 viewer가 loopback HTTP로 내장 정적 페이지와 JSON 경로를 제공한다. 새 crate·외부 CDN·빌드 도구는 쓰지 않는다. GetStatus(1초, 한 번에 하나)·Compare·PlanCheck만 조회하고 ApplyConfig·RunCheck는 CLI로 둔다. 값 상태를 보존하고 실패 시 마지막 값·시각과 사유를 구분한다. [화면 §7](../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)
 
-- **2026-11-21 Human 「묶음·파이프라인 ACK (권장)」 — [ADR-015](../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md):** `handoff`는 ACK를 대기열에 넣고 바로 반환한다. 묶음 Ack RPC와 유한 동시 전송을 쓰고, 실패는 이후 호출에서 `AcknowledgementUnknown`으로 보고하며, `flush`로 확인한다. 구현은 `4ac9bf1`, LAN P4 소형 Pass는 [EV-104](../05_verification/verification_evidence.md#ev-104)다.
+- **2026-11-21 Human 「묶음·파이프라인 ACK (권장)」 — [ADR-015](../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md):** `handoff`는 ACK를 대기열에 넣고 바로 반환한다. 묶음 Ack RPC와 유한 동시 전송을 쓰고, 실패는 이후 호출에서 `AcknowledgementUnknown`으로 보고하며, `flush`로 확인한다. 구현은 `c0f23bb`, LAN P4 소형 Pass는 [EV-104](../05_verification/verification_evidence.md#ev-104)다.
 
 - **2026-11-21 Human 「0 행 생략 (권장)」 — ADR-013 D2 저장 표현 개정:** 손실 checkpoint는 `version=2` part에 0이 아니거나 overflow인 행만 등록 행 구간과 함께 싣는다. 예약은 dense 최악값을 유지하고 v1 판독도 유지한다. 구현·P3/P5 Pass는 [EV-103](../05_verification/verification_evidence.md#ev-103), 근거는 [EV-101](../05_verification/verification_evidence.md#ev-101)이다. [ADR-013 개정](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#손실-checkpoint-0-행-생략-개정--2026-11-21)
 
@@ -39,7 +39,7 @@
 
 - **.logger 예약 토픽·호스트 예제 개정:** 호스트가 지정하는 예제 경로는 `.logger/`, CLI 예제 manifest는 `.logger/session.json`이다. native `.logger/meta`·`.logger/loss`는 `dot-logger/standard/2` 및 Metadata 형식 버전 2로 식별한다. 이전 개발 파일은 당시 검증 증거로 보존한다. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18) · [EV-090](../05_verification/verification_evidence.md#ev-090)
 
-- **ADR-013 A~E 완료:** 제품 `874c27c`의 native 표준 저장·revision 회전·손실·runtime 변경을 최종 수락했다. Foxglove 실제 값 판독·호출 비용·회귀는 [EV-088](../05_verification/verification_evidence.md#ev-088), tracing 경합/패닉 복구 회귀 `be20250`은 [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)에 있다. TASK-030·034·035와 MS-008은 Done. [EV-089](../05_verification/verification_evidence.md#ev-089)에서 TASK-033 S4와 MS-007 일정 판정도 마쳤다. GitHub PRIVATE 및 T2/T3 미도래를 유지한다.
+- **ADR-013 A~E 완료:** 제품 `3254b81`의 native 표준 저장·revision 회전·손실·runtime 변경을 최종 수락했다. Foxglove 실제 값 판독·호출 비용·회귀는 [EV-088](../05_verification/verification_evidence.md#ev-088), tracing 경합/패닉 복구 회귀 `e69aee3`은 [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)에 있다. TASK-030·034·035와 MS-008은 Done. [EV-089](../05_verification/verification_evidence.md#ev-089)에서 TASK-033 S4와 MS-007 일정 판정도 마쳤다. GitHub PRIVATE 및 T2/T3 미도래를 유지한다.
 
 - **2026-11-16 Human 「승인」 — ADR-013 Accepted:** D1 배포 전 native 단일 형식(legacy 쓰기/판독·선택 API·호환 wrapper 제외), D2 누적 손실 checkpoint(시도·assignment·skip·Unknown·미관측 분리), D3 단일 active writer의 교차 revision 회전·source별 조회/복구를 승인했다. [ADR-013](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) 범위 안의 구현·검증은 재승인 없이 진행한다. 설계 승인을 제품 구현/시험 Pass로 대신하지 않는다.
 
@@ -47,7 +47,7 @@
 - **2026-11-15 Human 합의 — 일정 목표:** 다음 주(2026-11-16 주) 목표는 핵심 범위 완료와 MS-007 일정 판정이다. 대상은 TASK-034, TASK-030 S2 + TASK-035, TASK-033 최종 재측정, TASK-025다. viewer·대시보드(TASK-031·032)는 그다음 주로 둔다(Human 「뷰어는 그렇게 해도 돼」). 인일은 추정이며 납기 확정이 아니다. 병목은 승인 지점 세 곳이다(TASK-034 결과, TASK-030 S2 ADR, 판정).
 - **2026-11-15 Human 「승인」 — TASK-034 facade 노출 계약(API §22):** D1 쉬는 writer는 facade ack(미반출·tracing) + 사용자 writer `Busy`/`Writer::refresh`, D2 이벤트 trigger는 일반 경로 `mark_event`만(RT trigger B1), D3 중요 예약 기본 0 + `PlanWarning`, D4 레시피 추가 없음.
 - **2026-11-15 Human 「승인」 — 일정 판단 목표치:** 커버리지 하한 라인 92·함수 92·리전 89%(회귀 방지), 85% 미만 파일 실제 동작 공백 미처리 0, 범위 안 UC 구현 동작 시험 대응 100%, TASK-034·035 뒤 재측정으로 MS-007 판정. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정).
-- **2026-11-15 Human 결정 — TASK-033 S3 기능 공백(「모두 권고대로 진행하자」):** facade 노출 ①실행 중 level·샘플링 ②이벤트 전후 보존 trigger ③단순 경로 중요도 → [TASK-034](../04_implementation/tasks/TASK-034.md)(MS-008 재개). 파일 안 손실 기록·채널별 손실 수 → [TASK-035](../04_implementation/tasks/TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께). 나머지 기능 공백 → B1(범위 밖, 일정 판단 제외). client `diagnostics`(dot-probe 전용 `SnapshotCheck`+bridge) → `examples/support/dot_probe` 이동(`4bd6d04`).
+- **2026-11-15 Human 결정 — TASK-033 S3 기능 공백(「모두 권고대로 진행하자」):** facade 노출 ①실행 중 level·샘플링 ②이벤트 전후 보존 trigger ③단순 경로 중요도 → [TASK-034](../04_implementation/tasks/TASK-034.md)(MS-008 재개). 파일 안 손실 기록·채널별 손실 수 → [TASK-035](../04_implementation/tasks/TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께). 나머지 기능 공백 → B1(범위 밖, 일정 판단 제외). client `diagnostics`(dot-probe 전용 `SnapshotCheck`+bridge) → `examples/support/dot_probe` 이동(`3a554ac`).
 - **2026-11-15 Human 결정 — native·24h 일정 판단 제외·TASK-030 S1 권고안:** 「native·24h 장기 검증을 일정 판단에서 빼자. 나머지는 권고대로」. TASK-024도 TASK-026처럼 마지막 단계·일정 판단 밖, 일정 판단은 TASK-033만. descriptor 없는 채널은 export에서 원문·encoding 유지+한계 기록([API §21.2](../03_design_artifacts/interface_contract.md#212-s1-구현-반영--2026-11-12)). CLI summary `records:0`은 결함 아님(출력한 `record` 줄 수) — CLI README에 의미 추가. [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[TASK-030](../04_implementation/tasks/TASK-030.md#s1-리뷰-기록--2026-11-15).
 - **2026-11-13 Human 결정 — 완료 기준 변경:** dot-logger는 범용 라이브러리이고 dot-probe는 첫 사용처다. 「실사용처 테스트는 마지막에 진행은 하겠지만, 일정 판단에 두지 말고, 일정 판단은 유닛테스트 케이스 커버리지, 실제 로깅 사용 사례 조사 등을 통해서 마무리」. 이에 따라 Task 22건 Done, native 잔여는 TASK-024, 실사용처는 TASK-026(MS-007, 마지막), 커버리지·사용 사례는 TASK-033. 커버리지 도구는 AI가 설치(Human 「필요한건 알아서 설치」). [quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)·[EV-078](../05_verification/verification_evidence.md#ev-078).
 - **TASK-030 매핑:** 사용자 schema/encoding·real 시각·전체 receipt의 RecordMeta 보존은 native A에 반영(API §23.1). ROS 2 encoding은 T1 유지. [API §21](../03_design_artifacts/interface_contract.md#21-task-030-mcap-표준-호환--2026-11-12).
@@ -83,7 +83,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
-| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | In Progress | 2026-11-21 | S1·S2 Done(영어 README, `3b0044d`). 다음 S3 07_delivery 작업 문서 → S4 추적표·Gate 4/5 |
+| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | In Progress | 2026-11-21 | S1·S2 Done(영어 README, `dca35d2`). 다음 S3 07_delivery 작업 문서 → S4 추적표·Gate 4/5 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -92,8 +92,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 범위 | 상태 | 현재 처리/후속 |
 |---|---|---|---|
 | REV-001~058 | 완료된 core·파일·조회·운영·facade·preset·통합 가드 및 ADR-013 A/B/C 개발 자가검토 | Closed | 회차별 근거는 [리뷰 문서](../05_verification/reviews/)(EV-082~085). native·실앱·성능 이월은 각 Task에 유지 |
-| [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `949a74e..0270f03` 통합 코드리뷰·후속 `8b59aa6` 조치 | **Closed** | RV-149~152 전부 수용·수정·자가검토·위임 수락(EV-086). 복구 완결·손실 관측·종료 경계·등록 검증, 두 Rust 각672 Pass·5 ignored |
-| [REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md) | WIP36c1724 기반 runtime D 개발 자가검토·제품874c27c | **Closed** | RV-153 pending 보존/기한·RV-154 무대기 ack 조치·위임 수락(EV-087), 두 Rust 각684·18 feature·Miri13·표면35/60 Pass |
+| [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `fa72a1a..5be17b5` 통합 코드리뷰·후속 `ca89b69` 조치 | **Closed** | RV-149~152 전부 수용·수정·자가검토·위임 수락(EV-086). 복구 완결·손실 관측·종료 경계·등록 검증, 두 Rust 각672 Pass·5 ignored |
+| [REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md) | WIP36c1724 기반 runtime D 개발 자가검토·제품3254b81 | **Closed** | RV-153 pending 보존/기한·RV-154 무대기 ack 조치·위임 수락(EV-087), 두 Rust 각684·18 feature·Miri13·표면35/60 Pass |
 | [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md) | ADR-013 E 최종 통합·tracing 경합/패닉 복구 회귀 | **Closed** | EV-088, RV-155 두 변이 Red·현행 Green, 기존 위임 수락 |
 | [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md) | .logger 예약 토픽·호스트 예제·standard/2 | **Closed** | EV-090, 두 Rust 각685 Pass·CLI/Foxglove 확인 |
 | [REV-063](../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md) | TASK-031 S2 WS bridge·카탈로그·ACK/수명 | **Closed** | EV-092·위임 로컬 수락. Foxglove 실시간·T7 정량 잔여 |
@@ -102,8 +102,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 | [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **Closed** | RV-160·161 Closed. 손실 checkpoint 0 행 생략 뒤 8 GiB P3·P5 Pass(EV-101·103) |
 | [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
-| [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `bd02d49..078ca6c` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`5daf22b` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
-| [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`5daf22b..277de2d`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`6b736c9` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
+| [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
+| [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
@@ -111,7 +111,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 0. **공개 범위 논의 계속(T2 사전):** Human은 `.cowork`도 공개하는 방향을 생각하고 있고, `imported_context`는 공개하지 않는다. 2026-11-21 #004에서 `imported_context` 추적을 해제했다(위 결정). 과거 커밋 69개에는 이 폴더가 남아 있으므로, 남은 결정은 둘 중 하나다. ① 현재 저장소를 공개로 바꿔 이력째 공개(dot-tools 방식, `imported_context` 이력 노출을 수용) ② 새 이력으로 공개(`imported_context` 완전 비공개). 어느 쪽이든 공개 전에 이력 전체 gitleaks 검사를 권장한다. 아래 점검 결과와 권장 방식은 #003 기준이다.
    - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
-     - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `0a153b5`에서 정리), dot-probe 언급 65곳(대부분 예제).
+     - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).
      - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
      - 그 밖: 사설 LAN IP 19곳, `.cowork/README.md`에 Human 본인 gmail 주소, `members/lim8603/`(profile·my_state) 추적, `.cowork` 안 dot-probe 언급 242곳, AI 도구 설정 파일(CLAUDE.md·AGENTS.md·GEMINI.md·`.agents/`·copilot-instructions).
    - **권장 방식:**
@@ -121,7 +121,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
      4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
      5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
    - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.
-1. **TASK-025 S3·S4:** S1 문서 검토(F1~F10)와 S2 공개용 영어 README(`0a153b5`·`3b0044d`)를 마쳤다. 다음은 S3 `07_delivery` 사용자 매뉴얼·운영서·릴리즈 노트 작업 문서, 그다음 S4 MS별 추적표와 Gate 4·5 판정이다. [TASK-025](../04_implementation/tasks/TASK-025.md)
+1. **TASK-025 S3·S4:** S1 문서 검토(F1~F10)와 S2 공개용 영어 README(`d4e0624`·`dca35d2`)를 마쳤다. 다음은 S3 `07_delivery` 사용자 매뉴얼·운영서·릴리즈 노트 작업 문서, 그다음 S4 MS별 추적표와 Gate 4·5 판정이다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약
@@ -133,7 +133,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
 - [MS 목록](../04_implementation/milestone_registry.md): 9개 MS, [Task 목록](../04_implementation/task_registry.md): 35개 Task(1개 선택). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
 - [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 8 + CON 7 = 34행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
-- [2026-10-26 조사](imported_context/research_2026-10-26_detailed_design.md): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
+- 2026-10-26 조사(비공개 원시 근거): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
 
 ## 이월 백로그
@@ -143,7 +143,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
-| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 #004 논의 중: `imported_context` 추적 해제 완료, 공개 방식 미결정** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
+| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 #004: 정리 이력을 비공개로 올림. 남은 MS·Task를 마친 뒤 공개 전환** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
 | T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 
@@ -171,8 +171,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 최근 작업·이력
 
 - 2026-11-21 — TASK-032 독립 리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) Conditional / Open, RV-166~170 등록.
-- 2026-11-21 #003 — REV-069 반입·RV-163~165 조치(`5daf22b`)·위임 마감, TASK-032 S1 ADR-016 결정·S2 대시보드 상태 화면 `704d055`·[EV-107](../05_verification/verification_evidence.md#ev-107)·S3 비교·계획 미리보기 `277de2d`·REV-070 조치 `6b736c9`·[EV-109](../05_verification/verification_evidence.md#ev-109)·[EV-108](../05_verification/verification_evidence.md#ev-108)([EV-106](../05_verification/verification_evidence.md#ev-106), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_003.md)).
-- 2026-11-21 #002 — `bd02d49..078ca6c` T7 저장·원격 변경 독립 코드리뷰 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open(`RV-163~165`)([로그](../members/lim8603/workspace/session_logs/session_2026-11-21_002.md)).
+- 2026-11-21 #003 — REV-069 반입·RV-163~165 조치(`0a9bc4d`)·위임 마감, TASK-032 S1 ADR-016 결정·S2 대시보드 상태 화면 `c876395`·[EV-107](../05_verification/verification_evidence.md#ev-107)·S3 비교·계획 미리보기 `97ece7f`·REV-070 조치 `007b25c`·[EV-109](../05_verification/verification_evidence.md#ev-109)·[EV-108](../05_verification/verification_evidence.md#ev-108)([EV-106](../05_verification/verification_evidence.md#ev-106), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_003.md)).
+- 2026-11-21 #002 — `b016fe8..98aa5bd` T7 저장·원격 변경 독립 코드리뷰 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open(`RV-163~165`)([로그](../members/lim8603/workspace/session_logs/session_2026-11-21_002.md)).
 - 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, ADR-015 묶음·파이프라인 ACK로 P4 소형 Pass, 하드웨어 CRC로 유선 P4-bulk Pass, T7 해소 및 TASK-031 Done([EV-101~105](../05_verification/verification_evidence.md#ev-101), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_001.md)).
 - 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다([EV-098~100](../05_verification/verification_evidence.md#ev-098), [로그](../members/lim8603/workspace/session_logs/session_2026-11-19_001.md)).
 

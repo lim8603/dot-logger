@@ -3,7 +3,7 @@
 ## 1. 개요
 
 - **일자/리뷰어:** 2026-10-30 / AI ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md))
-- **대상:** TASK-009 복구·IO 장애 구현 커밋 `e5f3147` (`crates/dot-logger/src/storage/recovery.rs`, `writer.rs`, `mod.rs`, `tests/fault_storage.rs`, `tests/rt-allocation/src/tests.rs`)
+- **대상:** TASK-009 복구·IO 장애 구현 커밋 `5bbb45c` (`crates/dot-logger/src/storage/recovery.rs`, `writer.rs`, `mod.rs`, `tests/fault_storage.rs`, `tests/rt-allocation/src/tests.rs`)
 - **종합 판정:** Pass (권고사항 P3 2건)
   - RT 경로 오염 없음, Safe Rust 100% (unsafe 0건), 철저한 산술/경계 바운드 검사, 메모리 누수 0, TDD 결함 주입 19개 및 할당 상한 검증 Pass.
 - **상태:** Closed — 2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최종 구현 승인. native/장비 GAP은 별도 유지.
@@ -103,6 +103,6 @@ TASK-009의 복구 및 IO 장애 처리 구현은 설계 계약과 실시간/안
 
 ## 6. 처리 결과 — 2026-10-30
 
-Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리하고, TASK-009 짧게 요약보고해줘」에 따라 RV-016/017을 반영했다. [EV-015 소스51개/명령/로그 hash](../../06_evolution/imported_context/task_009_review_fixes_2026-10-30/results.json) 기준 검사5개 exit0·source 불변을 확인했다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 위 리뷰어의 최초 판정은 수정 전 `e5f3147`/EV-014의 이력으로 보존한다. 현재 조치는 Resolved이며 Closed로 올리지 않는다. TASK-009 Human 최종 리뷰/native·장비 검증은 잔여다. commit/push는 수행하지 않았다.
+Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리하고, TASK-009 짧게 요약보고해줘」에 따라 RV-016/017을 반영했다. EV-015 소스51개/명령/로그 hash(비공개 원시 근거) 기준 검사5개 exit0·source 불변을 확인했다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 위 리뷰어의 최초 판정은 수정 전 `5bbb45c`/EV-014의 이력으로 보존한다. 현재 조치는 Resolved이며 Closed로 올리지 않는다. TASK-009 Human 최종 리뷰/native·장비 검증은 잔여다. commit/push는 수행하지 않았다.
 
-2026-10-30 후속 승인: Human이 TASK-009 최신 구현·REV-012 조치를 승인했다. 소스 `fe03468`은 EV-015 source51개/commit blob hash와 일치한다. 본 리뷰를 Closed로 전환하며 과거 Resolved/Human 대기 문장은 당시 이력으로 보존한다. native GAP-004·실장비 검증은 미완료다.
+2026-10-30 후속 승인: Human이 TASK-009 최신 구현·REV-012 조치를 승인했다. 소스 `5c60399`은 EV-015 source51개/commit blob hash와 일치한다. 본 리뷰를 Closed로 전환하며 과거 Resolved/Human 대기 문장은 당시 이력으로 보존한다. native GAP-004·실장비 검증은 미완료다.

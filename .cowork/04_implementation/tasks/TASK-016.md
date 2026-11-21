@@ -48,13 +48,13 @@
 
 ## 로컬 수락·후속
 
-[EV-030](../../05_verification/verification_evidence.md#ev-030)·[REV-027](../../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) Closed. source `542c6e65999de69ea8f682b4418de1c0fa730990`·검사10개/Miri496·source102개 commit blob 일치. native/운영 backend/실앱·실제 PC/RT 비용/오차 후속이 남아 Task는 In Progress, TC-009 전체 Partial·MS-005 In Progress·Gate4/5 Not Ready를 유지한다. 다음 후보 TASK-017은 Planned/미착수다.
+[EV-030](../../05_verification/verification_evidence.md#ev-030)·[REV-027](../../05_verification/reviews/REV-027_TASK-016_CONFIG_COMPARE.md) Closed. source `0247f3ed03e98f09c90d128c6c1537064aa5a53a`·검사10개/Miri496·source102개 commit blob 일치. native/운영 backend/실앱·실제 PC/RT 비용/오차 후속이 남아 Task는 In Progress, TC-009 전체 Partial·MS-005 In Progress·Gate4/5 Not Ready를 유지한다. 다음 후보 TASK-017은 Planned/미착수다.
 
-2026-11-01 #004: 독립 리뷰 REV-028 RV-063/064 수용·조치·위임 수락/Closed. 실제 poll API `Producer::apply_pending_config()`의 유휴 worker 책임·old 자원 배출 조건, 전환 표본을 비교용 Window로 만들지 않는 호스트 절차를 API/rustdoc에 명시했다. 안정 before→전환/IncompleteWindow→안정 after→Report/Comparison과 인접/겹침 경계를 검증했다. [EV-031](../../05_verification/verification_evidence.md#ev-031)·소스5d447b4. TASK-017 S1을 후속 착수했으며 기존 운영/실측/native 잔여는 유지한다.
+2026-11-01 #004: 독립 리뷰 REV-028 RV-063/064 수용·조치·위임 수락/Closed. 실제 poll API `Producer::apply_pending_config()`의 유휴 worker 책임·old 자원 배출 조건, 전환 표본을 비교용 Window로 만들지 않는 호스트 절차를 API/rustdoc에 명시했다. 안정 before→전환/IncompleteWindow→안정 after→Report/Comparison과 인접/겹침 경계를 검증했다. [EV-031](../../05_verification/verification_evidence.md#ev-031)·소스b060c69. TASK-017 S1을 후속 착수했으며 기존 운영/실측/native 잔여는 유지한다.
 
 ## 운영 backend — 2026-11-03 #001
 
-Human 결정(2026-11-03)으로 probe 연동 전에 원격 운영 backend를 구현했다. `telemetry::operations::OperationsHost`가 host 일반 worker에서 GetStatus(`dot_logger.status.v1` 지표)·ApplyConfig(`dot_logger.config_patch.v1`)·Compare(host 등록 snapshot, `dot_logger.compare.v1`)를 처리한다. 게시 없는 세 거절은 새 `RemoteError::{Conflict, Busy, RestartRequired}`로 구분하고 CLI에 각각 exit3/3/2로 노출한다. Status 지표는 기존 `Reply.data`에 싣고 proto는 바꾸지 않았다. 1초 sampling·snapshot 생성·producer poll은 host 책임이다. [API§15.8](../../03_design_artifacts/interface_contract.md#158-운영-backendstatusapplycompare--2026-11-03)·[EV-044](../../05_verification/verification_evidence.md#ev-044)·[REV-044](../../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) Closed, source `a738ebf`. 실제 dot-probe 화면·PC/RT 비용/오차·native가 남아 Task는 In Progress, TC-009 Partial을 유지한다.
+Human 결정(2026-11-03)으로 probe 연동 전에 원격 운영 backend를 구현했다. `telemetry::operations::OperationsHost`가 host 일반 worker에서 GetStatus(`dot_logger.status.v1` 지표)·ApplyConfig(`dot_logger.config_patch.v1`)·Compare(host 등록 snapshot, `dot_logger.compare.v1`)를 처리한다. 게시 없는 세 거절은 새 `RemoteError::{Conflict, Busy, RestartRequired}`로 구분하고 CLI에 각각 exit3/3/2로 노출한다. Status 지표는 기존 `Reply.data`에 싣고 proto는 바꾸지 않았다. 1초 sampling·snapshot 생성·producer poll은 host 책임이다. [API§15.8](../../03_design_artifacts/interface_contract.md#158-운영-backendstatusapplycompare--2026-11-03)·[EV-044](../../05_verification/verification_evidence.md#ev-044)·[REV-044](../../05_verification/reviews/REV-044_TASK-016_OPERATIONS_BACKEND.md) Closed, source `7f9fbd5`. 실제 dot-probe 화면·PC/RT 비용/오차·native가 남아 Task는 In Progress, TC-009 Partial을 유지한다.
 
 ## 완료 판정 — 2026-11-13
 

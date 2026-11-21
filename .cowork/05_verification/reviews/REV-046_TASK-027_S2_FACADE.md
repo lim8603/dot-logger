@@ -3,9 +3,9 @@
 ## 개요
 
 - 일자/담당: 2026-11-05 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
-- 대상: `capture` 내부 분해(`CaptureCore`·endpoint, 소스 `1af172c`), `logger` 모듈(`Logger`·`LoggerBuilder`·`Budget`·`Retention`·`WriterQuota`·`Writer`·`Channel<T>`·`Record`·`Schema`·host/IO worker·`FacadeReport`, 소스 `64c4d23`), TC-013 F1~F8 시험·rt-allocation F2/F3.
+- 대상: `capture` 내부 분해(`CaptureCore`·endpoint, 소스 `04a7cfa`), `logger` 모듈(`Logger`·`LoggerBuilder`·`Budget`·`Retention`·`WriterQuota`·`Writer`·`Channel<T>`·`Record`·`Schema`·host/IO worker·`FacadeReport`, 소스 `1e651b4`), TC-013 F1~F8 시험·rt-allocation F2/F3.
 - 상태: **Closed** — 결함 수정이 필요한 항목은 없다. 시험 공백 1건은 GAP-009, 기존 MSRV lint는 GAP-010으로 분리했다. 나머지 P3은 API §18.8 문서화와 S3 범위로 처리했다.
-- 판정: **Pass — 로컬 기능 범위.** 근거: [EV-047](../verification_evidence.md#ev-047)·[결과](../../06_evolution/imported_context/task_027_s2_2026-11-05/results.json).
+- 판정: **Pass — 로컬 기능 범위.** 근거: [EV-047](../verification_evidence.md#ev-047)·결과(비공개 원시 근거).
 
 ## 리뷰 요약
 

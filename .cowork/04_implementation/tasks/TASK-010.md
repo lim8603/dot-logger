@@ -45,7 +45,7 @@ TASK-008의 저수준 `ReadPin`은 만료/Drop으로 삭제 보호를 해제하�
 
 ## 착수 — 2026-10-30
 
-Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최신 구현 승인·소스fe03468/문서aee3830 게시 후 착수한다. native GAP-004·TASK-008 최종 리뷰는 별도 유지한다. 원본 불변 범위/complete chunk·시간/채널/레벨 필터·결정적 정렬·페이지/cursor/blob 한계와 RAII 읽기 수명을 TDD로 구현한다.
+Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최신 구현 승인·소스5c60399/문서74fc9ba 게시 후 착수한다. native GAP-004·TASK-008 최종 리뷰는 별도 유지한다. 원본 불변 범위/complete chunk·시간/채널/레벨 필터·결정적 정렬·페이지/cursor/blob 한계와 RAII 읽기 수명을 TDD로 구현한다.
 
 ## 구현 결과 — 2026-10-30
 
@@ -71,7 +71,7 @@ EV-016 최종 source53개/검사10개 exit0·두 Rust16조합/독립 실제 파�
 
 세션 마감 — 2026-10-30: Human 「세션마무리해줘」에 따라 EV-016 source53개·검사10개 exit0·로그42개 원본/뷰 hash의 현재 일치를 확인하고 성공 시험을 반복하지 않았다. REV-013 Resolved·Human 리뷰/native·장비 잔여, TASK-010/MS-004 In Progress와 미커밋/미게시 상태를 유지한다. 다음 세션은 TASK-010·REV-013·EV-016의 최종 Human 리뷰부터 재개하고 TASK-011은 자동 착수하지 않는다.
 
-후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `8bbec13`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. [커밋 대조](../../06_evolution/imported_context/task_010_2026-10-30/commit.json). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
+후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `4a54bcf`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
 
 ## REV-014 조치 — 2026-10-30
 
@@ -79,9 +79,9 @@ Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리�
 
 [EV-017](../../05_verification/verification_evidence.md#ev-017) source52개·검사14개 exit0, 두 Rust 각 core/all-features workspace·실제 파일 API consumer·allocator10·clippy/rustdoc/fmt·영향 Miri(query10+retention18)×8=224 Pass다. 교차 Query/이전 cursor 재개·동일 Query 새 cursor·취소/만료 회귀를 리팩토링 전후 확인했다. RV-022/023은 문서 개선으로 형식적 신규 실패 테스트를 만들지 않았다. query256B/8MiB 메모리 peak/예약은 EV-016과 동일하며 잔여0다. REV-014 Resolved, Human 최종 리뷰/native GAP-004·장비 대기, TASK-010/MS-004 In Progress를 유지한다. 이번 조치는 미커밋·미게시이며 TASK-011은 착수하지 않았다.
 
-2026-10-30 후속 지시 「커밋 푸시하고 다음 작업 시작하자」: EV-017 소스 `439d9c5` 로컬 커밋·source52개 commit blob hash 일치 확인, 동일 성공 시험은 반복하지 않았다. 문서는 별도 커밋·[skip ci] 게시하며 TASK-011 개발 진행은 승인됐다. 이 지시를 별도 최종 구현 리뷰 승인으로 확대하지 않아 REV-013/014 Resolved·native/장비 대기는 유지한다.
+2026-10-30 후속 지시 「커밋 푸시하고 다음 작업 시작하자」: EV-017 소스 `1972649` 로컬 커밋·source52개 commit blob hash 일치 확인, 동일 성공 시험은 반복하지 않았다. 문서는 별도 커밋·[skip ci] 게시하며 TASK-011 개발 진행은 승인됐다. 이 지시를 별도 최종 구현 리뷰 승인으로 확대하지 않아 REV-013/014 Resolved·native/장비 대기는 유지한다.
 
-게시 확인 — 2026-10-30: 소스439d9c5·문서35e3ac3 origin/main push 성공·ls-remote HEAD 일치를 확인했다. [게시 근거](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/push.json). TASK-011 후속 구현/EV-018 로컬 Pass는 별도 작업 트리다.
+게시 확인 — 2026-10-30: 소스1972649·문서f92dd17 origin/main push 성공·ls-remote HEAD 일치를 확인했다. 게시 근거(비공개 원시 근거). TASK-011 후속 구현/EV-018 로컬 Pass는 별도 작업 트리다.
 
 ## 검증 환경·시점 변경 — 2026-10-31
 

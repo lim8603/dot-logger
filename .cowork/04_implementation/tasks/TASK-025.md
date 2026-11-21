@@ -27,7 +27,7 @@ Human 결정(2026-11-21):
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
 | S1 | 문서 검토 | README·crate README·예제에 적힌 명령을 실행하고, 실제 기능과 다른 곳의 목록을 만든다 | Done — 2026-11-21 아래 F1~F10 |
-| S2 | 공개용 README | 루트·cli·client·viewer README를 영어로 새로 쓴다. S1 불일치를 고치고, 명령이 그대로 실행되는지 확인한다 | Done — 2026-11-21 `0a153b5`·`3b0044d` |
+| S2 | 공개용 README | 루트·cli·client·viewer README를 영어로 새로 쓴다. S1 불일치를 고치고, 명령이 그대로 실행되는지 확인한다 | Done — 2026-11-21 `d4e0624`·`dca35d2` |
 | S3 | 사용·운영 작업 문서 | `07_delivery`의 사용자 매뉴얼·운영서·릴리즈 노트(작업 문서, 한국어)에 재현 가능한 사용 예와 운영 한계를 정리한다 | Planned — 다음 |
 | S4 | 추적표·게이트 | MS별 구현/TC/EV 링크를 정리하고 Gate 4·5를 따로 판정해 기록한다 | Planned |
 
@@ -35,7 +35,7 @@ Human 결정(2026-11-21):
 
 ## S1 문서 검토 결과 — 2026-11-21
 
-외부 장비 없이 실행할 수 있는 문서 명령 9개(레시피 L1·L2·L3 tracing·L3 remote, `dot-logger-api-consumer`, CLI `--help`, `dot_probe_bridge --plan`, `dot_probe_check --plan`, feature 목록)는 `704d055` 이후 HEAD에서 모두 exit 0이었다. 내용 불일치는 다음과 같다.
+외부 장비 없이 실행할 수 있는 문서 명령 9개(레시피 L1·L2·L3 tracing·L3 remote, `dot-logger-api-consumer`, CLI `--help`, `dot_probe_bridge --plan`, `dot_probe_check --plan`, feature 목록)는 `c876395` 이후 HEAD에서 모두 exit 0이었다. 내용 불일치는 다음과 같다.
 
 | ID | 위치 | 불일치 | S2 처리 |
 |---|---|---|---|
@@ -52,11 +52,11 @@ Human 결정(2026-11-21):
 
 ## S2 결과 — 2026-11-21
 
-- **코드(`0a153b5`):**
+- **코드(`d4e0624`):**
   - 공개 rustdoc과 예제 머리말 22곳에서 내부 번호를 걷어냈다(F8). 시험·private 주석 35곳은 `.cowork` 공개 여부(T2)가 정해질 때까지 남긴다.
   - CLI `config`·`check`에 도움말 설명을 넣었다(F7).
   - L3 remote 레시피는 `http://주소`를 출력한다(F6). 레시피 줄 수 +5로 한도(+6) 안이다.
-- **README(`3b0044d`):** 루트·cli·client·viewer README를 영어 공개용으로 다시 썼다(F1~F5·F9·F10).
+- **README(`dca35d2`):** 루트·cli·client·viewer README를 영어 공개용으로 다시 썼다(F1~F5·F9·F10).
   - 내부 링크와 번호를 뺐다.
   - 루트 README는 기능, 구성 요소, 시작하기(git 의존성), 레시피, 선택 옵션, 실시간 조회와 대시보드, 검증 수준(단일 Linux PC, 측정값은 보장 아님), 라이선스 미정으로 구성했다.
   - CLI README는 기존 계약을 모두 옮겨 연결, 명령, 변경 결과, 점검, 오프라인·복구·손실, 출력, 종료 코드, 한도, 취소 순으로 정리했다.

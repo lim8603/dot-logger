@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-11-07 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
-- 대상: 소스 `21cc198`(S1a: capture·completion·control·routing·storage 예약 공식 추출, facade `derive` 정확 배정), `4465be3`(S1b: `logger/preset.rs`의 `Sizing`·`Preset`, `Budget::apply`, `LoggerBuilder::{preset, plan, resolve}`, `Plan`), TC-013 F14·F15.
+- 대상: 소스 `c92fb98`(S1a: capture·completion·control·routing·storage 예약 공식 추출, facade `derive` 정확 배정), `d23de85`(S1b: `logger/preset.rs`의 `Sizing`·`Preset`, `Budget::apply`, `LoggerBuilder::{preset, plan, resolve}`, `Plan`), TC-013 F14·F15.
 - 상태: **Closed** — 결함 수정이 필요한 항목은 없다.
 - 판정: **Pass — 로컬 기능 범위.** 근거: [EV-052](../verification_evidence.md#ev-052).
 

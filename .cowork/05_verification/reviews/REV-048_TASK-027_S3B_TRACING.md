@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-11-07 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
-- 대상: 소스 `91387ba` — `logger/sink.rs`(`TracingSink`·내부 `SinkState`·`EventRecord`/`LogRecord`), `mod.rs`(`LoggerBuilder::tracing`·`Logger::tracing`·shutdown 회수), `health.rs`(`tracing_dropped`), `adapters/tracing.rs`(level 변환 `pub(crate)`), TC-013 F12(`tests/tc_013_tracing.rs`).
+- 대상: 소스 `bbc0b28` — `logger/sink.rs`(`TracingSink`·내부 `SinkState`·`EventRecord`/`LogRecord`), `mod.rs`(`LoggerBuilder::tracing`·`Logger::tracing`·shutdown 회수), `health.rs`(`tracing_dropped`), `adapters/tracing.rs`(level 변환 `pub(crate)`), TC-013 F12(`tests/tc_013_tracing.rs`).
 - 상태: **Closed** — 결함 수정이 필요한 항목은 없다.
 - 판정: **Pass — 로컬 기능 범위.** 근거: [EV-049](../verification_evidence.md#ev-049).
 

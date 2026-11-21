@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 일자 | 2026-11-18 |
-| 대상 | `b5709eb..f1444d4`, ADR-014 |
+| 대상 | `2fa1501..b319fe1`, ADR-014 |
 | 판정 | 로컬 Pass. Foxglove 실시간·T7 LAN 검증 잔여 |
 | 상태 | Closed — 위임된 개발 검토, [EV-092](../verification_evidence.md#ev-092) |
 

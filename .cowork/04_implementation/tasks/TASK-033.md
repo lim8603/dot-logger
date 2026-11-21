@@ -28,7 +28,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 커버리지 측정 도구와 기준선 | `cargo llvm-cov` workspace all-features 측정·파일별 미실행 줄 목록, 저위 파일 분류 — [EV-078](../../05_verification/verification_evidence.md#ev-078) | Done |
-| S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — [UC 31개](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
+| S2 | 로깅 사용 사례 조사 | 공식 문서·공개 저장소 근거가 붙은 UC 목록(UC-ID·출처·요구 동작·관련 FR/NFR). 조사 대상 후보: ROS 2 rosbag2/MCAP, Foxglove·Lichtblick, PX4 ULog, ArduPilot DataFlash, Zephyr·FreeRTOS 로깅, defmt, spdlog·Quill 같은 비동기 로거, Rust `tracing`/`log` 생태계, 자동차 DLT. 사실·추정 구분 | **Done** 2026-11-15 — UC 31개(비공개 원시 근거)(12개 시스템, 1차 출처, 표본 2건 원본 재확인). 예비 대응: 있음 10·일부 16·없음 2(UC-07 rate 제한, UC-18 backtrace)·S3 보류 3 |
 | S3 | UC↔TC 대응과 공백 시험 | UC별 대응 시험 표, 대응 없는 UC의 시험 추가(Red→Green) 또는 범위 밖 사유, 아래 커버리지 공백 중 「실제 동작」 항목 처리 | **Done** 2026-11-15 — 대응표, 시험 17개 신규·1개 확장, 결함 1건 수정, 기능 공백 결정 4건 반영(TASK-034·035·B1·bridge 이동), 재측정 라인 92.40% |
 | S4 | 목표치와 완료 판정 | 커버리지·UC 대응률 목표 제안 → Human 승인 → 재측정 결과로 MS-007 일정 판단 | Done — TASK-034·035 수락 뒤 기준 1~4 최종 Pass(EV-089, 2026-11-18) |
 
@@ -54,7 +54,7 @@
 
 ## UC↔TC 대응 — S3 (2026-11-15)
 
-UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md)에 있다. 판정은 읽기 전용 조사(시험 본문과 제품 코드 대조)로 했고, 핵심 주장 3건은 코드에서 직접 다시 확인했다. 확인한 3건은 다음과 같다.
+UC 정의는 S2 조사(비공개 원시 근거)에 있다. 판정은 읽기 전용 조사(시험 본문과 제품 코드 대조)로 했고, 핵심 주장 3건은 코드에서 직접 다시 확인했다. 확인한 3건은 다음과 같다.
 - 손실 기록을 파일 안에 쓰지 않는다: [writer.rs](../../../crates/dot-logger/src/storage/writer.rs)에 Metadata 쓰기가 없다.
 - facade가 이벤트 보존을 끈다: [budget.rs](../../../crates/dot-logger/src/logger/budget.rs)에서 `max_events: 0`·`pre_ns`·`post_ns` 0이다.
 - 압축이 꺼져 있다: writer가 `.compression(None)`으로 고정한다.
@@ -99,7 +99,7 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 | UC-28 원격 실행 중 제어 | 일부 | `tc_009_operations::apply_maps_conflict_busy_restart…`, `operations_host::cli_status_apply_and_compare…`, `cli::actual_cli_remote_query_blob_and_replay_control…` | CLI `blob`(같은 시험 확장)·`completion` → `cli::actual_cli_remote_completion_reports…`·`cli::invalid_blob_and_completion_arguments…`, completion 결과 14종 wire → `remote::tests::completion_reply_pins_every_outcome…`·`codec::tests::completion_reply_decodes_every_outcome…`·`transport::every_completion_outcome_and_reason_survives…` | 기록 일시정지·재개·분할·snapshot 명령 없음. facade 원격 ApplyConfig Unsupported |
 | UC-29 상태 기반 기록 시작·중지 | 기능 없음 | (간접) `tc_009_config_update::configuration_state_and_sampling_survive…` 빈 route | — | 미구현 |
 | UC-30 백그라운드 affinity | 대응 | `tc_013_affinity`, `tc_013_facade::f11_unknown_worker_cpu…` | — | — |
-| UC-31 조회 필터 | 일부 | `tc_006_query::interleaved_queries_and_reused_cursors…`, `cli::real_offline_query_replay…` | 채널 일치 조회 → `tc_006_query::positive_channel_filter_returns_only_the_selected_channel…`. CLI `--channel/--level/--basis` → `cli::offline_query_channel_level_and_basis_flags_reach_the_query`(`4559fc7`) | 텍스트 검색 없음 |
+| UC-31 조회 필터 | 일부 | `tc_006_query::interleaved_queries_and_reused_cursors…`, `cli::real_offline_query_replay…` | 채널 일치 조회 → `tc_006_query::positive_channel_filter_returns_only_the_selected_channel…`. CLI `--channel/--level/--basis` → `cli::offline_query_channel_level_and_basis_flags_reach_the_query`(`8703459`) | 텍스트 검색 없음 |
 
 **요약:**
 - 31개 판정: 대응 9, 일부 19, 기능 없음 3(UC-18·23·29).
@@ -144,7 +144,7 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 - 1번 → [TASK-034](TASK-034.md)(①~③, MS-008 재개). ④는 B1.
 - 2번 → [TASK-035](TASK-035.md)(MS-009, TASK-030 S2 ADR과 함께).
 - 3번 → 범위 밖·백로그 B1, 일정 판단 제외.
-- 4번 → client `diagnostics`(`SnapshotCheck` + bridge)를 `examples/support/dot_probe`로 이동(`4bd6d04`). bridge만 옮기면 라이브러리의 `SnapshotCheck`가 예제 코드에 의존하게 되므로 모듈 전체를 옮겼다.
+- 4번 → client `diagnostics`(`SnapshotCheck` + bridge)를 `examples/support/dot_probe`로 이동(`3a554ac`). bridge만 옮기면 라이브러리의 `SnapshotCheck`가 예제 코드에 의존하게 되므로 모듈 전체를 옮겼다.
 
 원래 요청:
 
@@ -244,7 +244,7 @@ UC 정의는 [S2 조사](../../06_evolution/imported_context/research_2026-11-15
 ## 완료 기준
 
 - [x] S1 커버리지 기준선·파일별 공백 분류(EV-078).
-- [x] S2 사용 사례 목록(출처 포함) — 2026-11-15, [조사 문서](../../06_evolution/imported_context/research_2026-11-15_logging_use_cases.md).
+- [x] S2 사용 사례 목록(출처 포함) — 2026-11-15, 조사 문서(비공개 원시 근거).
 - [x] S3 UC↔TC 대응표와 공백 시험 — 2026-11-15(EV-079). 남은 경미 분기는 S4 규칙으로 처리.
 - [x] S4 목표치 Human 승인과 재측정 결과(EV-089).
 - [x] 기존 위임으로 최종 검증 수락.

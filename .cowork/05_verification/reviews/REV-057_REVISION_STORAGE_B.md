@@ -3,10 +3,10 @@
 | 항목 | 내용 |
 |---|---|
 | 일자·리뷰어 | 2026-11-17 / AI, code-review 스킬 적용 |
-| 대상 | `5e320a9` 이후 TASK-030 S2 B 제품·시험·fixture·SDK/CLI 변경 |
+| 대상 | `509ac01` 이후 TASK-030 S2 B 제품·시험·fixture·SDK/CLI 변경 |
 | 판정 | Pass — 두 Rust 전체·18 feature 구성·정적 검사·Miri Pass |
 | 상태 | Closed — RV-145 수정·최종 회귀·2026-11-17 위임 수락 |
-| 근거 | [EV-084](../verification_evidence.md#ev-084), [검증 결과](../../06_evolution/imported_context/task_030_s2b_2026-11-17/) |
+| 근거 | [EV-084](../verification_evidence.md#ev-084), 검증 결과(비공개 원시 근거) |
 
 ## 요약정리
 
@@ -44,7 +44,7 @@
 
 **[리뷰어]** 실제 파일에서 MCAP Header 끝을 safe_offset으로 지정하면 CLI query가 `complete`, records 0으로 종료됐다. source별 revision/sequence 검증을 요구하는 계약과 다르게, 검증할 Metadata가 없다는 사실을 성공으로 해석했다. recovery도 Header 뒤 EOF만으로 정상 빈 복구가 될 수 있었다. safe_offset 0의 미공개 active 범위는 별도 계약이므로 유지하고, nonzero source의 identity 미확인을 거절해야 한다.
 
-**[처리담당]** 수용. query scan 종료에서 `Validation::file_sequence`를 확인해 CorruptData로 거절한다. recovery는 DataEnd/EndOfInput이어도 identity 미확인이면 InvalidRecord로 보고하며 부분 출력 보존·file sync와 과거 completion의 구분을 유지한다. CLI `native_header_without_file_identity_cannot_be_accepted_as_an_empty_snapshot`이 query Red(exit0→기대4)를 재현했고, 수정 뒤 query exit4·recover InvalidRecord/partial exit3를 확인했다. [Red 원본](../../06_evolution/imported_context/task_030_s2b_2026-11-17/identity-red.log).
+**[처리담당]** 수용. query scan 종료에서 `Validation::file_sequence`를 확인해 CorruptData로 거절한다. recovery는 DataEnd/EndOfInput이어도 identity 미확인이면 InvalidRecord로 보고하며 부분 출력 보존·file sync와 과거 completion의 구분을 유지한다. CLI `native_header_without_file_identity_cannot_be_accepted_as_an_empty_snapshot`이 query Red(exit0→기대4)를 재현했고, 수정 뒤 query exit4·recover InvalidRecord/partial exit3를 확인했다. Red 원본(비공개 원시 근거).
 
 ## 리뷰 포인트
 
@@ -57,4 +57,4 @@
 
 ## 검증과 마감
 
-두 Rust workspace 각각642 Pass·5 ignored, clippy·workspace/core rustdoc Pass, fmt·표면/레시피34/60 Pass, Miri query/교차 revision20 Pass. 두 Rust 각18 feature 구성 Pass·source175개와 최종 `70d2f6a` blob 일치 확인(제품 `2dff5f0`, 상한 시험 보강 `70d2f6a`) 후 위임 수락했다. Open(진단) → In Progress(수정) → Resolved(회귀) → Closed(2026-11-17 위임 수락)로 마감했다. TASK-030 전체·MS-009·Gate4/5 완료를 선언하지 않는다.
+두 Rust workspace 각각642 Pass·5 ignored, clippy·workspace/core rustdoc Pass, fmt·표면/레시피34/60 Pass, Miri query/교차 revision20 Pass. 두 Rust 각18 feature 구성 Pass·source175개와 최종 `63a9c87` blob 일치 확인(제품 `91ac496`, 상한 시험 보강 `63a9c87`) 후 위임 수락했다. Open(진단) → In Progress(수정) → Resolved(회귀) → Closed(2026-11-17 위임 수락)로 마감했다. TASK-030 전체·MS-009·Gate4/5 완료를 선언하지 않는다.

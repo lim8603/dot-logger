@@ -34,9 +34,9 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 
 2026-10-30 후속: Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 조치를 게시하고 TASK-009를 구현했다. EV-014 복구19개·두 Rust16조합/consumer/예제/lint/doc/fmt·allocator9·Miri936 로컬 Pass, REV-011 Resolved다. Human 최종 구현 리뷰/native·장비 잔여로 MS-003 In Progress를 유지한다. 자동 startup 발견/재개·worker와 실물 장애 수락은 미완료다.
 
-2026-10-30 TASK-009 최신 구현 승인·REV-011/012 Closed, 소스fe03468/문서aee3830 게시 후 TASK-010을 구현했다. EV-016 query·reader-owned pin 수명·두 Rust16조합·allocator10/lint/doc/fmt·Miri1024 로컬 Pass, REV-013 Resolved·Human 리뷰/native·장비 잔여다. MS-004 In Progress이며 재생/remote/CLI·실장비 성능은 후속이다.
+2026-10-30 TASK-009 최신 구현 승인·REV-011/012 Closed, 소스5c60399/문서74fc9ba 게시 후 TASK-010을 구현했다. EV-016 query·reader-owned pin 수명·두 Rust16조합·allocator10/lint/doc/fmt·Miri1024 로컬 Pass, REV-013 Resolved·Human 리뷰/native·장비 잔여다. MS-004 In Progress이며 재생/remote/CLI·실장비 성능은 후속이다.
 
-2026-10-30 TASK-010 소스439d9c5/문서35e3ac3 게시 후 승인된 TASK-011을 구현했다. EV-018 두 Rust16features·실제 파일 replay consumer·allocator10/lint/doc/fmt·영향 Miri304 로컬 Pass, REV-015 Resolved·Human 리뷰/native·장비 잔여로 MS-004 In Progress를 유지한다.
+2026-10-30 TASK-010 소스1972649/문서f92dd17 게시 후 승인된 TASK-011을 구현했다. EV-018 두 Rust16features·실제 파일 replay consumer·allocator10/lint/doc/fmt·영향 Miri304 로컬 Pass, REV-015 Resolved·Human 리뷰/native·장비 잔여로 MS-004 In Progress를 유지한다.
 
 2026-10-31 TASK-011 REV-016 반입·RV-026 방어적 정리/RV-027~028 진단 API 조치, EV-019 두 Rust all-features·실제 파일 consumer/allocator/lint/doc/fmt·replay Miri96 로컬 Pass다. REV-015/016 Resolved·Human 리뷰/native·장비 대기로 MS-004 In Progress를 유지한다. remote/CLI는 후속이며 TASK-012는 자동 착수하지 않는다.
 
@@ -44,23 +44,23 @@ Must 종료 전에 FR-018 소프트웨어 옵션과 실제 장비 검증을 모�
 
 2026-10-31 ADR-011: 현재 PC 실측/UPS 시뮬레이션 수락·native 공개 완료 후 이월 승인. TASK-022 환경/수락 프로필 준비로 MS-007 In Progress이며 Phase Build는 유지하고 종합 시험/Verify 진입/Gate4·5 Pass를 선언하지 않는다.
 
-2026-10-31 TASK-013 EV-025: Rust native client/CLI·오프라인·취소/ACK·화면 API 계약 로컬 구현/리뷰 수락 완료(소스29e55da, 검사15개·Miri32). MS-004의 로컬 조회·재생·원격·클라이언트 근거를 연결했으며 native/다른 OS·실앱/성능 후속 때문에 MS-004 In Progress·Gate4/5 미완료를 유지한다. 다음 개발 후보 TASK-014는 이번 요청 범위에서 착수하지 않았다.
+2026-10-31 TASK-013 EV-025: Rust native client/CLI·오프라인·취소/ACK·화면 API 계약 로컬 구현/리뷰 수락 완료(소스6863268, 검사15개·Miri32). MS-004의 로컬 조회·재생·원격·클라이언트 근거를 연결했으며 native/다른 OS·실앱/성능 후속 때문에 MS-004 In Progress·Gate4/5 미완료를 유지한다. 다음 개발 후보 TASK-014는 이번 요청 범위에서 착수하지 않았다.
 
 2026-10-31 TASK-014 EV-027: 고정 계측·유한 이력/대상 합계·fixture 로컬 구현/검증·REV-023 위임 수락. MS-005 In Progress, 비용/RT/실앱/native·TASK-015~017은 미완료이며 다음 후보 TASK-015는 미착수다.
 
-2026-10-31 #012 TASK-015 로컬 수락: EV-028 source100개/검사13개·Miri168·소스a247d01, REV-024 Closed. Observed/Validated/Estimated/Stale·손실 안정 큐 Overloaded·분리된 bytes/slots/출력정지/filesystem/quota/순환 보존 산술과 합성 오차 시나리오를 검증했다. TASK-016/017·실제 PC/RT 오차/비용·native·실앱이 남아 MS-005 In Progress/TC-009 전체 미완료다.
+2026-10-31 #012 TASK-015 로컬 수락: EV-028 source100개/검사13개·Miri168·소스95a63a6, REV-024 Closed. Observed/Validated/Estimated/Stale·손실 안정 큐 Overloaded·분리된 bytes/slots/출력정지/filesystem/quota/순환 보존 산술과 합성 오차 시나리오를 검증했다. TASK-016/017·실제 PC/RT 오차/비용·native·실앱이 남아 MS-005 In Progress/TC-009 전체 미완료다.
 
 2026-10-31 #014 REV-025 조치: [EV-029](../05_verification/verification_evidence.md#ev-029) sourceeaf736c·검사14개/Miri224·source101개 blob일치로 거절 범주/압력·시도 부하·host 출력 끝점 정렬·poison 복구를 로컬 수락, REV-025 Closed. TASK-016/017·실측 비용/오차·native/실앱은 남아 MS-005 In Progress/TC-009·Gate4/5 전체 미완료를 유지한다.
 
 2026-11-01 #002 TASK-016 로컬 수락: EV-030/source542c6e6·source102개·검사10개·Miri496·REV-027 Closed. 명시 validate/apply·posted/per-producer ack·old plan Busy·filter/Normal sampling/기존 route·변경 전후의 관측/조건 차이를 연결했다. source102개 commit blob 일치. 운영 backend/CLI runtime·실앱/실제 PC/RT 비용/오차·native와 TASK-017이 남아 MS-005 In Progress·TC-009 전체 Partial·Gate4/5 Not Ready를 유지한다. 다음 TASK-017은 Planned/미착수다.
 
-2026-11-01 #004: TASK-016 REV-028 RV-063/064 조치/Closed 뒤 TASK-017 S1 무부하 계획·시간/물리 쓰기/reserve/취소 예산 판정을 착수·로컬 수락했다. [EV-031](../05_verification/verification_evidence.md#ev-031)·REV-029 Closed·소스0622a90. 다음 S2 실제 run·배출/sync/정리·결과 분류 및 CLI/runtime/실앱/실측/native가 남아 Task/MS·TC-010 전체 Partial·Gate4/5 Not Ready를 유지한다.
+2026-11-01 #004: TASK-016 REV-028 RV-063/064 조치/Closed 뒤 TASK-017 S1 무부하 계획·시간/물리 쓰기/reserve/취소 예산 판정을 착수·로컬 수락했다. [EV-031](../05_verification/verification_evidence.md#ev-031)·REV-029 Closed·소스75c6096. 다음 S2 실제 run·배출/sync/정리·결과 분류 및 CLI/runtime/실앱/실측/native가 남아 Task/MS·TC-010 전체 Partial·Gate4/5 Not Ready를 유지한다.
 
-2026-11-01 #005: TASK-017 S2 합성 파일 실제 실행·시간/쓰기/reserve/취소·footer/sync/close/소유 namespace 정리와 결과 분류를 [EV-032](../05_verification/verification_evidence.md#ev-032)·소스1cae3b9·REV-030 Closed로 로컬 수락했다. workspace347·MSRV 관련40·Miri24 Pass. S3 Report/CLI/운영 host·실제 free probe/실앱/PC/RT/native 후속이 남아 Task/MS/TC 전체·Gate4/5 미완료를 유지한다.
+2026-11-01 #005: TASK-017 S2 합성 파일 실제 실행·시간/쓰기/reserve/취소·footer/sync/close/소유 namespace 정리와 결과 분류를 [EV-032](../05_verification/verification_evidence.md#ev-032)·소스5d3349b·REV-030 Closed로 로컬 수락했다. workspace347·MSRV 관련40·Miri24 Pass. S3 Report/CLI/운영 host·실제 free probe/실앱/PC/RT/native 후속이 남아 Task/MS/TC 전체·Gate4/5 미완료를 유지한다.
 
 2026-11-01 #006: TASK-017 S3 로컬 운영 host/PlanCheck·RunCheck/CLI·실제 Linux free probe·원 Report/profile 연결을 [EV-033](../05_verification/verification_evidence.md#ev-033)·REV-031 Closed로 수락했다. workspace357/core288·MSRV workspace357·Miri16·audit Pass. 생산 capture/routing/실제 수신자·dot-probe/실앱·PC/RT/UPS/장기/native가 남아 S3 전체·Task/MS/TC·Gate4/5 미완료 유지.
 
-2026-11-01 #007: TASK-017 S3 실제 raw capture/routing·loopback TCP receiver 큐/ACK·dot-probe tick export snapshot을 [EV-034](../05_verification/verification_evidence.md#ev-034)·REV-032 Closed/소스cf8fa25로 첫 연결 수락했다. 신규7개·Rust1.96/MSRV workspace 각364 Pass. routed RunCheck 운영 backend·지속 실앱/화면·PC/RT/UPS/장기/native 후속으로 MS-005/Task/TC 전체·Gate4/5 미완료 유지.
+2026-11-01 #007: TASK-017 S3 실제 raw capture/routing·loopback TCP receiver 큐/ACK·dot-probe tick export snapshot을 [EV-034](../05_verification/verification_evidence.md#ev-034)·REV-032 Closed/소스b196f06로 첫 연결 수락했다. 신규7개·Rust1.96/MSRV workspace 각364 Pass. routed RunCheck 운영 backend·지속 실앱/화면·PC/RT/UPS/장기/native 후속으로 MS-005/Task/TC 전체·Gate4/5 미완료 유지.
 
 2026-11-01 #010: REV-034 P3 조치 EV-036/Closed 뒤 TASK-019 S1 유한 InfluxDB v2 write를 EV-037/REV-035 Closed로 로컬 수락했다. MS-006 In Progress. 실제 DB/query·Delivery/파일 격리·tracing/실앱·UPS·실측/native·Gate4/5는 미완료다.
 

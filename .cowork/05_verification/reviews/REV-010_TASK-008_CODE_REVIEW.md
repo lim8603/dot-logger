@@ -2,7 +2,7 @@
 
 ## 1. 리뷰 개요
 * **일자 / 리뷰어:** 2026-10-30 / AI ([code-review skill](../../../.agents/skills/code-review/SKILL.md))
-* **대상 Task / 기준 커밋:** [TASK-008](../../04_implementation/tasks/TASK-008.md) / commit [`7388145`](../../../crates/dot-logger/src/storage/retention.rs) (`71b3e2c` 대비 회전·보존·이벤트 보호 추가 구현분, EV-012 기준 소스 49개)
+* **대상 Task / 기준 커밋:** [TASK-008](../../04_implementation/tasks/TASK-008.md) / commit [`e6669ac`](../../../crates/dot-logger/src/storage/retention.rs) (`c932ee4` 대비 회전·보존·이벤트 보호 추가 구현분, EV-012 기준 소스 49개)
 * **종합 판정:** Conditional (Pass 조건부 수용 — P1 0건, P2 1건, P3 2건)
 * **진행 상태:** Closed — 2026-10-31 Human 최종 구현 승인 (EV-012/013)
 
@@ -77,7 +77,7 @@
 
 ## 최종 처리 결과 — 2026-10-30
 
-[EV-013](../verification_evidence.md#ev-013) / [source49개·명령/로그 hash](../../06_evolution/imported_context/task_008_review_fixes_2026-10-30/results.json): 보존 통합17개(신규2)·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt, 보존 Miri16×8=128회 Pass다. RV-012의 잔여 위험은 문서와 TASK-010 체크에 명시했으며 토큰 유실을 자동 복구한 것은 아니다. Human 구현 리뷰/native·장비는 잔여로 Conditional/Resolved를 유지한다. 새 REV를 만들어 처리 이력을 분산하지 않았고 제품 수정은 리뷰 전용 세션이 아닌 개발 세션 #003에서 수행했다. commit/push는 수행하지 않았다.
+[EV-013](../verification_evidence.md#ev-013) / source49개·명령/로그 hash(비공개 원시 근거): 보존 통합17개(신규2)·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt, 보존 Miri16×8=128회 Pass다. RV-012의 잔여 위험은 문서와 TASK-010 체크에 명시했으며 토큰 유실을 자동 복구한 것은 아니다. Human 구현 리뷰/native·장비는 잔여로 Conditional/Resolved를 유지한다. 새 REV를 만들어 처리 이력을 분산하지 않았고 제품 수정은 리뷰 전용 세션이 아닌 개발 세션 #003에서 수행했다. commit/push는 수행하지 않았다.
 
 ## Human 최종 구현 승인 — 2026-10-31
 

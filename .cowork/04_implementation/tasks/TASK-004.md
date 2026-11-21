@@ -53,7 +53,7 @@
 
 현재 `RobotProcess::spawn`·control/safety의 `thread::Builder::spawn`은 'static 소유 값을 넘기며 shutdown은 일반/비동기 bridge에서 join한다. borrowed Producer를 현재 spawn에 직접 넣을 수는 없다. owner를 가진 'static 관리 host 내부에서 scoped RT worker를 띄우고, worker join→drain/reclaim→owner Drop 순서를 보장하는 예제를 두 Rust에서 실행했다. 기존 borrowed 계약을 유지한 수명 모델은 성립하며, 실제 run entry point/생성부 조정과 애플리케이션 검증은 TASK-026이다. dot-probe 파일은 읽기만 했고 첫 적용 완료로 표시하지 않는다(T1 미도래).
 
-상태: **In Progress — 구현·Human 리뷰 승인·게시 완료, native CI 계정 사유 대기**. 코드 `9a4f34c`·문서 `f0ce6ee`를 게시했고 [CI run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735)을 시도했다. GitHub 결제 실패 또는 spending limit 안내로 8개 job 모두 runner/step 실행 전에 차단됐다. 제품 시험은 Not Run이며 GAP-004 Open이다. 계정 조건 해결 후 같은 source의 CI를 재실행해 Done을 판단한다. 원본 fanout·완료·파일·실장비 수락은 후속 Task다.
+상태: **In Progress — 구현·Human 리뷰 승인·게시 완료, native CI 계정 사유 대기**. 코드 `4a9ae56`·문서 `0cafb5c`를 게시했고 [CI run 40520558735](https://github.com/lim8603/dot-logger/actions/runs/40520558735)을 시도했다. GitHub 결제 실패 또는 spending limit 안내로 8개 job 모두 runner/step 실행 전에 차단됐다. 제품 시험은 Not Run이며 GAP-004 Open이다. 계정 조건 해결 후 같은 source의 CI를 재실행해 Done을 판단한다. 원본 fanout·완료·파일·실장비 수락은 후속 Task다.
 
 Human 구현 리뷰 승인: 2026-10-27 / 게시·CI 확인 후 오늘 세션 종료 요청. private unsafe 경계와 dot-probe 생성부 조건을 포함한 보고 범위를 승인받았다.
 

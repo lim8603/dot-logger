@@ -4,7 +4,7 @@
 
 - **일자 / 리뷰어:** 2026-11-01 / AI 독립 코드리뷰 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
 - **성격:** 독립 Read-Only 코드리뷰. REV-035~REV-037은 개발 세션별 자가 점검이었으므로, TASK-019 InfluxDB v2 어댑터 전체(S1 유한 Write, S2 제한 수치 Query, S3 원 Delivery·완료·파일 격리)의 구현 형상에 대해 독립적 관점에서 심층 검토를 수행했다. 제품 코드는 전혀 수정하지 않았다.
-- **대상 형상:** 커밋 `5bd70dc` 및 TASK-019 S1~S3 구현 파일 전체
+- **대상 형상:** 커밋 `86b1f67` 및 TASK-019 S1~S3 구현 파일 전체
   - InfluxDB 어댑터 코어:
     - [`crates/dot-logger/src/adapters/influxdb/mod.rs`](../../../crates/dot-logger/src/adapters/influxdb/mod.rs)
     - [`crates/dot-logger/src/adapters/influxdb/numeric.rs`](../../../crates/dot-logger/src/adapters/influxdb/numeric.rs)
@@ -79,7 +79,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·Closed.
 - **처리 내용:** `RoutedWriter::new` rustdoc에 5개 선행조건과 metadata 예약 실패 조건을 명시했다. 새 오류 variant나 동작 변경은 없다.
-- **검증 근거:** 소스 `d16c7e5`; `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`, `cargo fmt --check` exit0. [rustdoc 원문](../../06_evolution/imported_context/task_020_s1_2026-11-01/rev038-doc.log).
+- **검증 근거:** 소스 `73edb7a`; `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`, `cargo fmt --check` exit0. rustdoc 원문(비공개 원시 근거).
 
 ---
 
@@ -97,7 +97,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·Closed.
 - **처리 내용:** `NumericQuery::from_ns`의 `> i64::MIN + 1`, `to_ns`의 `< i64::MAX`와 `from_ns < to_ns`를 필드 rustdoc에 명시했다. Flux `time()` 변환 경계 방어 목적을 설명하며 기존 입력 검증은 그대로다.
-- **검증 근거:** 소스 `d16c7e5`; 위 rustdoc/fmt exit0. 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
+- **검증 근거:** 소스 `73edb7a`; 위 rustdoc/fmt exit0. 문서만 바꾸므로 동작을 복제하는 새 테스트는 추가하지 않았다.
 
 ---
 

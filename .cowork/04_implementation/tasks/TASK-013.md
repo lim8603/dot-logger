@@ -45,7 +45,7 @@ Human 「승인」·모든 권한/작업 단위별 커밋·푸시 위임·「다
 첫 단위는 RV-038 수명 지침을 클라이언트가 소비하도록 `ClientReceiver`를 구현했다. 실제 연결을 연 호스트가 `begin_connection`으로 opaque ConnectionId와 receiver를 만들고, push/세대 갱신/end/ACK 추출이 현재 identity를 검사한다. 서버 구독 ID를 재사용해도 오래된 연결의 조각/미인계 owner/ACK가 새 연결로 들어가지 않는다. consumer handoff는 기존 core의 generation/TTL/CRC·예산 경계를 사용하고 거절 시 원래 owner를 반환한다. disconnect는 미완성 버퍼를 정리하되 외부 보관 owner의 예약을 강제 회수하지 않는다.
 
 - 기본 feature는 core-only, remote는 opt-in이다. client identity/receipt metadata 및 transport/consumer buffer는 host headroom이며 전체 RSS 상한을 주장하지 않는다.
-- 공개 API 부재 compile Red → 통합3개 Green(재연결·세대/거절·잘못된/다른 연결), 두 Rust workspace/core consumer/lint/doc/fmt 및 Miri3×8=24 Pass. [EV-024](../../05_verification/verification_evidence.md#ev-024) source74개/검사12개·commit blob일치, 소스 `ded6372`.
+- 공개 API 부재 compile Red → 통합3개 Green(재연결·세대/거절·잘못된/다른 연결), 두 Rust workspace/core consumer/lint/doc/fmt 및 Miri3×8=24 Pass. [EV-024](../../05_verification/verification_evidence.md#ev-024) source74개/검사12개·commit blob일치, 소스 `86b50ef`.
 - [REV-020](../../05_verification/reviews/REV-020_TASK-013_RECEIVER_START.md)는 이 첫 단위의 개발 자가 점검/위임된 수락으로 Closed다. Task 전체 완료/최종 사용자 경로 수락은 아니다. 위 DoD·CLI 사용자 흐름 체크는 미완료로 유지한다.
 
 후속: 실제 tonic transport 연결·endpoint/TLS/token/버전·bounded 요청/stream decode, ACK를 검사한 바로 그 연결로 전송하는 수명, CLI JSON/exit/Ctrl-C, query→replay/오프라인 파일·예제/dot-probe API를 연결한다. 현재 begin/end는 소켓을 열고 닫는 API가 아니며 transport 재연결 시험이나 CLI 완료로 보고하지 않는다. 이미 추출/전송된 ACK·수락된 consumer 데이터는 취소했다고 추정하지 않는다. 실제 연결에 generation gate가 찼다면 종료 후 새 연결/receiver를 만들고 gate만 몰래 초기화하지 않는다.
@@ -71,7 +71,7 @@ Human 「TASK-013까지 진행할래?」·「계속 이어서 진행해줘」에
 
 ## REV-022 조치 수락 — 2026-10-31 #011
 
-Human 「권고대로 진행하자」에 따라 EV-026 source92개/검사14개·Miri32·소스b3c08bd를 로컬 검증/위임 수락했다. REV-022 Closed이며 상세는 REV §8과 API§14.5를 따른다. RV-049 포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성과 화면 불연속 표시는 TASK-020 후속이다. heartbeat wire 변경은 하지 않았다. 기존 EV-023/025는 이전 형상 근거로 보존하고 현재 조치는 EV-026을 사용한다. native T3·실앱/성능·Gate4/5 미완료는 유지한다. TASK-014는 이번 지시에 따라 착수한다.
+Human 「권고대로 진행하자」에 따라 EV-026 source92개/검사14개·Miri32·소스eb39cb2를 로컬 검증/위임 수락했다. REV-022 Closed이며 상세는 REV §8과 API§14.5를 따른다. RV-049 포화 회복 실측은 TASK-022, RV-053 서버 lease 초과 유휴/재구독 연속성과 화면 불연속 표시는 TASK-020 후속이다. heartbeat wire 변경은 하지 않았다. 기존 EV-023/025는 이전 형상 근거로 보존하고 현재 조치는 EV-026을 사용한다. native T3·실앱/성능·Gate4/5 미완료는 유지한다. TASK-014는 이번 지시에 따라 착수한다.
 
 ## 완료 판정 — 2026-11-13
 

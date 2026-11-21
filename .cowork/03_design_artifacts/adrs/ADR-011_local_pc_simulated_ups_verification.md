@@ -38,4 +38,4 @@
 
 - [요구사항 §19](../../02_project_definition/requirement_spec.md#19-검증-환경수락-방법-변경--2026-10-31)
 - [테스트 전략](../../05_verification/test_strategy.md), [TC-011/012](../../05_verification/test_case.md#tc-011), [GAP-001/004](../../05_verification/verification_evidence.md#open-evidence-gaps)
-- [TASK-022](../../04_implementation/tasks/TASK-022.md), [환경 관측](../../06_evolution/imported_context/verification_policy_2026-10-31/environment.json)
+- [TASK-022](../../04_implementation/tasks/TASK-022.md), 환경 관측(비공개 원시 근거)

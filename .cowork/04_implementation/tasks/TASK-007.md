@@ -80,7 +80,7 @@ Human 「코드리뷰 받은 내역을 확인하고 수정하자는 말이였어
 
 저장 통합21개·private Busy2개·두 Rust 각16 features/2-record 실제 파일 consumer→finish→sync→shutdown/예제·clippy/rustdoc/fmt·allocator7 Pass. Miri는 lib14+raw17+routing19+completion15+control18=83×8=664 Pass이며 파일 IO 통합19개는 일반 로컬 실행이다. 봉투2개는 변경되지 않아 EV-010의 Miri 근거를 재사용한다. 128채널·4096레코드 sparse/dense 요청 메모리 peak2454992/611808 bytes ≤ 예약5838400, 최종 잔여0이다. 버퍼 포함 단일 채널256B/8MiB peak108926/8497278 ≤ 예약236160/17012864다.
 
-수정분 AI 검토는 **Conditional**(로컬 수정·회귀 Pass, Human 최종 리뷰/native·장비 잔여)이다. RV-006~010은 로컬 수정 범위에서 해결했으며 TASK-007/MS-003 In Progress·TC-004 부분 실행을 유지한다. 실제 장비 성능/기본 chunk·buffer·batch 지연 설정은 TASK-022 후속이다. 수정 작업 당시 commit/push 지시는 없었다. 이후 Human 「커밋 푸쉬하고 세션 마감해줘」로 소스 `71b3e2c`를 게시했고 EV-011 source46개/commit blob 일치를 확인했다. 최신 구현 Human 리뷰/native는 계속 잔여다.
+수정분 AI 검토는 **Conditional**(로컬 수정·회귀 Pass, Human 최종 리뷰/native·장비 잔여)이다. RV-006~010은 로컬 수정 범위에서 해결했으며 TASK-007/MS-003 In Progress·TC-004 부분 실행을 유지한다. 실제 장비 성능/기본 chunk·buffer·batch 지연 설정은 TASK-022 후속이다. 수정 작업 당시 commit/push 지시는 없었다. 이후 Human 「커밋 푸쉬하고 세션 마감해줘」로 소스 `c932ee4`를 게시했고 EV-011 source46개/commit blob 일치를 확인했다. 최신 구현 Human 리뷰/native는 계속 잔여다.
 
 ## 정리 요약 — 2026-10-30
 

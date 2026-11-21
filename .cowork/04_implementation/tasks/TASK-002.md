@@ -40,7 +40,7 @@
 
 ## 실행 결과와 리뷰 범위 — 2026-10-26
 
-- 시작 `23a499c` 위 검증 작업 트리를 코드 커밋 `2f9015d`로 보존했다. 소스 hash·명령·로그는 EV-001에 연결했다.
+- 시작 `ace6d1a` 위 검증 작업 트리를 코드 커밋 `5f8cee9`로 보존했다. 소스 hash·명령·로그는 EV-001에 연결했다.
 - Rust 1.96.0 개발 pin, MSRV 1.85.0, Cargo lock. 두 버전 각각 16 feature 조합·독립 공개 API consumer·compile-fail·clippy, 개발 fmt/rustdoc Pass.
 - 구성 테스트 13개: 총 64/65 MiB, producer별 input/raw 합계, 최대 단일 slot, Important slots/bytes, TreatEqually, sum/product/누적 overflow, worker stack, sparse CPU/중복/required affinity, optional/required capability 실패 상태.
 - 전체 feature의 의존성 probe 6개: MCAP 무압축/zstd 왕복, rtrb·Protobuf, remote/DB/일반 로그 의존 API. 제품 어댑터 구현은 아님.
@@ -59,5 +59,5 @@ Human이 TASK-002 구현 리뷰를 승인하고 GitHub MCP 연결·본인 계정
 ## GitHub 게시·native CI 완료 — 2026-10-27
 
 - [lim8603/dot-logger](https://github.com/lim8603/dot-logger) 비공개 생성, 기존 main 7개 커밋과 이력 보존·origin/main 추적 설정 완료. VS Code Git 인증을 사용했으며 토큰은 기록하지 않았다.
-- [Rust contracts](https://github.com/lim8603/dot-logger/actions/runs/40504484501), revision `f9894f25f7b43eee6faaa47c98ecd62cb61ff797`: Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 Pass. 각 조합 16 feature·독립 consumer·clippy·rustdoc, 개발 Rust fmt 통과.
+- [Rust contracts](https://github.com/lim8603/dot-logger/actions/runs/40504484501), revision `24522e78b668a0e052232bb0857cc4962c00f95a`: Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 Pass. 각 조합 16 feature·독립 consumer·clippy·rustdoc, 개발 Rust fmt 통과.
 - 원본 로그·실행 metadata·소스 hash는 EV-001에 연결했다. GAP-004는 hosted native CI 범위에서 Closed, TASK-002 Done. 실제 Windows 11/PREEMPT_RT·장비 검증과 후속 런타임은 계속 미검증이다. 다음 TASK-003은 미착수다.

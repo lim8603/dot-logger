@@ -36,7 +36,7 @@
 - [x] S2 파일 scope 실패·취소·정리·메모리/시간/쓰기/reserve 경계 검증. 생산 부하/실측은 후속이다.
 - [x] 기존 위임에 따른 AI S2 개발 자가 점검/로컬 수락. 직접 Human 추가 리뷰·전체 제품 수락을 뜻하지 않는다.
 
-테스트 정의: [TC-010](../../05_verification/test_case.md#tc-010). S1 코드/검증: [EV-031](../../05_verification/verification_evidence.md#ev-031)·[REV-029](../../05_verification/reviews/REV-029_TASK-017_PLAN_START.md), 소스0622a90. S1 당시 계획 단위를 기존 위임으로 수락했으며 현재 S2 추가 수락은 아래 기록을 따른다. Task 전체 완료/실제 성능 인증은 아니다. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+테스트 정의: [TC-010](../../05_verification/test_case.md#tc-010). S1 코드/검증: [EV-031](../../05_verification/verification_evidence.md#ev-031)·[REV-029](../../05_verification/reviews/REV-029_TASK-017_PLAN_START.md), 소스75c6096. S1 당시 계획 단위를 기존 위임으로 수락했으며 현재 S2 추가 수락은 아래 기록을 따른다. Task 전체 완료/실제 성능 인증은 아니다. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
 ## 작업 단계와 현재 계약 — 2026-11-01 #004
 
@@ -50,7 +50,7 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 
 ## S2 로컬 수락 — 2026-11-01 #005
 
-- [EV-032](../../05_verification/verification_evidence.md#ev-032)·소스1cae3b9·[REV-030](../../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) Closed. [API §15.4](../../03_design_artifacts/interface_contract.md#154-task-017-s2-로컬-합성-파일-점검--2026-11-01).
+- [EV-032](../../05_verification/verification_evidence.md#ev-032)·소스5d3349b·[REV-030](../../05_verification/reviews/REV-030_TASK-017_FILE_RUN.md) Closed. [API §15.4](../../03_design_artifacts/interface_contract.md#154-task-017-s2-로컬-합성-파일-점검--2026-11-01).
 - 단일 호출 worker·전용 synthetic MCAP file scope. 신규 파일15개+짧은 쓰기/seek 재쓰기/부분 OS 오류/상한 내부3개, API/settlement/identity Red→Green. 단조 실제 시계와 실제 임시 file IO·footer/sync/close/정리, 기존 파일 bytes 보존, writer 예약 회수 확인.
 - workspace/all-features347개(문서 시험 포함), Rust1.96/MSRV1.85 관련40개 각각, fmt/clippy/rustdoc·Miri3종×8seeds=24 Pass. source4개 commit blob 일치.
 - `required_memory_bytes`에 writer+payload/run/path 보수 예약이 맞는지 preflight하고 writer의 실제 공유 output 예약을 사용한다. 물리 예약 상한·실제 Write bytes/free-reserve backstop, footer/부분 범위·primary/settlement/cleanup 오류를 보존한다.
@@ -59,7 +59,7 @@ TASK-013/015 로컬 수락을 선행 근거로 착수했다. 운영 backend/실�
 
 ## S3 로컬 운영 연결 수락 — 2026-11-01 #006
 
-- 소스 `5390a55194cf5bf80ecc74f461e24a07d8f6af10`·source101개 commit blob/hash 일치, 검사24개 exit0.
+- 소스 `f4ff74d5c3e2cb7c0140e6d64567691541437ae5`·source101개 commit blob/hash 일치, 검사24개 exit0.
 
 - [EV-033](../../05_verification/verification_evidence.md#ev-033)·[REV-031](../../05_verification/reviews/REV-031_TASK-017_CHECK_HOST.md) 개발 자가 점검, [API §15.5](../../03_design_artifacts/interface_contract.md#155-task-017-s3-로컬-운영-hostcli-연결--2026-11-01).
 - [x] 고정 슬롯·checked 증가/단일 사용 capability, host만 경로/예산 등록, 무부하 PlanCheck/CLI preview, 별도 RunCheck Manage 실행.
@@ -76,7 +76,7 @@ S3 전체 완료 체크는 위 후속 때문에 미완료로 유지한다. 기�
 - [실행 예제](../../../crates/dot-logger-client/examples/dot_probe_bridge.rs)·[host 흐름](../../../crates/dot-logger-client/examples/support/dot_probe.rs)·[통합 시험](../../../crates/dot-logger-client/tests/routed_check.rs). core/RT/unsafe·dot-probe 제품 코드·wire 변경 없음. serde_json은 이미 고정된 workspace 버전의 예제/시험 dev 의존만 추가했다.
 - [x] 실제 `CaptureOwner/Producer::try_record_raw` 수락 receipt·`Router` Delivery guard·`RemoteHub::offer_delivery`·실제 TCP/gRPC 수신/조립·1슬롯 소비 큐 인계/ACK·원 receipt ReceiverAcknowledged·raw 회수·실제 연결 종료/예약 반환을 연결했다. 수신/조립만으로 Pending이 바뀌지 않고 raw 슬롯이 유지된다.
 - [x] 입력≤64KiB/128 thread, 슬롯1·logger budget16MiB·current-thread worker1·2초 신규 수집/인계 구간. 취소/수신자 없음/시간 부족 무수집, 큐 포화/연결 종료 Unknown, 소비 수락 후 ACK 불명도 원 데이터는 유지하되 완료 추정 없음. 명시 `--plan` 무부하, `--run` 별도 실행.
-- [x] 실제 dot-probe `269d348`의 `robot-serve` 실행·기존 `PROBE_TICK_REPORT` export 1,618B 생성·SIGTERM 정상 종료(exit0) 후 해당 원문을 전달했다. SafetyThread120/ControlThread60/battery_main24 ticks는 입력 내용이며 logger 비용/RT 달성 근거로 쓰지 않는다. [원문·명령·결과](../../06_evolution/imported_context/task_017_routed_2026-11-01/results.json).
+- [x] 실제 dot-probe `269d348`의 `robot-serve` 실행·기존 `PROBE_TICK_REPORT` export 1,618B 생성·SIGTERM 정상 종료(exit0) 후 해당 원문을 전달했다. SafetyThread120/ControlThread60/battery_main24 ticks는 입력 내용이며 logger 비용/RT 달성 근거로 쓰지 않는다. 원문·명령·결과(비공개 원시 근거).
 - [x] 신규7개 Red→Green, Rust1.96/MSRV1.85 workspace 각364·fmt/clippy/doc/protocol/core 의존 분리·실제 예제 실행 Pass. 개발 자가 점검 미해결 P1/P2/P3 없음.
 - [x] #008의 `register_routed/run_routed`·`handle_command`로 고정 routed backend/원 Report·기존 CLI 관리 권한을 연결했다(EV-035). EV-033 file backend와 별도 bridge 예제도 유지하며 자동 worker는 도입하지 않는다.
 - [x] (2026-11-13 이관: TASK-026·024) export snapshot 연결은 dot-probe 내장 상시 capture·기존 화면·off/on 비교·TASK-020/026 첫 적용 완료가 아니다. T1은 미도래다. source freshness/boot identity·capacity/network/RSS 측정은 Unavailable. LAN·실제 PC/RT 오차/비용·UPS/장기/native(T3)/다른 OS 및 Task/MS/TC 전체·Gate4/5 미완료 유지.
@@ -103,7 +103,7 @@ TASK-017의 로컬 기능 구현 잔여는 처리했으나 위 통합/환경 수
 
 ## REV-034 조치 — 2026-11-01 #010
 
-RV-071/072를 `SnapshotCheck::TARGET_ID`·`REQUIRED_MEMORY_BYTES` 공개와 24MiB 구성/RSS 한계 rustdoc로 조치했다. trait/bridge/예제가 상수를 공유한다. 소스 `a972229`·[EV-036](../../05_verification/verification_evidence.md#ev-036) 로컬 회귀 수락, REV-034 Closed. 위 통합/실측/native 조건과 Task In Progress는 유지한다. 다음 개발 단위는 TASK-019 S1이다.
+RV-071/072를 `SnapshotCheck::TARGET_ID`·`REQUIRED_MEMORY_BYTES` 공개와 24MiB 구성/RSS 한계 rustdoc로 조치했다. trait/bridge/예제가 상수를 공유한다. 소스 `6cc91bb`·[EV-036](../../05_verification/verification_evidence.md#ev-036) 로컬 회귀 수락, REV-034 Closed. 위 통합/실측/native 조건과 Task In Progress는 유지한다. 다음 개발 단위는 TASK-019 S1이다.
 
 ## 완료 판정 — 2026-11-13
 

@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-11-07 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
-- 대상: 소스 `c284354` — `logger/remote.rs`(`Remote`·`Tap`·`Runtime`·`default_limits`), `host.rs`(`Links`, IO tap, command 처리, Closed 전 정지), `budget.rs`(`Extra`·`resolve`), `mod.rs`(`remote`·`remote_with`·`remote_addr`·`StartError::Remote`), `health.rs`(remote thread 고정 결과), `routing`(`Delivery::is_raw` crate 내부), TC-013 F13(`dot-logger-client/tests/facade_remote.rs`).
+- 대상: 소스 `d595122` — `logger/remote.rs`(`Remote`·`Tap`·`Runtime`·`default_limits`), `host.rs`(`Links`, IO tap, command 처리, Closed 전 정지), `budget.rs`(`Extra`·`resolve`), `mod.rs`(`remote`·`remote_with`·`remote_addr`·`StartError::Remote`), `health.rs`(remote thread 고정 결과), `routing`(`Delivery::is_raw` crate 내부), TC-013 F13(`dot-logger-client/tests/facade_remote.rs`).
 - 상태: **Closed** — 결함 수정이 필요한 항목은 없다.
 - 판정: **Pass — 로컬 기능 범위.** 근거: [EV-050](../verification_evidence.md#ev-050).
 

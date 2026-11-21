@@ -55,7 +55,7 @@ let report = logger.shutdown(Duration::from_secs(3))?;
 
 ## S2 실행 — 2026-11-05
 
-- 소스 `1af172c`(capture 분해, 공개 시그니처 불변)·`64c4d23`(logger 모듈). TC-013 F1·F4~F8 + rt-allocation F2/F3 Pass, workspace 1.96/1.85 각 460 Pass. 근거 [EV-047](../../05_verification/verification_evidence.md#ev-047), 자가 점검 [REV-046](../../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md) Closed.
+- 소스 `04a7cfa`(capture 분해, 공개 시그니처 불변)·`1e651b4`(logger 모듈). TC-013 F1·F4~F8 + rt-allocation F2/F3 Pass, workspace 1.96/1.85 각 460 Pass. 근거 [EV-047](../../05_verification/verification_evidence.md#ev-047), 자가 점검 [REV-046](../../05_verification/reviews/REV-046_TASK-027_S2_FACADE.md) Closed.
 - 구현하며 구체화한 규칙(완료 경계 Written + sync barrier, 메모리 분할, routing·파일 규칙, `LogError` variant)은 [API §18.8](../../03_design_artifacts/interface_contract.md#188-s2-구현-반영--2026-11-05).
 - 잔여: worker panic 자동 시험(GAP-009), CPU 고정·`health()`(S3), 기존 MSRV clippy lint(GAP-010).
 
@@ -65,11 +65,11 @@ S3 범위가 넓어 하위 단계로 나눈다. 각 단계는 TDD·회귀·커�
 
 | 하위 | 범위 | 상태 |
 |---|---|---|
-| S3a | `health()`(RV-095)·선택 계측 `telemetry()`·CPU 고정 `worker_cpus`(RV-096)·worker panic 시험(GAP-009) | 로컬 Pass — 소스 `2a805ef`, [EV-048](../../05_verification/verification_evidence.md#ev-048), [REV-047](../../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) Closed, API §18.9 |
-| S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | 로컬 Pass — 소스 `91387ba`, [EV-049](../../05_verification/verification_evidence.md#ev-049), [REV-048](../../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) Closed, API §18.10(연결 +2줄) |
-| S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | 로컬 Pass — 소스 `c284354`, [EV-050](../../05_verification/verification_evidence.md#ev-050), [REV-049](../../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) Closed, API §18.11(Human 결정 3건: 관측용 사본·상태 조회만·기본값+명시) |
+| S3a | `health()`(RV-095)·선택 계측 `telemetry()`·CPU 고정 `worker_cpus`(RV-096)·worker panic 시험(GAP-009) | 로컬 Pass — 소스 `691f937`, [EV-048](../../05_verification/verification_evidence.md#ev-048), [REV-047](../../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md) Closed, API §18.9 |
+| S3b | tracing 선택 연결(L3 +6줄 이하): builder 선언 → 일반 경로 subscriber/`log` sink | 로컬 Pass — 소스 `bbc0b28`, [EV-049](../../05_verification/verification_evidence.md#ev-049), [REV-048](../../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md) Closed, API §18.10(연결 +2줄) |
+| S3c | remote 선택 연결(L3 +6줄 이하): facade가 runtime·hub·server·운영 backend를 소유 | 로컬 Pass — 소스 `d595122`, [EV-050](../../05_verification/verification_evidence.md#ev-050), [REV-049](../../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md) Closed, API §18.11(Human 결정 3건: 관측용 사본·상태 조회만·기본값+명시) |
 | S3d | slot 직접 encode | **제외(2026-11-07 Human 승인)** — 재설계 조건은 이월 T4 |
-| S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | 로컬 Pass — 소스 `ad5dadf`, [EV-051](../../05_verification/verification_evidence.md#ev-051)(feature-matrix 스크립트 두 toolchain 포함) |
+| S3e | api-consumer 갱신(facade 공개 표면 사용 확인) | 로컬 Pass — 소스 `46e833a`, [EV-051](../../05_verification/verification_evidence.md#ev-051)(feature-matrix 스크립트 두 toolchain 포함) |
 
 **S3d 조사 결과(결정 필요):** 현재 소형 기록은 per-writer scratch에 encode한 뒤 core가 byte ring으로 실제 길이만큼 복사한다. byte ring은 경계에서 감겨(wrap) 연속 slot을 보장하지 않는다. rtrb의 안전한 `write_chunk(n)`은 n바이트를 먼저 0으로 채우므로, 직접 encode하면 복사 대신 slot 전체 0 채우기가 들어가 작은 기록에서 오히려 비싸다. 부분 commit에는 `unsafe`(capture는 `deny`)가 필요하고, 감김 처리에는 queued record에 건너뛰기 길이를 넣는 core 형식 변경이 필요하다. 권고: S3에서 제외하고 scratch 경로를 유지하되, TASK-023 S2 P1(256B)에서 encode+복사 비용을 재고 유의하면 그때 별도 설계로 다룬다. §18.3의 "S3에서 slot 직접 encode로 교체" 문구를 바꾸므로 Human 결정 사항이다.
 

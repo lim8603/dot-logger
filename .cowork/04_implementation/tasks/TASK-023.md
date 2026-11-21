@@ -54,12 +54,12 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 
 | 단계 | 범위 | 상태 |
 |---|---|---|
-| S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `3740671`. 정식 측정 NotRun |
+| S1 | P0 기준선 harness·결과 판정 규칙·합성 제어 루프 | 로컬 구현 완료 — [EV-046](../../05_verification/verification_evidence.md#ev-046), 소스 `c9ea04a`. 정식 측정 NotRun |
 | S2 | logger on 경로(P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널)와 같은 P0 workload 대조·무결성 oracle. TASK-027 facade 기본 worker 경로로 측정. P1에서 `try_log`의 encode·복사 비용을 분리해 기록한다(이월 T4 판정 입력) | TASK-027 뒤 |
-| S2a | facade 채널별 출력 선택(`channel_with`·`ChannelOptions::outputs`) — 16파일 workload를 P0와 같게 만드는 제품 변경(Human 2026-11-07 「출력 순서 지정」) | 로컬 완료 — 소스 `1602d5e`, API §18.12, TC-013 F16, 1.96/1.85 각 496 Pass |
+| S2a | facade 채널별 출력 선택(`channel_with`·`ChannelOptions::outputs`) — 16파일 workload를 P0와 같게 만드는 제품 변경(Human 2026-11-07 「출력 순서 지정」) | 로컬 완료 — 소스 `e399357`, API §18.12, TC-013 F16, 1.96/1.85 각 496 Pass |
 | S2b | facade 경로 logger on 측정 도구: P1 `try_log`, 같은 workload의 `StorageRun{tool: Logger}`, MCAP 판독 무결성 oracle, 호출 지연 ns 분포(p99/p99.9), encode·복사 비용 분리(T4 입력). P0 회전 256 MiB·16,384건 | 완료 — [EV-054](../../05_verification/verification_evidence.md#ev-054)·[EV-055](../../05_verification/verification_evidence.md#ev-055). 제품 발견 ①~⑧ 조치(⑥ Human 「권고대로」). smoke: P1 무제한 logger 73.7 MB/s·판독 일치, P0 대비 7.7% |
-| S2c | P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합 확장, 32생산자·16파일·128채널) | 완료 — [EV-057](../../05_verification/verification_evidence.md#ev-057). `Channel::metadata`(Human 「메타데이터 헬퍼」) `e5a005a`, 도구 `145dc4a`, RV-128 정정 `b2899a3`. smoke: P2 logger 성공, P3 logger Unsuccessful(발견 ⑨ Open) |
-| S2d | 짧은 시험 실행(측정 아님)·EV 기록. 정식 측정은 S3 | 완료 — [EV-058](../../05_verification/verification_evidence.md#ev-058). 발견 ⑨(완료 장부 전체 sweep) 조치 `a7fd4e1`. smoke P3 20초 logger 969 MB/s(P0 1,023 MB/s), 판독 일치 |
+| S2c | P2 raw(`producer()` loan 8 MiB), P3 혼합(`StorageWorkload` 크기 혼합 확장, 32생산자·16파일·128채널) | 완료 — [EV-057](../../05_verification/verification_evidence.md#ev-057). `Channel::metadata`(Human 「메타데이터 헬퍼」) `8313fc4`, 도구 `b85ee9b`, RV-128 정정 `11f44d9`. smoke: P2 logger 성공, P3 logger Unsuccessful(발견 ⑨ Open) |
+| S2d | 짧은 시험 실행(측정 아님)·EV 기록. 정식 측정은 S3 | 완료 — [EV-058](../../05_verification/verification_evidence.md#ev-058). 발견 ⑨(완료 장부 전체 sweep) 조치 `5511eb3`. smoke P3 20초 logger 969 MB/s(P0 1,023 MB/s), 판독 일치 |
 | S3 | 정식 측정(예열10초·120초×3, off/on 각3회)·계측 비용≤5%. 2026-11-08 Human: 장시간 기준(S·0.6×S 정상 부하·무제한 효율 ≥0.8), P4·P5 이월, P1 대표 3조합 | 완료(2026-11-10 Human 「a」, 추가 쓰기 없이 판정) — 도구 완료(2026-11-09 축소 기준 반영), 발견 ⑩ 조치, ⑪ 비차단(T5), 1회차 [EV-064](../../05_verification/verification_evidence.md#ev-064)·후속 [EV-065](../../05_verification/verification_evidence.md#ev-065) P3 효율 미판정·T5 미확정([EV-059](../../05_verification/verification_evidence.md#ev-059)·[EV-060](../../05_verification/verification_evidence.md#ev-060)·[EV-061](../../05_verification/verification_evidence.md#ev-061)) |
 | RT | 합성 generic 측정 뒤 TASK-022 요청 규칙으로 RT 준비/재시작 요청 | S3 뒤 |
 
@@ -73,7 +73,7 @@ S1 구현 위치는 UPS harness 선례를 따른다: [support/perf](../../../cra
 
 2026-11-07 독립 리뷰: [REV-052](../../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional, P1 2·P2 1). 공개 L4 sync coverage·부분 scope watermark와 P0/logger 측정 구간을 후속 개발 세션에서 조치·검증한 뒤 S2c/S3로 진행한다. EV-054·055의 로컬 구현·과거 실행 결과와 정식 측정 NotRun은 유지한다.
 
-2026-11-08 #001 조치: RV-128·129(공개 L4 sync 경계) `97e2b12`, RV-130(측정 구간) `f8f2859` — [EV-056](../../05_verification/verification_evidence.md#ev-056). **판정 규칙 추가:** 부하와 control/safety는 공통 `Gate` 시작 시각부터 계시하고(setup 제외), `LoadWindow`가 skew 0·control 구간 99% 이상 중첩일 때만 off/on 비교에 쓴다(아니면 `NotConcurrent`). 최종 내구화 tail은 부하 구간과 분리해 보고한다. S3의 예열 10초 분리는 S3 구현에서 이 공통 시작 기준으로 둔다(아직 미구현).
+2026-11-08 #001 조치: RV-128·129(공개 L4 sync 경계) `a4b9bcb`, RV-130(측정 구간) `2af2dce` — [EV-056](../../05_verification/verification_evidence.md#ev-056). **판정 규칙 추가:** 부하와 control/safety는 공통 `Gate` 시작 시각부터 계시하고(setup 제외), `LoadWindow`가 skew 0·control 구간 99% 이상 중첩일 때만 off/on 비교에 쓴다(아니면 `NotConcurrent`). 최종 내구화 tail은 부하 구간과 분리해 보고한다. S3의 예열 10초 분리는 S3 구현에서 이 공통 시작 기준으로 둔다(아직 미구현).
 
 ## 완료 판정 — 2026-11-13
 

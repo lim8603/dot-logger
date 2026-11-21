@@ -899,7 +899,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 
 ### 18.9 S3a 구현 반영 — 2026-11-07
 
-[EV-048](../05_verification/verification_evidence.md#ev-048)·[REV-047](../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md), 소스 `2a805ef`. §18.4·§18.5 범위 안의 구체화이며 승인된 계약과 다른 결정은 없다. 단, §18.5의 `Closing` 상태는 넣지 않았다(아래).
+[EV-048](../05_verification/verification_evidence.md#ev-048)·[REV-047](../05_verification/reviews/REV-047_TASK-027_S3A_HEALTH.md), 소스 `691f937`. §18.4·§18.5 범위 안의 구체화이며 승인된 계약과 다른 결정은 없다. 단, §18.5의 `Closing` 상태는 넣지 않았다(아래).
 
 - **`Logger::health() -> Health`(일반 경로, 목록 할당):** `state: HealthState`, `outputs: Vec<OutputHealth>`(file_output 선언 순서), `affinity: Option<bool>`, `telemetry: Option<Observation<Sample>>`.
   - `HealthState`는 심각한 것부터 `Failed(Failure::WorkerFailed)`(worker panic·정지, 수락 Closing) → `Failed(Failure::IoPoisoned)`(어느 출력이든 쓰기·sync·게시 IO 실패로 정지. 모든 출력이 required라 이후 기록이 모두 실패한다) → `Degraded(Degradation::RecordsFailed)`(IO 고장 없이 출력이 기록을 거절, 예: continuous 보존 가득) → `Degraded(Degradation::SyncOverdue)`(마지막 성공 sync, 없으면 시작 시점부터 `4 × sync_every + 1 s` 초과) → `Running`.
@@ -914,7 +914,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 
 ### 18.10 S3b tracing 선택 연결 — 2026-11-07
 
-[EV-049](../05_verification/verification_evidence.md#ev-049)·[REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md), 소스 `91387ba`. feature `tracing-adapter`에서만 존재한다. §18.1 S3 범위 안의 구체화다.
+[EV-049](../05_verification/verification_evidence.md#ev-049)·[REV-048](../05_verification/reviews/REV-048_TASK-027_S3B_TRACING.md), 소스 `bbc0b28`. feature `tracing-adapter`에서만 존재한다. §18.1 S3 범위 안의 구체화다.
 
 ```rust
 let logger = Logger::builder()
@@ -933,7 +933,7 @@ tracing::subscriber::set_global_default(logger.tracing()?)?;                  //
 
 ### 18.11 S3c remote 선택 연결 — 2026-11-07
 
-[EV-050](../05_verification/verification_evidence.md#ev-050)·[REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md), 소스 `c284354`. feature `remote`에서만 존재한다. 2026-11-07 Human 결정(아래 3항목 모두 권고안)에 따른다.
+[EV-050](../05_verification/verification_evidence.md#ev-050)·[REV-049](../05_verification/reviews/REV-049_TASK-027_S3C_REMOTE.md), 소스 `d595122`. feature `remote`에서만 존재한다. 2026-11-07 Human 결정(아래 3항목 모두 권고안)에 따른다.
 
 ```rust
 let logger = Logger::builder()
@@ -957,7 +957,7 @@ let address = logger.remote_addr();                                   // 선택(
 - **계약:** `ChannelOptions::new()`(기본 = 모든 file output, `.channel(topic)`과 동일)·`.outputs(&[usize])`(`file_output` 선언 순서 0부터). 빈 목록·중복·선언되지 않은 index는 `start()`/`plan()`을 `StartError::InvalidOutputs`로 거절한다. core `Route.targets`에 그대로 반영되며 완료 추적도 선택된 출력만 대상으로 한다. 모든 출력의 MCAP channel 표에는 등록된 채널이 모두 기록된다(기록이 없는 채널 포함).
 - **remote 영향:** 구독 사본은 첫 번째 출력이 쓴 기록에서 만들어지므로(§18.11), 출력 0으로 가지 않는 채널은 구독에 보이지 않는다(rustdoc 명시).
 - **공개 표면:** 새 공개 타입 `ChannelOptions` 1개, 메서드 `channel_with`·`ChannelOptions::{new, outputs}`, `StartError::InvalidOutputs` 변형 1개. level·importance 옵션은 필요할 때 같은 타입에 추가한다. NFR-008 계수는 TASK-029.
-- **검증:** 소스 `1602d5e`. TC-013 F16(`tc_013_routing.rs`) — 선택 출력만 기록·기본 전체 출력·잘못된 선택 거절. 출력 선택을 무시하는 돌연변이에서 F16 실패 확인.
+- **검증:** 소스 `e399357`. TC-013 F16(`tc_013_routing.rs`) — 선택 출력만 기록·기본 전체 출력·잘못된 선택 거절. 출력 선택을 무시하는 돌연변이에서 F16 실패 확인.
 
 ## 19. 예산 preset·사이징 계약 — 2026-11-07
 
@@ -990,7 +990,7 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 
 ### 19.3 S1 구현 반영 — 2026-11-07
 
-[EV-052](../05_verification/verification_evidence.md#ev-052)·[REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md), 소스 `21cc198`(S1a)·`4465be3`(S1b). §19.1 결정과 다른 점은 없다.
+[EV-052](../05_verification/verification_evidence.md#ev-052)·[REV-050](../05_verification/reviews/REV-050_TASK-028_S1_PRESET.md), 소스 `c92fb98`(S1a)·`d23de85`(S1b). §19.1 결정과 다른 점은 없다.
 
 - **S1a 정확 배정(RV-097 해소):** capture 등록·completion registry·control owner·routing·storage(catalog + 활성 writer 1개)의 예약 공식을 각 생성자와 공유하는 crate 내부 순수 함수로 꺼냈다(생성자 동작 불변). facade `derive`는 control = 정확 요구량, output = 나머지 전부(writer buffering에 쓰임)로 배정한다. 명시 `memory_bytes`가 모자라면 `StartError::Budget { resource: Total, required, available }`이며, 보고된 `required`는 정확하고 충분하다(F14: 그 값으로 성공, 1바이트 적으면 같은 값으로 거절).
 - **S1b 공개 API:** `Sizing::new(sync_every, drop_deadline)`·`.small(hz, bytes)`·`.raw(hz, bytes)`·`.absorb(d)`·`.sync_every(d)`·`.drop_deadline(d)`, `Preset::{control(hz), sensor(hz, bytes), black_box(hz)}`(Sizing 반환, 이어서 조정 가능), `LoggerBuilder::preset(Sizing)`, `LoggerBuilder::plan() -> Result<Plan, StartError>`, `Plan { memory: MemoryBudget, required_bytes, sync_every, drop_deadline, writer_quota, preset_filled: Vec<Missing> }`.
@@ -1023,7 +1023,7 @@ let plan = builder.plan()?;   // 시작 없이 Budget·근거 확인(재현 기�
 
 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md), [EV-056](../05_verification/verification_evidence.md#ev-056). 기존 승인 범위의 결함 조치이며 새 공개 API는 없다.
 
-- **파일 sync coverage(RV-128):** 완료 기준이 Written인 target에서 종료·Expired는 "어느 파일에 쓰였다"는 과거 사실일 뿐 Synced가 아니다. target마다 writer 교체 뒤에도 남는 파일 장부가 producer별로 ① 이 target의 파일이 append한 최고 seq, ② sync 없이 놓인 파일들의 범위를 기록한다. 한 파일의 `sync_work`에서 그 파일 범위 밖이면서 **다른 파일이 가질 수 있는 기록**(파일 시작 전 sync 없이 놓인 범위, 파일의 마지막 기록 뒤 다른 파일이 append한 범위 — 파일이 유일한 writer였던 구간의 빠진 기록은 이 target으로 라우팅되지 않은 것이라 제외, `b2899a3`)은 Synced·NotRouted·실패 종료로 증명되어야 한다. 증명 구간이 완료 window보다 길거나 Expired면 `InvalidRecord`로 거절하고 work를 돌려준다. 어떤 파일도 append하지 않은 구간만 최신 window의 Pending 여부로 판정한다(§19.5 ①). 완료 기준이 Synced인 target은 종료가 Synced 또는 실패라 증명을 생략한다.
+- **파일 sync coverage(RV-128):** 완료 기준이 Written인 target에서 종료·Expired는 "어느 파일에 쓰였다"는 과거 사실일 뿐 Synced가 아니다. target마다 writer 교체 뒤에도 남는 파일 장부가 producer별로 ① 이 target의 파일이 append한 최고 seq, ② sync 없이 놓인 파일들의 범위를 기록한다. 한 파일의 `sync_work`에서 그 파일 범위 밖이면서 **다른 파일이 가질 수 있는 기록**(파일 시작 전 sync 없이 놓인 범위, 파일의 마지막 기록 뒤 다른 파일이 append한 범위 — 파일이 유일한 writer였던 구간의 빠진 기록은 이 target으로 라우팅되지 않은 것이라 제외, `11f44d9`)은 Synced·NotRouted·실패 종료로 증명되어야 한다. 증명 구간이 완료 window보다 길거나 Expired면 `InvalidRecord`로 거절하고 work를 돌려준다. 어떤 파일도 append하지 않은 구간만 최신 window의 Pending 여부로 판정한다(§19.5 ①). 완료 기준이 Synced인 target은 종료가 Synced 또는 실패라 증명을 생략한다.
 - **부채 기록·해소:** 단독 `SegmentWriter`가 sync 안 된 기록을 가진 채 `finish`하거나 Drop되면, 또는 `SegmentLog`가 그런 상태로 Drop되면 부채가 남는다. `FinishedSegment::sync_work`(복구의 sync 포함) 성공이 그 파일의 부채를 해소한다. 해소 수단이 없는 파일(sync 없이 Drop)의 범위는 세션 끝까지 다른 파일로 대신 덮을 수 없다. 여러 파일에 걸친 barrier는 파일별 범위로 나눠 각 파일에서 처리한다(`FinishedSegment::sync_work` 문서의 "다른 segment는 별도 조정" 계약). facade `SegmentLog`는 회전 시 이전 파일을 sync하고 전체 범위를 가지므로 동작이 바뀌지 않는다.
 - **sync 발급 watermark(RV-129):** (target, 생산자) Written watermark는 그 바로 다음부터 연속으로 확인한 구간만 전진한다. 더 뒤에서 시작하는 부분 범위는 그 요청에서만 확인한다. 완료 window 생략·Expired 통과는 완료 기준이 Written/Synced인 target에만 쓰고, Enqueued 기준 target은 drained 조건을 쓴다.
 - **측정 구간(RV-130, harness):** P0·logger·control·safety는 각자 setup(스레드 시작·pin·파일 생성·logger 시작·조회)을 마친 뒤 공통 절대 시작 시각부터 계시한다. 처리량 분모·수락 시각·control 첫 release가 모두 이 시각 기준이다. 부하 수락 구간과 최종 내구화 tail을 나눠 보고하고, skew 0·control 구간의 99% 이상 중첩이 아니면 `NotConcurrent`로 판정해 off/on 비교에 쓰지 않는다.

@@ -2,7 +2,7 @@
 
 ## 1. 리뷰 개요
 * **일자 / 리뷰어:** 2026-10-27 / AI 요약보고 및 Human 승인
-* **대상 Task / 기준 커밋:** [TASK-004](../04_implementation/tasks/TASK-004.md) / commit `98580cb` ([EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명무해제-반환))
+* **대상 Task / 기준 커밋:** [TASK-004](../04_implementation/tasks/TASK-004.md) / commit `d5759c2` ([EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명무해제-반환))
 * **종합 판정:** Pass (결함 없음)
 * **진행 상태:** Closed (Human 구현 리뷰 승인 완료, native CI는 사용량 소진으로 GAP-004 이월)
 
@@ -29,4 +29,4 @@
 #### [처리담당 / 승인 (2026-10-27 #003)]
 * **판정 결과:** 수용 (Pass — Human 리뷰 승인)
 * **처리 내용:** 원본 통합 테스트 17개, compile-fail 7개, Miri 및 allocator 계측 통과. Human 승인 후 원격 게시.
-* **검증 근거:** [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명무해제-반환), commit `9a4f34c` / `694464e`.
+* **검증 근거:** [EV-003](../05_verification/verification_evidence.md#ev-003--task-004-원본-풀수명무해제-반환), commit `4a9ae56` / `0f2ad6e`.

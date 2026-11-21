@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-11-07 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
-- 대상: 소스 `2a805ef` — `logger/health.rs`(`Health`·`HealthState`·`Degradation`·`Failure`·`OutputHealth`·내부 `Shared`/`OutputStatus`), `logger/affinity.rs`, `budget.rs`(`Budget::worker_cpus`·platform 관측), `host.rs`(출력별 상태 기록·telemetry 표본·thread 고정·command 수신단 해제), `mod.rs`(`LoggerBuilder::telemetry`·`Logger::health`), `logger/tests.rs`(GAP-009), TC-013 F9~F11, `adapters/tracing.rs` lint(GAP-010).
+- 대상: 소스 `691f937` — `logger/health.rs`(`Health`·`HealthState`·`Degradation`·`Failure`·`OutputHealth`·내부 `Shared`/`OutputStatus`), `logger/affinity.rs`, `budget.rs`(`Budget::worker_cpus`·platform 관측), `host.rs`(출력별 상태 기록·telemetry 표본·thread 고정·command 수신단 해제), `mod.rs`(`LoggerBuilder::telemetry`·`Logger::health`), `logger/tests.rs`(GAP-009), TC-013 F9~F11, `adapters/tracing.rs` lint(GAP-010).
 - 상태: **Closed** — 결함 수정이 필요한 항목은 없다. P3은 문서화 또는 S3 후속으로 처리했다.
 - 판정: **Pass — 로컬 기능 범위.** 근거: [EV-048](../verification_evidence.md#ev-048).
 

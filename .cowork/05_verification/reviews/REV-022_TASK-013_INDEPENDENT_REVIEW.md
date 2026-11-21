@@ -4,10 +4,10 @@
 
 - **일자 / 리뷰어:** 2026-10-31 #009 / AI 리뷰 전용 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
 - **성격:** 독립 Read-Only 리뷰. REV-020/021은 개발 세션 자가 점검이므로 같은 형상을 리뷰어 관점에서 다시 검토했다. 제품 코드는 수정하지 않았다.
-- **대상 형상:** 소스 `29e55da` (HEAD `5f214ae`는 문서 변경만 포함)
-  - TASK-013: `ded6372`·`29e55da`의 [client](../../../crates/dot-logger-client/src/) `cancel`·`receiver`·`transport`·`codec`·`offline`, [CLI](../../../crates/dot-logger-cli/src/) `main`·`args`·`commands`·`model`·`output`
-  - TASK-012 후속: `4f79119`(RV-036/037/038 조치)의 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) diff 및 서버↔클라이언트 wire 경계
-- **TASK-012 범위 판단:** `4f79119..29e55da` 사이에 `crates/dot-logger` 변경은 없다. TASK-012 본 구현(`5f0ad83`)은 REV-019에서 독립 리뷰를 마쳤으므로 전체를 다시 검토하지 않았다. REV-019 이후 자가 검증만 거친 조치 diff `4f79119`와 TASK-013이 사용하는 계약 경계만 포함했다.
+- **대상 형상:** 소스 `6863268` (HEAD `421fc1a`는 문서 변경만 포함)
+  - TASK-013: `86b50ef`·`6863268`의 [client](../../../crates/dot-logger-client/src/) `cancel`·`receiver`·`transport`·`codec`·`offline`, [CLI](../../../crates/dot-logger-cli/src/) `main`·`args`·`commands`·`model`·`output`
+  - TASK-012 후속: `ca1694a`(RV-036/037/038 조치)의 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) diff 및 서버↔클라이언트 wire 경계
+- **TASK-012 범위 판단:** `ca1694a..6863268` 사이에 `crates/dot-logger` 변경은 없다. TASK-012 본 구현(`d63fdea`)은 REV-019에서 독립 리뷰를 마쳤으므로 전체를 다시 검토하지 않았다. REV-019 이후 자가 검증만 거친 조치 diff `ca1694a`와 TASK-013이 사용하는 계약 경계만 포함했다.
 - **경계 확장 (Human 선택 A, 같은 세션):** TASK-013이 실제로 호출하는 서버 경로를 클라이언트 사용 패턴과 대조했다. 대상은 [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs) `RpcService`·`UnaryRpc`·`AckRpc`·`SubscribeRpc`·`SubscriptionStream`·`status`, [hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs) `Subscription::next/ack/expire`·`offer` Gap·`request`/`Command`, [receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) `push`/`handoff`, core `Replay::seek` generation이다. RV-053~055가 여기서 나왔다. `types`·`wire` 변환 전체와 원격 통합 시험은 다시 검토하지 않았다.
 - **정적 확인:** `cargo fmt --check` Pass, `cargo clippy -p dot-logger-client -p dot-logger-cli --all-targets --all-features -- -D warnings` Pass. 소스가 EV-025와 같으므로 테스트·Miri는 다시 실행하지 않았다. 아래 반례는 코드 정독으로 도출했고 실행 재현은 처리담당 Red 시험에 맡긴다.
 - **종합 판정:** Pass (P2 2, P3 8). P1 없음. 데이터 손실, ACK 선행, RT 침해 결함은 확인하지 못했다.
@@ -37,7 +37,7 @@
 | RV-046 | P2 | [`RemoteSubscription::handoff`](../../../crates/dot-logger-client/src/transport.rs#L590-L593) | 만료·세대 폐기·소비자 거절을 모두 `ConsumerRejected`로 합치고, CLI는 이를 `io_or_transport`/exit4로 표시함 | 사전 거절과 소비자 거절을 구분하고 CLI 분류를 명시 | 수용 | Closed |
 | RV-047 | P3 | [`Context::validate` tail](../../../crates/dot-logger-cli/src/commands.rs#L48-L66) | `external-bytes` 2GiB 상한과 `tail_plan` 검증이 연결 뒤에 실행되어 RV-039 유형의 입력 오류 가림이 남음 | tail 입력 검사를 모두 preflight로 이동 | 수용 | Closed |
 | RV-048 | P3 | [local replay limit](../../../crates/dot-logger-cli/src/commands.rs#L381-L384) | 정확히 `limit`개 기록을 재생해도 Limit/exit3. query는 후속 기록이 있을 때만 Limit | 후속 기록 존재 여부로 판정하거나 의미를 문서화 | 수용 | Closed |
-| RV-049 | P3 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L228-L252) (TASK-012 `4f79119`) | 포화 시 초과 연결을 10ms에 1개씩만 거절해, permit이 반환된 뒤 backlog 뒤의 정상 연결이 약 N×10ms 지연될 수 있음 | wake당 유한 batch 거절 또는 trade-off 문서화·측정 | 부분 수용 — 영향 조건 보정, 최적화 보류 | Closed |
+| RV-049 | P3 | [`Incoming::poll_next`](../../../crates/dot-logger/src/adapters/remote/server.rs#L228-L252) (TASK-012 `ca1694a`) | 포화 시 초과 연결을 10ms에 1개씩만 거절해, permit이 반환된 뒤 backlog 뒤의 정상 연결이 약 N×10ms 지연될 수 있음 | wake당 유한 batch 거절 또는 trade-off 문서화·측정 | 부분 수용 — 영향 조건 보정, 최적화 보류 | Closed |
 | RV-050 | P3 | [token `MetadataValue`](../../../crates/dot-logger-client/src/transport.rs#L263) | bearer 값이 sensitive로 표시되지 않음(HPACK 색인 대상, Debug 출력 가능) | parse 후 `set_sensitive(true)` 적용 | 수용 | Closed |
 | RV-051 | P3 | [`path`](../../../crates/dot-logger-client/src/transport.rs#L196-L207)·[`codec::method`](../../../crates/dot-logger-client/src/codec.rs#L58) | 문자열 method 대응이 누락되면 조용히 GetStatus로 라우팅됨 | variant별 경로를 한 곳의 exhaustive match로 관리 | 수용 | Closed |
 | RV-052 | P3 | [`recover`](../../../crates/dot-logger-cli/src/commands.rs#L410-L420) | open한 descriptor를 재검사하지 않고 path metadata 길이로 safe_offset을 비교함. `open_snapshot`의 RV-043 조치와 일관되지 않음 | 열린 파일 `metadata()`로 종류·길이 재검사 | 수용 — 열린 descriptor 재검사 | Closed |
@@ -198,7 +198,7 @@
 | 생성 | [client transport.rs](../../../crates/dot-logger-client/src/transport.rs)·[codec.rs](../../../crates/dot-logger-client/src/codec.rs)·[cancel.rs](../../../crates/dot-logger-client/src/cancel.rs)·[offline.rs](../../../crates/dot-logger-client/src/offline.rs)·wire.rs | 연결/TLS 검증, 취소, native 변환, read-only 파일 — RV-046/050/051 |
 | 생성 | [client receiver.rs](../../../crates/dot-logger-client/src/receiver.rs) | 연결 식별·handoff/take_ack — 이상 없음 |
 | 생성 | [CLI commands.rs](../../../crates/dot-logger-cli/src/commands.rs)·[main.rs](../../../crates/dot-logger-cli/src/main.rs)·[output.rs](../../../crates/dot-logger-cli/src/output.rs)·[model.rs](../../../crates/dot-logger-cli/src/model.rs)·args.rs | preflight·limit·출력 cap·종료 분류·복구 — RV-046/047/048/052 |
-| 수정 | [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) (`4f79119`) | 포화 admission 냉각·고정 길이 credential 비교·gate 수명 문서 — RV-049 |
+| 수정 | [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs)·[receiver.rs](../../../crates/dot-logger/src/adapters/remote/receiver.rs) (`ca1694a`) | 포화 admission 냉각·고정 길이 credential 비교·gate 수명 문서 — RV-049 |
 | 기존 (경계 확장) | [server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs) RPC/stream·[hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs) 구독/ACK/command | 클라이언트 사용 패턴과 대조 — RV-053/054/055 |
 
 ## 5. 클래스(타입) 검토표
@@ -234,7 +234,7 @@
 
 ## 8. 조치·검증 및 위임 수락 — 2026-10-31 #011
 
-Human 「권고대로 진행하자」에 따라 기존 wire를 유지하는 개선/검증을 수행했다. [EV-026](../verification_evidence.md#ev-026) source92개/검사14개 exit0·Miri32, 소스 `b3c08bd` commit blob92개 일치다. 아래 수락은 로컬 범위이고 장기 tail·새 구독 간 연속성·native/실앱/실측을 완료로 바꾸지 않는다.
+Human 「권고대로 진행하자」에 따라 기존 wire를 유지하는 개선/검증을 수행했다. [EV-026](../verification_evidence.md#ev-026) source92개/검사14개 exit0·Miri32, 소스 `eb39cb2` commit blob92개 일치다. 아래 수락은 로컬 범위이고 장기 tail·새 구독 간 연속성·native/실앱/실측을 완료로 바꾸지 않는다.
 
 | 항목 | 실제 처리/검증 |
 |---|---|

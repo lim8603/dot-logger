@@ -3,10 +3,10 @@
 | 항목 | 내용 |
 |---|---|
 | 일자·리뷰어 | 2026-11-17 / AI, code-review 스킬 적용 |
-| 대상 | `fa1d498` 이후 TASK-035 S2 counter·native control·조회/복구·client/CLI·fixture 변경 |
+| 대상 | `5215b78` 이후 TASK-035 S2 counter·native control·조회/복구·client/CLI·fixture 변경 |
 | 판정 | Pass — 두 Rust 최종 각665·각18 feature·정적/doc·Miri/RT 가드 Pass |
 | 상태 | Closed — RV-146~148 수정·최종 회귀·2026-11-17 위임 수락 |
-| 근거 | [EV-085](../verification_evidence.md#ev-085), [실행 자료](../../06_evolution/imported_context/task_035_s2_2026-11-17/) |
+| 근거 | [EV-085](../verification_evidence.md#ev-085), 실행 자료(비공개 원시 근거) |
 
 ## 요약정리
 
@@ -47,21 +47,21 @@ ADR-013 §3의 session 누적 counter를 telemetry와 분리하고 producer 시�
 
 ### RV-146 — 사용자 기록이 없는 주기 보고의 인덱스 상한
 
-**[리뷰어]** retention.max_index_bytes=4096, max_loss_reports=16, max_segments=1에서 첫 주기 표본까지는 예약 final 포함 허용하지만 이후 표본은 회전/capacity여야 한다. 기존 구현은 주기 표본을 계속 추가했다. writer의 max_chunks/메모리는 유한하지만 명시 retention index 상한 계약을 어겼다. [Red](../../06_evolution/imported_context/task_035_s2_2026-11-17/index-red.log.gz).
+**[리뷰어]** retention.max_index_bytes=4096, max_loss_reports=16, max_segments=1에서 첫 주기 표본까지는 예약 final 포함 허용하지만 이후 표본은 회전/capacity여야 한다. 기존 구현은 주기 표본을 계속 추가했다. writer의 max_chunks/메모리는 유한하지만 명시 retention index 상한 계약을 어겼다. Red(비공개 원시 근거).
 
-**[처리담당]** 수용. `SegmentWriter::projected_loss_index_bytes`에 기존 사용자/제어 message·physical chunk·auxiliary index와 이번 K part·reserved final K part를 포함하고 SegmentLog.checkpoint에서 회전 전에 비교한다. count 포화와 index 포화를 같은 시험의 별도 조건으로 재현한다. 회전 capacity는 원래 파일/누적 counter를 보존하며 final에 coalesced=true, count3/delta3이 남는다. [Green](../../06_evolution/imported_context/task_035_s2_2026-11-17/boundary-green.log.gz).
+**[처리담당]** 수용. `SegmentWriter::projected_loss_index_bytes`에 기존 사용자/제어 message·physical chunk·auxiliary index와 이번 K part·reserved final K part를 포함하고 SegmentLog.checkpoint에서 회전 전에 비교한다. count 포화와 index 포화를 같은 시험의 별도 조건으로 재현한다. 회전 capacity는 원래 파일/누적 counter를 보존하며 final에 coalesced=true, count3/delta3이 남는다. Green(비공개 원시 근거).
 
 ### RV-147 — 다른 observer로 변조한 CRC 정상 control
 
-**[리뷰어]** 첫 report의 protobuf observer10을20으로 바꾸고 chunk CRC를 다시 계산하면 reader가 이를 정상 관측으로 수락했다. 동일 session의 다른 출력으로 가장한 관측은 누적 watermark 비교의 provenance를 훼손한다. [Red](../../06_evolution/imported_context/task_035_s2_2026-11-17/observer-red.log.gz).
+**[리뷰어]** 첫 report의 protobuf observer10을20으로 바꾸고 chunk CRC를 다시 계산하면 reader가 이를 정상 관측으로 수락했다. 동일 session의 다른 출력으로 가장한 관측은 누적 watermark 비교의 provenance를 훼손한다. Red(비공개 원시 근거).
 
-**[처리담당]** 수용. `Validation::loss_report`가 원래 FileInfo.target과 observer를 일치 검증한다. native iterator/query/recovery가 같은 Validation을 사용한다. 회복 파일도 원래 target/report를 보존하므로 새 sink budget의 target을 대조하지 않는다. 변조 control은 반출 전 InvalidRecord로 거절한다. [Green](../../06_evolution/imported_context/task_035_s2_2026-11-17/boundary-green.log.gz).
+**[처리담당]** 수용. `Validation::loss_report`가 원래 FileInfo.target과 observer를 일치 검증한다. native iterator/query/recovery가 같은 Validation을 사용한다. 회복 파일도 원래 target/report를 보존하므로 새 sink budget의 target을 대조하지 않는다. 변조 control은 반출 전 InvalidRecord로 거절한다. Green(비공개 원시 근거).
 
 ### RV-148 — 사용자 quota를 채운 뒤 control-only 파일의 복구
 
-**[리뷰어]** 사용자 max_records1, 두 출력 파일(앞 user1+control6, 뒤 user0+control6)에서 앞 파일 뒤 Limit으로 중단해 뒤 손실 관측을 보존하지 못했다. 사용자 기록 상한과 별도인 control part 상한의 계약에 어긋난다. [Red](../../06_evolution/imported_context/task_035_s2_2026-11-17/control-quota-red.log.gz). 또한 max_records0으로 실제 사용자 기록을 거절한 core NeedRotation/Limit이 CLI에서는 IO exit4로 바뀌었다.
+**[리뷰어]** 사용자 max_records1, 두 출력 파일(앞 user1+control6, 뒤 user0+control6)에서 앞 파일 뒤 Limit으로 중단해 뒤 손실 관측을 보존하지 못했다. 사용자 기록 상한과 별도인 control part 상한의 계약에 어긋난다. Red(비공개 원시 근거). 또한 max_records0으로 실제 사용자 기록을 거절한 core NeedRotation/Limit이 CLI에서는 IO exit4로 바뀌었다.
 
-**[처리담당]** 수용. writer는 양수 max_loss_reports가 있으면 max_records0의 control-only 예약을 허용하되 append는 사용자 pair 쓰기 전에 NeedRotation으로 거절한다. CLI는 남은 control allowance가 있으면 뒤 source를 처리하고 recovery Limit은 exit3으로 매핑한다. 뒤 control-only는 user0/control6·정상0, 뒤에 사용자 fanout이 있으면 user0·부분3·앞 정상 파일 유지로 둘 다 대조했다. 기존 사용자 상한과 count/bytes/part/chunk 상한은 유지한다. TC-017 baseline 파일도 max_records0으로 쓰고 NativeReader의 사용자 count0과 원 report를 확인한다. [Green](../../06_evolution/imported_context/task_035_s2_2026-11-17/control-quota-green.log.gz).
+**[처리담당]** 수용. writer는 양수 max_loss_reports가 있으면 max_records0의 control-only 예약을 허용하되 append는 사용자 pair 쓰기 전에 NeedRotation으로 거절한다. CLI는 남은 control allowance가 있으면 뒤 source를 처리하고 recovery Limit은 exit3으로 매핑한다. 뒤 control-only는 user0/control6·정상0, 뒤에 사용자 fanout이 있으면 user0·부분3·앞 정상 파일 유지로 둘 다 대조했다. 기존 사용자 상한과 count/bytes/part/chunk 상한은 유지한다. TC-017 baseline 파일도 max_records0으로 쓰고 NativeReader의 사용자 count0과 원 report를 확인한다. Green(비공개 원시 근거).
 
 ## 리뷰 포인트
 
@@ -74,7 +74,7 @@ ADR-013 §3의 session 누적 counter를 telemetry와 분리하고 producer 시�
 
 ## 검증과 마감
 
-제품 `0270f03`의 156개 최종 source SHA/commit blob 일치, 두 Rust 전체 각665 Pass·5 ignored·각18 feature·clippy/strict docs, fmt·표면34/60·Miri17 및 control-only1 재검증·allocator(default19/remote20) Pass를 확인했다. Open(자가 진단) → In Progress(RV-146~148 수정) → Resolved(최종 회귀) → Closed(2026-11-17 위임 수락)로 마감한다. TASK-030·035 전체와 D/E·GUI/비용/커버리지 판정은 후속이며 새 Human 설계 승인으로 대체하지 않는다.
+제품 `5be17b5`의 156개 최종 source SHA/commit blob 일치, 두 Rust 전체 각665 Pass·5 ignored·각18 feature·clippy/strict docs, fmt·표면34/60·Miri17 및 control-only1 재검증·allocator(default19/remote20) Pass를 확인했다. Open(자가 진단) → In Progress(RV-146~148 수정) → Resolved(최종 회귀) → Closed(2026-11-17 위임 수락)로 마감한다. TASK-030·035 전체와 D/E·GUI/비용/커버리지 판정은 후속이며 새 Human 설계 승인으로 대체하지 않는다.
 
 
 ## 새 상한 gate 소비자 확인 (F-11)

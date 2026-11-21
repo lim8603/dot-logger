@@ -3,22 +3,22 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-11-07 (`#002`) / AI 독립 코드리뷰 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
-- **성격:** 독립 Read-Only 코드리뷰. 직전 독립 코드리뷰([REV-045](REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md), 소스 마감 `497149b` / 문서 `77013e7`) 이후 누적된 모든 제품·검증 코드 변경분(`77013e7..49df7d3`, 10개 소스 커밋, 32개 파일 `+6,850 / -327`줄 — `REV-046`~`REV-050`은 개발 세션 자가 점검)을 객관적 관점에서 전수 검토했다. **제품·테스트 코드는 단 한 줄도 수정하지 않았다.**
-- **대상 형상:** `77013e7..49df7d3` (소스 기준 `13523f1..4465be3`, 총 32개 파일)
-  - **원격 어댑터(`13523f1`, GAP-008 / EV-045):**
+- **성격:** 독립 Read-Only 코드리뷰. 직전 독립 코드리뷰([REV-045](REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md), 소스 마감 `ee57f44` / 문서 `b330818`) 이후 누적된 모든 제품·검증 코드 변경분(`b330818..8eecc90`, 10개 소스 커밋, 32개 파일 `+6,850 / -327`줄 — `REV-046`~`REV-050`은 개발 세션 자가 점검)을 객관적 관점에서 전수 검토했다. **제품·테스트 코드는 단 한 줄도 수정하지 않았다.**
+- **대상 형상:** `b330818..8eecc90` (소스 기준 `d001931..d23de85`, 총 32개 파일)
+  - **원격 어댑터(`d001931`, GAP-008 / EV-045):**
     - [`crates/dot-logger/src/adapters/remote/server.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/adapters/remote/server.rs)
-  - **성능 기준선 P0 harness(`3740671`, TASK-023 S1 / EV-046):**
+  - **성능 기준선 P0 harness(`c9ea04a`, TASK-023 S1 / EV-046):**
     - [`crates/dot-logger/examples/perf_baseline.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/examples/perf_baseline.rs)
     - [`crates/dot-logger/examples/support/perf/mod.rs`](file:///home/lim8603/src/dot-logger/examples/support/perf/mod.rs)
     - [`crates/dot-logger/tests/tc_012_performance.rs`](file:///home/lim8603/src/dot-logger/tests/tc_012_performance.rs)
-  - **코어 분해 및 정확 예약 공식 추출(`1af172c`, `2a805ef`, `21cc198` — TASK-027 S2/S3a·TASK-028 S1a):**
+  - **코어 분해 및 정확 예약 공식 추출(`04a7cfa`, `691f937`, `c92fb98` — TASK-027 S2/S3a·TASK-028 S1a):**
     - [`crates/dot-logger/src/capture/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/capture/mod.rs), [`crates/dot-logger/src/capture/tests.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/capture/tests.rs)
     - [`crates/dot-logger/src/completion/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/completion/mod.rs)
     - [`crates/dot-logger/src/control/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/crates/dot-logger/src/control/mod.rs)
     - [`crates/dot-logger/src/routing/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/routing/mod.rs)
     - [`crates/dot-logger/src/storage/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/storage/mod.rs), [`crates/dot-logger/src/storage/retention.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/storage/retention.rs), [`crates/dot-logger/src/storage/catalog.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/storage/catalog.rs)
     - [`crates/dot-logger/src/adapters/tracing.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/adapters/tracing.rs)
-  - **기본 실행 계층(`logger` facade)·기본 worker·선택 연결·preset(`64c4d23`, `2a805ef`, `91387ba`, `c284354`, `4465be3` — TASK-027 S2~S3c·TASK-028 S1b):**
+  - **기본 실행 계층(`logger` facade)·기본 worker·선택 연결·preset(`1e651b4`, `691f937`, `bbc0b28`, `d595122`, `d23de85` — TASK-027 S2~S3c·TASK-028 S1b):**
     - [`crates/dot-logger/Cargo.toml`](file:///home/lim8603/src/dot-logger/crates/dot-logger/Cargo.toml), [`crates/dot-logger/src/lib.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/lib.rs)
     - [`crates/dot-logger/src/logger/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/mod.rs)
     - [`crates/dot-logger/src/logger/writer.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/writer.rs)
@@ -30,7 +30,7 @@
     - [`crates/dot-logger/src/logger/sink.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/sink.rs)
     - [`crates/dot-logger/src/logger/remote.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/remote.rs)
     - [`crates/dot-logger/src/logger/tests.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/logger/tests.rs)
-  - **통합·소비자·RT 할당 검증(`64c4d23`~`4465be3` — TC-013 F1~F15 / EV-047~052):**
+  - **통합·소비자·RT 할당 검증(`1e651b4`~`d23de85` — TC-013 F1~F15 / EV-047~052):**
     - [`crates/dot-logger/tests/tc_013_facade.rs`](file:///home/lim8603/src/dot-logger/tests/tc_013_facade.rs)
     - [`crates/dot-logger/tests/tc_013_affinity.rs`](file:///home/lim8603/src/dot-logger/tests/tc_013_affinity.rs)
     - [`crates/dot-logger/tests/tc_013_tracing.rs`](file:///home/lim8603/src/dot-logger/tests/tc_013_tracing.rs)
@@ -50,7 +50,7 @@
   - Safe Rust 100% (`logger/`·`perf/`·`remote` 신규·변경 코드 내 `unsafe` 블록 0건)
 - **종합 판정:** **Conditional Pass** (P1 1건, P2 5건, P3 2건).
   - 아키텍처 분리(ADR-008 borrowed core 불변 보존 + ADR-012 facade 소유 핸들), RT 핫패스(`try_log`·`try_log_raw`) 무할당·무대기 구조, feature 격리, `unsafe` 0건은 매우 우수하나, **`Writer::drop`과 `host_main` reaper 간 파괴 순서 경쟁으로 RT 스레드에서 대규모 heap 해제가 일어날 수 있는 Critical 결함(RV-120)** 및 TASK-023 S2 성능·자원 측정에 직접 영향을 주는 worker 유휴 스핀·시작 실패 정리·산술 오버플로·facade 메모리 예산 누락·`settle` 오류 분류(RV-121~125)가 확인되어 TASK-023 S2 착수 전 조치가 필요하다.
-- **상태:** **Closed** (2026-11-07 #003 조치 [EV-053](../verification_evidence.md#ev-053) `60ea9bb`, Human 「승인」으로 최종 구현 리뷰 마감)
+- **상태:** **Closed** (2026-11-07 #003 조치 [EV-053](../verification_evidence.md#ev-053) `559f2b9`, Human 「승인」으로 최종 구현 리뷰 마감)
 
 ---
 
@@ -113,7 +113,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** ① reaper 판정을 `host::writers_returned`/`writers_outstanding`으로 꺼내 `Consumer::is_empty` 대신 `Consumer::is_abandoned`(Writer의 mailbox `Producer` drop 완료) 기준으로 바꿨다. host가 항상 두 번째 dropper가 되어 `drop_slow`·`Owned`·`CaptureCore` 해제를 맡는다. `facade_report`의 `writers_outstanding`도 같은 기준. ② `Arc<CaptureCore>`를 `Owned` 안으로 옮겨 push 뒤 RT 스레드가 공유 자원 참조를 하나도 갖지 않게 했다(필드 선언 순서에 의존하지 않음). ③ rtrb 0.4.0 `ArcRingBuffer::drop`(먼저 drop한 쪽은 플래그만, 나중 쪽이 `drop_slow`) 동작을 소스로 확인.
-- **검증 근거:** Red: `logger::tests::reaper_waits_until_the_writer_dropped_its_mailbox_producer` — push 후 Producer 생존 상태를 기존 판정이 "반납 완료"로 판단(결정적 재현). Green 후 RT 할당 F3(0/0) 포함 `dot-logger-rt-allocation` 18건 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `logger::tests::reaper_waits_until_the_writer_dropped_its_mailbox_producer` — push 후 Producer 생존 상태를 기존 판정이 "반납 완료"로 판단(결정적 재현). Green 후 RT 할당 F3(0/0) 포함 `dot-logger-rt-allocation` 18건 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -140,7 +140,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** 유휴 대기를 `host::idle_sleep`으로 꺼냈다. 보류 배치가 없으면 `idle_wait`, 보류 배치가 있으면 그 남은 보류 시간과 `idle_wait` 중 작은 값만큼 잔다. `batch_wait = 0`에서도 유휴 spin이 없다. `idle_wait = 0`은 사용자가 명시한 성능 값이라 유지했다.
-- **검증 근거:** Red: `idle_io_sleep_ignores_batch_wait_until_a_batch_is_held`(`batch_wait=0`에서 0ns 대기). [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `idle_io_sleep_ignores_batch_wait_until_a_batch_is_held`(`batch_wait=0`에서 0ns 대기). [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -164,7 +164,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** `host::spawn` 실패가 `SpawnFailed { error, host: Option<JoinHandle> }`를 돌려준다. `start()`는 아직 내보내지 않은 writer·tracing sink를 먼저 drop(상태를 reaper로 반납)한 뒤 host를 join하고 `Err`를 반환한다. 그래서 반환 시점에 listener·core 메모리가 모두 정리돼 있다. 실패 경로 소요는 시험에서 0.00s.
-- **검증 근거:** Red: `facade_remote::f13_host_start_failure_closes_the_listener_before_returning`(읽기 전용 출력 디렉터리로 host 내부 `open_logs` 실패 유도, 같은 주소 재bind가 3/3 `AddrInUse`). root 권한이면 유도 불가로 건너뜀. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `facade_remote::f13_host_start_failure_closes_the_listener_before_returning`(읽기 전용 출력 디렉터리로 host 내부 `open_logs` 실패 유도, 같은 주소 재bind가 3/3 `AddrInUse`). root 권한이면 유도 불가로 건너뜀. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -191,7 +191,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** `budget::later(now, d)`(100년 상한 클램프)와 `budget::sync_overdue`(포화 4배+1초)로 `Instant`/`Duration` 덧셈을 대체(`request_shutdown`·host 연결 끊김 종료·ordinary sync 기한·`overdue`), `REPORT_GRACE`는 `saturating_add`, reaper 백오프는 `saturating_mul`. `Sizing::slots`·`remote::default_limits`는 포화 연산, `WriterQuota::records/payload_bytes/small_bytes`는 `checked_*`로 바꿔 `derive`에서 `InvalidBudget`.
-- **검증 근거:** Red: `tc_013_preset::f15_unbounded_durations_start_shut_down_and_drop_without_panic`(`Duration::MAX` 덧셈 패닉), `f15_overflowing_sizes_are_rejected_not_panicking`(preset `u128` 곱셈 패닉), `facade_remote::f13_overflowing_quota_with_remote_is_rejected_not_panicking`(`default_limits` 곱셈 패닉 → 수정 뒤 `Remote(Limit)` 거절). [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `tc_013_preset::f15_unbounded_durations_start_shut_down_and_drop_without_panic`(`Duration::MAX` 덧셈 패닉), `f15_overflowing_sizes_are_rejected_not_panicking`(preset `u128` 곱셈 패닉), `facade_remote::f13_overflowing_quota_with_remote_is_rejected_not_panicking`(`default_limits` 곱셈 패닉 → 수정 뒤 `Remote(Limit)` 거절). [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -205,7 +205,7 @@
 - **분석 내용:**
   - Accepted [ADR-012 §결과(단점·위험 및 완화)](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md)는 다음과 같이 명시하고 있다:
     > *"`Writer`당 반환 mailbox(1-slot 링)·scratch 버퍼가 추가된다. facade 고정 overhead로 control/worker 예산에 포함하고 계산 근거를 공개한다."*
-  - TASK-028 S1a(`21cc198`)에서 코어 5개 생성자(`CaptureOwner`, `Registry`, `ControlOwner`, `Router`, `SegmentLog`)의 예약 바이트 공식은 정밀하게 일치시켰으나, 정작 facade 계층이 직접 사전 할당하는 다음 힙 메모리들은 `budget::derive`의 `fixed` 및 `Plan::required_bytes`에 포함되지 않았다:
+  - TASK-028 S1a(`c92fb98`)에서 코어 5개 생성자(`CaptureOwner`, `Registry`, `ControlOwner`, `Router`, `SegmentLog`)의 예약 바이트 공식은 정밀하게 일치시켰으나, 정작 facade 계층이 직접 사전 할당하는 다음 힙 메모리들은 `budget::derive`의 `fixed` 및 `Plan::required_bytes`에 포함되지 않았다:
     1. `Writer`당 `scratch: vec![0u8; quota.small_slot_bytes]` 및 1-slot `rtrb::RingBuffer::<Owned>::new(1)` (`mod.rs:669-674`)
     2. 출력 타깃당 `IoTarget::batch: Vec::<Delivery>::with_capacity(tuning.batch_records)` (`host.rs:377`)
     3. `dot-logger-host` 루프의 `events: vec![None; 256]`, `ranges`, `cutoffs` 등 고정 운영 버퍼 (`host.rs:328, 535, 577`)
@@ -216,7 +216,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** `budget::facade_bytes`가 writer별 scratch(small slot)+1-slot mailbox(`size_of::<RingBuffer<Owned>>() + size_of::<Owned>()`), 출력별 IO batch(`batch_records × size_of::<Delivery>()`), host 이벤트 버퍼(`HOST_EVENTS=256`)·producer별 sync 범위 배열 3개를 계산해 worker partition과 `required_bytes`에 더한다. host는 같은 `HOST_EVENTS` 상수를 쓴다. 스레드 스택(기존 별도 계산)·채널 큐·유한 sync 작업 목록은 제외(rustdoc·API §19.4에 명시).
-- **검증 근거:** Red: `tc_013_preset::f15_facade_buffers_are_charged_to_the_worker_partition`(slot 64B→64KiB에도 worker 증가 0). F14 정확 요구량 시험 유지 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `tc_013_preset::f15_facade_buffers_are_charged_to_the_worker_partition`(slot 64B→64KiB에도 worker 증가 0). F14 정확 요구량 시험 유지 Pass. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -235,7 +235,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** ① `settle`: prefix flush가 `Io`/`Poisoned`로 실패하면 `host::tail_reason`으로 뒤쪽 전체를 `IoFailure`로 승격. `io_failed`·`status.fail()`은 `IoFailure`일 때만 기록하고 보존 한도 등은 `records_failed`만 올린다. ② 같은 결함 유형이 sync 경로에도 있어 함께 정리: 보존 한도로 기록되지 않은 범위를 덮는 barrier가 `InvalidRecord`로 실패하면 barrier만 `Failed`(core `sync_failed`)이고 출력 IO 장애로 표시하지 않는다. 실제 `Io`/`Poisoned`만 IO 장애.
-- **검증 근거:** Red: `settle_promotes_a_failed_prefix_flush_to_io_failure`(단위), `tc_013_facade::f9_*`에 `!report.io_failed` 단언 추가(settle 수정 뒤에도 sync 경로로 true → ② 수정 후 Pass). F5 실제 파일 장애는 계속 `io_failed`. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red: `settle_promotes_a_failed_prefix_flush_to_io_failure`(단위), `tc_013_facade::f9_*`에 `!report.io_failed` 단언 추가(settle 수정 뒤에도 sync 경로로 true → ② 수정 후 Pass). F5 실제 파일 장애는 계속 `io_failed`. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -259,7 +259,7 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** `prelude`에 `Preset`·`Sizing` 재수출, `logger::EncodeError`에 `Display`("record does not fit the encode buffer")·`std::error::Error` 구현, `PendingShutdown::wait`에 `# Errors`(Incomplete 1회·이후 Unresponsive 의미), `LoggerBuilder::channel` rustdoc과 API §18.2 표에 발신 기본 `Info`·채널 수용 하한 `Trace` 구분.
-- **검증 근거:** Red(컴파일): `tc_013_preset::prelude_surface::f15_prelude_has_presets_and_encode_error_is_an_error`. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red(컴파일): `tc_013_preset::prelude_surface::f15_prelude_has_presets_and_encode_error_is_an_error`. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`
 
 ---
 
@@ -278,4 +278,4 @@
 #### [처리담당]
 - **판정 결과:** 수용 (`Closed`)
 - **처리 내용:** `perf::records_for(total, payload)`가 `payload == 0`을 사용법 오류로 반환하고 `--p0`·`--p0-max` 모두 이를 쓴다. `perf/mod.rs` 두 곳 `saturating_sub`. (리뷰 당시 서술한 `64MiB / payload` 식은 현재 `rate×seconds / payload`·`total / payload`였고 같은 0 나눗셈이다.)
-- **검증 근거:** Red(컴파일): `tc_012_performance::p0_record_count_rejects_a_zero_payload`. `perf_baseline --p0-max … 0 …` → `payload must be at least 1 byte`, exit 4. [EV-053](../verification_evidence.md#ev-053), 소스 `60ea9bb`
+- **검증 근거:** Red(컴파일): `tc_012_performance::p0_record_count_rejects_a_zero_payload`. `perf_baseline --p0-max … 0 …` → `payload must be at least 1 byte`, exit 4. [EV-053](../verification_evidence.md#ev-053), 소스 `559f2b9`

@@ -39,7 +39,7 @@ Human 승인으로 MCAP **0.26.0**을 채택한다. `Cargo.toml`과 `Cargo.lock`
 - **결정:** Human 「권고대로」(2026-11-11, T5 후속 ②) — MCAP 0.26.0을 `vendor/mcap-0.26.0`에 두고 `[patch.crates-io]`로 쓴다. 최초 패치는 `src/write.rs` `ChunkWriter` 한 곳이다(2026-11-16 reader 결함 조치 보완은 아래 참조). 무압축 chunk에서는 compressed CRC 계층을 만들지 않고 uncompressed CRC를 data section CRC 결합에 재사용한다.
 - **근거:** 0.26은 무압축 chunk의 같은 바이트를 CRC로 두 번 훑는다. 복구가 chunk CRC를 필수로 쓰므로 옵션으로 끌 수 없다. 파일 바이트와 모든 CRC 값은 그대로이며, tmpfs P3 무제한에서 +4~6%(raw 4 스트림)·+5%(8 스트림)이다.
 - **검증:** 패치본과 원본에서 상류 시험 결과가 같다(lib 130 Pass, 패키지에 없는 fixture 때문에 통합 시험 7개는 양쪽 모두 실패). dot-logger에 chunk·data section CRC 정확성 시험을 추가했다. 상세는 [EV-068](../../05_verification/verification_evidence.md#ev-068).
-- **결과·비용:** 위 옵션 표의 「자체 패치·포크」 비용이 생긴다. `cargo audit`은 path 패키지를 검사하지 않으므로 의존성 검토 때 `mcap` 공지를 수동으로 확인한다. crates.io 패키지에 LICENSE 파일이 없어 MIT 전문 고지는 공개 전 검토(T2)에서 보완한다. 상류가 1회 계산으로 바뀌면 패치를 제거한다. vendor 경로·manifest 정리 범위는 `vendor/mcap-0.26.0/VENDORED.md`에 있다.
+- **결과·비용:** 위 옵션 표의 「자체 패치·포크」 비용이 생긴다. `cargo audit`은 path 패키지를 검사하지 않으므로 의존성 검토 때 `mcap` 공지를 수동으로 확인한다. crates.io 패키지에 LICENSE 파일이 없어, 공개 준비(T2, 2026-11-21)에서 상류 MIT 전문을 `vendor/mcap-0.26.0/LICENSE`로 보완했다. 상류가 1회 계산으로 바뀌면 패치를 제거한다. vendor 경로·manifest 정리 범위는 `vendor/mcap-0.26.0/VENDORED.md`에 있다.
 
 ### 승인된 계약의 결함 조치 보완 — 2026-11-16 / REV-055 RV-136
 

@@ -6,8 +6,8 @@
 |---|---|
 | 회차 / 일자 | REV-052 / 2026-11-07 |
 | 리뷰어 | Codex AI — 리뷰 전용 세션 |
-| 대상 | REV-051 이후 조치와 TASK-023 S2a/S2b 누적 변경, `49df7d3..93db6e3` |
-| 주요 소스 | `60ea9bb`, `1602d5e`, `93e7241`, `c93a44a`, `a92aee6`, `97651f5`, `49f097d`, `eeec11f`, `d0c4851`, `a6938ca` |
+| 대상 | REV-051 이후 조치와 TASK-023 S2a/S2b 누적 변경, `8eecc90..f807b58` |
+| 주요 소스 | `559f2b9`, `e399357`, `91fd057`, `b2584c6`, `9898031`, `764abde`, `edea00f`, `9cf009a`, `c7a086a`, `511c75b` |
 | 범위 | 29파일 중 Rust 21파일의 변경 및 관련 완료·저장소·제어 계약. 시작 작업 트리 clean |
 | 종합 판정 | **Conditional — P1 2건·P2 1건. 공개 L4 sync 경계 조치와 측정 구간 정렬 필요** |
 | 상태 | **Closed** — 2026-11-08 #001 조치·검증([EV-056](../verification_evidence.md#ev-056), 정정 [EV-057](../verification_evidence.md#ev-057)), Human 「승인」 |
@@ -47,7 +47,7 @@
 #### [리뷰어]
 
 - **위치:** [SyncWork::covers_file](../../../crates/dot-logger/src/control/mod.rs:883), [check_sync](../../../crates/dot-logger/src/storage/writer.rs:90), [FinishedSegment::sync_work](../../../crates/dot-logger/src/storage/writer.rs:267), [SegmentWriter::sync_work](../../../crates/dot-logger/src/storage/writer.rs:648).
-- **문제:** `c93a44a`는 파일 밖 구간을 최신 window로 좁히고 `Expired` 거절을 제거했다. 그러나 완료 기준이 `Written`이면 TERMINAL·Expired는 **파일에 쓰였다는 과거 사실**일 뿐 `Synced`나 다른 파일로의 대체 가능성을 증명하지 않는다. `covers_file`은 전체 log 범위를 보관하는 `SegmentLog`뿐 아니라 단일 `SegmentWriter`·`FinishedSegment`도 공통으로 사용한다. 주석의 “이 log가 받은 모든 기록” 전제를 이 세 호출자에 일괄 적용할 수 없다.
+- **문제:** `b2584c6`는 파일 밖 구간을 최신 window로 좁히고 `Expired` 거절을 제거했다. 그러나 완료 기준이 `Written`이면 TERMINAL·Expired는 **파일에 쓰였다는 과거 사실**일 뿐 `Synced`나 다른 파일로의 대체 가능성을 증명하지 않는다. `covers_file`은 전체 log 범위를 보관하는 `SegmentLog`뿐 아니라 단일 `SegmentWriter`·`FinishedSegment`도 공통으로 사용한다. 주석의 “이 log가 받은 모든 기록” 전제를 이 세 호출자에 일괄 적용할 수 없다.
 - **재현:** 기존 `tc_004_storage::a_new_segment_cannot_acknowledge_an_older_segments_unsynced_records`를 저장소 밖으로 복제했다. `tracking.targets[0].completion = Written`, `history_retention = 1ms`로 설정하고 첫 파일 `finish()` 뒤 10ms 대기했다. `finish`는 sync하지 않는 공개 계약이다(`writer.rs:682`). 이전 receipt가 Expired인 것을 확인한 뒤 같은 target의 새 **빈** `SegmentWriter`에 이전 cutoff의 SyncWork를 전달했다.
 
 ```text
@@ -67,8 +67,8 @@ SyncSnapshot { queued: 0, in_flight: 0, applying: 0, succeeded: 1,
 
 - **판정 결과:** 수용 — 유효(공개 L4 조립에서 재현). 2026-11-08 #001 AI.
 - **처리 내용:** 완료 이력 만료와 파일 내구성 증명을 분리했다. target별 `FileLedger`(routing `TargetLedger` 소유, writer 교체 뒤에도 유지)가 ① producer별로 이 target의 파일이 append한 최고 seq와 ② sync 없이 놓인 파일들의 범위(hull)·개수를 기록한다. 각 파일은 시작 시 ①의 값을 `base`로 받는다. `covers_file`은 범위 밖 구간 중 **다른 파일이 미동기화로 가질 수 있는 부분**(base 이하의 owed hull, base 초과·현재 appended 이하)에 대해 Synced·NotRouted·실패 종료의 양의 증명을 요구한다. 그 구간이 window보다 길거나 Expired면 거절한다. 어떤 파일도 append하지 않은 부분만 기존처럼 최신 window의 Pending만 확인한다. 완료 기준이 Synced인 target은 종료가 Synced/실패를 뜻하므로 증명 생략. 부채는 단독 `SegmentWriter`의 `finish`(dirty일 때)·Drop, `SegmentLog` Drop(dirty일 때)에서 기록하고, `FinishedSegment::sync_work`·`sync_recovered` 성공이 해소한다. `SegmentLog` 내부 파일은 log가 전체 범위를 갖고 회전 시 sync하므로 부채를 만들지 않는다(facade 경로 동작 불변). routing 예약에 producer당 24B 추가.
-- **후속 정정(2026-11-08 #001, TASK-023 S2c에서 발견):** `97e2b12`의 "이후 파일" 증명 구간이 파일 **첫 기록 이전**의 다른 target 전용 기록까지 포함해, 부분 라우팅 출력에서 완료 slot이 재사용되면 종료 sync를 거절했다(혼합 실행에서 재현). 구간 시작을 파일의 `last` 뒤로 고쳤다 — `b2899a3`, Red→Green `tc_004_storage::an_unrouted_record_before_the_file_never_needs_a_proof`. [EV-057](../verification_evidence.md#ev-057).
-- **검증 근거:** 소스 `97e2b12`. Red→Green: `tc_004_storage::{an_expired_written_record_cannot_let_a_new_segment_skip_its_unsynced_file, a_reused_written_record_cannot_let_a_new_segment_skip_its_unsynced_file, a_finished_segment_cannot_skip_a_later_files_expired_unsynced_records}`(세 건 모두 수정 전 잘못된 `Ok`), `tc_005_retention::a_dropped_unsynced_log_keeps_its_records_owed_to_a_later_log`(Drop 부채 기록을 끈 돌연변이에서 Red 확인). 정상 경로: 이전 파일이 같은 work로 sync하면 성공하고 이후 새 파일이 이전 범위를 다시 덮을 수 있다. F16 부분 라우팅·tc_013 facade·기존 `a_new_segment_cannot_acknowledge_*`·회전 sync 회귀 Pass. [EV-056](../verification_evidence.md#ev-056).
+- **후속 정정(2026-11-08 #001, TASK-023 S2c에서 발견):** `a4b9bcb`의 "이후 파일" 증명 구간이 파일 **첫 기록 이전**의 다른 target 전용 기록까지 포함해, 부분 라우팅 출력에서 완료 slot이 재사용되면 종료 sync를 거절했다(혼합 실행에서 재현). 구간 시작을 파일의 `last` 뒤로 고쳤다 — `11f44d9`, Red→Green `tc_004_storage::an_unrouted_record_before_the_file_never_needs_a_proof`. [EV-057](../verification_evidence.md#ev-057).
+- **검증 근거:** 소스 `a4b9bcb`. Red→Green: `tc_004_storage::{an_expired_written_record_cannot_let_a_new_segment_skip_its_unsynced_file, a_reused_written_record_cannot_let_a_new_segment_skip_its_unsynced_file, a_finished_segment_cannot_skip_a_later_files_expired_unsynced_records}`(세 건 모두 수정 전 잘못된 `Ok`), `tc_005_retention::a_dropped_unsynced_log_keeps_its_records_owed_to_a_later_log`(Drop 부채 기록을 끈 돌연변이에서 Red 확인). 정상 경로: 이전 파일이 같은 work로 sync하면 성공하고 이후 새 파일이 이전 범위를 다시 덮을 수 있다. F16 부분 라우팅·tc_013 facade·기존 `a_new_segment_cannot_acknowledge_*`·회전 sync 회귀 Pass. [EV-056](../verification_evidence.md#ev-056).
 
 ### RV-129 — 부분 범위가 공유 Written watermark의 앞쪽 공백을 건너뜀 (P1)
 
@@ -92,7 +92,7 @@ next_sync(scope=[1,1], target=10).is_some() == true
 
 - **판정 결과:** 수용 — 유효. 2026-11-08 #001 AI.
 - **처리 내용:** `ready_for_sync`는 검사 시작점이 `mark + 1`(window 생략 포함)과 같을 때만 `mark`를 전진시킨다. 더 뒤에서 시작하는 범위는 따로 검사하고 공유 watermark를 건드리지 않는다. 처리 제안의 "terminal과 Written 차이·완료 기준" 검토 결과, 완료 기준이 Enqueued인 target은 Written 전에 종료(및 이력 만료)되므로 window 생략·Expired 통과 경로를 완료 기준 Written/Synced인 target으로 한정하고, 나머지는 기존 drained 조건을 쓴다.
-- **검증 근거:** 소스 `97e2b12`. Red→Green: `tc_003_control::{a_partial_barrier_cannot_skip_an_earlier_unwritten_record, a_full_barrier_after_a_partial_one_still_waits_for_the_gap, an_enqueued_completion_target_does_not_treat_an_expired_record_as_written}`. 보호 시험 `overlapping_partial_barriers_wait_for_the_gap_in_either_order`(겹침·역순). F6 연속 부하 주기 sync(tc_013 facade) 회귀 Pass — 굶지 않음. [EV-056](../verification_evidence.md#ev-056).
+- **검증 근거:** 소스 `a4b9bcb`. Red→Green: `tc_003_control::{a_partial_barrier_cannot_skip_an_earlier_unwritten_record, a_full_barrier_after_a_partial_one_still_waits_for_the_gap, an_enqueued_completion_target_does_not_treat_an_expired_record_as_written}`. 보호 시험 `overlapping_partial_barriers_wait_for_the_gap_in_either_order`(겹침·역순). F6 연속 부하 주기 sync(tc_013 facade) 회귀 Pass — 굶지 않음. [EV-056](../verification_evidence.md#ev-056).
 
 ### RV-130 — P0·logger·제어 루프가 같은 측정 시작점을 공유하지 않음 (P2)
 
@@ -108,7 +108,7 @@ next_sync(scope=[1,1], target=10).is_some() == true
 
 - **판정 결과:** 수용 — 유효(정적 대조 확인). 2026-11-08 #001 AI.
 - **처리 내용:** 측정 harness에 공통 시작 장벽 `Gate`를 두었다. P0 writer 스레드(pin·`Output::open`·버퍼), logger 생산자 스레드(plan·start·파일 생성·조회 뒤 스레드 시작·pin), control·safety 루프(pin·검증)가 각자 setup을 마친 뒤 같은 절대 CLOCK_MONOTONIC 시각(마지막 도착 + 50 ms)부터 계시한다. control 첫 release = 그 시각. setup 실패는 장벽을 풀어 다른 쪽이 무한 대기하지 않고, `loops`는 load 자신의 오류를 먼저 보고한다. `StorageRun.start_ns`·`ControlRun.origin_ns`를 기록하고 `load_window`가 skew·제어 구간·부하 수락 구간·내구화 tail(분리)·중첩을 계산한다. `LoadWindow::judge`는 skew 0이고 부하가 제어 구간의 99% 이상을 덮을 때만 통과, 아니면 `Rejection::NotConcurrent`. `--p0`/`--p1`은 `LoadWindow` JSON 행을 출력한다.
-- **검증 근거:** 소스 `f8f2859`. `tc_012_performance::{gate_starts_every_party_after_the_slowest_setup, gate_releases_every_party_when_one_setup_fails, load_window_needs_a_shared_start_and_coverage_of_the_control_window, a_slow_setup_shifts_neither_the_load_nor_the_control_window(control 쪽 100 ms 인위 지연), a_load_that_ends_early_is_not_concurrent_with_the_control_window}`(새 API라 컴파일 Red → Green). smoke(측정 아님) `--p0`·`--p1` 3초: skew 0, 중첩 99.97%/99.94%, tail 11.5/24.7 ms 분리 보고. [EV-056](../verification_evidence.md#ev-056).
+- **검증 근거:** 소스 `2af2dce`. `tc_012_performance::{gate_starts_every_party_after_the_slowest_setup, gate_releases_every_party_when_one_setup_fails, load_window_needs_a_shared_start_and_coverage_of_the_control_window, a_slow_setup_shifts_neither_the_load_nor_the_control_window(control 쪽 100 ms 인위 지연), a_load_that_ends_early_is_not_concurrent_with_the_control_window}`(새 API라 컴파일 Red → Green). smoke(측정 아님) `--p0`·`--p1` 3초: skew 0, 중첩 99.97%/99.94%, tail 11.5/24.7 ms 분리 보고. [EV-056](../verification_evidence.md#ev-056).
 
 ## 5. 검증 및 다음 액션
 
@@ -131,7 +131,7 @@ next_sync(scope=[1,1], target=10).is_some() == true
 
 | 항목 | 내용 |
 |---|---|
-| 처리 | RV-128·129 수용·조치 `97e2b12`, RV-130 수용·조치 `f8f2859`. 세 건 모두 TDD Red 확인 후 Green |
+| 처리 | RV-128·129 수용·조치 `a4b9bcb`, RV-130 수용·조치 `2af2dce`. 세 건 모두 TDD Red 확인 후 Green |
 | 계약 반영 | [API §19.6](../../03_design_artifacts/interface_contract.md#196-rev-052-조치-반영--2026-11-08), §19.5 ①·④ 한정 문구 |
 | 검증 | [EV-056](../verification_evidence.md#ev-056) |
-| 상태 | Closed — 2026-11-08 Human 「승인」(RV-128 정정 `b2899a3` 포함) |
+| 상태 | Closed — 2026-11-08 Human 「승인」(RV-128 정정 `11f44d9` 포함) |

@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-10-31 #007 / AI, code-review 스킬 기준 적용.
-- 대상: 소스 `ded6372`, dot-logger-client의 receiver 수명 첫 단위 및 workspace 등록. 실제 transport/CLI는 범위 밖이다.
+- 대상: 소스 `86b50ef`, dot-logger-client의 receiver 수명 첫 단위 및 workspace 등록. 실제 transport/CLI는 범위 밖이다.
 - 성격: 개발 자가 점검/조치 자산. 독립 Read-Only 리뷰 세션이 아니다.
 - 판정: Pass — 검토 범위에서 새 P1/P2 미해결 지적을 확인하지 못했다. 전체 제품/Task 통과를 뜻하지 않는다.
 - 상태: Closed — Human의 구현/검증·마감 판단 위임에 따라 EV-024 검증 뒤 첫 단위를 AI가 수락했다. 전체 TASK-013 완료 승인은 아니다.

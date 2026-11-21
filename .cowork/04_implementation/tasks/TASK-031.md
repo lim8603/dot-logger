@@ -57,7 +57,7 @@ Lichtblick Web v1.31.0은 공개 v1과 SDK v1을 모두 제안하며, SDK v1.1�
 
 ### S2 실시간 구현과 로컬 검증 — 2026-11-18
 
-제품 `f1444d4`의 [사용법과 예제](../../../crates/dot-logger-viewer/README.md), [EV-092](../../05_verification/verification_evidence.md#ev-092), [REV-063](../../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md)을 따른다. 하나의 native 채널에 한 gRPC 구독을 공유하며 WebSocket의 건수/바이트와 2초 쓰기 기한을 각각 제한한다. 채널당 ACK는 순차 처리된다(2026-11-21 [ADR-015](../../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md)부터 묶음·파이프라인 전송). 새 카탈로그는 viewer 재시작 시 적용한다. 스키마 불일치가 관측되면 이전 광고를 회수하고 상태를 표시한다.
+제품 `b319fe1`의 [사용법과 예제](../../../crates/dot-logger-viewer/README.md), [EV-092](../../05_verification/verification_evidence.md#ev-092), [REV-063](../../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md)을 따른다. 하나의 native 채널에 한 gRPC 구독을 공유하며 WebSocket의 건수/바이트와 2초 쓰기 기한을 각각 제한한다. 채널당 ACK는 순차 처리된다(2026-11-21 [ADR-015](../../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md)부터 묶음·파이프라인 전송). 새 카탈로그는 viewer 재시작 시 적용한다. 스키마 불일치가 관측되면 이전 광고를 회수하고 상태를 표시한다.
 
 Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `robot/pose` x=51·y=-7과 Rust 통합 시험에서 포화 회복·세션 종료/재연결·구독 반환을 확인했다. Foxglove Desktop 3.5.0의 격리 프로필은 로그인 화면에서 실시간 검증을 멈췄다. P4/P4-bulk·P5의 LAN·기준 TCP 부하 실측은 T7에 유지한다.
 
@@ -69,7 +69,7 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 
 ### S3 파일 호환 구현 — 2026-11-18
 
-`a3296dc`부터 Schema/Channel 등록은 MCAP data section, 사용자 기록·RecordMeta·LossReport는 인덱스가 있는 메시지 청크에 기록한다. `standard/2`에서 두 등록 방식의 판독을 지원한다. Lichtblick 1.31.0의 새 파일 직접 재생과 기존 EV-090 원본을 `recover`로 만든 별도 사본의 재생을 확인했다. 기존 파일을 직접 열면 같은 Lichtblick 문제를 만날 수 있다. [명령 예제](../../../crates/dot-logger-viewer/README.md) · [EV-093](../../05_verification/verification_evidence.md#ev-093)
+`4be7240`부터 Schema/Channel 등록은 MCAP data section, 사용자 기록·RecordMeta·LossReport는 인덱스가 있는 메시지 청크에 기록한다. `standard/2`에서 두 등록 방식의 판독을 지원한다. Lichtblick 1.31.0의 새 파일 직접 재생과 기존 EV-090 원본을 `recover`로 만든 별도 사본의 재생을 확인했다. 기존 파일을 직접 열면 같은 Lichtblick 문제를 만날 수 있다. [명령 예제](../../../crates/dot-logger-viewer/README.md) · [EV-093](../../05_verification/verification_evidence.md#ev-093)
 
 ### S3 원격 재생 경로 — 검토
 

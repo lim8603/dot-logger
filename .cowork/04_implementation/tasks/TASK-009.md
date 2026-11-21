@@ -62,9 +62,9 @@ Human 「커밋 푸쉬 후, 다음 테스크 진행」에 따라 TASK-008 EV-013
 | 생성 | tests/fault_storage.rs | State/Buffer/Store·BrokenReader/FailAtReader/CancelOnSync — 파일/OS 오류·취소·삭제 금지·prefix·독립 판독 |
 | 수정 | allocator tests·CI recipe·README | 복구 예산/최종 반환, future native Miri의 retention/fault_storage 추가, 호출자 책임/지원 범위 |
 
-TASK-008 REV-010 조치까지는 소스14fd1a4·문서1f2f44d로 origin/main 게시 완료했다. TASK-009는 후속 세션 마감/게시 요청으로 소스 e5f3147을 커밋했으며, Human 최종 구현 리뷰는 별도 대기다.
+TASK-008 REV-010 조치까지는 소스7102d93·문서bf3acf0로 origin/main 게시 완료했다. TASK-009는 후속 세션 마감/게시 요청으로 소스 5bbb45c을 커밋했으며, Human 최종 구현 리뷰는 별도 대기다.
 
-세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `e5f3147`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서212373c와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. [커밋 근거](../../06_evolution/imported_context/task_009_2026-10-30/commit.json).
+세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `5bbb45c`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서6626690와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. 커밋 근거(비공개 원시 근거).
 
 ## REV-012 조치 — 2026-10-30
 
@@ -72,7 +72,7 @@ Human의 새 리뷰 지적사항 처리 요청으로 RV-016/017(P3)을 수용했
 
 [EV-015](../../05_verification/verification_evidence.md#ev-015)에서 Rust1.85/1.96 workspace/all-features 각각201개(복구19·allocator9·doctest17 포함)·양쪽 clippy·fmt Pass. 이전 EV-014와 소스51개 중 recovery.rs만 달라졌고 최신 hash/로그는 EV-015다. Miri/16-feature matrix/rustdoc은 EV-014 이전 소스의 이력으로 보존한다. [REV-012](../../05_verification/reviews/REV-012_TASK-009_DEEP_REVIEW.md)는 Open→In Progress→Resolved, Human 최종 리뷰 전 Closed로 올리지 않는다. native GAP-004·장비 검증·TASK-009/MS-003 In Progress는 유지한다. 이번 요청으로 commit/push·TASK-010 착수는 수행하지 않았다.
 
-2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」: TASK-009 최신 구현 승인·REV-011/012 Closed, 소스 `fe03468`은 EV-015 source51개와 일치한다. native/장비 미완료로 In Progress를 유지하며 TASK-010 진행을 승인받았다.
+2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」: TASK-009 최신 구현 승인·REV-011/012 Closed, 소스 `5c60399`은 EV-015 source51개와 일치한다. native/장비 미완료로 In Progress를 유지하며 TASK-010 진행을 승인받았다.
 
 ## 검증 환경·시점 변경 — 2026-10-31
 

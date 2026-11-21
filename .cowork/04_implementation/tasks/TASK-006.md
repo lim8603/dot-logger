@@ -67,7 +67,7 @@ Human 「지금 수정과 회기 검증 진행해도 되겠어?」로 수정/검
 
 수정분 Human 구현 리뷰·native/실제 파일/worker/장비 검증은 잔여다. 기존 승인 이력과 별개이며 TASK-006/MS-002 In Progress, Gate4/5 Not Ready를 유지한다. commit/push·CI 조회/재시도·fresh audit는 하지 않았다. 새 source37개(README 포함)와 명령/로그는 EV-007에 고정한다.
 
-후속 마감: Human 「커밋 푸쉬하고 세션 마무리」에 따라 수정 코드 `d57c2e3`을 `[skip ci]`로 커밋·origin/main push했고 원격 ref와 EV-007 source37개 blob 일치를 확인했다. 검증/상태/마감 문서는 별도 docs(cowork) 커밋이다. 커밋 요청을 수정분 구현 리뷰 승인으로 대신하지 않으며 native/장비 이월과 사용량 조회/재시도 금지는 유지한다. 다음은 EV-007 수정분 리뷰이며 TASK-007은 미착수다.
+후속 마감: Human 「커밋 푸쉬하고 세션 마무리」에 따라 수정 코드 `16f58de`을 `[skip ci]`로 커밋·origin/main push했고 원격 ref와 EV-007 source37개 blob 일치를 확인했다. 검증/상태/마감 문서는 별도 docs(cowork) 커밋이다. 커밋 요청을 수정분 구현 리뷰 승인으로 대신하지 않으며 native/장비 이월과 사용량 조회/재시도 금지는 유지한다. 다음은 EV-007 수정분 리뷰이며 TASK-007은 미착수다.
 
 ## 후속 개선 검토·종료 경합 리뷰 — 2026-10-29
 
@@ -124,7 +124,7 @@ Human 「다음단계로」에 따라 앞서 안내한 최종 리뷰를 진행�
 | 수정 | [CI](../../../.github/workflows/ci.yml) | 기존 raw-memory job에 완료·제어 Miri 대상 추가; 실행은 후속 검증 |
 | 수정 | [도메인](../../03_design_artifacts/domain_model.md), [인터페이스](../../03_design_artifacts/interface_contract.md), [Task 목록](../task_registry.md), [MS 목록](../milestone_registry.md), [MS-002](../milestones/MS-002.md), 이 문서 | 구현/계약과 진행 상태 정렬 |
 | 수정 | [전략](../../05_verification/test_strategy.md), [TC/추적표](../../05_verification/test_case.md), [EV](../../05_verification/verification_evidence.md), [공유 상태](../../06_evolution/project_state.md), [개인 상태](../../members/lim8603/workspace/my_state.md) | 현재 근거·미검증/승인·다음 시작점 |
-| 생성 | [증거 폴더](../../06_evolution/imported_context/task_006_2026-10-28/), [세션 로그](../../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) | Red/Green·환경/명령·hash와 작업 연속성 |
+| 생성 | 증거 폴더(비공개 원시 근거), [세션 로그](../../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) | Red/Green·환경/명령·hash와 작업 연속성 |
 
 ## 클래스·타입 변경표
 
@@ -165,7 +165,7 @@ Human 「다음단계로」에 따라 앞서 안내한 최종 리뷰를 진행�
 
 ## 승인·커밋·세션 마감 — 2026-10-28
 
-Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006 코드/테스트/CI를 `c98b7fa4ba8928137f95d40ac2aa693a541ea934`에 함께 커밋했고 EV-005의36 source hash와 commit blob이 일치한다. 기존 CI 사용량 소진 지시에 따라 커밋에 `[skip ci]`를 사용하고 CI를 조회/재시도하지 않는다. 초기 HTTPS 인증 차단은 gh 브라우저 인증과 Git credential helper 연결로 해소했다. pull --ff-only 후 코드·승인 문서 `136fe96`의 origin/main push를 완료했고 원격 ref 일치를 확인했다. 승인/검증/마감 문서는 별도 docs(cowork) 커밋으로 정리했다. TASK-004/005/006 native는 Not Run을 유지하며 세션을 마감한다.
+Human이 구현 승인·commit/push·세션 종료를 요청했다. TASK-005/006 코드/테스트/CI를 `550185fe2e9812910f4ef3fa7db6b231f4538256`에 함께 커밋했고 EV-005의36 source hash와 commit blob이 일치한다. 기존 CI 사용량 소진 지시에 따라 커밋에 `[skip ci]`를 사용하고 CI를 조회/재시도하지 않는다. 초기 HTTPS 인증 차단은 gh 브라우저 인증과 Git credential helper 연결로 해소했다. pull --ff-only 후 코드·승인 문서 `b3a0ca6`의 origin/main push를 완료했고 원격 ref 일치를 확인했다. 승인/검증/마감 문서는 별도 docs(cowork) 커밋으로 정리했다. TASK-004/005/006 native는 Not Run을 유지하며 세션을 마감한다.
 
 ## 최종 승인 — 2026-10-29
 

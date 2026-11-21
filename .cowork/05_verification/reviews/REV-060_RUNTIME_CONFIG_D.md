@@ -5,9 +5,9 @@
 | 항목 | 내용 |
 |---|---|
 | 회차 / 일자 | REV-060 / 2026-11-17 착수·2026-11-18 마감 |
-| 대상 | `6628475` 이후, 보관 WIP36c1724를 현재 ADR-013 native/loss 계약에 맞춰 적용 |
+| 대상 | `22e21f9` 이후, 보관 WIP36c1724를 현재 ADR-013 native/loss 계약에 맞춰 적용 |
 | 종류 | 개발 세션 자가검토 — Human 「런타임 통합 진행하자」 |
-| 판정 | **Pass** — [EV-087](../verification_evidence.md#ev-087), 제품 `874c27c` |
+| 판정 | **Pass** — [EV-087](../verification_evidence.md#ev-087), 제품 `3254b81` |
 | 상태 | **Closed** — 2026-11-18, RV-153/154 조치·위임 수락 |
 
 S1 계약 승인·기존 S2 중요도/시작 level/이벤트 및 S3를 유지하고 S2 runtime 잔여를 통합했다. `set_channel`·`refresh`·쉬는 held/tracing/반납 writer ack·원격 ApplyConfig를 제공하며 B의 단일 active writer revision 회전을 그대로 소비한다. 제품 형식 선택/legacy wrapper·새 저장 회전 경로를 만들지 않는다. E GUI/호출 비용/최종 커버리지와 Task 전체 완료는 별도다.

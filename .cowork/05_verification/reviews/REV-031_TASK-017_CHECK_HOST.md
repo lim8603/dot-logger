@@ -4,8 +4,8 @@
 
 - 일자/담당: 2026-11-01 #006 / AI 개발 자가 점검. 독립 리뷰가 아니다.
 - 요청: Human 「S3 시작하자」. 기존 TASK-017 구현/검증·수락/분리 커밋·푸시 위임 적용.
-- 소스: `5390a55194cf5bf80ecc74f461e24a07d8f6af10`·source101개 commit blob/hash 일치.
-- 대상: diagnostics host/run·remote Command/native RPC·client codec·CLI·Linux probe 의존성 및 통합 시험. 정확한 파일/hash·명령은 [EV-033](../verification_evidence.md#ev-033)·[결과](../../06_evolution/imported_context/task_017_s3_2026-11-01/results.json).
+- 소스: `f4ff74d5c3e2cb7c0140e6d64567691541437ae5`·source101개 commit blob/hash 일치.
+- 대상: diagnostics host/run·remote Command/native RPC·client codec·CLI·Linux probe 의존성 및 통합 시험. 정확한 파일/hash·명령은 [EV-033](../verification_evidence.md#ev-033)·결과(비공개 원시 근거).
 - 기준: [code-review 스킬](../../../.agents/skills/code-review/SKILL.md)·API §15.3~15.5·TC-010·coding convention.
 - 상태/판정: Closed / Pass — 아래 개발 중 발견3건 조치, 신규 미해결 P1/P2/P3 없음. S3 로컬 운영 연결만 기존 위임으로 수락한다.
 
@@ -33,9 +33,9 @@
 
 ## [처리담당] 조치·근거
 
-- RV-066 수용: `next_record`의 공간 조회 직후 `Shared::now` 및 cancellation을 재관측하고 초기 preflight elapsed도 실제 probe 이후 시각으로 계산한다. 이미 admitted IO/마감은 중단하지 않으며 time/cancel만으로 기존 prefix의 footer/sync/정리를 생략하지 않는다. [Red](../../06_evolution/imported_context/task_017_s3_2026-11-01/red-probe-deadline.log)·S2 실제16개 Pass.
-- RV-067 수용: host schema/outcome 해석 뒤 실제 결과를 먼저 출력하고 전용 Failure로 종료 코드를 분리했다. 실제 결과가 있는 실패에는 불필요한 completion_unconfirmed가 없으며 transport timeout에는 유지한다. [Red](../../06_evolution/imported_context/task_017_s3_2026-11-01/red-cli-outcome.log)·CLI 실제5개 Pass.
-- RV-068 수용: source 운영 session/clock을 전용 check session과 일치시키지 않고 양쪽 identity와 원래 Window/profile를 별도 보존한다. 측정 시각 간 차분/갱신은 하지 않고 Report 내부 및 재현 revision/environment/workload/target/boundary 일관성은 유지한다. [Red](../../06_evolution/imported_context/task_017_s3_2026-11-01/red-source-session.log)·native/source4242와 check42의 실제 CLI 결과 보존 Pass.
+- RV-066 수용: `next_record`의 공간 조회 직후 `Shared::now` 및 cancellation을 재관측하고 초기 preflight elapsed도 실제 probe 이후 시각으로 계산한다. 이미 admitted IO/마감은 중단하지 않으며 time/cancel만으로 기존 prefix의 footer/sync/정리를 생략하지 않는다. Red(비공개 원시 근거)·S2 실제16개 Pass.
+- RV-067 수용: host schema/outcome 해석 뒤 실제 결과를 먼저 출력하고 전용 Failure로 종료 코드를 분리했다. 실제 결과가 있는 실패에는 불필요한 completion_unconfirmed가 없으며 transport timeout에는 유지한다. Red(비공개 원시 근거)·CLI 실제5개 Pass.
+- RV-068 수용: source 운영 session/clock을 전용 check session과 일치시키지 않고 양쪽 identity와 원래 Window/profile를 별도 보존한다. 측정 시각 간 차분/갱신은 하지 않고 Report 내부 및 재현 revision/environment/workload/target/boundary 일관성은 유지한다. Red(비공개 원시 근거)·native/source4242와 check42의 실제 CLI 결과 보존 Pass.
 - Rust1.96 workspace357/core288·MSRV1.85 workspace357, fmt/clippy/rustdoc -D warnings·protobuf/prost 비교/protoc·audit Pass. strict-provenance Miri 관리 수명/공간 산술2종×8seeds=16 Pass. 신규 기능 시험10개(host3+CLI5+산술1+느린 probe1). 실제 OS IO를 Miri로 대체하지 않는다.
 - F-11 소비자: 기존 S1/S2·수집/라우팅/완료/저장·remote/Command timeout/권한·client/CLI·RT allocator를 workspace 및 core 회귀로 확인했다. 세션 로그에 조인 소비자와 미검증 범위를 기록했다.
 

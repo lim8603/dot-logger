@@ -4,7 +4,7 @@
 
 - **일자 / 리뷰어:** 2026-11-03 / AI 독립 코드리뷰 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
 - **성격:** 독립 Read-Only 코드리뷰. REV-044는 개발 세션 내 자가 점검이었으므로, TASK-016 운영 backend(`OperationsHost`, live status 지표 보고, 명시적 `ApplyConfig`, 스냅샷 `Compare`, 신규 오류 3종 및 wire/gRPC/CLI 매핑)의 전체 구현 형상에 대해 독립적 관점에서 심층 검토를 수행했다. 제품 코드는 전혀 수정하지 않았다.
-- **대상 형상:** 커밋 `a738ebf` 및 운영 backend 연계 파일 전체
+- **대상 형상:** 커밋 `7f9fbd5` 및 운영 backend 연계 파일 전체
   - 코어 호스트 백엔드 및 원격 어댑터:
     - [`crates/dot-logger/src/telemetry/operations.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/operations.rs)
     - [`crates/dot-logger/src/telemetry/mod.rs`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/telemetry/mod.rs)
@@ -36,7 +36,7 @@
   - `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps`: Pass (문서 경고 0건)
   - Safe Rust 100% (신규 구현 코드 내 `unsafe` 블록 0건)
 - **종합 판정:** **Pass** (P1 0건, P2 0건, P3 3건). RT 경로 무할당 불변식 보존, 호스트 일반 워커 주도형 구조, wire/gRPC/CLI 오류 매핑 정합성, 관측 정직성(0-채움 배제), Safe Rust 100% 준수 확인.
-- **상태:** **Closed** (2026-11-03 #003 개발 세션, 소스 `497149b`에서 P3 3건 수용·조치)
+- **상태:** **Closed** (2026-11-03 #003 개발 세션, 소스 `ee57f44`에서 P3 3건 수용·조치)
 
 ---
 
@@ -93,7 +93,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `new`(`InvalidInput`), `register_snapshot`(`Limit`: 슬롯 가득/ID 소진), `forget_snapshot`·`compare`(`Gone`)에 더해 `apply`에도 `# Errors`를 추가해 §15.8 오류 매핑 전체(`Unsupported`·`InvalidInput`·`RestartRequired`·`Conflict`·`Busy`·`Limit`·`Gone`·`Transport`)를 명시했다. 동작 변경은 없다.
-- **검증 근거:** 소스 `497149b`; `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps` exit0. [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
+- **검증 근거:** 소스 `ee57f44`; `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps` exit0. 검증 원문(비공개 원시 근거)
 
 ---
 
@@ -111,7 +111,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `#[derive(Debug)]`를 추가했다.
-- **검증 근거:** 소스 `497149b`; `host_slots_are_bounded`에 `{host:?}` 포맷 검사를 추가했다(추가 전 E0277 컴파일 Red → derive 후 Pass). [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
+- **검증 근거:** 소스 `ee57f44`; `host_slots_are_bounded`에 `{host:?}` 포맷 검사를 추가했다(추가 전 E0277 컴파일 Red → derive 후 Pass). 검증 원문(비공개 원시 근거)
 
 ---
 
@@ -131,5 +131,5 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 — 대안 A (`Closed`)
 - **처리 내용:** ID가 인스턴스 안에서 재사용되지 않으므로 ID 오름차순은 곧 등록 순서다. 정렬 비용은 일반 worker의 64개 이하 항목이고 RT 경로와 무관하므로, 문서로 비정렬을 허용하기보다 안정 순서를 보장했다. `status`가 보유 snapshot을 ID 기준 정렬 후 직렬화하며, API §15.8에 「ID 오름차순 = 등록 순서」를 명시했다.
-- **검증 근거:** 소스 `497149b`; `compare_preserves_differences_and_rejects_unknown_or_exhausted_ids` 끝에 forget 후 첫 슬롯 재사용 목록 검사를 추가했다(Red: `["3","2"]` → Pass: `["2","3"]`). `cargo test -p dot-logger --features remote`, `-p dot-logger-cli`, `-p dot-logger-rt-allocation`(16/16, RT 0할당/0해제) 전체 Pass. [검증 원문](../../06_evolution/imported_context/rev045_2026-11-03/rev045-verify.log)
+- **검증 근거:** 소스 `ee57f44`; `compare_preserves_differences_and_rejects_unknown_or_exhausted_ids` 끝에 forget 후 첫 슬롯 재사용 목록 검사를 추가했다(Red: `["3","2"]` → Pass: `["2","3"]`). `cargo test -p dot-logger --features remote`, `-p dot-logger-cli`, `-p dot-logger-rt-allocation`(16/16, RT 0할당/0해제) 전체 Pass. 검증 원문(비공개 원시 근거)
 

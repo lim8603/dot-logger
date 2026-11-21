@@ -6,11 +6,11 @@
 |---|---|
 | 회차 / 일자 | REV-055 / 2026-11-15 |
 | 리뷰어 | Antigravity AI — 리뷰 전용 세션 |
-| 대상 | REV-054 이후 누적 코드 커밋 `64e9d69..949a74e` (9개 코드 커밋: `04bf3aa`, `19e04d2`, `4158f08`, `4bd6d04`, `4559fc7`, `11f91a5`, `561f2c3`, `340c19c`, `949a74e`, WIP `36c1724` 제외) |
+| 대상 | REV-054 이후 누적 코드 커밋 `a536486..fa72a1a` (9개 코드 커밋: `3cbd1b2`, `783f2e3`, `17ebda6`, `3a554ac`, `8703459`, `ce0efcd`, `a543432`, `67fa480`, `fa72a1a`, WIP `36c1724` 제외) |
 | 범위 | TASK-030 S1 표준 MCAP export, TASK-033 S3/S4 시험 및 ring `2 × segment` 하한 수정, client `diagnostics` 이동, TASK-034 S2a~S2c(중요도·시작 시 최소 level·이벤트 보존) |
 | 종합 판정 | **Conditional — P1 1건·P2 3건·P3 1건 (`RV-136~140`)** |
 | 상태 | **Closed** — 2026-11-16 RV-136~140 조치·검증·위임 수락 |
-| 조치 판정 | 로컬 **Pass**, 소스 `5d7fe6a`, [EV-082](../verification_evidence.md#ev-082) |
+| 조치 판정 | 로컬 **Pass**, 소스 `3e6dcb5`, [EV-082](../verification_evidence.md#ev-082) |
 
 전체 회귀(1.96.0 및 MSRV 1.85.0 각 625 passed·5 ignored), `clippy`, `fmt`, strict `rustdoc`, `--no-default-features` 빌드, NFR-008 표면/레시피 검사(`34/60` 항목), RT 무할당 시험(19개)은 모두 통과했다. 그러나 심층 검토 및 `/tmp/dot-logger-rev055` 재현 진단 결과:
 1. **P1 (`RV-136`):** 손상된 무압축 chunk를 `standard::export`로 읽을 때 `vendor/mcap` `LinearReader`에서 산술 언더플로 패닉(release에서는 `u64` wrap)과 CLI 실패 시 출력 파일 미삭제가 발생하고, `crc == 0` 또는 chunk 내부 레코드 파싱 실패 시 검증되지 않은 chunk의 부분 메시지가 출력에 포함되는 결함을 실제 재현했다.
@@ -23,7 +23,7 @@
 
 | 구분 | 파일 | 변경 내용 |
 |---|---|---|
-| 생성 | [REV-055](REV-055_FACADE_STANDARD_EXPORT_REVIEW.md) | `64e9d69..949a74e` 심층 리뷰 결과(`RV-136~140`), 재현 근거 및 처리담당 영역 기록 (`Open`) |
+| 생성 | [REV-055](REV-055_FACADE_STANDARD_EXPORT_REVIEW.md) | `a536486..fa72a1a` 심층 리뷰 결과(`RV-136~140`), 재현 근거 및 처리담당 영역 기록 (`Open`) |
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | 미처리 리뷰 목록에 REV-055 (`Open`, P1 1·P2 3·P3 1) 등록 및 다음 시작점 동기화 |
 
 검토한 핵심 파일은 `crates/dot-logger/src/logger/{event.rs, budget.rs, host.rs, mod.rs, writer.rs}`, `crates/dot-logger/src/storage/{standard.rs, writer.rs, recovery.rs, retention.rs, catalog.rs}`, `vendor/mcap-0.26.0/src/sans_io/linear_reader.rs`, `crates/dot-logger-cli/src/{args.rs, commands.rs, main.rs, model.rs}`, `crates/dot-logger-client/{src/lib.rs, examples/support/dot_probe*}`, 관련 단위·통합 시험(`tc_013_facade.rs`, `tc_014_standard.rs`, `tc_003_completion.rs`, `tc_009_report.rs`, `tc_013_tracing.rs`, `cli.rs`, `rt-allocation`)이다.
@@ -59,7 +59,7 @@
 
 - **위치:**
   - [linear_reader.rs:672-676, 730-746](../../../vendor/mcap-0.26.0/src/sans_io/linear_reader.rs#L672-L746)
-  - [standard.rs:13-17, 161-203, 284-330](https://github.com/lim8603/dot-logger/blob/949a74e/crates/dot-logger/src/storage/standard.rs#L161-L203)
+  - [standard.rs:13-17, 161-203, 284-330](https://github.com/lim8603/dot-logger/blob/fa72a1a/crates/dot-logger/src/storage/standard.rs#L161-L203)
   - [commands.rs:904-937](../../../crates/dot-logger-cli/src/commands.rs#L904-L937)
   - 계약: API §21.2 ("잘린 파일·CRC 불일치 chunk·해석 불가 레코드를 만나면 그 앞의 검증된 chunk까지 내보내고 `ExportReport::truncated`에 이유를 남긴다... 실패·취소 시 만든 출력을 지운다"), `standard.rs:16-17` ("a chunk is checked before any of its messages is written").
 - **원인:**
@@ -84,7 +84,7 @@
 
 - **판정:** 수용.
 - **처리:** `LinearReader`에 짧은 chunk header·무압축 크기 불일치·내부 record 경계 검사를 추가했다. `prevalidate_chunk_crcs`는 CRC 0도 전체 chunk를 한도 안에서 로드하고 내부 레코드를 파싱한 뒤 반출한다. 비영 CRC는 기존대로 검사한다. CLI `ExportCleanup`은 모든 오류와 unwind에서 새 출력만 정리하고 결과 반출까지 성공해야 해제된다.
-- **검증:** `tc_014_standard` f13~f15의 수정 전 Red(패닉·부분 반출·상한 우회) → Green, f18 압축/CRC 0 호환·크기 상한, 실제 CLI 손상 chunk/summary 통합, 정리 가드 오류·unwind·commit 시험 및 생략 변이 Red. vendor 전체 패키지 lib 131 Pass. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
+- **검증:** `tc_014_standard` f13~f15의 수정 전 Red(패닉·부분 반출·상한 우회) → Green, f18 압축/CRC 0 호환·크기 상한, 실제 CLI 손상 chunk/summary 통합, 정리 가드 오류·unwind·commit 시험 및 생략 변이 Red. vendor 전체 패키지 lib 131 Pass. [EV-082](../verification_evidence.md#ev-082), 소스 `3e6dcb5`.
 
 ---
 
@@ -95,7 +95,7 @@
 - **위치:**
   - [mod.rs:1106-1171, 1224-1235](../../../crates/dot-logger/src/logger/mod.rs#L1106-L1171) (`Logger::mark_event`, `Logger::ask`, `worse`)
   - [host.rs:399-407, 682-693, 994-1021](../../../crates/dot-logger/src/logger/host.rs#L682-L693) (`io_main`, `drain_failed`)
-  - 계약: API §22.3·§22.9 (`949a74e`).
+  - 계약: API §22.3·§22.9 (`fa72a1a`).
 - **원인 및 영향:**
   1. **다중 출력 롤백 조기 중단:** `mark_event()`는 `self.ask(Mark)` 실패 시 롤백으로 `self.ask(Release)`를 재사용한다. 그런데 `ask()`는 ① 진입 시 `if self.worker_failed() { return Err(EventError::Closing); }`로 즉시 반환하고, ② 전송 루프 `for output in &self.events`에서 첫 `output.send(...)` 실패 시 `?`로 즉시 반환한다. 따라서 이벤트 출력이 2개 이상(`io_threads > 1` 등)일 때 한 IO 스레드가 패닉(`worker_failed = true`)하거나 앞선 출력의 수신단이 닫히면, 이미 보호에 성공한 다른 살아 있는 출력으로 `Release`가 전송되지 않는다. 또한 `self.ask(Mark)` 전송 루프 도중 `events[1].send`가 실패하면 `events[0]`에 이미 보낸 `Mark` 요청의 처리를 기다리지 않고 반환한다.
   2. **오류 우선순위(`worse`) 역전:** API §22.9와 `worse()`는 여러 출력의 응답이 다를 때 `Failed(3) > Closing(2) > Quota(1)` 순으로 반환하도록 정의한다. 그러나 `ask()`의 수신 루프(`mod.rs:1164-1167`)는 `Ok(Err(error)) => result = worse(result, error)`로 누적해 놓고도, 다음 출력에서 `Err(RecvTimeoutError::Disconnected)`가 나오면 `result`를 무시하고 곧바로 `return Err(EventError::Closing)`을 실행한다(타임아웃은 `Failed`라 최고 순위지만 `Disconnected`는 `Closing`이라 이미 받은 `Failed`를 덮어쓴다).
@@ -109,7 +109,7 @@
 
 - **판정:** 수용.
 - **처리:** `ask_all`은 전송 실패에서 중단하지 않고 성공한 전송 수만큼 응답을 수거한다. mark 실패 뒤 rollback은 worker 실패 flag와 무관하게 `ask_all(Release)`를 호출한다. timeout/disconnect도 `worse`로 누적해 `Failed > Closing > Quota`를 유지한다. `drain_failed` 진입 시 모든 `target.marks`를 버려 대기 reply를 즉시 끊는다.
-- **검증:** 실제 Logger+모의 출력의 끊긴 첫 출력/worker 실패 rollback·Failed 뒤 Disconnected 시험 3건은 수정 전 모두 Red → Green. 실제 IO target+라우팅 guard의 queued reply 해제 시험은 수정 생략 변이로 Red 확인. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
+- **검증:** 실제 Logger+모의 출력의 끊긴 첫 출력/worker 실패 rollback·Failed 뒤 Disconnected 시험 3건은 수정 전 모두 Red → Green. 실제 IO target+라우팅 guard의 queued reply 해제 시험은 수정 생략 변이로 Red 확인. [EV-082](../verification_evidence.md#ev-082), 소스 `3e6dcb5`.
 
 ---
 
@@ -133,7 +133,7 @@
 
 - **판정:** 수용.
 - **처리:** `Marks::mark` 시작에 만료 정리를 넣었다. `io_loop`는 주기 만료를 배치 쓰기 앞으로 옮기고 해당 turn 시작 시각을 공유해 시계 역전을 피한다. 요청 처리의 fresh clock은 유지한다.
-- **검증:** `tc_013_facade::f37`은 주기 sync(60초) 전에 만료된 1초 hold의 quota 재사용을 확인한다. host 시험은 1-record segment·2-file 한도·실제 라우팅 guard에서 만료된 보호가 회전을 막지 않는지 확인한다. 각 수정 생략 변이는 Quota/실패 record 1건으로 Red, 원복 후 Green. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
+- **검증:** `tc_013_facade::f37`은 주기 sync(60초) 전에 만료된 1초 hold의 quota 재사용을 확인한다. host 시험은 1-record segment·2-file 한도·실제 라우팅 guard에서 만료된 보호가 회전을 막지 않는지 확인한다. 각 수정 생략 변이는 Quota/실패 record 1건으로 Red, 원복 후 Green. [EV-082](../verification_evidence.md#ev-082), 소스 `3e6dcb5`.
 
 ---
 
@@ -141,7 +141,7 @@
 
 #### [리뷰어]
 
-- **위치:** [standard.rs:226-263](https://github.com/lim8603/dot-logger/blob/04bf3aa/crates/dot-logger/src/storage/standard.rs#L226-L263) (`04bf3aa`).
+- **위치:** [standard.rs:226-263](https://github.com/lim8603/dot-logger/blob/3cbd1b2/crates/dot-logger/src/storage/standard.rs#L226-L263) (`3cbd1b2`).
 - **원인:**
   1. `standard::export`는 입력 MCAP의 `dot_logger.Envelope` 스키마와 사용자 페이로드 descriptor 스키마를 동일한 `schemas: HashMap<u16, (String, String, Vec<u8>)>`에 저장한다. `Record::Channel(c)`에서 `payload_schema_file_id`를 조회할 때 `id == c.schema_id`이거나 조회된 스키마 이름이 `dot_logger.Envelope`(`ENVELOPE_SCHEMA`)인 경우를 걸러내지 않으며, `payload_schema_name`이 빈 문자열(`""`)이거나 `payload_schema_file_id` 없이 단독으로 존재하는 경우도 검사하지 않는다(`recovery.rs:545-558`은 이를 엄격히 거절함).
   2. 동일 `c.id`의 `Record::Channel`이 Summary 섹션 등에서 다시 등장할 때 `known.topic != c.topic`만 검사하고 `c.schema_id`, `c.message_encoding`, `c.metadata`가 첫 선언과 같은지 확인하지 않는다(`Record::Schema`는 재등장 시 `(name, encoding, data)` 전체 일치를 검사하는 것과 비대칭).
@@ -158,7 +158,7 @@
 
 - **판정:** 수용.
 - **처리:** payload descriptor가 채널 Envelope 스키마 자신 또는 다른 Envelope 스키마를 가리키는 경우를 거절한다. 유효 이름도 Envelope/빈 문자열은 거절하고 descriptor id 없는 이름도 거절한다. `Mapped.input`에 첫 Channel 전체를 보관해 재등장 시 id/schema/topic/encoding/metadata 전부 일치해야 한다.
-- **검증:** f16(자기참조·다른 Envelope·빈 이름·단독 이름·Envelope alias 5조건)·f17(채널 필드별 불일치 5조건)을 추가해 시험 함수 단위로 수정 전 Red → Green을 확인했다. 실제 CLI는 summary 채널 불일치를 exit 4 `invalid_data`로 보고하고 새 출력을 삭제한다. 정상 descriptor/schemaless·summary 반복은 기존 f1·f9·CLI 왕복이 검증한다. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
+- **검증:** f16(자기참조·다른 Envelope·빈 이름·단독 이름·Envelope alias 5조건)·f17(채널 필드별 불일치 5조건)을 추가해 시험 함수 단위로 수정 전 Red → Green을 확인했다. 실제 CLI는 summary 채널 불일치를 exit 4 `invalid_data`로 보고하고 새 출력을 삭제한다. 정상 descriptor/schemaless·summary 반복은 기존 f1·f9·CLI 왕복이 검증한다. [EV-082](../verification_evidence.md#ev-082), 소스 `3e6dcb5`.
 
 ---
 
@@ -169,16 +169,16 @@
 - **위치:**
   - [retention.rs:313-321](../../../crates/dot-logger/src/storage/retention.rs#L313-L321)
   - [writer.rs:362-370](../../../crates/dot-logger/src/storage/writer.rs#L362-L370)
-  - [standard.rs:106-123, 153-160](https://github.com/lim8603/dot-logger/blob/949a74e/crates/dot-logger/src/storage/standard.rs#L106-L160)
+  - [standard.rs:106-123, 153-160](https://github.com/lim8603/dot-logger/blob/fa72a1a/crates/dot-logger/src/storage/standard.rs#L106-L160)
 - **내용:**
-  1. `04bf3aa`에서 `PayloadSchema::name: Option<String>`을 추가하면서 `SegmentWriter::new`(`writer.rs:369`)에는 `s.name = s.name.take().map(|n| n.into_boxed_str().into_string());`를 넣어 `String`의 초과 capacity가 output 메모리 예산을 넘지 않도록 축소했으나, 같은 역할을 하는 `SegmentLog::new`(`retention.rs:313-321`)에는 `schema.name` 축소가 빠졌다.
+  1. `3cbd1b2`에서 `PayloadSchema::name: Option<String>`을 추가하면서 `SegmentWriter::new`(`writer.rs:369`)에는 `s.name = s.name.take().map(|n| n.into_boxed_str().into_string());`를 넣어 `String`의 초과 capacity가 output 메모리 예산을 넘지 않도록 축소했으나, 같은 역할을 하는 `SegmentLog::new`(`retention.rs:313-321`)에는 `schema.name` 축소가 빠졌다.
   2. `standard::export`는 첫 `Record::Header`를 읽은 직후 `output: W`에 MCAP Magic·Header·`_dot_logger/meta` 채널을 기록한다. 따라서 `ExportError::Cancelled`뿐 아니라 이후 레코드에서 `NotDotLogger`·`TopicConflict`·`RecordTooLarge`·`InvalidRecord`가 반환될 때도 `output`에는 이미 바이트가 쓰여 있다. 현재는 `ExportError::Cancelled`에만 "the output is incomplete and must be discarded"라고 적혀 있으므로, `export` 함수 또는 `ExportError` 문서에 모든 `Err` 반환 시 `output`을 폐기해야 함을 명시하는 것이 명확하다(참고로 다수의 작은 `Schema`/`Channel` 레코드 반복 시 `schemas`/`channels` 맵 엔트리 수 상한 여부도 향후 필요 시 검토).
 
 #### [처리담당]
 
 - **판정:** 수용.
 - **처리:** `SegmentLog::new`의 `schema.name`을 `into_boxed_str().into_string()`으로 정리해 기존 `SegmentWriter::new`와 일치시켰다. `standard::export` rustdoc/API §21.2에 모든 `Err`에서 출력 폐기, 개별 record/chunk 상한과 누적 schema/channel map 한계의 차이를 명시했다.
-- **검증:** 두 생성자의 정규화 코드 대조, 전체 저장/보존·facade 회귀, rustdoc 검사. 누적 metadata 총량의 새 API/예산 정책은 이번 결함 조치에 추가하지 않았다. [EV-082](../verification_evidence.md#ev-082), 소스 `5d7fe6a`.
+- **검증:** 두 생성자의 정규화 코드 대조, 전체 저장/보존·facade 회귀, rustdoc 검사. 누적 metadata 총량의 새 API/예산 정책은 이번 결함 조치에 추가하지 않았다. [EV-082](../verification_evidence.md#ev-082), 소스 `3e6dcb5`.
 
 ---
 
@@ -202,12 +202,12 @@
 
 ### 중점 ①~⑥ 검토 요약
 
-1. **① `949a74e` 이벤트 보존:** Logger→IO thread 전용 채널과 IO loop `try_recv`, `at.min(now)` 단조 시계, `4 × sync_every + 1 s` 응답 기한(`overdue`), `held_bytes` 메모리 사이징(`f36` 1바이트 오차 검증), `protected_bytes + 2 × segment <= ring` 검증은 정확하다. 다만 다중 출력 롤백·오류 우선순위·IO 패닉 시 `target.marks` 정리(`RV-137`, P2)와 `mark`/`write_batch` 전 만료 정리 순서(`RV-138`, P2)에 보완이 필요하다.
-2. **② `561f2c3`·`340c19c` 중요도·최소 level:** `Channel<T>`에 `importance: Option<Importance>` 추가 후 `Copy`·무할당이 유지되고 RT 할당 시험(`f2`, `Channel::important()`)이 통과한다. `ByLevel` 매핑 경계, `important_slots >= small_slots` 거절, `with_raw` 호출 순서 무관성, `self.writers`만 검사해 `tracing` 내부 writer를 제외한 `PlanWarning::NoImportantReserve`, `ChannelOptions::minimum`의 `Logged::Skipped` RT 경로 모두 결함이 없다.
-3. **③ `4158f08` ring `2 × segment` 하한:** `segment = (r.bytes / 8).clamp(floor, SEGMENT_CEILING.max(floor))` 및 `ring_minimum = segment.saturating_mul(2)`로 15 MiB 거절 / 16 MiB 통과 경계값이 정확하며, `Continuous` 모드에는 영향을 주지 않고 `preset`/`calibrate`와도 충돌하지 않는다.
-4. **④ `4bd6d04` client `diagnostics` 이동:** `dot_logger_client::diagnostics` 공개 모듈 제거 및 `examples/support/dot_probe/` 이동이 깔끔하고, `#![allow(dead_code, unused_imports)]`는 `dot_probe.rs` 지원 모듈 내부에만 적용된다. `--no-default-features` 빌드도 통과해 `remote` feature 경계가 온전하다.
-5. **⑤ `04bf3aa` TASK-030 S1 표준 export:** 정상 파일 및 단순 파일 끝 잘림(`f1`~`f7`) 동작은 확인되었으나, 손상된 무압축 chunk에서의 `LinearReader` 언더플로 패닉·CLI 출력 파일 미삭제·미검증 chunk 부분 메시지 반출(`RV-136`, P1), 채널 메타데이터 자기참조·재등장 검증 공백(`RV-139`, P2), `SegmentLog::new`의 `schema.name` 축소 누락(`RV-140`, P3)을 발견했다.
-6. **⑥ 시험 커밋(`19e04d2`·`4559fc7`·`11f91a5`·`4158f08` 시험부):** `cli.rs`의 `ReplayAction::Speed` mock 변경(`Speed::new(3, 2)` 불일치 시 `InvalidInput` 반환)은 CLI가 실제로 인자를 전달했는지 검증을 강화한 것이며 계약을 가리지 않는다. 추가된 시험들의 결정성과 `/tmp` 임시 디렉터리 정리도 정상이다.
+1. **① `fa72a1a` 이벤트 보존:** Logger→IO thread 전용 채널과 IO loop `try_recv`, `at.min(now)` 단조 시계, `4 × sync_every + 1 s` 응답 기한(`overdue`), `held_bytes` 메모리 사이징(`f36` 1바이트 오차 검증), `protected_bytes + 2 × segment <= ring` 검증은 정확하다. 다만 다중 출력 롤백·오류 우선순위·IO 패닉 시 `target.marks` 정리(`RV-137`, P2)와 `mark`/`write_batch` 전 만료 정리 순서(`RV-138`, P2)에 보완이 필요하다.
+2. **② `a543432`·`67fa480` 중요도·최소 level:** `Channel<T>`에 `importance: Option<Importance>` 추가 후 `Copy`·무할당이 유지되고 RT 할당 시험(`f2`, `Channel::important()`)이 통과한다. `ByLevel` 매핑 경계, `important_slots >= small_slots` 거절, `with_raw` 호출 순서 무관성, `self.writers`만 검사해 `tracing` 내부 writer를 제외한 `PlanWarning::NoImportantReserve`, `ChannelOptions::minimum`의 `Logged::Skipped` RT 경로 모두 결함이 없다.
+3. **③ `17ebda6` ring `2 × segment` 하한:** `segment = (r.bytes / 8).clamp(floor, SEGMENT_CEILING.max(floor))` 및 `ring_minimum = segment.saturating_mul(2)`로 15 MiB 거절 / 16 MiB 통과 경계값이 정확하며, `Continuous` 모드에는 영향을 주지 않고 `preset`/`calibrate`와도 충돌하지 않는다.
+4. **④ `3a554ac` client `diagnostics` 이동:** `dot_logger_client::diagnostics` 공개 모듈 제거 및 `examples/support/dot_probe/` 이동이 깔끔하고, `#![allow(dead_code, unused_imports)]`는 `dot_probe.rs` 지원 모듈 내부에만 적용된다. `--no-default-features` 빌드도 통과해 `remote` feature 경계가 온전하다.
+5. **⑤ `3cbd1b2` TASK-030 S1 표준 export:** 정상 파일 및 단순 파일 끝 잘림(`f1`~`f7`) 동작은 확인되었으나, 손상된 무압축 chunk에서의 `LinearReader` 언더플로 패닉·CLI 출력 파일 미삭제·미검증 chunk 부분 메시지 반출(`RV-136`, P1), 채널 메타데이터 자기참조·재등장 검증 공백(`RV-139`, P2), `SegmentLog::new`의 `schema.name` 축소 누락(`RV-140`, P3)을 발견했다.
+6. **⑥ 시험 커밋(`783f2e3`·`8703459`·`ce0efcd`·`17ebda6` 시험부):** `cli.rs`의 `ReplayAction::Speed` mock 변경(`Speed::new(3, 2)` 불일치 시 `InvalidInput` 반환)은 CLI가 실제로 인자를 전달했는지 검증을 강화한 것이며 계약을 가리지 않는다. 추가된 시험들의 결정성과 `/tmp` 임시 디렉터리 정리도 정상이다.
 
 ### 다음 개발 세션 인계
 
@@ -217,7 +217,7 @@
 ## 6. 개발 조치 마감 — 2026-11-16
 
 - **처리 결과:** RV-136~140 전부 수용, `Open` → `In Progress` → `Resolved`(재현·수정·회귀 완료) → `Closed`(2026-10-31 구현·검증·리뷰 마감 위임에 따른 AI 수락). 최초 리뷰의 Conditional 판정과 리뷰어 원문은 당시 기록으로 보존한다.
-- **대상 소스:** `5d7fe6a`. 전체 근거 [EV-082](../verification_evidence.md#ev-082).
+- **대상 소스:** `3e6dcb5`. 전체 근거 [EV-082](../verification_evidence.md#ev-082).
 - **검증:** 1.96.0·MSRV 1.85.0 각각 workspace 639 Pass·0 Failed·5 ignored, 18 feature 구성·독립 consumer/RT allocator, clippy·strict rustdoc(core-only 포함)·fmt Pass. 표면 guard 자기 시험 18개와 NFR-008 guard 34/60 Pass. vendor full-package lib 131 Pass.
 - **파일 변경:** vendor reader·VENDORED/Cargo 주석, `storage/{standard,retention}.rs`, `logger/{mod,event,host,tests}.rs`, CLI `commands.rs`/통합 시험, `tc_013_facade`/`tc_014_standard`, API·ADR-010 결함 조치 보완·TC/EV·Task/목록·상태 문서. 세션 로그는 기존 ignore 규칙으로 로컬 보관한다.
 - **타입 변경:** 생성 `ExportCleanup`(실패 출력 Drop 정리); 수정 `Mapped`(첫 Channel 전체), `LinearReader`(경계/선검증)·`LinearReaderOptions`(기존 옵션 의미 문서), `Logger`(전체 출력 응답/rollback), `Marks`(보호 전 만료), `SegmentLog`(schema.name capacity 정리), 시험 `Temp`(host fixture 재사용 가시성). 공개 facade 항목 추가 없음.

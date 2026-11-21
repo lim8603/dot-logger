@@ -27,7 +27,7 @@
 
 TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-version = "1.85"`로 MSRV를 고정했다. Ubuntu 26.04.1 x86_64에서 Rust 1.85.0/1.96.0의 16가지 feature 조합·독립 consumer·clippy·개발 rustdoc/fmt를 확인했다([EV-001](../05_verification/verification_evidence.md)). `Cargo.lock`으로 patch/간접 의존성도 고정한다. 전역 rustup default는 변경하지 않고 프로젝트 toolchain으로 실행한다.
 
-MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. rustix는 RUSTSEC-2026-0486(xattr unsound, dot-logger 미사용 함수) 때문에 같은 계열 1.1.6으로 고정했다(2026-11-11 Human 「올려올려」, [EV-069](../05_verification/verification_evidence.md#ev-069)). 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 [목록](../06_evolution/imported_context/task_002_2026-10-26/dependencies.json)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
+MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. rustix는 RUSTSEC-2026-0486(xattr unsound, dot-logger 미사용 함수) 때문에 같은 계열 1.1.6으로 고정했다(2026-11-11 Human 「올려올려」, [EV-069](../05_verification/verification_evidence.md#ev-069)). 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 목록(비공개 원시 근거)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
 
 CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 [Pass](https://github.com/lim8603/dot-logger/actions/runs/40504484501)했다(2026-10-27, EV-001, GAP-004 Closed). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
 
@@ -44,7 +44,7 @@ CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 
 
 ## 조사 근거
 
-[2026-10-26 상세설계 조사](../06_evolution/imported_context/research_2026-10-26_detailed_design.md)와 [2026-10-25 초기 조사](../06_evolution/imported_context/research_2026-10-25_logging_telemetry.md)는 조사 당시의 사실·권고 기록이다. 현재 채택 여부의 기준은 이 표와 Accepted ADR이며, 조사에만 등장하는 OTel/기타 도구까지 채택하지 않는다.
+2026-10-26 상세설계 조사(비공개 원시 근거)와 2026-10-25 초기 조사(비공개 원시 근거)는 조사 당시의 사실·권고 기록이다. 현재 채택 여부의 기준은 이 표와 Accepted ADR이며, 조사에만 등장하는 OTel/기타 도구까지 채택하지 않는다.
 
 
 ## TASK-004 검증 도구 구체화 — 2026-10-27
@@ -53,7 +53,7 @@ ADR-009의 선택 검증 도구 중 Miri를 사용했다. 개발/MSRV pin은 그
 
 ## 현재 PC 검증 프로필 — 2026-10-31
 
-[ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)·[TASK-022](../04_implementation/tasks/TASK-022.md): Ubuntu26.04.1 LTS x86_64, Ryzen7 H255 8코어16스레드, OS 인식 메모리59,750,248,448B. 현재 실행7.0.0-42-generic(CONFIG_PREEMPT_RT 미설정), 설치7.0.0-38-realtime(CONFIG_PREEMPT_RT=y). 현재 PC 실측/UPS 시뮬레이션을 수락하며 일반/RT 실행을 별도로 기록한다. [환경 원문](../06_evolution/imported_context/verification_policy_2026-10-31/environment.json). 제품 기능·성능 시험은 이번 환경 조사에서 실행하지 않았다.
+[ADR-011](adrs/ADR-011_local_pc_simulated_ups_verification.md)·[TASK-022](../04_implementation/tasks/TASK-022.md): Ubuntu26.04.1 LTS x86_64, Ryzen7 H255 8코어16스레드, OS 인식 메모리59,750,248,448B. 현재 실행7.0.0-42-generic(CONFIG_PREEMPT_RT 미설정), 설치7.0.0-38-realtime(CONFIG_PREEMPT_RT=y). 현재 PC 실측/UPS 시뮬레이션을 수락하며 일반/RT 실행을 별도로 기록한다. 환경 원문(비공개 원시 근거). 제품 기능·성능 시험은 이번 환경 조사에서 실행하지 않았다.
 
 TASK-012(2026-10-31): 선택 remote에서 tonic/tls-ring을 활성화했다. 기존 lock의 package/version 집합은 유지하고 TLS dependency edge만 연결했다. host 소유 Tokio runtime·실제 TLS/read-manage 권한·bounded RPC는 EV-022 로컬 검증이며 core consumer의 네트워크 격리는 두 Rust16feature로 회귀했다. LAN 성능·native 공개 후 검증은 별도다.
 

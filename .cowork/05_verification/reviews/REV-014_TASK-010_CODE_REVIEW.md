@@ -3,7 +3,7 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-10-30 / AI ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md))
-- **대상:** TASK-010 조회·읽기 수명 구현 커밋 [`8bbec13`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs) (`crates/dot-logger/src/query/mod.rs`, `storage/catalog.rs`, `storage/retention.rs`, `storage/recovery.rs`, `storage/mod.rs`, `lib.rs`, `tests/tc_006_query.rs`, `tests/tc_005_retention.rs`, `tests/api-consumer/src/main.rs`, `tests/rt-allocation/src/tests.rs`)
+- **대상:** TASK-010 조회·읽기 수명 구현 커밋 [`4a54bcf`](file:///home/lim8603/src/dot-logger/crates/dot-logger/src/query/mod.rs) (`crates/dot-logger/src/query/mod.rs`, `storage/catalog.rs`, `storage/retention.rs`, `storage/recovery.rs`, `storage/mod.rs`, `lib.rs`, `tests/tc_006_query.rs`, `tests/tc_005_retention.rs`, `tests/api-consumer/src/main.rs`, `tests/rt-allocation/src/tests.rs`)
 - **종합 판정:** Pass (권고사항 P2 1건, P3 2건)
   - Safe Rust 100% (신규 `unsafe` 0건), RT 경로 오염 없음 (RT 제로 할당·무대기 불변식 유지)
   - 외부 파티션 사전 예약(`QueryBudget`), 유한 페이지/인라인/블롭 한도 관리, Reader-owned permit drop 순서 안전성 및 회전 추적 완결
@@ -62,7 +62,7 @@
 #### [처리담당]
 - 판정 결과: 수용 — 동일 Query 정렬 index 재사용
 - 처리 내용: `Snapshot::page`가 모든 Query 필드(Eq/PartialEq)가 같은 경우 기존 order를 재사용한다. 질의 변경 시 같은 사전 예약 버퍼에서 재구성하고 시작 전 캐시 무효화·정렬/생존 검사 완료 뒤 게시한다. cursor 위치/identity·결정적 tie·payload 재읽기/차감·취소/만료 검사는 유지한다. `sort_by_cached_key`는 추가 할당 여지가 있어 사용하지 않았고 기존 `sort_unstable_by_key`를 유지했다. 동일 질의 M개 페이지의 반복 scan/sort는 최초 1회로 줄며 실제 장비 성능은 미측정이다.
-- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 [검사 명령/소스·로그 hash](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/results.json). 2026-10-30 작업 트리(기준 HEAD `3eeaaa3`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
+- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 검사 명령/소스·로그 hash(비공개 원시 근거). 2026-10-30 작업 트리(기준 HEAD `89e33eb`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
 
 ---
 
@@ -90,7 +90,7 @@
 #### [처리담당]
 - 판정 결과: 수용 — 호환 유지·rustdoc 보강
 - 처리 내용: `Payload::Inline`과 `Page::inline`에 해당 Page에서 얻은 record만 전달하도록 명시했다. offset은 파일 위치가 아니며 Page 사이 재사용 불가, 범위 검사는 하지만 Page identity는 검사하지 않음을 설명한다. 공개 필드 비공개화는 도입하지 않았다.
-- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 [검사 명령/소스·로그 hash](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/results.json). 2026-10-30 작업 트리(기준 HEAD `3eeaaa3`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
+- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 검사 명령/소스·로그 hash(비공개 원시 근거). 2026-10-30 작업 트리(기준 HEAD `89e33eb`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
 
 ---
 
@@ -113,7 +113,7 @@
 #### [처리담당]
 - 판정 결과: 수용 — 누적 예산 rustdoc 보강
 - 처리 내용: `QueryConfig::read_bytes`에 모든 source safe_offset 합계의 초기 scan 차감과 이후 inline/blob 재읽기 합계가 필요함을 명시했다. prefix만 예약하면 payload 재읽기 여유가 없고 반복 호출도 다시 차감됨을 안내한다. API §14.1도 동기화했다.
-- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 [검사 명령/소스·로그 hash](../../06_evolution/imported_context/task_010_review_fixes_2026-10-30/results.json). 2026-10-30 작업 트리(기준 HEAD `3eeaaa3`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
+- 검증 근거: [EV-017](../verification_evidence.md#ev-017) 및 검사 명령/소스·로그 hash(비공개 원시 근거). 2026-10-30 작업 트리(기준 HEAD `89e33eb`), 미커밋. interleaved cursor 회귀는 리팩토링 전후 동일 결과를 확인했다.
 
 
 ## 개발 세션 검증 요약 — 2026-10-30

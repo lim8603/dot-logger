@@ -99,12 +99,12 @@ TASK-035 S2의 C 로컬 단위를 구현·검증·위임 수락했다([EV-085](.
 
 ## REV-059 후속 — 2026-11-17
 
-RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Closed, [EV-086](../../05_verification/verification_evidence.md#ev-086), 제품 `8b59aa6`). 복구 완전 prefix·손실 관측/차분·종료 watermark·초기 등록 검증을 보강했고 두 Rust 각672 Pass·5 ignored, Miri7·RT20 Pass다. A/B/C 로컬 완료와 Task 전체 In Progress를 유지한다. 다음 D TASK-034 runtime 통합 → E GUI/호출 비용·최종 통합/커버리지 판정이다.
+RV-149~152 조치·자가검토·위임 마감([REV-059](../../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) Closed, [EV-086](../../05_verification/verification_evidence.md#ev-086), 제품 `ca89b69`). 복구 완전 prefix·손실 관측/차분·종료 watermark·초기 등록 검증을 보강했고 두 Rust 각672 Pass·5 ignored, Miri7·RT20 Pass다. A/B/C 로컬 완료와 Task 전체 In Progress를 유지한다. 다음 D TASK-034 runtime 통합 → E GUI/호출 비용·최종 통합/커버리지 판정이다.
 
 
 ## D facade runtime 통합 — 2026-11-18
 
-현재 B/C 저장 계약을 소비하는 facade runtime을 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). 로컬/원격 설정 전후 파일 revision·세션 누적 손실·쉬는 writer ack 및 두 Rust 각684 Pass·5 ignored를 확인했다. D 로컬 검증·위임 마감(제품 `874c27c`, REV-060 Closed) 뒤 E GUI/호출 비용·통합/최종 커버리지·UC 판정으로 진행한다. Task 전체 In Progress와 native/장기/실앱 이월은 유지한다.
+현재 B/C 저장 계약을 소비하는 facade runtime을 통합했다([EV-087](../../05_verification/verification_evidence.md#ev-087), [REV-060](../../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md)). 로컬/원격 설정 전후 파일 revision·세션 누적 손실·쉬는 writer ack 및 두 Rust 각684 Pass·5 ignored를 확인했다. D 로컬 검증·위임 마감(제품 `3254b81`, REV-060 Closed) 뒤 E GUI/호출 비용·통합/최종 커버리지·UC 판정으로 진행한다. Task 전체 In Progress와 native/장기/실앱 이월은 유지한다.
 
 ## E 최종 수락 — 2026-11-18
 

@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/리뷰어: 2026-10-30 / AI, [code-review 스킬](../../../.agents/skills/code-review/SKILL.md).
-- 대상: `71b3e2c` 이후 TASK-008 구현, 로컬 소스 commit `7388145`(source49개·최종 hash/검증은 EV-012).
+- 대상: `c932ee4` 이후 TASK-008 구현, 로컬 소스 commit `e6669ac`(source49개·최종 hash/검증은 EV-012).
 - 판정: Conditional — 로컬 통합15개·두 Rust 각16 features/consumer/예제/lint/doc/fmt/allocator8·Miri776 Pass, Human 최종 구현 리뷰/native·장비 잔여.
 - 상태: Closed — 2026-10-31 Human 최종 구현 승인 (EV-012/013)
 
@@ -36,9 +36,9 @@ unlink와 directory sync는 서로 다른 관측이다. sync 실패 시 durable 
 
 ## 최종 검증
 
-[EV-012](../verification_evidence.md#ev-012)·[source49개/명령/로그 hash](../../06_evolution/imported_context/task_008_2026-10-30/results.json)를 확인했다. `97 tests × 8 seeds = 776` Miri 실행 모두 Pass이며 실제 파일 통합1개는 Miri 범위 밖의 일반 Linux 실행이다. 소스/manifest/lock 49개와 최종 검사10개의 source hash가 일치한다. 현재 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 최종 구현 Human 승인 전이므로 Closed로 승격하지 않는다.
+[EV-012](../verification_evidence.md#ev-012)·source49개/명령/로그 hash(비공개 원시 근거)를 확인했다. `97 tests × 8 seeds = 776` Miri 실행 모두 Pass이며 실제 파일 통합1개는 Miri 범위 밖의 일반 Linux 실행이다. 소스/manifest/lock 49개와 최종 검사10개의 source hash가 일치한다. 현재 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 최종 구현 Human 승인 전이므로 Closed로 승격하지 않는다.
 
-2026-10-30 로컬 커밋 `7388145`는 EV-012 source49개와 일치한다. 커밋·세션 종료 요청을 최종 구현 승인으로 확대하지 않으며 Resolved를 유지한다. 푸시는 수행하지 않았다.
+2026-10-30 로컬 커밋 `e6669ac`는 EV-012 source49개와 일치한다. 커밋·세션 종료 요청을 최종 구현 승인으로 확대하지 않으며 Resolved를 유지한다. 푸시는 수행하지 않았다.
 
 ## Human 최종 구현 승인 — 2026-10-31
 

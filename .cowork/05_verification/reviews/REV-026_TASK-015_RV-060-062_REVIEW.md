@@ -3,8 +3,8 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-11-01 / AI 리뷰 전용 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
-- **성격:** 독립 Read-Only 코드리뷰. 이전 독립 리뷰([REV-025](REV-025_TASK-014-015_INDEPENDENT_REVIEW.md))에서 도출된 지적사항(RV-060, RV-061, RV-062)의 조치 커밋(`eaf736c`) 및 현재 HEAD 형상(`5a2a776`)에 대한 안전성, 계약 정합성, RT 제약 준수 여부를 검증한다. 제품 코드는 수정하지 않았다.
-- **대상 형상:** 커밋 `eaf736c` (diff 기준 `a247d01..eaf736c`), 제품 및 테스트 코드 8개 파일 (+684/−36).
+- **성격:** 독립 Read-Only 코드리뷰. 이전 독립 리뷰([REV-025](REV-025_TASK-014-015_INDEPENDENT_REVIEW.md))에서 도출된 지적사항(RV-060, RV-061, RV-062)의 조치 커밋(`9fecaae`) 및 현재 HEAD 형상(`cb64767`)에 대한 안전성, 계약 정합성, RT 제약 준수 여부를 검증한다. 제품 코드는 수정하지 않았다.
+- **대상 형상:** 커밋 `9fecaae` (diff 기준 `95a63a6..9fecaae`), 제품 및 테스트 코드 8개 파일 (+684/−36).
   - [capture/mod.rs](../../../crates/dot-logger/src/capture/mod.rs): 카운터 기록 시 거절 에러 범주별 위임(`counter.reject`)
   - [telemetry/counters.rs](../../../crates/dot-logger/src/telemetry/counters.rs): `CaptureCounts` 6개 범주 필드 추가, `CounterCell` 9슬롯 확장(128B 정렬 유지), 단일 relaxed 카테고리 갱신 및 관리 합산, `Bank::reset`의 `clear_poison()`
   - [telemetry/mod.rs](../../../crates/dot-logger/src/telemetry/mod.rs): `history_len`의 `Observation<usize>` 반환 및 poison 복구 단위 테스트

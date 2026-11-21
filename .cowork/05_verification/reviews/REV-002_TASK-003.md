@@ -2,7 +2,7 @@
 
 ## 1. 리뷰 개요
 * **일자 / 리뷰어:** 2026-10-27 / AI 요약보고 및 Human 승인
-* **대상 Task / 기준 커밋:** [TASK-003](../04_implementation/tasks/TASK-003.md) / commit `ebb3819` ([EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기))
+* **대상 Task / 기준 커밋:** [TASK-003](../04_implementation/tasks/TASK-003.md) / commit `3cab15f` ([EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기))
 * **종합 판정:** Pass (결함 없음)
 * **진행 상태:** Closed (Human 구현 리뷰 승인 및 native CI 7개 작업 Pass 완료)
 
@@ -29,4 +29,4 @@
 #### [처리담당 / 승인 (2026-10-27 #002)]
 * **판정 결과:** 수용 (Pass — Human 리뷰 승인)
 * **처리 내용:** 소형 수집 통합 테스트 16개, compile-fail 4개, allocator guard 통과. Human 승인 후 원격 게시.
-* **검증 근거:** [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기), [native CI run 40512793054](https://github.com/lim8603/dot-logger/actions/runs/40512793054) 7개 작업 성공, commit `39f9c72` / `98580cb`.
+* **검증 근거:** [EV-002](../05_verification/verification_evidence.md#ev-002--task-003-소형-수집예약일반-대기), [native CI run 40512793054](https://github.com/lim8603/dot-logger/actions/runs/40512793054) 7개 작업 성공, commit `8f8d2dc` / `d5759c2`.

@@ -3,7 +3,7 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-10-31 / AI ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md))
-- **대상:** TASK-012 원격 어댑터(gRPC/ACK/관리) 구현 및 프로젝트 전체 형상 (커밋 [`5f0ad83`](../../../crates/dot-logger/src/adapters/remote/mod.rs) 기준)
+- **대상:** TASK-012 원격 어댑터(gRPC/ACK/관리) 구현 및 프로젝트 전체 형상 (커밋 [`d63fdea`](../../../crates/dot-logger/src/adapters/remote/mod.rs) 기준)
   - `crates/dot-logger/src/adapters/remote/` (`mod.rs`, `types.rs`, `hub.rs`, `receiver.rs`, `server.rs`, `wire.rs`, `tests.rs`)
   - `crates/dot-logger/proto/logger.proto`
   - `crates/dot-logger/tests/tc_007_remote.rs`
@@ -143,7 +143,7 @@
 
 ## 6. 조치·검증 및 위임에 따른 마감 — 2026-10-31 #007
 
-Human 「승인」으로 기존 TASK-012 로컬 구현을 수락하고 「모든 권한을 위임」하여 추가 조치의 검증·수락/마감 판단과 TASK-013 착수를 맡겼다. 이번 조치는 [EV-023](../verification_evidence.md#ev-023)·소스 `4f79119`로 검증 후 AI가 수락했다. 상태 이력은 Open → In Progress(#006 반입) → Resolved(조치/검증) → Closed(위임된 마감)다. 앞선 “미수정/구현 대기”는 #006 당시 상태다.
+Human 「승인」으로 기존 TASK-012 로컬 구현을 수락하고 「모든 권한을 위임」하여 추가 조치의 검증·수락/마감 판단과 TASK-013 착수를 맡겼다. 이번 조치는 [EV-023](../verification_evidence.md#ev-023)·소스 `ca1694a`로 검증 후 AI가 수락했다. 상태 이력은 Open → In Progress(#006 반입) → Resolved(조치/검증) → Closed(위임된 마감)다. 앞선 “미수정/구현 대기”는 #006 당시 상태다.
 
 | 항목 | 실제 조치 | 검증 | 결과 |
 |---|---|---|---|

@@ -6,7 +6,7 @@
 - 대상: core 고정 host File/Routed dispatch·source 검증, client SnapshotCheck/공유 bridge·실행 예제, 기존/신규 CLI 및 통합 시험.
 - 기준: [code-review 스킬](../../../.agents/skills/code-review/SKILL.md)·API §15.7·TC-010·coding convention.
 - 상태/판정: Closed / Pass(로컬 기능 범위). Open → In Progress → Resolved → Closed를 이번 개발 및 기존 위임 수락으로 처리했다. 전체 제품/실앱/성능 수락을 뜻하지 않는다.
-- 근거: [EV-035](../verification_evidence.md#ev-035)·[형상/명령/원문](../../06_evolution/imported_context/task_017_host_2026-11-01/results.json). 초기 검사와 RV-070 이후 최종 검사를 분리 기록한다.
+- 근거: [EV-035](../verification_evidence.md#ev-035)·형상/명령/원문(비공개 원시 근거). 초기 검사와 RV-070 이후 최종 검사를 분리 기록한다.
 
 ## 요약표
 

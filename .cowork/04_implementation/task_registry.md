@@ -8,7 +8,7 @@
 - 2026-10-28 Human: CI 차단 원인은 사용량 전량 소진, 재확인 불필요. TASK-005 착수 지시를 TASK-004 native CI 후속 검증 상태의 개발 진행 예외로 반영한다. TASK-004/GAP-004 검증 상태는 유지한다.
 - TASK-006도 2026-10-28 Human 「다음 진행하자」로 착수. 선행 TASK-004/005 구현·로컬 Pass·Human 승인을 근거로 native 후속 검증 상태에서 개발을 진행했다. 완료/제어 EV-005 로컬 Pass·Human 리뷰 승인 이력은 보존한다. 최신 RV-001~005 수정은 EV-009 로컬 Pass·2026-10-29 Human 승인/native 대기다.
 - 2026-10-29 Human 「승인」으로 TASK-006 최신 수정분과 native 이월 상태의 TASK-007 진행을 승인했다. TASK-007은 RV-006~010 수정·EV-011 로컬 Pass, 당시 최신 구현 Human 리뷰/native 대기였다. 2026-10-30 최신 구현 Human 승인 완료, native는 잔여다.
-- 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 EV-013 소스14fd1a4/문서1f2f44d를 게시하고 TASK-009 후속 개발을 진행했다. TASK-008 최종 리뷰·native는 잔여이며 TASK-009는 별도 로컬 구현/EV-014·REV-011로 추적한다.
+- 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 EV-013 소스7102d93/문서bf3acf0를 게시하고 TASK-009 후속 개발을 진행했다. TASK-008 최종 리뷰·native는 잔여이며 TASK-009는 별도 로컬 구현/EV-014·REV-011로 추적한다.
 - 모든 Build Task는 TASK-001의 Gate 3와 관련 ADR/계약 합의가 선행한다. 의존 Task의 완료가 추가 진입 조건이다.
 - TDD: 해당 상세 문서의 실패 동작부터 Red → Green → Refactor. 구현/테스트/근거는 서로 별도 체크한다.
 - TASK-018은 FR-015 범위 승인이 추가로 필요하며 Must 완료의 필수 의존에 포함하지 않는다.
@@ -46,7 +46,7 @@
 | TASK-029 | 연결 레시피·문서·접점 회귀 가드 | MS-008 | INT-001 | US-001·003 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-027·TASK-028 | [상세](tasks/TASK-029.md) | 1~2 |
 | TASK-030 | MCAP 표준 호환(표준 도구 판독) | MS-009 | INT-001 | US-003·005 | AI | Done | 2026-11-18 | 표준 export·native A~E 완료(EV-077·082~088, REV-061 Closed). 다음 TASK-031 S1 | TASK-007·TASK-009·TASK-010·TASK-011·TASK-027 | [상세](tasks/TASK-030.md) | 4~6 |
 | TASK-031 | 원격 소비처 dot-logger-viewer와 시각화 bridge | MS-009 | INT-001 | US-003·004 | AI | Done | 2026-11-21 | S1~S3·T7 완료(EV-092~097·103~105), REV-063~068 Closed, 위임 수락. 다음 TASK-032 S1 | TASK-012·TASK-013·TASK-030 | [상세](tasks/TASK-031.md) | 2~3 |
-| TASK-032 | viewer 운영 대시보드 | MS-009 | INT-001 | US-004 | AI | Done | 2026-11-21 | S1~S3·REV-070 완료(ADR-016, `704d055`·`277de2d`·`6b736c9`, EV-107~109). 2026-11-21 Human 「승인」 수락 | TASK-031·TASK-016·TASK-017 | [상세](tasks/TASK-032.md) | 2~4 |
+| TASK-032 | viewer 운영 대시보드 | MS-009 | INT-001 | US-004 | AI | Done | 2026-11-21 | S1~S3·REV-070 완료(ADR-016, `c876395`·`97ece7f`·`007b25c`, EV-107~109). 2026-11-21 Human 「승인」 수락 | TASK-031·TASK-016·TASK-017 | [상세](tasks/TASK-032.md) | 2~4 |
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-11-18 | S1~S4 완료. E 수락 후 최종 커버리지와 UC 대응 기준 Pass(EV-089) | 없음 | [상세](tasks/TASK-033.md) | 3~5 |
 | TASK-034 | facade에 core 기능 노출(실행 중 level·샘플링, 이벤트 보존, 중요도) | MS-008 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-18 | S1 계약, S2 facade 기능, S3 API 표면·레시피와 E 완료(EV-088, REV-061 Closed) | TASK-027·TASK-029 | [상세](tasks/TASK-034.md) | 5~6 |
 | TASK-035 | 손실 기록의 파일 내 표시와 채널별 손실 수 | MS-009 | INT-001 | US-002·003·004 | AI | Done | 2026-11-18 | S1 형식, S2 손실·회전과 E 파일 판독·비용·최종 회귀 완료(EV-088, REV-061 Closed) | TASK-030 | [상세](tasks/TASK-035.md) | 3~4 |
@@ -59,11 +59,11 @@ TASK-008 EV-012 로컬 Pass: 보존 통합15개·두 Rust 각16 features/consume
 
 2026-10-31 TASK-013: [EV-025](../05_verification/verification_evidence.md#ev-025) source92개/검사15개·두 Rust각16feature·CLI10/transport7·Miri32 Pass, [REV-021](../05_verification/reviews/REV-021_TASK-013_CLIENT_CLI.md) RV-039~045 조치 및 위임된 AI 로컬 수락 완료다. native/실앱/성능 잔여 때문에 Task/MS 상태는 In Progress를 유지한다. 다음 TASK-014는 이번 요청으로 자동 착수하지 않았다.
 
-2026-10-31 TASK-014: [EV-027](../05_verification/verification_evidence.md#ev-027) source97개/검사14개·Miri56·소스d99ba3b와 [REV-023](../05_verification/reviews/REV-023_TASK-014_TELEMETRY.md) 위임 로컬 수락 완료. MS-005 In Progress, 비용≤5%/RT/PC/native/실앱·TASK-015~017은 후속이며 다음 후보 TASK-015는 미착수다.
+2026-10-31 TASK-014: [EV-027](../05_verification/verification_evidence.md#ev-027) source97개/검사14개·Miri56·소스3164f0d와 [REV-023](../05_verification/reviews/REV-023_TASK-014_TELEMETRY.md) 위임 로컬 수락 완료. MS-005 In Progress, 비용≤5%/RT/PC/native/실앱·TASK-015~017은 후속이며 다음 후보 TASK-015는 미착수다.
 
 2026-10-31 #011 종료: Human 「다음 세션에서 TASK-015 시작하자」로 다음 세션 착수 승인. TASK-015는 Planned/미착수 유지, 선행 TASK-008/014 로컬 수락 근거로 재개하고 native/실측·Gate4/5 미완료는 유지한다.
 
-2026-10-31 #012: TASK-015 리포트·용량 근거·분리된 버퍼/디스크/보존 계산을 EV-028 source100개/검사13개·Miri168·소스a247d01로 위임 로컬 수락했다. [REV-024](../05_verification/reviews/REV-024_TASK-015_REPORT.md) RV-056~059 Closed. 실제 PC/RT/native·실앱 검증과 TASK-016/017은 후속이다.
+2026-10-31 #012: TASK-015 리포트·용량 근거·분리된 버퍼/디스크/보존 계산을 EV-028 source100개/검사13개·Miri168·소스95a63a6로 위임 로컬 수락했다. [REV-024](../05_verification/reviews/REV-024_TASK-015_REPORT.md) RV-056~059 Closed. 실제 PC/RT/native·실앱 검증과 TASK-016/017은 후속이다.
 
 - 현재(2026-11-01 #008): TASK-017 고정 routed RunCheck·원 source·기존 CLI 권한/취소·실제 exporter host 실행은 EV-035/REV-033. 로컬 기능 구현 잔여 완료, 별도 통합/실측/native 수락 조건은 유지하여 In Progress다.
 

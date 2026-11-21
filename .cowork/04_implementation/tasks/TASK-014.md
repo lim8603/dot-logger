@@ -36,7 +36,7 @@
 - [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
 - [x] Human 착수 승인·기존 수락/마감 위임에 따른 AI 로컬 검증 수락(REV-023 Closed). 실제 비용/RT/native 시험의 수락은 별도다.
 
-테스트 정의: [TC-009](../../05_verification/test_case.md#tc-009). 제품 코드·테스트 실행 결과: [EV-027](../../05_verification/verification_evidence.md#ev-027), 소스d99ba3b. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
+테스트 정의: [TC-009](../../05_verification/test_case.md#tc-009). 제품 코드·테스트 실행 결과: [EV-027](../../05_verification/verification_evidence.md#ev-027), 소스3164f0d. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.
 
 ## 로컬 구현·위임 수락 — 2026-10-31 #011
 

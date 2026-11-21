@@ -3,10 +3,10 @@
 ## 1. 개요
 
 - **일자 / 리뷰어:** 2026-10-31 #013 / AI 리뷰 전용 세션 ([code-review 스킬](../../../.agents/skills/code-review/SKILL.md), [§1E](../../01_cowork_protocol/session_protocol.md#1e-리뷰-세션-및-코드리뷰-절차-review-session-protocol))
-- **성격:** 독립 Read-Only 리뷰. REV-023/024는 개발 세션 자가 점검이었다. 그래서 마지막 독립 리뷰(REV-022, 소스 `b3c08bd`) 이후의 제품 변경을 리뷰어 관점에서 다시 검토했다. 제품 코드는 수정하지 않았다.
-- **대상 형상:** 소스 `a247d01` (HEAD `d953e1d`는 문서 변경만 포함). `b3c08bd..a247d01` 제품 diff 16개 파일, +2139/−5.
-  - TASK-014 `d99ba3b`: [capture/mod.rs](../../../crates/dot-logger/src/capture/mod.rs) enable/reset/counter 호출 지점, [completion/mod.rs](../../../crates/dot-logger/src/completion/mod.rs) `target_totals`/`selected_totals`, [telemetry/mod.rs](../../../crates/dot-logger/src/telemetry/mod.rs)·[counters.rs](../../../crates/dot-logger/src/telemetry/counters.rs)·[aggregate.rs](../../../crates/dot-logger/src/telemetry/aggregate.rs)
-  - TASK-015 `a247d01`: [capacity.rs](../../../crates/dot-logger/src/telemetry/capacity.rs)·[report.rs](../../../crates/dot-logger/src/telemetry/report.rs), TC-009 시험·api-consumer·rt-allocation 추가분, README
+- **성격:** 독립 Read-Only 리뷰. REV-023/024는 개발 세션 자가 점검이었다. 그래서 마지막 독립 리뷰(REV-022, 소스 `eb39cb2`) 이후의 제품 변경을 리뷰어 관점에서 다시 검토했다. 제품 코드는 수정하지 않았다.
+- **대상 형상:** 소스 `95a63a6` (HEAD `2ae300a`는 문서 변경만 포함). `eb39cb2..95a63a6` 제품 diff 16개 파일, +2139/−5.
+  - TASK-014 `3164f0d`: [capture/mod.rs](../../../crates/dot-logger/src/capture/mod.rs) enable/reset/counter 호출 지점, [completion/mod.rs](../../../crates/dot-logger/src/completion/mod.rs) `target_totals`/`selected_totals`, [telemetry/mod.rs](../../../crates/dot-logger/src/telemetry/mod.rs)·[counters.rs](../../../crates/dot-logger/src/telemetry/counters.rs)·[aggregate.rs](../../../crates/dot-logger/src/telemetry/aggregate.rs)
+  - TASK-015 `95a63a6`: [capacity.rs](../../../crates/dot-logger/src/telemetry/capacity.rs)·[report.rs](../../../crates/dot-logger/src/telemetry/report.rs), TC-009 시험·api-consumer·rt-allocation 추가분, README
 - **정적 확인:** `cargo fmt --all --check` Pass. `cargo clippy --workspace --all-targets --all-features -- -D warnings` Pass. `cargo test --workspace --all-features` 전체 Pass. Miri는 EV-028과 소스가 같아 다시 실행하지 않았다. 아래 반례는 코드 정독과 기존 시험 대조로 도출했다. 실행 재현은 처리담당 Red 시험에 맡긴다.
 - **종합 판정:** Conditional (P2 1, P3 2). P1 없음. RT 할당·대기·unsafe 위반은 확인하지 못했다. 다만 리포트의 병목 진단 의미에 결함이 1건 있다.
 - **상태:** Closed — #014 EV-029/sourceeaf736c·검사14개/Miri224·commit blob101개 일치 후 기존 위임으로 로컬 수락. 최초 Conditional 판정은 발견 당시 이력이다.

@@ -1790,7 +1790,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ### EV-115 — TASK-036 S5 잠금 예열 회귀와 T3 세 번째 실행
 
-- **T3 세 번째 실행(run `44914448830`, `378c6ba` — macOS 할당 시험 3개 ignore 판):** contracts 6개(Linux·Windows·`macos-15` × 1.85.0·1.96.0, Linux 행의 새 외부 소비자 단계 포함), audit, integration-surface 모두 Pass. 세 OS 모두에서 contracts가 처음 통과했다. raw-memory는 세션 마감 시점에 실행 중이었다.
+- **T3 세 번째 실행(run `44914448830`, `378c6ba` — macOS 할당 시험 3개 ignore 판):** contracts 6개(Linux·Windows·`macos-15` × 1.85.0·1.96.0, Linux 행의 새 외부 소비자 단계 포함), audit, integration-surface 모두 Pass. 세 OS 모두에서 contracts가 처음 통과했다. raw-memory도 Pass(마감 직후 확인) — 이 실행의 9개 작업 전부 통과.
 - **S5 대상:** 작업 트리(`378c6ba` 위): `crate::sync::warm_mutex`로 core std `Mutex` 9개 생성 시 예열, 예약 회계 3곳에 `MUTEX_BYTES`(Apple 64, 그 밖 0), macOS ignore 3개 해제, 단위 시험 1개. 이 PC(Ubuntu 7.0.0-43-realtime, x86_64). AI 실행.
 - **로컬 회귀:** 두 Rust 각 **742 Pass, 실패 0, 5 ignored**. RT 할당 가드 19개 Pass(Linux는 `MUTEX_BYTES` 0이라 회계 변화 없음). Clippy `-D warnings`(Linux와 macOS·Windows 교차, 두 버전), 외부 소비자 두 버전, 통합 표면, audit, strict rustdoc, feature 조합(1.96.0 468초·1.85.0 550초), CI 범위 Miri(787초, 실패 0, 파싱된 결과 줄 57개에서 1,346 Pass·88 ignored). fmt는 `mod` 정렬 1건을 고친 뒤 통과.
 - **판정에 쓰는 범위:** Linux 로컬 회귀. macOS에서 예열이 첫 잠금 할당을 없애는지는 S5 푸시 뒤 CI의 macOS RT 할당 시험으로 판정한다(GAP-004).

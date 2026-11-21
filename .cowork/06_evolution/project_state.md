@@ -95,7 +95,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **CI 확인:** run `44919471193`(`a0fcfcf`)에서 macOS RT 할당 시험 3개가 ignore 없이 통과하는지 확인하고 GAP-004와 TASK-036 S5를 판정한다. 실패하면 macOS 할당 출처를 다시 본다. `378c6ba` run `44914448830`의 raw-memory 결과도 EV-115에 반영한다.
+0. **CI 확인:** run `44919471193`(`a0fcfcf`)에서 macOS RT 할당 시험 3개가 ignore 없이 통과하는지 확인하고 GAP-004와 TASK-036 S5를 판정한다. 실패하면 macOS 할당 출처를 다시 본다.
 0-1. **TASK-036 Human 수락 → v0.1.0 미리보기(MS-010 1단계):** 별칭 crate 이름·버전은 「권장대로」 확정. 남은 리뷰 포인트는 `^` 범위, 잠금 예열. 그다음 `CHANGELOG.md`·주석 태그·GitHub pre-release.
    - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.

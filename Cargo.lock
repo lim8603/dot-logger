@@ -291,6 +291,7 @@ name = "dot-logger"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "crc32fast",
  "log",
  "mcap",
  "prost",

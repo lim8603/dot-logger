@@ -997,26 +997,49 @@ pub(crate) fn chunk_data(body: &[u8]) -> Result<&[u8], RecoveryStop> {
     }
     Ok(f.0)
 }
-// IEEE CRC-32, also used by the pinned MCAP writer. A fixed table keeps large
-// management-path scans linear without a per-byte eight-step interpreter loop.
-const CRC_TABLE: [u32; 256] = {
-    let mut table = [0; 256];
-    let mut i = 0;
-    while i < 256 {
-        let mut crc = i as u32;
-        let mut bit = 0;
-        while bit < 8 {
-            crc = (crc >> 1) ^ (0xedb88320 & 0u32.wrapping_sub(crc & 1));
-            bit += 1;
+// IEEE CRC-32 over the raw (not yet inverted) state, as the pinned MCAP writer
+// computes it. crc32fast's combinable hasher takes and returns the inverted
+// form and selects the hardware path at run time (EV-105).
+pub(crate) fn crc_update(crc: u32, bytes: &[u8]) -> u32 {
+    let mut hasher = crc32fast::Hasher::new_with_initial(!crc);
+    hasher.update(bytes);
+    !hasher.finalize()
+}
+#[cfg(test)]
+mod crc_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::crc_update;
+    // Bitwise IEEE CRC-32 reference, independent of any table or SIMD path.
+    fn reference(mut crc: u32, bytes: &[u8]) -> u32 {
+        for byte in bytes {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                crc = (crc >> 1) ^ (0xedb8_8320 & 0u32.wrapping_sub(crc & 1));
+            }
         }
-        table[i] = crc;
-        i += 1;
+        crc
     }
-    table
-};
-pub(crate) fn crc_update(mut crc: u32, bytes: &[u8]) -> u32 {
-    for byte in bytes {
-        crc = (crc >> 8) ^ CRC_TABLE[usize::from(crc as u8 ^ byte)];
+    #[test]
+    fn incremental_crc_matches_the_bitwise_reference_for_every_split() {
+        let data: Vec<u8> = (0..4099u32)
+            .map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8)
+            .collect();
+        assert_eq!(!crc_update(!0, b"123456789"), 0xcbf4_3926);
+        for len in [0, 1, 7, 8, 15, 16, 63, 64, 65, 255, 1024, 4099] {
+            let whole = crc_update(!0, &data[..len]);
+            assert_eq!(whole, reference(!0, &data[..len]), "length {len}");
+            for split in [0, 1, len / 3, len / 2, len.saturating_sub(1), len] {
+                let (a, b) = data[..len].split_at(split.min(len));
+                assert_eq!(
+                    crc_update(crc_update(!0, a), b),
+                    whole,
+                    "{len} split {split}"
+                );
+            }
+        }
+        // Arbitrary intermediate states, not only the initial value.
+        for state in [0, 1, 0xffff_ffff, 0x1234_5678] {
+            assert_eq!(crc_update(state, &data), reference(state, &data));
+        }
     }
-    crc
 }

@@ -18,6 +18,7 @@ calibrate = ["dep:serde_json"]
 rtrb.workspace = true
 mcap.workspace = true
 prost.workspace = true
+crc32fast.workspace = true
 tonic = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }

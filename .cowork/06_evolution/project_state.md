@@ -10,16 +10,18 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | 없음 — TASK-032 Done(2026-11-21 Human 「승인」). 다음 [TASK-025](../04_implementation/tasks/TASK-025.md) 사용 문서·추적표·인수 정리 |
+| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1 문서 검토·S2 공개용 영어 README(`3b0044d`) Done. 다음 S3 `07_delivery` 작업 문서 |
 | 미처리 리뷰 | 없음 — REV-001~070 Closed. 최근 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치·수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / TASK-032 수락·MS-009 마감 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #003.** REV-069·070 마감, TASK-032 수락·MS-009 Done. 다음 TASK-025 |
+| 갱신 | 2026-11-21 / TASK-025 S1·S2 / AI |
+| 세션 상태 | **진행 — 2026-11-21 #003.** TASK-032 수락·MS-009 Done, TASK-025 S1·S2 Done. 다음 S3 |
 | 최근 완료 세션 | 2026-11-21 — TASK-032 S2·S3 독립 코드리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) |
 
 ## 현재 결정과 제약
+
+- **2026-11-21 Human 「영어 통일」·「README만, T2는 나중에」 — TASK-025 README:** GitHub 공개를 고려해 루트와 crate README 3개를 영어로 다시 썼다. 라이선스는 미정으로 두고 `.cowork` 내부 링크에 의존하지 않는다. T2(라이선스·공개 범위)는 실제 공개 전환을 요청할 때 진행한다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 
 - **2026-11-21 Human 「승인」 — TASK-032 수락·MS-009 마감:** 운영 대시보드(ADR-016, S1~S3)와 독립 리뷰 REV-070 조치(`6b736c9`, [EV-109](../05_verification/verification_evidence.md#ev-109))를 수락했다. MS-009의 소속 Task 네 개가 모두 Done이 되어 MS-009를 Done으로 마감했다. native(T3)·실사용처·장기 잔여는 MS-007 쪽에 유지하며 Gate 4·5는 Not Ready다. [MS-009](../04_implementation/milestones/MS-009.md#마감--2026-11-21)
 
@@ -77,7 +79,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
-| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-21 | 다음 작업. 선행 TASK-033·TASK-032 Done(MS-009 마감 2026-11-21) |
+| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | In Progress | 2026-11-21 | S1·S2 Done(영어 README, `3b0044d`). 다음 S3 07_delivery 작업 문서 → S4 추적표·Gate 4/5 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -103,7 +105,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-1. **TASK-025 인수 정리:** 선행 조건(TASK-033·TASK-032)이 모두 Done이고 MS-009도 2026-11-21에 마감됐다. 사용 문서(설치·통합·관측·조절·장애·보존 예제)와 실제 기능의 불일치를 점검하고 MS 추적표를 정리한다. 11월 16일 주 목표에 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다. [TASK-025](../04_implementation/tasks/TASK-025.md)
+1. **TASK-025 S3·S4:** S1 문서 검토(F1~F10)와 S2 공개용 영어 README(`0a153b5`·`3b0044d`)를 마쳤다. 다음은 S3 `07_delivery` 사용자 매뉴얼·운영서·릴리즈 노트 작업 문서, 그다음 S4 MS별 추적표와 Gate 4·5 판정이다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약

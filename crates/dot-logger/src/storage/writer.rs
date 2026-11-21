@@ -914,8 +914,10 @@ impl<W: SyncSink> SegmentWriter<W> {
             .saturating_add(62);
         // Use the maximum metadata width, so a possible split is counted even
         // when the actual pair would fit the current chunk.
-        let split = self.pending_records > 0
-            && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes;
+        // Same split rule as `append`: a record never joins an open loss chunk.
+        let split = self.pending_loss_parts > 0
+            || (self.pending_records > 0
+                && self.pending_bytes.saturating_add(bytes) > self.config.chunk_target_bytes);
         let new_pair = split
             || self
                 .channels

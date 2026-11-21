@@ -838,48 +838,51 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                 .await?;
             let limit = ctx.limit()?;
             let mut gaps = 0;
-            // Handoffs whose ACK the server has not confirmed yet (ADR-015).
-            let mut handed = 0;
-            while let Some(event) = stream.next(&ctx.cancel).await? {
-                match event {
-                    RemoteEvent::Gap { first, last } => {
-                        gaps += 1;
-                        out.emit("gap",json!({"first":first.to_string(),"last":last.to_string(),"reason":"overflow"}))?;
-                    }
-                    RemoteEvent::Record(record) => {
-                        let mut failure = None;
-                        let accepted = stream
-                            .handoff(
-                                record,
-                                |r, bytes| match emit_record(
-                                    out,
-                                    *r,
-                                    if include { Some(bytes) } else { None },
-                                    json!({"ack":"pending"}),
-                                ) {
-                                    Ok(()) => true,
-                                    Err(error) => {
-                                        failure = Some(error);
-                                        false
-                                    }
-                                },
-                                &ctx.cancel,
-                            )
-                            .await;
-                        if let Some(failure) = failure {
-                            return Err(failure);
+            // ACKs are pipelined (ADR-015): report what the server confirmed,
+            // also when the stream ends, times out or fails before the limit.
+            let result = async {
+                while let Some(event) = stream.next(&ctx.cancel).await? {
+                    match event {
+                        RemoteEvent::Gap { first, last } => {
+                            gaps += 1;
+                            out.emit("gap",json!({"first":first.to_string(),"last":last.to_string(),"reason":"overflow"}))?;
                         }
-                        accepted?;
-                        handed += 1;
-                        if out.records == limit {
-                            stream.flush(&ctx.cancel).await?;
-                            out.acknowledged += handed;
-                            return Ok(json!({"gaps":gaps,"stopped":"record_limit"}));
+                        RemoteEvent::Record(record) => {
+                            let mut failure = None;
+                            let accepted = stream
+                                .handoff(
+                                    record,
+                                    |r, bytes| match emit_record(
+                                        out,
+                                        *r,
+                                        if include { Some(bytes) } else { None },
+                                        json!({"ack":"pending"}),
+                                    ) {
+                                        Ok(()) => true,
+                                        Err(error) => {
+                                            failure = Some(error);
+                                            false
+                                        }
+                                    },
+                                    &ctx.cancel,
+                                )
+                                .await;
+                            if let Some(failure) = failure {
+                                return Err(failure);
+                            }
+                            accepted?;
+                            if out.records == limit {
+                                stream.flush(&ctx.cancel).await?;
+                                return Ok(json!({"gaps":gaps,"stopped":"record_limit"}));
+                            }
                         }
                     }
                 }
+                Err(Failure::Unknown)
             }
-            Err(Failure::Unknown)
+            .await;
+            out.acknowledged += usize::try_from(stream.acknowledged()).unwrap_or(usize::MAX);
+            result
         }
         _ => {
             let request = match (name, sub) {

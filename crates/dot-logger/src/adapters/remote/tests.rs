@@ -445,7 +445,13 @@ mod sockets {
     #[test]
     fn actual_grpc_batched_ack_settles_in_order_and_keeps_the_single_form() {
         runtime().block_on(async {
-            let (hub, inbox, addr, tx, task, b) = start(config(), limits()).await;
+            // The server allows wider windows than this subscription's two
+            // records; the batch bound is the subscription's own window (RV-163).
+            let wide = RemoteLimits {
+                subscription_records: 8,
+                ..limits()
+            };
+            let (hub, inbox, addr, tx, task, b) = start(config(), wide).await;
             let mut c = client(addr).await;
             let mut stream = subscribe(&mut c).await;
             let started = stream.message().await.unwrap().unwrap();

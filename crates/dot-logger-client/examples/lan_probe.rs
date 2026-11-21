@@ -147,7 +147,9 @@ async fn grpc_server(address: SocketAddr, bytes: usize, count: u64, identity: &P
     let limits = RemoteLimits {
         connections: 1,
         subscriptions: 1,
-        commands: 1,
+        // HTTP/2 allows commands + subscriptions streams per connection; four
+        // commands let the client's four concurrent ACK RPCs proceed (ADR-015).
+        commands: 4,
         message_bytes: (256 << 10) + 1024,
         record_bytes: bytes,
         subscription_records: records,
@@ -341,6 +343,9 @@ async fn grpc_receiver(
             "elapsed_s": start.elapsed().as_secs_f64(), "payload_bytes": bytes
         })
     );
+    if gaps != 0 {
+        return Err(format!("{gaps} records were lost to gaps").into());
+    }
     Ok(())
 }
 

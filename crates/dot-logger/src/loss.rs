@@ -140,6 +140,18 @@ pub struct LossRange {
     /// Registered counter rows of this session epoch.
     pub rows: u64,
 }
+impl LossRange {
+    // Per-part invariants of a part listing `listed` rows out of `parts`: a
+    // nonempty span within the registered rows, at most one listed row per
+    // covered row, and ROWS_PER_REPORT rows in every part but the last.
+    fn holds(self, listed: usize, parts: u32) -> bool {
+        self.end > 0
+            && self.end <= self.rows
+            && listed as u64 <= self.end
+            && (self.end == self.rows || listed == ROWS_PER_REPORT)
+            && u64::from(parts) == self.rows.div_ceil(ROWS_PER_REPORT as u64)
+    }
+}
 #[derive(Default)]
 struct Cell {
     count: AtomicU64,
@@ -402,8 +414,9 @@ impl Bank {
         })
     }
     /// One version-2 part from registered row `start`: the next nonzero or
-    /// overflowed rows, at most ROWS_PER_REPORT. Its range ends after the last
-    /// listed row when the part is full, otherwise at the registered rows.
+    /// overflowed rows, at most ROWS_PER_REPORT. A full part's range ends at the
+    /// next such row, so trailing zero rows never need a part of their own;
+    /// otherwise it ends at the registered rows.
     pub(crate) fn sparse(
         &self,
         target: u32,
@@ -417,11 +430,11 @@ impl Bank {
         let mut end = self.len();
         for index in start..self.len() {
             if self.written(index) {
-                counts.extend(self.get(index));
                 if counts.len() == ROWS_PER_REPORT {
-                    end = index + 1;
+                    end = index;
                     break;
                 }
+                counts.extend(self.get(index));
             }
         }
         LossReport {
@@ -580,10 +593,7 @@ impl LossReport {
         let range = match (r.version, r.rows, r.rows_end) {
             (1, None, None) => None,
             (2, Some(rows), Some(end))
-                if end > 0
-                    && end <= rows
-                    && r.counts.len() as u64 <= end
-                    && u64::from(r.parts) == rows.div_ceil(ROWS_PER_REPORT as u64) =>
+                if LossRange { end, rows }.holds(r.counts.len(), r.parts) =>
             {
                 Some(LossRange { end, rows })
             }
@@ -791,6 +801,7 @@ pub fn summarize(
             || r.counts.len() > ROWS_PER_REPORT
             || r.parts == 0
             || r.part >= r.parts
+            || r.range.is_some_and(|g| !g.holds(r.counts.len(), r.parts))
     }) {
         return Err(StorageError::CorruptData);
     }
@@ -849,7 +860,12 @@ pub fn summarize(
             Some(LossRange { rows, .. }) => {
                 let mut covered = 0;
                 groups[at..end].iter().enumerate().all(|(i, r)| {
-                    let next = r.range.filter(|g| g.rows == rows && g.end > covered);
+                    // A part lists distinct rows of the span it covers.
+                    let next = r.range.filter(|g| {
+                        g.rows == rows
+                            && g.end > covered
+                            && r.counts.len() as u64 <= g.end - covered
+                    });
                     covered = next.map_or(covered, |g| g.end);
                     same(i, r) && next.is_some()
                 }) && covered == rows
@@ -1300,13 +1316,17 @@ mod tests {
         assert_eq!(deltas.len(), 1);
         assert_eq!(deltas[0].counter.count, 2);
         assert_eq!(deltas[0].delta, Some(2));
-        // A part that stops before the registered rows proves nothing about omitted keys.
+        // A lone part that stops before the registered rows is not a shape the
+        // writer produces: only a full part may end early.
         baseline[0].range = Some(LossRange {
             end: bank.len() as u64 - 1,
             rows: bank.len() as u64,
         });
         let reports: Vec<_> = baseline.iter().chain(&observed).cloned().collect();
-        assert_eq!(summarize(&reports, 256).unwrap()[0].delta, None);
+        assert!(matches!(
+            summarize(&reports, 256),
+            Err(crate::storage::StorageError::CorruptData)
+        ));
         // Synthesized zero samples count against the caller's row bound.
         bank.ingress(0, None, Cause::InvalidInput);
         let fresh = Bank::new(42, 1, vec![7], vec![10]);
@@ -1324,6 +1344,67 @@ mod tests {
             deltas.iter().map(|d| d.delta).collect::<Vec<_>>(),
             [Some(2), Some(1)]
         );
+    }
+    // Mark the first `nonzero` registered rows; the bank needs trailing zero rows.
+    fn leading_rows(nonzero: usize) -> Bank {
+        let bank = Bank::new(42, 2, vec![7, 8], vec![10, 20]);
+        assert!(bank.len() > nonzero + 8);
+        for cell in &bank.cells[..nonzero] {
+            cell.count.store(1, Ordering::Relaxed);
+        }
+        bank
+    }
+    // RV-164: a part holding the 64th nonzero row also covers the zero rows up
+    // to the next nonzero row, so M nonzero rows use max(1, ceil(M / 64)) parts.
+    #[test]
+    fn full_sparse_parts_absorb_trailing_zero_rows() {
+        for (nonzero, expected) in [(63, 1), (64, 1), (65, 2), (128, 2)] {
+            let bank = leading_rows(nonzero);
+            let parts = sparse_checkpoint(&bank, 10, 1, Coverage::Observed);
+            assert_eq!(parts.len(), expected, "{nonzero} nonzero rows");
+            assert!(parts.iter().skip(1).all(|r| !r.counts.is_empty()));
+            assert_eq!(parts.last().unwrap().range.unwrap().end, bank.len() as u64);
+        }
+    }
+    // RV-164: only the final part may hold fewer than ROWS_PER_REPORT rows, and
+    // a part cannot list more rows than its range covers.
+    #[test]
+    fn sparse_part_width_and_non_final_row_count_are_verified() {
+        let bank = leading_rows(66);
+        let baseline = sparse_checkpoint(&bank, 10, 1, Coverage::Baseline);
+        assert_eq!(baseline.len(), 2);
+        assert_eq!(baseline[1].counts.len(), 2);
+        let mut short = baseline[0].clone();
+        short.counts.pop();
+        assert!(LossReport::decode(&report_to_bytes(&short)).is_err());
+        assert!(matches!(
+            summarize(&[short, baseline[1].clone()], 256),
+            Err(crate::storage::StorageError::CorruptData)
+        ));
+        // A row omitted by the baseline compares as zero only when its
+        // checkpoint is complete.
+        bank.cells[70].count.store(1, Ordering::Relaxed);
+        let observed = sparse_checkpoint(&bank, 10, 2, Coverage::Observed);
+        let key = counter_key(observed.last().unwrap().counts.last().unwrap());
+        let delta = |baseline: &[LossReport]| {
+            let reports: Vec<_> = baseline.iter().chain(&observed).cloned().collect();
+            summarize(&reports, 512)
+                .unwrap()
+                .into_iter()
+                .find(|d| counter_key(&d.counter) == key)
+                .unwrap()
+                .delta
+        };
+        assert_eq!(delta(&baseline), Some(1));
+        // A checkpoint missing its last part proves nothing about omitted keys.
+        assert_eq!(delta(&baseline[..1]), None);
+        // Part 1 now claims one registered row but lists two.
+        let mut narrow = baseline.clone();
+        narrow[0].range = Some(LossRange {
+            end: bank.len() as u64 - 1,
+            rows: bank.len() as u64,
+        });
+        assert_eq!(delta(&narrow), None);
     }
     #[test]
     fn registered_shape_and_memory_arithmetic_reject_impossible_counter_grids() {

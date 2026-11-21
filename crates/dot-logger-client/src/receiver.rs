@@ -25,6 +25,13 @@ pub struct ReceiverConfig {
 /// Old identities cannot match a new connection, even if server IDs are reused.
 #[derive(Clone)]
 pub struct ConnectionId(Arc<()>);
+#[cfg(all(test, feature = "remote"))]
+impl ConnectionId {
+    // A fresh identity with no receiver behind it, for transport unit tests.
+    pub(crate) fn detached() -> Self {
+        Self(Arc::new(()))
+    }
+}
 
 /// Verified record retaining its core permit and originating connection identity.
 /// Only [`ClientReceiver::handoff`] can produce its acknowledgement.

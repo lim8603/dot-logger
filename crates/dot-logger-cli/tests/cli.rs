@@ -2215,6 +2215,57 @@ fn remote_tail_reports_overflow_gaps_or_disconnects() {
     );
 }
 
+/// ACKs are pipelined (ADR-015): a tail that fails before its record limit
+/// still reports the handoffs the server already confirmed (RV-165).
+#[test]
+fn remote_tail_failure_reports_confirmed_acknowledgements() {
+    with_host(
+        |_| Err(dot_logger::adapters::remote::RemoteError::Unsupported),
+        |endpoint, hub| {
+            let mut child = command()
+                .args(["tail", "--json", "--endpoint", endpoint])
+                .args([
+                    "--record-bytes",
+                    "8",
+                    "--limit",
+                    "2",
+                    "--timeout-ms",
+                    "1000",
+                ])
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let mut ids = [0; 2];
+            let start = Instant::now();
+            while hub.subscriptions(&mut ids) == 0 {
+                assert!(start.elapsed() < Duration::from_secs(3), "no subscription");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            let first = hub
+                .offer(ids[0], remote_record(1, 1), &[9], false, 1)
+                .unwrap();
+            let start = Instant::now();
+            while first.state() != dot_logger::adapters::remote::AckState::Acknowledged {
+                assert!(start.elapsed() < Duration::from_secs(3), "first ACK");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            // No second record: the next wait times out before the limit.
+            let mut text = String::new();
+            BufReader::new(child.stdout.take().unwrap())
+                .read_to_string(&mut text)
+                .unwrap();
+            let status = child.wait().unwrap();
+            let rows = lines(text.as_bytes());
+            let last = rows.last().unwrap();
+            assert_eq!(status.code(), Some(3), "{text}");
+            assert_eq!(last["data"]["outcome"], "deadline", "{text}");
+            assert_eq!(records(&rows).len(), 1, "{text}");
+            assert_eq!(last["data"]["acknowledged"], 1, "{text}");
+            drop(first);
+        },
+    );
+}
+
 /// An unreachable host is a transport failure (exit 4). Nothing was posted,
 /// so no `posted_host_io` notice is added.
 #[test]

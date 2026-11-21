@@ -9,7 +9,7 @@ use std::{
     pin::Pin,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     task::{Context, Poll, Waker},
     time::{Duration, Instant},
@@ -480,6 +480,8 @@ impl RemoteClient {
             oldest: None,
             in_flight: std::collections::VecDeque::new(),
             batch: ACK_BATCH.min(limits.records),
+            lost: false,
+            confirmed: Arc::new(AtomicU64::new(0)),
         })
     }
 }
@@ -518,6 +520,10 @@ pub struct RemoteSubscription {
     oldest: Option<Instant>,
     in_flight: std::collections::VecDeque<AckRpc>,
     batch: usize,
+    // Sticky: some handed-off record's ACK failed or was never sent.
+    lost: bool,
+    // Records in ACK RPCs the server confirmed, counted by each RPC task.
+    confirmed: Arc<AtomicU64>,
 }
 impl Drop for RemoteSubscription {
     fn drop(&mut self) {
@@ -527,13 +533,16 @@ impl Drop for RemoteSubscription {
 impl RemoteSubscription {
     fn close(&mut self) {
         self.stream = None;
-        // Unsent ACKs are never claimed; the server settles them as Unknown.
+        // Unsent ACKs are never claimed; the server settles them as Unknown,
+        // and every later flush reports AcknowledgementUnknown.
+        self.lost |= !self.acks.is_empty();
         self.acks.clear();
         self.oldest = None;
         let _ = self.receiver.end_connection(&self.id);
     }
     // Any failed ACK RPC makes its records' outcome unknown and ends the stream.
     fn unknown(&mut self) -> ClientError {
+        self.lost = true;
         self.close();
         ClientError::AcknowledgementUnknown
     }
@@ -552,15 +561,18 @@ impl RemoteSubscription {
         }
         Ok(())
     }
-    // Wait for the oldest ACK RPC.
+    // Wait for the oldest ACK RPC. It stays queued until it finishes, so a
+    // dropped wait (a local `next` timeout) keeps it and its outcome.
     async fn settle_one(&mut self) -> Result<(), ClientError> {
-        if let Some(rpc) = self.in_flight.pop_front() {
-            match rpc.await {
-                Ok(Ok(())) => {}
-                _ => return Err(self.unknown()),
-            }
+        let Some(rpc) = self.in_flight.front_mut() else {
+            return Ok(());
+        };
+        let result = rpc.await;
+        self.in_flight.pop_front();
+        match result {
+            Ok(Ok(())) => Ok(()),
+            _ => Err(self.unknown()),
         }
-        Ok(())
     }
     // Send every queued ACK as one RPC, after making room in the bounded window.
     async fn send_acks(&mut self) -> Result<(), ClientError> {
@@ -574,12 +586,14 @@ impl RemoteSubscription {
         if self.state.closed.load(Ordering::Acquire) {
             return Err(self.unknown());
         }
+        let records = self.acks.len() as u64;
         let request = codec::acks(self.subscription, std::mem::take(&mut self.acks));
         self.oldest = None;
         let mut grpc = self.grpc.clone();
         let request = auth(request, &self.token, self.timeout);
         let timeout = self.timeout;
-        self.in_flight.push_back(tokio::spawn(async move {
+        let confirmed = self.confirmed.clone();
+        let rpc = tokio::spawn(async move {
             tokio::time::timeout(timeout, async move {
                 grpc.ready()
                     .await
@@ -597,17 +611,24 @@ impl RemoteSubscription {
                 if reply.kind != 0 {
                     return Err(ClientError::Remote(RemoteError::Corrupt));
                 }
+                confirmed.fetch_add(records, Ordering::Relaxed);
                 Ok(())
             })
             .await
             .map_err(|_| ClientError::Remote(RemoteError::TimedOut))?
-        }));
+        });
+        self.in_flight.push_back(rpc);
         Ok(())
     }
     /// Send queued ACKs and wait for every ACK RPC of this subscription. Ok means
     /// the server confirmed every record handed off so far. A failure closes the
-    /// stream with AcknowledgementUnknown; no ACK is retried (ADR-015).
+    /// stream with AcknowledgementUnknown; no ACK is retried (ADR-015). Once an
+    /// ACK failed or a queued ACK was dropped by the stream closing, every
+    /// later flush reports AcknowledgementUnknown too.
     pub async fn flush(&mut self, cancel: &Cancellation) -> Result<(), ClientError> {
+        if self.lost {
+            return Err(self.unknown());
+        }
         let result = cancel
             .guard(self.timeout, async {
                 self.send_acks().await?;
@@ -621,6 +642,13 @@ impl RemoteSubscription {
             return Err(self.unknown());
         }
         Ok(())
+    }
+    /// Records handed off on this subscription whose ACK the server has
+    /// confirmed so far, including RPCs no later call has collected yet. After
+    /// a successful `flush` it equals every handoff; a record whose outcome is
+    /// unknown is never counted.
+    pub fn acknowledged(&self) -> u64 {
+        self.confirmed.load(Ordering::Relaxed)
     }
     /// Invalidate queued/ready fragments before accepting a newer replay generation.
     /// Host replay/stream generation must be advanced separately by its owner.
@@ -766,5 +794,105 @@ impl RemoteSubscription {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+    // A subscription with no frame stream whose ACK RPCs are test tasks; the
+    // lazy channel is never used because nothing is queued when it would send.
+    fn detached() -> RemoteSubscription {
+        RemoteSubscription {
+            stream: None,
+            grpc: Grpc::new(Endpoint::from_static("http://127.0.0.1:9").connect_lazy()),
+            token: None,
+            state: Arc::new(ConnectionState::new()),
+            timeout: Duration::from_millis(500),
+            receiver: ClientReceiver::new(),
+            id: ConnectionId::detached(),
+            subscription: 1,
+            acks: Vec::new(),
+            oldest: None,
+            in_flight: std::collections::VecDeque::new(),
+            batch: ACK_BATCH,
+            lost: false,
+            confirmed: Arc::new(AtomicU64::new(0)),
+        }
+    }
+    fn finished(result: Result<(), ClientError>) -> AckRpc {
+        tokio::spawn(async move { result })
+    }
+    async fn settled(sub: &RemoteSubscription) {
+        while !sub.in_flight.iter().all(|rpc| rpc.is_finished()) {
+            tokio::task::yield_now().await;
+        }
+    }
+    // RV-163: the frame stream ended (EOF or a stream error) while a handed-off
+    // record's ACK was still queued; flush must not claim it was confirmed.
+    #[test]
+    fn closing_with_a_queued_ack_keeps_flush_unknown() {
+        runtime().block_on(async {
+            let cancel = Cancellation::new();
+            let mut sub = detached();
+            sub.acks.push(wire::AckItem::default());
+            sub.oldest = Some(Instant::now());
+            sub.close();
+            assert_eq!(
+                sub.flush(&cancel).await,
+                Err(ClientError::AcknowledgementUnknown)
+            );
+        });
+    }
+    // RV-163: once an ACK RPC failed, later RPCs that succeed cannot turn a
+    // repeated flush into a success.
+    #[test]
+    fn an_earlier_ack_failure_stays_unknown_for_every_later_flush() {
+        runtime().block_on(async {
+            let cancel = Cancellation::new();
+            let mut sub = detached();
+            sub.in_flight
+                .push_back(finished(Err(ClientError::Remote(RemoteError::Gone))));
+            sub.in_flight.push_back(finished(Ok(())));
+            settled(&sub).await;
+            for _ in 0..2 {
+                assert_eq!(
+                    sub.flush(&cancel).await,
+                    Err(ClientError::AcknowledgementUnknown)
+                );
+            }
+        });
+    }
+    // RV-163: `next` may drop its wait while the oldest ACK RPC is being
+    // settled (local timeout); that RPC and its failure must not be lost.
+    #[test]
+    fn a_dropped_settle_wait_keeps_the_ack_rpc_and_its_failure() {
+        runtime().block_on(async {
+            let cancel = Cancellation::new();
+            let mut sub = detached();
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            sub.in_flight
+                .push_back(tokio::spawn(async move { rx.await.unwrap() }));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), sub.settle_one())
+                    .await
+                    .is_err()
+            );
+            tx.send(Err(ClientError::Remote(RemoteError::TimedOut)))
+                .unwrap();
+            assert_eq!(
+                sub.flush(&cancel).await,
+                Err(ClientError::AcknowledgementUnknown)
+            );
+        });
     }
 }

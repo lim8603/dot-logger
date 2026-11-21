@@ -374,12 +374,13 @@ impl tonic::server::UnaryService<wire::AckRequest> for AckRpc {
         let s = self.0.clone();
         Box::pin(async move {
             let peer = s.security.check(&request, false).map_err(status)?;
+            // The server-wide window bounds decoding; the subscription's own
+            // window bounds the batch. Items settle in order and stop at the
+            // first failure; earlier items stay acknowledged and later ones
+            // remain pending until their TTL (ADR-015).
             let max = s.hub.shared.limits.subscription_records;
-            // Settle in order and stop at the first failure; earlier items stay
-            // acknowledged and later ones remain pending until their TTL (ADR-015).
-            for ack in request.into_inner().native(max).map_err(status)? {
-                s.hub.ack(ack, peer).map_err(status)?;
-            }
+            let acks = request.into_inner().native(max).map_err(status)?;
+            s.hub.ack_batch(acks, peer).map_err(status)?;
             Ok(Response::new(wire::Reply {
                 major: PROTOCOL_MAJOR,
                 ..wire::Reply::default()

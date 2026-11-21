@@ -1121,6 +1121,7 @@ fn pipelined_handoffs_are_confirmed_by_flush_and_later_failures_stay_unknown() {
             }
             stream.flush(&cancel).await.unwrap();
             assert!(pending.iter().all(|p| p.state() == AckState::Acknowledged));
+            assert_eq!(stream.acknowledged(), pending.len() as u64);
         }
         let last = hub.offer(ids[0], record(1000, 1), &[1], false, 1).unwrap();
         let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
@@ -1132,6 +1133,12 @@ fn pipelined_handoffs_are_confirmed_by_flush_and_later_failures_stay_unknown() {
             stream.flush(&cancel).await,
             Err(ClientError::AcknowledgementUnknown)
         );
+        // The failure stays reported and never adds the unknown handoff.
+        assert_eq!(
+            stream.flush(&cancel).await,
+            Err(ClientError::AcknowledgementUnknown)
+        );
+        assert_eq!(stream.acknowledged(), pending.len() as u64);
         drop(stream);
         tokio::time::timeout(Duration::from_secs(2), async {
             while last.state() == AckState::Pending {

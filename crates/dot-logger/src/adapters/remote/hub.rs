@@ -501,8 +501,28 @@ impl RemoteHub {
         Subscription::expire(&mut s, Instant::now());
         Ok(())
     }
+    #[cfg(test)]
     pub(crate) fn ack(&self, ack: Ack, peer: SocketAddr) -> Result<(), RemoteError> {
         self.find(ack.subscription)?.ack(ack, peer)
+    }
+    /// Settle one Ack RPC's items of a single subscription in order, stopping
+    /// at the first failure. A batch longer than that subscription's window is
+    /// rejected before any item is applied (ADR-015).
+    pub(crate) fn ack_batch(&self, acks: Vec<Ack>, peer: SocketAddr) -> Result<(), RemoteError> {
+        let Some(first) = acks.first() else {
+            return Err(RemoteError::InvalidInput);
+        };
+        let sub = self.find(first.subscription)?;
+        if peer != sub.peer {
+            return Err(RemoteError::PermissionDenied);
+        }
+        if acks.len() > sub.records || acks.iter().any(|a| a.subscription != sub.id) {
+            return Err(RemoteError::InvalidInput);
+        }
+        for ack in acks {
+            sub.ack(ack, peer)?;
+        }
+        Ok(())
     }
     pub(crate) async fn request(
         &self,

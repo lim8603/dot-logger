@@ -13,7 +13,7 @@ use dot_logger_client::{Cancellation, ClientError, RemoteClient, RemoteConfig};
 use serde_json::{Value, json};
 use std::{
     io,
-    net::IpAddr,
+    net::{Ipv4Addr, Ipv6Addr},
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -21,7 +21,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::{mpsc, oneshot},
-    time::{MissedTickBehavior, timeout},
+    time::{Instant, sleep_until, timeout},
 };
 
 /// Schema of the viewer's own status document.
@@ -205,12 +205,32 @@ fn received(reply: ManagementReply) -> Result<(u128, u64, Value), &'static str> 
         json!({"state": "Unavailable", "reason": "no_runtime_metrics_backend"})
     } else {
         let metrics: Value = serde_json::from_slice(&report).map_err(|_| "corrupt")?;
-        if metrics["schema"] != STATUS_SCHEMA {
+        if metrics["schema"] != STATUS_SCHEMA || !well_formed(&metrics) {
             return Err("corrupt");
         }
         metrics
     };
     Ok((session, revision, metrics))
+}
+
+// The fields the page consumes have the status.v1 types: observations are
+// objects with a state, windows and snapshots are arrays of such entries.
+fn well_formed(metrics: &Value) -> bool {
+    let observation = |v: &Value| v.is_object() && v["state"].is_string();
+    let window = |v: &Value| observation(v) && v["seconds"].is_u64();
+    let snapshot = |v: &Value| {
+        ["id", "revision", "epoch", "from_ns", "to_ns"]
+            .iter()
+            .all(|key| v[key].is_string())
+    };
+    observation(&metrics["latest"])
+        && metrics["windows"]
+            .as_array()
+            .is_some_and(|w| w.iter().all(window))
+        && metrics["snapshots"]
+            .as_array()
+            .is_some_and(|s| s.iter().all(snapshot))
+        && (metrics["posted_revision"].is_null() || metrics["posted_revision"].is_string())
 }
 
 fn reason(error: ClientError) -> &'static str {
@@ -256,8 +276,15 @@ pub async fn serve(
     allow_origin: Option<String>,
     stop: impl Future<Output = ()>,
 ) -> io::Result<()> {
+    // Only the checked scheme, host and port are ever shown (RV-166).
+    let shown = upstream.checked_endpoint().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "upstream must be an http(s) URL with only a host and port",
+        )
+    })?;
     let port = listener.local_addr()?.port();
-    let status = Arc::new(Mutex::new(Status::new(&upstream.endpoint)));
+    let status = Arc::new(Mutex::new(Status::new(&shown)));
     // A lookup may wait behind a status request and the queued lookups.
     let deadline = upstream.timeout.saturating_mul(JOBS as u32 + 2);
     let (jobs, queue) = mpsc::channel(JOBS);
@@ -285,21 +312,25 @@ struct Shared {
     allow_origin: Option<String>,
 }
 
-// The only upstream user: one request at a time, GetStatus at most once per
-// interval and queued lookups in between.
+// The only upstream user: one request at a time, queued lookups in between.
+// The next GetStatus waits one interval after the previous one finished, so
+// the host sees them at least an interval apart even when connecting or the
+// network was slow (RV-170).
 async fn work(status: Arc<Mutex<Status>>, upstream: RemoteConfig, mut queue: mpsc::Receiver<Job>) {
     let cancel = Cancellation::new();
     let mut client: Option<RemoteClient> = None;
-    let mut tick = tokio::time::interval(POLL_INTERVAL);
-    tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    let mut due = Instant::now();
     loop {
         let (request, reply) = tokio::select! {
-            _ = tick.tick() => (ManagementRequest::GetStatus, None),
+            () = sleep_until(due) => (ManagementRequest::GetStatus, None),
             Some(job) = queue.recv() => (job.request, Some(job.reply)),
         };
         let outcome = ask(&mut client, &upstream, &cancel, request).await;
         match reply {
-            None => lock(&status).record(now_ms(), outcome),
+            None => {
+                due = Instant::now() + POLL_INTERVAL;
+                lock(&status).record(now_ms(), outcome);
+            }
             Some(reply) => {
                 let _ = reply.send(outcome);
             }
@@ -503,20 +534,37 @@ fn header_values<'a>(
 }
 
 // Some(true) for a loopback name or address with this port, Some(false) for
-// another well-formed host (DNS rebinding), None when malformed.
-fn loopback_host(host: &str, port: u16) -> Option<bool> {
-    let (name, host_port) = host.trim().rsplit_once(':')?;
-    let host_port: u16 = host_port.parse().ok()?;
-    if name.is_empty() {
-        return None;
-    }
-    let loopback = name.eq_ignore_ascii_case("localhost")
-        || name
-            .strip_prefix('[')
-            .and_then(|v6| v6.strip_suffix(']'))
-            .unwrap_or(name)
-            .parse::<IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback());
+// another well-formed host (DNS rebinding), None when malformed. A missing
+// port is HTTP's default 80; an IPv6 address needs brackets (RV-168).
+pub(crate) fn loopback_host(host: &str, port: u16) -> Option<bool> {
+    let host = host.trim();
+    let (loopback, rest) = match host.strip_prefix('[') {
+        Some(bracketed) => {
+            let (address, rest) = bracketed.split_once(']')?;
+            (address.parse::<Ipv6Addr>().ok()?.is_loopback(), rest)
+        }
+        None => {
+            let (name, rest) = host
+                .find(':')
+                .map_or((host, ""), |at| (&host[..at], &host[at..]));
+            if name.is_empty() {
+                return None;
+            }
+            let loopback = name.eq_ignore_ascii_case("localhost")
+                || name.parse::<Ipv4Addr>().is_ok_and(|ip| ip.is_loopback());
+            (loopback, rest)
+        }
+    };
+    let host_port = match rest {
+        "" => 80,
+        _ => {
+            let digits = rest.strip_prefix(':')?;
+            if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            digits.parse::<u16>().ok()?
+        }
+    };
     Some(loopback && host_port == port)
 }
 

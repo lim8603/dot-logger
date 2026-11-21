@@ -238,19 +238,23 @@
       el("span", "note", " at " + time(doc.at_unix_ms)));
     return box;
   }
+  // Only the newest lookup of each kind may update its result (RV-169).
+  const newest = { compare: 0, plan: 0 };
   async function lookup(kind, url, render) {
+    const ticket = ++newest[kind];
     fill(kind, el("p", "note", "Asking the host…"));
+    let shown;
     try {
       const reply = await fetch(url, { cache: "no-store" });
       const doc = await reply.json();
       if (!reply.ok || doc.schema !== "dot_logger.viewer.request.v1" || doc.request !== kind) {
         throw new Error("bad reply");
       }
-      if (doc.outcome !== "ok") fill(kind, failure(kind, doc));
-      else fill(kind, ...render(doc.report, doc.at_unix_ms));
+      shown = doc.outcome !== "ok" ? [failure(kind, doc)] : render(doc.report, doc.at_unix_ms);
     } catch (error) {
-      fill(kind, badge("Failed", "viewer unreachable"));
+      shown = [badge("Failed", "viewer unreachable")];
     }
+    if (ticket === newest[kind]) fill(kind, ...shown);
   }
   function change(name, c) {
     const row = el("tr");
@@ -350,20 +354,40 @@
     lookup("plan", "api/plan?id=" + id, renderPlan);
   });
 
+  // `latest` is the last status that rendered completely. A status the page
+  // cannot render keeps it on screen with a separate error, and the next
+  // refresh is always scheduled (RV-167).
   let latest = null;
   async function refresh() {
+    let body = null;
     try {
       const reply = await fetch("api/status", { cache: "no-store" });
-      const body = await reply.json();
+      body = await reply.json();
       if (!reply.ok || body.schema !== SCHEMA) throw new Error("bad reply");
       viewerLostAt = null;
-      latest = body;
     } catch (error) {
+      body = null;
       if (viewerLostAt === null) viewerLostAt = Date.now();
     }
-    if (latest) render(latest);
-    else if (viewerLostAt !== null) fill("connection", badge("Failed", "viewer unreachable"));
-    setTimeout(refresh, POLL_MS);
+    try {
+      if (body) {
+        try {
+          render(body);
+          latest = body;
+        } catch (error) {
+          if (latest) render(latest);
+          const header = document.getElementById("connection");
+          header.prepend(badge("Failed", "status not understood"),
+            el("span", "error", " at " + time(Date.now()) + " "));
+        }
+      } else if (latest) {
+        render(latest);
+      } else if (viewerLostAt !== null) {
+        fill("connection", badge("Failed", "viewer unreachable"));
+      }
+    } finally {
+      setTimeout(refresh, POLL_MS);
+    }
   }
   refresh();
 })();

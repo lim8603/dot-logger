@@ -44,6 +44,29 @@ pub struct RemoteConfig {
     pub message_bytes: usize,
 }
 impl RemoteConfig {
+    /// The endpoint as `scheme://host:port` after the syntax check that
+    /// [`RemoteClient::connect`] applies: http or https, a host, no userinfo,
+    /// path or query. Safe to display. The loopback-only plaintext and TLS
+    /// requirements are still checked when connecting.
+    ///
+    /// # Errors
+    /// `InvalidInput` for an endpoint `connect` would reject by syntax.
+    pub fn checked_endpoint(&self) -> Result<String, ClientError> {
+        let (uri, https) = parse_endpoint(&self.endpoint)?;
+        let host = uri
+            .host()
+            .ok_or(ClientError::Remote(RemoteError::InvalidInput))?;
+        let host = if host.contains(':') && !host.starts_with('[') {
+            format!("[{host}]")
+        } else {
+            host.to_owned()
+        };
+        let port = uri.port_u16().unwrap_or(if https { 443 } else { 80 });
+        Ok(format!(
+            "{}://{host}:{port}",
+            if https { "https" } else { "http" }
+        ))
+    }
     /// Bounded defaults; plaintext is permitted only for literal loopback IPs.
     pub fn new(endpoint: impl Into<String>) -> Self {
         Self {
@@ -55,6 +78,41 @@ impl RemoteConfig {
             message_bytes: MAX_CHUNK_BYTES + 1024,
         }
     }
+}
+// Syntax shared by connect and checked_endpoint: an absolute http(s) URI with
+// a host and optional port, no userinfo, and no path beyond "/" or query.
+// Returns the URI and whether it is https.
+fn parse_endpoint(endpoint: &str) -> Result<(Uri, bool), ClientError> {
+    let invalid = || ClientError::Remote(RemoteError::InvalidInput);
+    if endpoint.len() > 2048 {
+        return Err(invalid());
+    }
+    let uri: Uri = endpoint.parse().map_err(|_| invalid())?;
+    let https = match uri.scheme_str() {
+        Some("http") => false,
+        Some("https") => true,
+        _ => return Err(invalid()),
+    };
+    let (Some(host), Some(authority)) = (uri.host(), uri.authority()) else {
+        return Err(invalid());
+    };
+    // An out-of-range port parses as no port; check what follows the host.
+    let port = authority.as_str().strip_prefix(host).ok_or_else(invalid)?;
+    let port_ok = port.is_empty()
+        || port.strip_prefix(':').is_some_and(|digits| {
+            !digits.is_empty()
+                && digits.bytes().all(|b| b.is_ascii_digit())
+                && digits.parse::<u16>().is_ok()
+        });
+    if !port_ok
+        || authority.as_str().contains('@')
+        || uri
+            .path_and_query()
+            .is_some_and(|p| !matches!(p.as_str(), "" | "/"))
+    {
+        return Err(invalid());
+    }
+    Ok((uri, https))
 }
 struct ConnectionState {
     closed: AtomicBool,
@@ -238,22 +296,13 @@ impl RemoteClient {
         {
             return Err(invalid());
         }
-        let uri: Uri = config.endpoint.parse().map_err(|_| invalid())?;
+        let (uri, https) = parse_endpoint(&config.endpoint)?;
         let host = uri
             .host()
             .ok_or_else(invalid)?
             .trim_matches(['[', ']'])
             .to_owned();
-        let scheme = uri.scheme_str().ok_or_else(invalid)?;
-        if !matches!(scheme, "http" | "https")
-            || uri.authority().is_none_or(|a| a.as_str().contains('@'))
-            || uri
-                .path_and_query()
-                .is_some_and(|p| !matches!(p.as_str(), "" | "/"))
-            || (uri.port().is_some() && uri.port_u16().is_none())
-        {
-            return Err(invalid());
-        }
+        let scheme = if https { "https" } else { "http" };
         let loopback = host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback());
         if !loopback && (scheme == "http" || config.token.is_none()) {
             return Err(ClientError::Remote(RemoteError::PermissionDenied));
@@ -270,10 +319,7 @@ impl RemoteClient {
                 Some(value)
             }
         };
-        let port = uri
-            .port_u16()
-            .unwrap_or(if scheme == "https" { 443 } else { 80 });
-        let https = scheme == "https";
+        let port = uri.port_u16().unwrap_or(if https { 443 } else { 80 });
         let mut endpoint = Endpoint::from(uri)
             .connect_timeout(config.timeout)
             .buffer_size(1)
@@ -894,5 +940,39 @@ mod tests {
                 Err(ClientError::AcknowledgementUnknown)
             );
         });
+    }
+    // RV-166 (REV-070): the endpoint a viewer may display is the validated
+    // scheme, host and port only; userinfo, path, query and other schemes fail.
+    #[test]
+    fn checked_endpoint_keeps_only_a_validated_authority() {
+        for (endpoint, shown) in [
+            ("http://127.0.0.1:9", "http://127.0.0.1:9"),
+            ("http://127.0.0.1:9/", "http://127.0.0.1:9"),
+            ("http://localhost", "http://localhost:80"),
+            ("https://robot.example", "https://robot.example:443"),
+            ("https://[::1]:8443", "https://[::1]:8443"),
+        ] {
+            assert_eq!(
+                RemoteConfig::new(endpoint).checked_endpoint().as_deref(),
+                Ok(shown),
+                "{endpoint}"
+            );
+        }
+        for endpoint in [
+            "http://user:secret@127.0.0.1:9",
+            "http://127.0.0.1:9/?token=secret",
+            "http://127.0.0.1:9/Logger/Subscribe",
+            "ftp://127.0.0.1:9",
+            "127.0.0.1:9",
+            "http://127.0.0.1:99999",
+            "http://127.0.0.1:",
+            "",
+        ] {
+            assert_eq!(
+                RemoteConfig::new(endpoint).checked_endpoint(),
+                Err(ClientError::Remote(RemoteError::InvalidInput)),
+                "{endpoint}"
+            );
+        }
     }
 }

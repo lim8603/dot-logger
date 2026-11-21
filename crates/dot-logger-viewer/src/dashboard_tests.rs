@@ -543,3 +543,165 @@ async fn lookups_share_the_single_upstream_request_slot_with_status_polling() {
     served.await.unwrap().unwrap();
     drop((inbox, hub));
 }
+
+// ---- REV-070 ----
+
+// RV-166: an upstream with userinfo or a query never reaches the status
+// document; a valid one is shown as its checked authority.
+#[tokio::test]
+async fn the_status_document_shows_only_the_checked_upstream_authority() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let refused = timeout(
+        WAIT,
+        dashboard::serve(
+            listener,
+            RemoteConfig::new("http://user:secret@127.0.0.1:9"),
+            None,
+            std::future::pending(),
+        ),
+    )
+    .await
+    .unwrap()
+    .unwrap_err();
+    assert!(!refused.to_string().contains("secret"), "{refused}");
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (stop, stopped) = oneshot::channel::<()>();
+    tokio::spawn(dashboard::serve(
+        listener,
+        RemoteConfig::new("http://127.0.0.1:9/"),
+        None,
+        async {
+            let _ = stopped.await;
+        },
+    ));
+    assert_eq!(status_json(address).await["upstream"], "http://127.0.0.1:9");
+    stop.send(()).unwrap();
+}
+
+// RV-167: a status.v1 report whose consumed fields have other types is
+// corrupt; the last valid value stays.
+#[test]
+fn a_status_report_with_unexpected_field_types_is_corrupt() {
+    let mut status = Status::new("http://127.0.0.1:9");
+    status.record(1, Ok(reply(&unobserved())));
+    for (field, value) in [
+        ("latest", json!("Observed")),
+        ("windows", json!({"seconds": 10})),
+        ("windows", json!([1])),
+        ("snapshots", json!("none")),
+        ("snapshots", json!([{"id": 1}])),
+    ] {
+        let mut report = unobserved();
+        report[field] = value;
+        status.record(2, Ok(reply(&report)));
+        let shown = status.json(2);
+        assert_eq!(shown["poll"]["failure"]["reason"], "corrupt", "{field}");
+        assert_eq!(shown["last"]["metrics"], unobserved(), "{field}");
+    }
+}
+
+// RV-168: a browser omits the default port 80; IPv6 needs brackets.
+#[test]
+fn host_headers_default_to_port_80_and_parse_bracketed_ipv6() {
+    use dashboard::loopback_host;
+    for (host, port, expected) in [
+        ("127.0.0.1", 80, Some(true)),
+        ("localhost", 80, Some(true)),
+        ("LOCALHOST:80", 80, Some(true)),
+        ("[::1]", 80, Some(true)),
+        ("[::1]:8080", 8080, Some(true)),
+        ("127.0.0.1", 8080, Some(false)),
+        ("[::1]:80", 8080, Some(false)),
+        ("evil.example", 80, Some(false)),
+        ("[::2]:80", 80, Some(false)),
+        ("::1", 80, None),
+        ("[::1", 80, None),
+        ("127.0.0.1:", 80, None),
+        (":80", 80, None),
+        ("127.0.0.1:x", 80, None),
+    ] {
+        assert_eq!(loopback_host(host, port), expected, "{host} on {port}");
+    }
+}
+
+// RV-170: after a slow first connection, the host still sees GetStatus
+// requests at least one interval apart.
+#[tokio::test]
+async fn status_requests_stay_one_interval_apart_after_a_slow_connection() {
+    let budget = crate::tests::budget();
+    let (hub, mut inbox) = RemoteHub::new(
+        &budget,
+        RemoteLimits {
+            connections: 2,
+            subscriptions: 1,
+            commands: 2,
+            message_bytes: 32 * 1024,
+            record_bytes: 1024,
+            subscription_records: 1,
+            subscription_bytes: 1024,
+            max_age: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(2),
+        },
+    )
+    .unwrap();
+    let server = RemoteServer::bind(
+        ServerConfig {
+            enabled: true,
+            address: "127.0.0.1:0".parse().unwrap(),
+            ..ServerConfig::default()
+        },
+        hub.clone(),
+    )
+    .await
+    .unwrap();
+    let target = server.local_addr().unwrap();
+    let (server_stop, server_stopped) = oneshot::channel::<()>();
+    let served = tokio::spawn(server.serve(async {
+        let _ = server_stopped.await;
+    }));
+    // A relay that holds the first connection for 1.3 s before forwarding.
+    let relay = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let relay_address = relay.local_addr().unwrap();
+    let relaying = tokio::spawn(async move {
+        let mut first = true;
+        loop {
+            let (mut inbound, _) = relay.accept().await.unwrap();
+            let hold = std::mem::take(&mut first);
+            tokio::spawn(async move {
+                if hold {
+                    sleep(Duration::from_millis(1300)).await;
+                }
+                let mut outbound = TcpStream::connect(target).await.unwrap();
+                let _ = tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await;
+            });
+        }
+    });
+    let mut config = RemoteConfig::new(format!("http://{relay_address}"));
+    config.timeout = Duration::from_secs(5);
+    let (_, stop) = start(config).await;
+    let mut starts = Vec::new();
+    timeout(WAIT, async {
+        while starts.len() < 2 {
+            if let Some(command) = inbox.try_next() {
+                assert!(matches!(command.request(), ManagementRequest::GetStatus));
+                starts.push(std::time::Instant::now());
+                command.respond(Ok(reply(&unobserved())));
+            } else {
+                sleep(Duration::from_millis(1)).await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    let gap = starts[1] - starts[0];
+    assert!(
+        gap >= Duration::from_millis(900),
+        "GetStatus 1 s apart: {gap:?}"
+    );
+    stop.send(()).unwrap();
+    relaying.abort();
+    server_stop.send(()).unwrap();
+    served.await.unwrap().unwrap();
+    drop((inbox, hub));
+}

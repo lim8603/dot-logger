@@ -236,6 +236,10 @@ async fn run(command: Command) -> Result<(), Box<dyn Error>> {
         .map(|path| read_file(path, 65_536))
         .transpose()?;
     upstream.tls_domain = command.tls_domain;
+    // Reject before any listener opens; never echo the given URL (RV-166).
+    upstream.checked_endpoint().map_err(
+        |_| "--upstream must be an http(s) URL with only a host and port (no user, path or query)",
+    )?;
     let playback = command
         .replay_from_ns
         .zip(command.replay_to_ns)

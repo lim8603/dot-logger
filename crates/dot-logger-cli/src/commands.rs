@@ -533,6 +533,11 @@ fn recover(ctx: &Context, out: &mut Output, m: &Manifest, path: &Path) -> Result
         .iter()
         .enumerate()
         .any(|(i, s)| sources[..i].iter().any(|p| p.sequence == s.sequence));
+    // Repeated sequences name every output by target: refuse a source without
+    // one before any output exists (REV-071 RV-186).
+    if multiple && repeated_sequences && sources.iter().any(|s| s.target.is_none()) {
+        return Err(Failure::Input);
+    }
     if ctx.cancel.is_cancelled() {
         return Err(Failure::Cancelled);
     }
@@ -745,6 +750,10 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                     return Err(Failure::Corrupt);
                 };
                 if next != 0 && next == cursor {
+                    return Err(Failure::Corrupt);
+                }
+                // Later pages continue the same frozen snapshot (RV-186).
+                if snapshot != 0 && current != snapshot {
                     return Err(Failure::Corrupt);
                 }
                 snapshot = current;

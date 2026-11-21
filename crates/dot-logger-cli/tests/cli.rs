@@ -2667,6 +2667,38 @@ fn loss_fixture_with_fanout(fanout: bool) -> Fixture {
     std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
     f
 }
+/// REV-071 RV-186: with repeated sequences every source needs a target for its
+/// output name; one without is refused before any output exists.
+#[test]
+fn recovery_refuses_a_missing_target_before_creating_output() {
+    let f = loss_fixture();
+    let third = f.dir.join("30.mcap");
+    std::fs::copy(f.dir.join("10.mcap"), &third).unwrap();
+    let mut m: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
+    m["sources"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"path":third,"sequence":1,"revision":1}));
+    std::fs::write(&f.manifest, serde_json::to_vec(&m).unwrap()).unwrap();
+    let output_dir = f.dir.join("recovered");
+    let output = command()
+        .args(["recover", "--json", "--manifest"])
+        .arg(&f.manifest)
+        .arg("--output")
+        .arg(&output_dir)
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        !output_dir.exists(),
+        "output was created before the input was refused"
+    );
+}
 #[test]
 fn loss_cli_compares_target_replicas_without_replaying_or_summing_user_fanout() {
     let f = loss_fixture();

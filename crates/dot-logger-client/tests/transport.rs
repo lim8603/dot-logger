@@ -1058,6 +1058,127 @@ fn config_conflict_busy_restart_and_status_report_keep_their_meaning() {
     });
 }
 
+// REV-071 RV-178: an unacknowledged record expiring closes the subscription
+// and wakes its stream at once, instead of leaving it waiting for a later
+// record's timer.
+#[test]
+fn an_expired_record_ends_the_waiting_stream_at_once() {
+    runtime().block_on(async {
+        let budget = budget();
+        let (hub, _inbox, addr, _stop, _server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut client =
+            RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                .await
+                .unwrap();
+        let mut stream = client
+            .subscribe(
+                &budget,
+                SubscriptionFilter {
+                    channel: None,
+                    minimum_level: Level::Trace,
+                    originals: false,
+                    overflow: OverflowPolicy::Gap,
+                },
+                ReceiverConfig {
+                    records: 2,
+                    record_bytes: 8,
+                    ttl: Duration::from_millis(400),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let _first = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+        assert!(stream.next(&cancel).await.unwrap().is_some());
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let _second = hub.offer(ids[0], record(2, 1), &[2], false, 1).unwrap();
+        assert!(stream.next(&cancel).await.unwrap().is_some());
+        let waiting = tokio::spawn(async move { stream.next(&cancel).await.map(|_| ()) });
+        // The first record expired at 400 ms; the next offer (at ~450 ms)
+        // notices it. The second record's own timer would fire at ~700 ms.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let noticed = std::time::Instant::now();
+        let _ = hub.offer(ids[0], record(3, 1), &[3], false, 1);
+        let end = waiting.await.unwrap();
+        let woke = noticed.elapsed();
+        assert!(
+            matches!(end, Err(ClientError::Remote(RemoteError::Gone))),
+            "expected Gone, got {end:?}"
+        );
+        assert!(woke < Duration::from_millis(120), "woke after {woke:?}");
+    });
+}
+
+// REV-071 RV-177: a stream that ends while handed-off ACKs are still queued
+// or in flight does not look like a clean end; every later call says Unknown.
+#[test]
+fn stream_end_with_unsettled_acks_reports_unknown_not_a_clean_end() {
+    runtime().block_on(async {
+        let budget = budget();
+        let (hub, _inbox, addr, _stop, _server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            limits(),
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut client =
+            RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                .await
+                .unwrap();
+        let mut stream = client
+            .subscribe(
+                &budget,
+                SubscriptionFilter {
+                    channel: None,
+                    minimum_level: Level::Trace,
+                    originals: false,
+                    overflow: OverflowPolicy::Gap,
+                },
+                ReceiverConfig {
+                    records: 2,
+                    record_bytes: 8,
+                    ttl: Duration::from_secs(10),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let _first = hub.offer(ids[0], record(1, 1), &[1], false, 1).unwrap();
+        let _second = hub.offer(ids[0], record(2, 1), &[2], false, 1).unwrap();
+        for _ in 0..2 {
+            let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+                panic!("record")
+            };
+            stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+        }
+        hub.close();
+        for _ in 0..2 {
+            let end = stream.next(&cancel).await;
+            assert!(
+                matches!(end, Err(ClientError::AcknowledgementUnknown)),
+                "a stream end with unsettled ACKs was not reported as unknown"
+            );
+        }
+    });
+}
+
 // ADR-015: handoff queues the ACK and returns without waiting for the server;
 // flush sends what is queued and waits for every ACK RPC, and a failure after
 // handoff surfaces on a later call as AcknowledgementUnknown.

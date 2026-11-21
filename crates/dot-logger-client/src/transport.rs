@@ -710,6 +710,10 @@ impl RemoteSubscription {
         &mut self,
         cancel: &Cancellation,
     ) -> Result<Option<RemoteEvent>, ClientError> {
+        // An earlier ACK failure stays reported, never as a clean end (RV-177).
+        if self.lost {
+            return Err(self.unknown());
+        }
         if self.state.closed.load(Ordering::Acquire) {
             self.close();
             return Err(ClientError::Disconnected);
@@ -726,6 +730,12 @@ impl RemoteSubscription {
                 Err(ClientError::Remote(RemoteError::TimedOut))
             }
             Ok(Err(error)) | Err(error) => {
+                // Unsettled handoffs outrank the stream's own error: report
+                // that their ACKs are unknown (REV-071 RV-177).
+                let reaped = self.reap();
+                if reaped.is_err() || !self.acks.is_empty() || !self.in_flight.is_empty() {
+                    return Err(self.unknown());
+                }
                 self.close();
                 Err(error)
             }
@@ -748,20 +758,44 @@ impl RemoteSubscription {
                 return Ok(None);
             };
             // Streaming::message keeps its decoder state in the stream, so the
-            // ACK timer may drop the wait future (tonic 0.13.1).
-            let message = match deadline {
-                Some(deadline) => tokio::select! {
+            // ACK timer may drop the wait future (tonic 0.13.1). While an ACK
+            // RPC is outstanding, wait for it too so its failure surfaces now,
+            // not after the next frame or the local timeout (REV-071 RV-177).
+            let mut settled = None;
+            let message = match (deadline, self.in_flight.front_mut()) {
+                (Some(deadline), _) => tokio::select! {
                     biased;
                     message = stream.message() => Some(message),
                     () = tokio::time::sleep_until(deadline) => None,
                 },
-                None => Some(stream.message().await),
+                (None, Some(rpc)) => tokio::select! {
+                    biased;
+                    message = stream.message() => Some(message),
+                    result = rpc => {
+                        settled = Some(result);
+                        None
+                    }
+                },
+                (None, None) => Some(stream.message().await),
             };
+            if let Some(result) = settled {
+                self.in_flight.pop_front();
+                if !matches!(result, Ok(Ok(()))) {
+                    return Err(self.unknown());
+                }
+                continue;
+            }
             let Some(message) = message else {
                 self.send_acks().await?;
                 continue;
             };
             let Some(frame) = message.map_err(rpc_error)? else {
+                // The server ended the stream: settle what was handed off, so
+                // an unconfirmed ACK is reported instead of a clean end.
+                self.send_acks().await?;
+                while !self.in_flight.is_empty() {
+                    self.settle_one().await?;
+                }
                 self.close();
                 return Ok(None);
             };
@@ -806,6 +840,9 @@ impl RemoteSubscription {
     ) -> Result<(), ClientError> {
         if cancel.is_cancelled() {
             return Err(ClientError::Cancelled);
+        }
+        if self.lost {
+            return Err(self.unknown());
         }
         if self.stream.is_none() || self.state.closed.load(Ordering::Acquire) {
             return Err(ClientError::Disconnected);

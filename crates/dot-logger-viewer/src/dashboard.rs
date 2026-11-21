@@ -106,7 +106,7 @@ impl Query {
     }
 }
 
-struct Job {
+pub(crate) struct Job {
     request: ManagementRequest,
     reply: oneshot::Sender<Result<ManagementReply, ClientError>>,
 }
@@ -288,7 +288,9 @@ pub async fn serve(
     // A lookup may wait behind a status request and the queued lookups.
     let deadline = upstream.timeout.saturating_mul(JOBS as u32 + 2);
     let (jobs, queue) = mpsc::channel(JOBS);
-    let worker = tokio::spawn(work(status.clone(), upstream, queue));
+    // Aborted on every exit, including when this future is dropped or
+    // aborted while listening (REV-071 RV-179).
+    let worker = AbortOnDrop(tokio::spawn(work(status.clone(), upstream, queue)));
     let shared = Arc::new(Shared {
         status,
         jobs,
@@ -300,8 +302,15 @@ pub async fn serve(
         respond(socket, shared.clone())
     })
     .await;
-    worker.abort();
+    drop(worker);
     result
+}
+
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 struct Shared {
@@ -316,14 +325,22 @@ struct Shared {
 // The next GetStatus waits one interval after the previous one finished, so
 // the host sees them at least an interval apart even when connecting or the
 // network was slow (RV-170).
-async fn work(status: Arc<Mutex<Status>>, upstream: RemoteConfig, mut queue: mpsc::Receiver<Job>) {
+pub(crate) async fn work(
+    status: Arc<Mutex<Status>>,
+    upstream: RemoteConfig,
+    mut queue: mpsc::Receiver<Job>,
+) {
     let cancel = Cancellation::new();
     let mut client: Option<RemoteClient> = None;
     let mut due = Instant::now();
     loop {
         let (request, reply) = tokio::select! {
             () = sleep_until(due) => (ManagementRequest::GetStatus, None),
-            Some(job) = queue.recv() => (job.request, Some(job.reply)),
+            job = queue.recv() => match job {
+                Some(job) => (job.request, Some(job.reply)),
+                // Every sender is gone: the dashboard stopped.
+                None => return,
+            },
         };
         let outcome = ask(&mut client, &upstream, &cancel, request).await;
         match reply {

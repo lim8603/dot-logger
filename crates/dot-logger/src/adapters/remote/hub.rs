@@ -190,6 +190,11 @@ impl Subscription {
                     .status
                     .compare_exchange(0, 2, Ordering::AcqRel, Ordering::Acquire);
             }
+            // Wake the waiting stream so it ends now with Gone, as `close`
+            // does, not at a later record's timer (REV-071 RV-178).
+            if let Some(w) = s.waker.take() {
+                w.wake();
+            }
         }
         s.records.retain(|t| {
             if now >= t.expires {

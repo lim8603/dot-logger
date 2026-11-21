@@ -437,7 +437,7 @@ impl Reply {
                     || items.iter().any(|i| {
                         !valid_record(i.record)
                             || (i.blob == 0 && i.inline.len() != i.record.payload_len)
-                            || (i.blob != 0 && !i.inline.is_empty())
+                            || (i.blob != 0 && (!i.inline.is_empty() || i.record.payload_len == 0))
                     })
                     || items
                         .iter()

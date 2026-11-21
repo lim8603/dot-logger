@@ -217,8 +217,9 @@ pub(crate) fn reply(
             let mut items = Vec::with_capacity(r.items.len());
             for item in r.items {
                 let record = item.record.ok_or(RemoteError::Corrupt)?.native()?;
+                // A blob stands for a nonempty payload only (REV-071 RV-186).
                 if (item.blob == 0 && item.inline.len() != record.payload_len)
-                    || (item.blob != 0 && !item.inline.is_empty())
+                    || (item.blob != 0 && (!item.inline.is_empty() || record.payload_len == 0))
                 {
                     return Err(RemoteError::Corrupt);
                 }

@@ -278,7 +278,12 @@ impl Upstream {
                         channel,
                         resumed: attempted,
                     });
-                    let end = Self::forward(&mut subscription, feed, &cancel).await;
+                    let mut end = Self::forward(&mut subscription, feed, &cancel).await;
+                    // Settle what was handed off before letting the stream go,
+                    // so an unconfirmed ACK is reported (REV-071 RV-177).
+                    if subscription.flush(&cancel).await.is_err() {
+                        end = "upstream acknowledgement was unconfirmed";
+                    }
                     drop(subscription);
                     if feed.channel.retired() {
                         return;
@@ -324,6 +329,9 @@ impl Upstream {
                     first,
                     last,
                 }),
+                Err(ClientError::AcknowledgementUnknown) => {
+                    return "upstream acknowledgement was unconfirmed";
+                }
                 Ok(None) | Err(_) => return "upstream stream ended",
             }
         }

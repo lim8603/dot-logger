@@ -705,3 +705,59 @@ async fn status_requests_stay_one_interval_apart_after_a_slow_connection() {
     served.await.unwrap().unwrap();
     drop((inbox, hub));
 }
+
+// REV-071 RV-179: an Origin with an out-of-range port is not a local origin.
+#[test]
+fn origins_with_an_invalid_port_are_not_local() {
+    use crate::websocket::local_origin;
+    for (origin, expected) in [
+        ("http://localhost:8080/", true),
+        ("http://127.0.0.1/", true),
+        ("http://[::1]:65535/", true),
+        ("http://localhost:99999/", false),
+        ("http://localhost:0/", false),
+        ("http://localhost:/", false),
+        ("http://[::1]:70000/", false),
+    ] {
+        assert_eq!(local_origin(origin), expected, "{origin}");
+    }
+}
+
+// REV-071 RV-179: the WebSocket handshake checks Host like the dashboard
+// does, so a rebinding name with a loopback Origin is still refused.
+#[test]
+fn websocket_handshake_requires_a_loopback_host_on_its_port() {
+    use crate::websocket::negotiate_for_tests as negotiate;
+    let request = |host: &str| {
+        tokio_tungstenite::tungstenite::handshake::server::Request::builder()
+            .uri("/")
+            .header("host", host)
+            .header("sec-websocket-protocol", "foxglove.websocket.v1")
+            .header("origin", "http://localhost:8765/")
+            .body(())
+            .unwrap()
+    };
+    assert!(negotiate(&request("127.0.0.1:8765"), 8765).is_ok());
+    assert!(negotiate(&request("localhost:8765"), 8765).is_ok());
+    assert!(negotiate(&request("evil.example:8765"), 8765).is_err());
+    assert!(negotiate(&request("127.0.0.1:9999"), 8765).is_err());
+}
+
+// REV-071 RV-179: the status worker ends once every job sender is gone
+// instead of polling forever.
+#[tokio::test]
+async fn status_worker_ends_when_its_queue_closes() {
+    let (jobs, queue) = tokio::sync::mpsc::channel(1);
+    drop(jobs);
+    let status = std::sync::Arc::new(std::sync::Mutex::new(Status::new("http://127.0.0.1:1")));
+    let upstream = RemoteConfig::new("http://127.0.0.1:1");
+    let ended = tokio::time::timeout(
+        Duration::from_secs(5),
+        dashboard::work(status, upstream, queue),
+    )
+    .await;
+    assert!(
+        ended.is_ok(),
+        "the worker kept polling after its queue closed"
+    );
+}

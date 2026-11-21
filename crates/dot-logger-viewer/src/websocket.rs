@@ -106,11 +106,12 @@ pub(crate) async fn open(
         .max_frame_size(Some(COMMAND_BYTES))
         .write_buffer_size(0)
         .max_write_buffer_size(MAX_CATALOG_BYTES.max(options.record_bytes + DATA_HEADER) + 32);
+    let port = tcp.local_addr().ok()?.port();
     #[allow(clippy::result_large_err)] // The callback uses tungstenite's HTTP response type.
     let handshake = accept_hdr_async_with_config(
         tcp,
         |request: &Request, response: Response| {
-            negotiate(request, response, options.allow_origin.as_deref())
+            negotiate(request, response, options.allow_origin.as_deref(), port)
         },
         Some(config),
     );
@@ -128,7 +129,24 @@ fn negotiate(
     request: &Request,
     mut response: Response,
     explicit_origin: Option<&str>,
+    port: u16,
 ) -> Result<Response, ErrorResponse> {
+    // One Host naming a loopback address on this listener's port, as the
+    // dashboard requires, so a rebinding name is refused (REV-071 RV-179).
+    let hosts = request.headers().get_all("host");
+    let mut hosts = hosts.iter();
+    let (Some(host), None) = (hosts.next(), hosts.next()) else {
+        return Err(reject(StatusCode::BAD_REQUEST));
+    };
+    match host
+        .to_str()
+        .ok()
+        .and_then(|host| crate::dashboard::loopback_host(host, port))
+    {
+        None => return Err(reject(StatusCode::BAD_REQUEST)),
+        Some(false) => return Err(reject(StatusCode::FORBIDDEN)),
+        Some(true) => {}
+    }
     let protocols = request.headers().get_all("sec-websocket-protocol");
     if !protocols.iter().any(|header| {
         header
@@ -159,9 +177,9 @@ pub(crate) fn local_origin(origin: &str) -> bool {
         return false;
     };
     matches!(uri.scheme_str(), Some("http" | "https"))
-        && uri
-            .authority()
-            .is_some_and(|authority| !authority.as_str().contains('@'))
+        && uri.authority().is_some_and(|authority| {
+            !authority.as_str().contains('@') && valid_port(authority.as_str())
+        })
         && uri
             .path_and_query()
             .is_some_and(|path| path.as_str() == "/")
@@ -172,6 +190,29 @@ pub(crate) fn local_origin(origin: &str) -> bool {
                     .parse::<IpAddr>()
                     .is_ok_and(|ip| ip.is_loopback())
         })
+}
+
+// An explicit port must be 1..=65535; the URI parser accepts any digits
+// (REV-071 RV-179).
+fn valid_port(authority: &str) -> bool {
+    let after_host = match authority.strip_prefix('[') {
+        Some(rest) => rest.split_once(']').map_or("", |(_, after)| after),
+        None => authority.find(':').map_or("", |at| &authority[at..]),
+    };
+    match after_host.strip_prefix(':') {
+        None => after_host.is_empty(),
+        Some(digits) => {
+            !digits.is_empty()
+                && digits.bytes().all(|b| b.is_ascii_digit())
+                && digits.parse::<u16>().is_ok_and(|port| port != 0)
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::result_large_err)]
+pub(crate) fn negotiate_for_tests(request: &Request, port: u16) -> Result<Response, ErrorResponse> {
+    negotiate(request, Response::new(()), None, port)
 }
 
 fn reject(status: StatusCode) -> ErrorResponse {

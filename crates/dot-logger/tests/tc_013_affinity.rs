@@ -2,7 +2,6 @@
 //! `/proc/self/task` lists only this logger's worker threads.
 #![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#![cfg(target_os = "linux")]
 
 use dot_logger::logger::{
     Budget, EncodeError, Logger, Record, Retention, Schema, Shutdown, WriterQuota,

@@ -11,13 +11,13 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실·원격 viewer 완료, 운영 대시보드(TASK-032) 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | 없음 — TASK-031 Done(2026-11-21 위임 수락). 다음 [TASK-032](../04_implementation/tasks/TASK-032.md) S1 UI 방식 결정 |
-| 미처리 리뷰 | **REV-069 요청(2026-11-21)** — 범위 `bd02d49..078ca6c` 코드 커밋 7개, 리뷰 전용 세션에서 수행. REV-001~068 Closed |
-| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 705 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 미처리 리뷰 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) (**Open**, Conditional — P1 0·P2 2·P3 1: `RV-163~165`). REV-001~068 Closed |
+| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 705 Pass·5 ignored, 독립 리뷰 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open(`RV-163~165` 조치 대기). [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / REV-069 리뷰 요청 등록 / AI |
-| 세션 상태 | **종료 — 2026-11-21 #001 마감.** |
-| 최근 완료 세션 | 2026-11-21 #001 — RV-161 종료, ADR-015 묶음·파이프라인 ACK, 하드웨어 CRC-32, T7 해소, TASK-031 Done([EV-101~105](../05_verification/verification_evidence.md#ev-101)) |
+| 갱신 | 2026-11-21 / 코드리뷰 세션 종료·REV-069 Open 인계 / AI |
+| 세션 상태 | **종료 — 2026-11-21 #002.** REV-069 독립 코드리뷰 완료(Open, RV-163~165), 다음 개발 세션에서 조치 후 TASK-032 S1 |
+| 최근 완료 세션 | 2026-11-21 #002 — bd02d49..078ca6c 독립 코드리뷰([REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open, RV-163~165) |
 
 ## 현재 결정과 제약
 
@@ -93,19 +93,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 | [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **Closed** | RV-160·161 Closed. 손실 checkpoint 0 행 생략 뒤 8 GiB P3·P5 Pass(EV-101·103) |
 | [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
-| REV-069(요청) | REV-066 조치 이후 T7 저장·원격 변경 독립 리뷰(`bd02d49..078ca6c`) — REV-067·068은 자가검토뿐 | Requested | 리뷰 전용 세션이 REV-069 문서를 만든다. 중점은 아래 「다음 시작점」 0 |
+| [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `bd02d49..078ca6c` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Open** | Conditional — P1 0·P2 2·P3 1(`RV-163~165`). TASK-032 S1 착수 전 TDD 조치·마감 대기 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **REV-069 독립 코드리뷰(요청, 2026-11-21 Human 「리뷰 요청 하나 쓰자」):** 리뷰 전용 세션에서 `bd02d49..078ca6c`를 본다. 대상 코드 커밋 7개: `8dbbe01`, `0be4bfe`, `7edae2a`, `af68578`, `4ac9bf1`, `0637601`, `078ca6c`. REV-066 조치 `bd02d49`와 문서 커밋은 범위 밖이다. 리뷰 결과 처리는 TASK-032 S1보다 먼저 한다. 중점:
-   - ① `4ac9bf1`·`078ca6c` 묶음·파이프라인 ACK([ADR-015](../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md)): wire 확장의 하위 호환, 서버의 묶음 길이 상한·적용 전 거절, transfer 기준 조회와 도착 순서 무관성, 동시 RPC 4개·대기열이 정하는 메모리 상한, `AcknowledgementUnknown` 보고 시점·`flush` 의미, 소비자 수락 뒤 취소, ACK 기한(5 ms)과 `select` 순서, CLI·예제가 `flush` 뒤에 보고하는지
-   - ② `af68578` 손실 checkpoint 0 행 생략(ADR-013 D2 개정): v2 part 구간·행 수의 복구 대조, v1 판독 유지(`loss_report.v1.bin`), dense 최악값 예약과 part 수 상한, 생략 키를 0으로 보는 비교가 완전한 v2 checkpoint에만 적용되는지, `max_rows` 계산
-   - ③ `8dbbe01`·`0be4bfe` checkpoint 인덱스 예약·part 묶음: `plan()`과 `SegmentLog::new` 산정 일치, 오버플로 검사, 애플리케이션 기록 여유 보존, 회전·retention 경계
-   - ④ `0637601` CRC-32 교체: `crc_update` 상태값 의미(반전 전), 기준 구현 대조 시험의 충분성, `crc32fast` 직접 의존 추가(lockfile에 이미 있던 crate) 범위와 MSRV 1.85·audit 영향
-   - ⑤ `7edae2a` LAN 측정 예제(`lan_probe`): 예제 전용 코드가 공개 API·feature 경계를 넓히지 않는지, 측정 검증 로직의 정확성
-   - ⑥ 시험부(`tc_017_loss`·`tc_013_facade`·client/remote 시험): 결정성, /tmp 쓰기량, 타이밍 의존으로 인한 간헐 실패 위험
+0. **REV-069 조치 (`RV-163~165`):** TASK-032 S1 착수 전에 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md)의 `RV-163`(P2: `RemoteSubscription` `AcknowledgementUnknown` 상태 보존·스트림 종료 시 미전송 `acks` 감지, `settle_one` `front_mut().await` 후 `pop_front()`, 서버 묶음 ACK `sub.records` 사전 검증), `RV-164`(P2: `Bank::sparse` 64배수 비영 행 경계 빈 후행 part 제거, `decode`·`summarize`의 비최종 part 64행 및 `counts.len() <= g.end - covered` 검증), `RV-165`(P3: CLI `tail` 기확인 `acknowledged` 집계, `projected_index_bytes` `pending_loss_parts` 조건 정렬, `lan_probe` `commands: 4` 및 수신 Gap 종료 코드)를 TDD(Red→Green→회귀)로 조치·마감한다.
 1. **TASK-032 S1.** viewer 운영 대시보드의 UI 방식(viewer 내장 웹·native·Foxglove 확장 패널)을 조사해 Human에게 결정을 받는다. TASK-031은 2026-11-21에 Done이 됐다. [TASK-032](../04_implementation/tasks/TASK-032.md) · [TASK-031 수락](../04_implementation/tasks/TASK-031.md#수락--2026-11-21)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
@@ -156,9 +150,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
-- 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, ADR-015 묶음·파이프라인 ACK로 P4 소형 Pass, 하드웨어 CRC로 유선 P4-bulk Pass. T7 해소. [EV-101~105](../05_verification/verification_evidence.md#ev-101)
-- 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다. [EV-098~100](../05_verification/verification_evidence.md#ev-098)
-- 2026-11-18 #005: [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_005.md)).
-- 2026-11-18 #004: ae3b6b3..3f8a46f 통합 코드리뷰 [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) Open(RV-156~159)([로그](../members/lim8603/workspace/session_logs/session_2026-11-18_004.md)).
+- 2026-11-21 #002 — `bd02d49..078ca6c` T7 저장·원격 변경 독립 코드리뷰 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open(`RV-163~165`)([로그](../members/lim8603/workspace/session_logs/session_2026-11-21_002.md)).
+- 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, ADR-015 묶음·파이프라인 ACK로 P4 소형 Pass, 하드웨어 CRC로 유선 P4-bulk Pass, T7 해소 및 TASK-031 Done([EV-101~105](../05_verification/verification_evidence.md#ev-101), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_001.md)).
+- 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다([EV-098~100](../05_verification/verification_evidence.md#ev-098), [로그](../members/lim8603/workspace/session_logs/session_2026-11-19_001.md)).
 
 완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031 및 관련 EV·세션 로그에 보존한다.

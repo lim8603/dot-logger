@@ -102,6 +102,17 @@ message AckRequest {
   bytes session = 5;
   uint32 producer = 6;
   uint64 sequence = 7;
+  // Batched items, settled in order until the first failure. When nonempty,
+  // the single-item fields 3-7 are unused. A batch larger than the
+  // subscription window is rejected before any item is applied.
+  repeated AckItem items = 8;
+}
+message AckItem {
+  uint64 transfer = 1;
+  uint64 generation = 2;
+  bytes session = 3;
+  uint32 producer = 4;
+  uint64 sequence = 5;
 }
 service Logger {
   rpc GetStatus(Request) returns (Reply);

@@ -11,29 +11,36 @@ rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 publish = false
 
+# Caret ranges so projects that use dot-logger can resolve shared crates
+# (ADR-009 amendment, TASK-036). Each lower bound is the version Cargo.lock
+# pins and CI tests with --locked; scripts/check-external-consumer.py builds
+# against the newest compatible versions instead.
 [workspace.dependencies]
-rtrb = "=0.4.0"
-# ADR-010: the optional zstd path requires the security fixes in MCAP 0.26.
-mcap = { version = "=0.26.0", default-features = false }
-prost = "=0.13.5"
-# Same version the pinned MCAP writer already uses; hardware CRC-32 (EV-105).
-crc32fast = "=1.5.3"
-tonic = { version = "=0.13.1", default-features = false, features = ["transport", "codegen", "prost"] }
-# Same-series security fix for RUSTSEC-2026-0386.
-tokio = { version = "=1.51.6", features = ["rt-multi-thread", "net", "sync", "time"] }
-reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls"] }
-bytes = "=1.12.1"
-tracing = "=0.1.44"
-log = "=0.4.29"
-subtle = "=2.6.1"
-tower = { version = "=0.5.3", features = ["util"] }
-hyper-util = { version = "=0.1.21", features = ["tokio"] }
-clap = { version = "=4.6.6", default-features = false, features = ["std", "help", "usage", "error-context"] }
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.154"
+rtrb = "0.4.0"
+# ADR-010: MCAP 0.26 (security fixes), with local changes kept in
+# vendor/mcap-0.26.0 as the `dot-logger-mcap` package. A workspace [patch]
+# would not reach downstream users (ADR-010 amendment 2, TASK-036); see
+# VENDORED.md and local-changes.patch.
+mcap = { package = "dot-logger-mcap", version = "0.1.0", path = "vendor/mcap-0.26.0", default-features = false }
+prost = "0.13.5"
+# Same version the MCAP writer uses; hardware CRC-32 (EV-105).
+crc32fast = "1.5.3"
+tonic = { version = "0.13.1", default-features = false, features = ["transport", "codegen", "prost"] }
+# Lower bound carries the fix for RUSTSEC-2026-0386.
+tokio = { version = "1.51.6", features = ["rt-multi-thread", "net", "sync", "time"] }
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+bytes = "1.12.1"
+tracing = "0.1.44"
+log = "0.4.29"
+subtle = "2.6.1"
+tower = { version = "0.5.3", features = ["util"] }
+hyper-util = { version = "0.1.21", features = ["tokio"] }
+clap = { version = "4.6.6", default-features = false, features = ["std", "help", "usage", "error-context"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 
 # Safe Linux filesystem observations on the ordinary host path.
-rustix = { version = "=1.1.6", default-features = false, features = ["std", "fs"] }
+rustix = { version = "1.1.6", default-features = false, features = ["std", "fs"] }
 
 [workspace.lints.rust]
 missing_docs = "warn"
@@ -42,11 +49,3 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "warn"
 expect_used = "warn"
-
-# ADR-010 amendment (EV-068): hash uncompressed chunks once, preserving bytes.
-# REV-055 RV-136 (EV-082): reject malformed chunk boundaries and prevalidate
-# complete chunks before export, including when their CRC is absent.
-# TASK-031 S3: opt-in top-level Schema/Channel registration before chunks.
-# See vendor/mcap-0.26.0/VENDORED.md and local-changes.patch.
-[patch.crates-io]
-mcap = { path = "vendor/mcap-0.26.0" }

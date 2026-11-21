@@ -682,6 +682,10 @@ fn tracked_session_repeated_query_sync_and_shutdown_stay_within_concrete_reserva
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS std Mutex allocates its pthread mutex on first lock; allocation accounting is a Tier 1 (Linux) contract"
+)]
 fn storage_encoder_indexes_and_finish_remain_within_shared_output_reservations() {
     use dot_logger::{
         capture::{CaptureReceipt, CapturedRecord},
@@ -1259,6 +1263,10 @@ fn remote_receiver_and_hub_buffers_stay_in_shared_external_reservation() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS std Mutex allocates its pthread mutex on first lock; allocation accounting is a Tier 1 (Linux) contract"
+)]
 fn enabled_telemetry_capture_rejection_skip_raw_and_handle_drop_do_not_allocate() {
     let plan = tracked_fixtures::plan();
     let mut channel = ChannelConfig::new(7, 99, 1);
@@ -1297,6 +1305,10 @@ fn enabled_telemetry_capture_rejection_skip_raw_and_handle_drop_do_not_allocate(
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS std Mutex allocates its pthread mutex on first lock; allocation accounting is a Tier 1 (Linux) contract"
+)]
 fn telemetry_preallocation_and_rotating_history_stay_inside_control_reservation() {
     let plan = tracked_fixtures::plan();
     let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();

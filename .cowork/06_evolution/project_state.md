@@ -21,6 +21,8 @@
 
 ## 현재 결정과 제약
 
+- **2026-11-21 #004 Human 결정 — 공개 준비(T2):** 공개 방식은 이력을 유지하되 `git filter-repo`로 `imported_context`만 이력 전체에서 제거한다. 라이선스는 권장대로 `MIT OR Apache-2.0`이고 vendor `mcap` MIT 고지를 보완한다. dot-probe 언급은 둘 다 Human 프로젝트라 그대로 둔다. `imported_context` 링크는 "비공개 원시 근거"로 표시한다. `wip/task-034-s2b-runtime-config`는 공개 저장소에 올리지 않는다. 내용은 이미 `874c27c`로 main에 반영돼 있다. GitHub 저장소는 하나만 둔다(이름을 바꿔 보관하는 안은 기각). 단일 저장소 절차는 Human 확인 대기이고, gitleaks 8.30.1과 git-filter-repo 2.47.0은 `~/.local/bin`에 설치했다.
+
 - **2026-11-21 Human 「dot-logger에서는 비공개로 .gitignore에만 넣자」 — `imported_context` 비공개:** `imported_context`는 비공개 입력으로 의도했으나 `.gitignore`에 들어간 적이 없어 첫 커밋부터 추적되고 있었다. `.gitignore`에 `.cowork/06_evolution/imported_context/*`(`.gitkeep` 제외)를 추가하고 1,997개 파일의 추적을 해제했다. 로컬 파일은 남아 있고 과거 커밋에는 계속 있다. 새 자료는 git으로 백업되지 않는다. 프레임워크 규칙 보완은 dot-cowork 프로젝트 몫으로 넘기고 여기서는 하지 않는다. dot-tools(공개 저장소)는 공개해도 되는 내용이라 그대로 둔다.
 
 - **2026-11-21 Human 「영어 통일」·「README만, T2는 나중에」 — TASK-025 README:** GitHub 공개를 고려해 루트와 crate README 3개를 영어로 다시 썼다. 라이선스는 미정으로 두고 `.cowork` 내부 링크에 의존하지 않는다. T2(라이선스·공개 범위)는 실제 공개 전환을 요청할 때 진행한다. [TASK-025](../04_implementation/tasks/TASK-025.md)

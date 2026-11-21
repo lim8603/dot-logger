@@ -15,11 +15,13 @@
 | 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / 세션 마감·공개 범위 논의 인계 / AI |
-| 세션 상태 | **종료 — 2026-11-21 #003 마감.** 다음 세션 브리핑에서 공개 범위(T2) 권장 방식을 먼저 논의한 뒤 TASK-025 S3 |
+| 갱신 | 2026-11-21 / #004 공개 범위 논의·imported_context 비공개 처리 / AI |
+| 세션 상태 | **진행 — 2026-11-21 #004.** 공개 범위 논의 중 `imported_context` 추적 해제. 공개 방식(이력 유지/새 이력)은 미결정 |
 | 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
 
 ## 현재 결정과 제약
+
+- **2026-11-21 Human 「dot-logger에서는 비공개로 .gitignore에만 넣자」 — `imported_context` 비공개:** `imported_context`는 비공개 입력으로 의도했으나 `.gitignore`에 들어간 적이 없어 첫 커밋부터 추적되고 있었다. `.gitignore`에 `.cowork/06_evolution/imported_context/*`(`.gitkeep` 제외)를 추가하고 1,997개 파일의 추적을 해제했다. 로컬 파일은 남아 있고 과거 커밋에는 계속 있다. 새 자료는 git으로 백업되지 않는다. 프레임워크 규칙 보완은 dot-cowork 프로젝트 몫으로 넘기고 여기서는 하지 않는다. dot-tools(공개 저장소)는 공개해도 되는 내용이라 그대로 둔다.
 
 - **2026-11-21 Human 「영어 통일」·「README만, T2는 나중에」 — TASK-025 README:** GitHub 공개를 고려해 루트와 crate README 3개를 영어로 다시 썼다. 라이선스는 미정으로 두고 `.cowork` 내부 링크에 의존하지 않는다. T2(라이선스·공개 범위)는 실제 공개 전환을 요청할 때 진행한다. [TASK-025](../04_implementation/tasks/TASK-025.md)
 
@@ -105,7 +107,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **다음 세션 브리핑에서 먼저 논의 — 공개 범위(T2 사전, 2026-11-21 Human 「권장방식 다음 세션 브리핑때 다시 이야기해줘」):** Human은 `.cowork`도 공개하는 방향을 생각하고 있고, `imported_context`는 공개 대상이 아니라고 확인했다. 아직 결정이나 작업은 하지 않았다. 브리핑에서 아래 권장 방식을 다시 제시하고 결정을 받는다.
+0. **공개 범위 논의 계속(T2 사전):** Human은 `.cowork`도 공개하는 방향을 생각하고 있고, `imported_context`는 공개하지 않는다. 2026-11-21 #004에서 `imported_context` 추적을 해제했다(위 결정). 과거 커밋 69개에는 이 폴더가 남아 있으므로, 남은 결정은 둘 중 하나다. ① 현재 저장소를 공개로 바꿔 이력째 공개(dot-tools 방식, `imported_context` 이력 노출을 수용) ② 새 이력으로 공개(`imported_context` 완전 비공개). 어느 쪽이든 공개 전에 이력 전체 gitleaks 검사를 권장한다. 아래 점검 결과와 권장 방식은 #003 기준이다.
    - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
      - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `0a153b5`에서 정리), dot-probe 언급 65곳(대부분 예제).
      - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
@@ -139,7 +141,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
-| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 Human 요청: 다음 세션 브리핑에서 권장 방식을 다시 논의** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
+| T2 | 공개 전환 전 라이선스·GitHub 운영정책·공개할 이력/로그 검토(vendor `mcap` MIT 전문 고지 보완 포함 — ADR-010 개정 1). 2026-11-21 사전 점검과 권장 방식은 아래 「다음 시작점」 0 | 공개 전환 또는 첫 외부 배포를 요청할 때. **2026-11-21 #004 논의 중: `imported_context` 추적 해제 완료, 공개 방식 미결정** | INT-001 / 공개 준비 | 2026-10-28 Human 논의, 2026-11-21 사전 점검 |
 | T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 

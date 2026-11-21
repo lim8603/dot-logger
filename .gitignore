@@ -2,6 +2,10 @@
 .cowork/members/*/workspace/session_logs/*.md
 !.cowork/members/*/workspace/session_logs/.gitkeep
 
+# Imported context — private raw inputs, kept local only
+.cowork/06_evolution/imported_context/*
+!.cowork/06_evolution/imported_context/.gitkeep
+
 # Rust build artifacts
 target/
 **/*.rs.bk

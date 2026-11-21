@@ -109,7 +109,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **공개 범위 논의 계속(T2 사전):** Human은 `.cowork`도 공개하는 방향을 생각하고 있고, `imported_context`는 공개하지 않는다. 2026-11-21 #004에서 `imported_context` 추적을 해제했다(위 결정). 과거 커밋 69개에는 이 폴더가 남아 있으므로, 남은 결정은 둘 중 하나다. ① 현재 저장소를 공개로 바꿔 이력째 공개(dot-tools 방식, `imported_context` 이력 노출을 수용) ② 새 이력으로 공개(`imported_context` 완전 비공개). 어느 쪽이든 공개 전에 이력 전체 gitleaks 검사를 권장한다. 아래 점검 결과와 권장 방식은 #003 기준이다.
+0. **공개 전환(T2 잔여):** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
    - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
      - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).
      - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.

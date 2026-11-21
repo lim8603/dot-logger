@@ -25,7 +25,7 @@
 
 | Intent ID | 제목 | 상태 | 우선순위 | 현재 초점 Phase | 관련 Milestone | 문서 경로 | 비고 |
 |-----------|------|------|----------|-----------------|----------------|----------|------|
-| INT-001 | 재사용 가능한 실시간 로보틱스 로깅·텔레메트리 | Approved | Must | Design | MS-001~007 | [상세](intents/INT-001_realtime_robotics_logging.md) | Human이 프로젝트 목표·핵심 가치를 지정. ADR-005 초기 기준선과 ADR-007~009 상세설계·계획 승인. Gate 3 Pass, Design 완료·Build 착수 준비 |
+| INT-001 | 재사용 가능한 실시간 로보틱스 로깅·텔레메트리 | Approved | Must | Build/Verify | MS-001~009 | [상세](intents/INT-001_realtime_robotics_logging.md) | Human이 프로젝트 목표·핵심 가치를 지정. MS-001~006·008·009 Done, MS-007 In Progress(2026-11-21). 범용 라이브러리·첫 사용처 dot-probe, 완료 기준은 2026-11-13 결정 |
 
 - `상태`: `Draft` / `Approved` / `Superseded` / `Split` / `Closed`
 - `우선순위`: `Must` / `Should` / `Could`
@@ -35,9 +35,9 @@
 
 ## 활성 Intent 요약
 
-- 현재 활성 Intent: INT-001
-- 다음 검토 대상: 도메인/모듈·자원 경계와 핵심 API 계약 초안. ADR-005의 설계 기준선/이월은 재승인받지 않는다.
-- Human 확인 필요 사항: OQ-002~005의 설계 이월/수락 기준. OQ-001은 ADR-003으로 해결됐으므로 다시 묻지 않는다.
+- 현재 활성 Intent: INT-001 (2026-11-21 Build/Verify)
+- 다음 검토 대상: REV-071 코드 전체 리뷰 처리와 Gate 4 수락, 저장소 공개 전환, 그 뒤 TASK-024·026.
+- Human 확인 필요 사항: Gate 4 판정안 수락, 공개 전환 시점. 상세는 [project_state](../06_evolution/project_state.md).
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 상태
 
-`Approved` — 프로젝트 목표·핵심 가치 및2026-10-25 Human 「확정」에 따른 설계용 초기 성능/Story AC·문서 계획·미결 이월 승인. 현재 초점은 Design이다. 실제 성능 달성·미검토 기술/API 채택은 별도 검증/선정 사항이다.
+`Approved` — 프로젝트 목표·핵심 가치와 2026-10-25 Human 「확정」에 따른 설계용 초기 성능/Story AC·문서 계획·미결 이월 승인. **2026-11-21 현재 초점은 Build/Verify다.** MS-001~006·008·009 Done, MS-007 In Progress. 아래 본문의 "미정" 표현은 2026-10-25 당시 기록이며, 이후 정해진 내용은 맨 아래 [현재 상태](#현재-상태--2026-11-21)를 따른다.
 
 ## 배경
 
@@ -67,3 +67,32 @@ Q5에서 첫 적용은 자체 기록·조회·재생 기능으로 정했다. ROS
 Human 선택으로 첫 클라이언트는 Rust API + CLI와 dot-probe 기존 화면 연동, 실행 구조는 내장형 Ports and Adapters + 제한된 파이프라인(ADR-007)이다. 이 범위에서 위 초기 미정 표현을 해소한다. 실제 장비는 미확정이며 정량 수치 자체는 ADR-005 설계 기준선이다.
 
 목표를 추가 Intent로 쪼개지 않고 INT-001 아래 [MS-001~007](../../04_implementation/milestone_registry.md)와 [실행 Task](../../04_implementation/task_registry.md)로 분해한다. [요구 추적표](../../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트)에서 MS별 구현/검증을 관리한다. 현재 상세 계약/기술/계획은 2026-10-26 Human 승인됐고 Gate 3 Pass다. MS-001/TASK-001 완료, 제품 구현/시험은 미완료다.
+
+## 현재 상태 — 2026-11-21
+
+위 본문의 목표 문장은 승인 당시 그대로 둔다. 그 뒤 정해진 사항과 완료 기준 변경은 다음과 같다.
+
+### 성격과 완료 기준
+
+- **범용 라이브러리:** dot-logger는 범용 로보틱스/RTOS Rust 로그 라이브러리이고 dot-probe는 첫 사용처일 뿐이다. 설계·구현을 특정 사용처에 맞추지 않는다(2026-11-13 Human 결정).
+- **일정 판단:** 시험 커버리지와 로깅 사용 사례 대응으로 한다. 실사용처 적용(TASK-026), native·다른 OS·24시간·전원 차단(TASK-024)은 마지막 단계로 진행하되 일정 판단에 넣지 않는다(2026-11-13·15). 일정 판정은 [EV-089](../../05_verification/verification_evidence.md#ev-089)에서 Pass했다.
+- **실제 장치 시험:** 현재 PC 실측으로 대체하고, UPS는 시뮬레이션으로 판정하며, native는 저장소 공개 뒤 진행한다([ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md)).
+
+### 당시 "미정"에서 정해진 것
+
+| 당시 미정 항목 | 결정 | 근거 |
+|---|---|---|
+| 프로세스 구성·큐 | 내장형 Ports and Adapters, 제한된 생산자/소비자 파이프라인(별도 데몬 없음) | [ADR-007](../../03_design_artifacts/adrs/ADR-007_embedded_ports_adapters_pipeline.md), [ADR-008](../../03_design_artifacts/adrs/ADR-008_bounded_ownership_completion.md) |
+| 파일 형식 | native 표준 MCAP(`dot-logger/standard/2`), 손실 기록 내장, 설정 revision별 파일 회전 | [ADR-010](../../03_design_artifacts/adrs/ADR-010_mcap_security_update.md), [ADR-013](../../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md) |
+| 시계열 DB | InfluxDB v2(선택 feature, 유한 쓰기·수치 조회) | [ADR-009](../../03_design_artifacts/adrs/ADR-009_storage_transport_toolchain.md), TASK-019 |
+| 조회·재생 | 시간·채널 조회, mono 시간 재생(배속·이동), gRPC 원격 조회·재생 | TASK-010·011·012, [ADR-014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md) |
+| 모니터링 클라이언트 형태 | Rust 클라이언트 라이브러리 + `dot-logger` CLI + `dot-logger-viewer`(Foxglove WebSocket bridge, 읽기 전용 운영 대시보드) | TASK-013, [ADR-014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md), [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md) |
+| 통합 방식 | 기본 경로 facade(기본 worker, 소유 writer, preset) + 고급 경로 모듈 | [ADR-012](../../03_design_artifacts/adrs/ADR-012_facade_owned_writer_handles.md), MS-008 |
+| 수치 기준 | 설계 기준선은 ADR-005, 이 PC 수락 프로필은 local-pc-v1(TASK-022), 일정 판정 목표치는 커버리지 하한 라인·함수 92%, 리전 89% | [ADR-005](../../03_design_artifacts/adrs/ADR-005_design_baseline_and_deferred_decisions.md), [quality_gate](../../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정) |
+| 전원 이상 기록 | 고급 경로 옵션, 기본 꺼짐. 신호→차단 3초·여유 200 ms 프로필을 시뮬레이션으로 수락 | TASK-021, [EV-043](../../05_verification/verification_evidence.md#ev-043) |
+| ROS 2 호환 | 첫 사용처 적용 뒤 검토(T1, 미도래) | project_state 이월 T1 |
+
+### 남은 것
+
+- 3개 OS native 검증·24시간·전원 차단(TASK-024, 공개 뒤 T3), dot-probe 첫 적용(TASK-026), 질문 프리셋(TASK-018, 선택·범위 미승인).
+- Gate 4는 판정안 Pass(이 PC 로컬, Human 수락 대기), Gate 5는 Not Ready([판정](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)).

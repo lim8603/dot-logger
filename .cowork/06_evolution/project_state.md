@@ -11,11 +11,11 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실·원격 viewer 완료, 운영 대시보드(TASK-032) 진행 중. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
 | 활성 Task | [TASK-032](../04_implementation/tasks/TASK-032.md) In Progress — S1(ADR-016)·S2(`704d055`)·S3(`277de2d`) Done. Task 수락 전 리뷰 대기 |
-| 미처리 리뷰 | 없음 — REV-001~069 Closed. 최근 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) RV-163~165 조치·수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
+| 미처리 리뷰 | **REV-070 요청(2026-11-21)** — 범위 `5daf22b..277de2d` 코드 커밋 2개(TASK-032 대시보드), 리뷰 전용 세션에서 수행. REV-001~069 Closed |
 | 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 조치 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108) 두 Rust 각 719 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / TASK-032 S3 비교·계획 미리보기 / AI |
+| 갱신 | 2026-11-21 / REV-070 리뷰 요청 등록 / AI |
 | 세션 상태 | **진행 — 2026-11-21 #003.** REV-069 마감, TASK-032 S1~S3 Done(`277de2d`). 다음 TASK-032 리뷰·수락 |
 | 최근 완료 세션 | 2026-11-21 #002 — bd02d49..078ca6c 독립 코드리뷰([REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md), RV-163~165) |
 
@@ -96,11 +96,19 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **Closed** | RV-160·161 Closed. 손실 checkpoint 0 행 생략 뒤 8 GiB P3·P5 Pass(EV-101·103) |
 | [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `bd02d49..078ca6c` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`5daf22b` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
+| REV-070(요청) | TASK-032 viewer 내장 대시보드 S2·S3 독립 리뷰(`5daf22b..277de2d`) — 새 HTTP·보안 경계, 자가검토만 거침 | Requested | 리뷰 전용 세션이 REV-070 문서를 만든다. 중점은 아래 「다음 시작점」 0 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
+0. **REV-070 독립 코드리뷰(요청, 2026-11-21 Human 「리뷰 요청 하나 쓰자」):** 리뷰 전용 세션에서 `5daf22b..277de2d`를 본다. 대상 코드 커밋 2개: `704d055`(S2 상태 화면·HTTP), `277de2d`(S3 Compare·PlanCheck 조회). 같은 구간 문서 커밋의 [viewer README](../../crates/dot-logger-viewer/README.md) 대시보드 절도 대조한다. REV-069 조치 `5daf22b`는 범위 밖이다. 결과 처리는 TASK-032 수락보다 먼저 한다. 기준은 [ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md)·[화면 §7](../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21). 중점:
+   - ① HTTP 경계(`dashboard.rs` `read_head`·`route`·`respond`): 손으로 만든 HTTP/1.1 응답의 정확성(httparse 사용, 연결당 요청 1개, `Connection: close`, 응답 뒤 입력 비우기), Host 검사의 DNS rebinding 방어와 IPv6·대소문자·포트 경계, Origin 규칙(`local_origin`·`--allow-origin`), 메서드·본문·머리 크기(8 KiB, 431)·기한(2초)·동시 연결(8), 느린 클라이언트로 연결을 붙잡는 경우, CSP와 보안 헤더
+   - ② 값 보존 계약(`Status`): 상류 `status.v1`을 가공 없이 넘기는지, 실패가 마지막 값과 시각을 지우지 않는지, schema 불일치·비상태 응답의 corrupt 처리, `dot_logger.viewer.dashboard.v1` 필드가 ui_spec §7.1과 맞는지
+   - ③ 상류 작업자(`work`·`ask`·`lookup`): 상태 조회와 조회 요청을 합쳐 동시에 하나만 진행하는지(ADR-016 결정 2), 대기열 4개와 `viewer_busy`, 조회 기한(`timeout × 6`), 재연결 기준(`broken`: 전송 계열만), 종료 시 작업자 abort와 연결 정리, credential이 브라우저 응답에 섞이지 않는지
+   - ④ 조회 경로: `ids` 파싱(정확한 이름·중복·빈 값·u64 초과·숫자 아님), `Query::report`의 schema·kind 검사, 실패 시 일부 보고서를 싣지 않는지, 읽기 전용(RunCheck·ApplyConfig 경로가 없는지)
+   - ⑤ 화면 JS(`assets/dashboard/dashboard.js`): textContent만 쓰는지(XSS), 없는 값을 0으로 그리지 않는지, 실패·viewer 무응답 표시, `RateChange`(after − before 크기, ns 단위) 환산과 부호, BigInt 경계, 선택 상자 유지
+   - ⑥ 시험·예제: 대시보드 시험 8건의 결정성과 시간 의존(300 ms 보류, 1초 주기), `operations_host` 예제의 자원 정리와 10분 상한, `live_host`의 `.telemetry()` 추가 영향
 1. **TASK-032 리뷰·수락.** S1([ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md)), S2(`704d055`, [EV-107](../05_verification/verification_evidence.md#ev-107)), S3(`277de2d`, [EV-108](../05_verification/verification_evidence.md#ev-108))이 끝났다. 완료 기준의 Human 리뷰(독립 리뷰 요청 또는 위임 수락 결정) 뒤 TASK-032·MS-009를 마감하고 추적표 MS 칸을 갱신한다. 다음은 TASK-025다. [TASK-032](../04_implementation/tasks/TASK-032.md)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.

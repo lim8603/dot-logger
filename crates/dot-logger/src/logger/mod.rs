@@ -934,7 +934,7 @@ impl LoggerBuilder {
             _ => None,
         };
         let held = Held {
-            writers: Arc::new(Mutex::new(writers)),
+            writers: Arc::new(crate::sync::warm_mutex(writers)),
             #[cfg(feature = "tracing-adapter")]
             sink,
         };

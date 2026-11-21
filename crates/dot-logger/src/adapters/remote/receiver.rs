@@ -93,7 +93,7 @@ impl Reassembler {
         Ok(Self {
             ledger: Arc::new(Ledger {
                 used: AtomicUsize::new(0),
-                generations: Mutex::new(Vec::with_capacity(records)),
+                generations: crate::sync::warm_mutex(Vec::with_capacity(records)),
                 _reservation: reservation,
             }),
             frames: Vec::with_capacity(records),

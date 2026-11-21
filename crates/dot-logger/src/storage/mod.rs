@@ -229,7 +229,7 @@ impl FileLedger {
     pub(crate) fn new(producers: usize) -> Self {
         Self {
             appended: (0..producers).map(|_| Default::default()).collect(),
-            owed: std::sync::Mutex::new(Owed {
+            owed: crate::sync::warm_mutex(Owed {
                 stuck: 0,
                 stuck_ranges: vec![(0, 0); producers].into_boxed_slice(),
                 slot_ids: vec![0; PENDING_FILES].into_boxed_slice(),
@@ -245,6 +245,9 @@ impl FileLedger {
     pub(crate) const PRODUCER_BYTES: usize = size_of::<std::sync::atomic::AtomicU64>()
         + (2 + PENDING_FILES) * size_of::<(u64, u64)>()
         + PENDING_FILES * size_of::<u64>();
+    /// Bytes `new` allocates once per ledger beyond the struct: its warmed
+    /// lock on Apple targets (TASK-036 S5).
+    pub(crate) const LEDGER_BYTES: usize = crate::sync::MUTEX_BYTES;
     fn owed(&self) -> std::sync::MutexGuard<'_, Owed> {
         // Owed is updated in place without panicking paths; a poisoned
         // guard still holds consistent counts.

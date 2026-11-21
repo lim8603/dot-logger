@@ -129,7 +129,7 @@ impl Shared {
             finish: AtomicBool::new(false),
             outputs: (0..outputs).map(|_| OutputStatus::new()).collect(),
             affinity: AtomicU8::new(AFFINITY_NONE),
-            telemetry: telemetry.then(|| Mutex::new(None)),
+            telemetry: telemetry.then(|| crate::sync::warm_mutex(None)),
             #[cfg(test)]
             inject: AtomicU8::new(0),
         }

@@ -291,7 +291,7 @@ impl RemoteHub {
         let shared = Arc::new(Shared {
             limits,
             closed: AtomicBool::new(false),
-            subs: Mutex::new(Registry { next: 1, slots }),
+            subs: crate::sync::warm_mutex(Registry { next: 1, slots }),
             commands,
             command_permits: permits,
             _reservation: reservation,
@@ -353,7 +353,7 @@ impl RemoteHub {
             records,
             bytes,
             age,
-            state: Mutex::new(SubState {
+            state: crate::sync::warm_mutex(SubState {
                 next: 1,
                 records: VecDeque::with_capacity(records),
                 used: 0,

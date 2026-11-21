@@ -31,7 +31,7 @@ pub(crate) struct SinkState {
 impl SinkState {
     pub(crate) fn new(writer: Writer, session: u128, channel: u32, max: ::tracing::Level) -> Self {
         Self {
-            writer: Mutex::new(Some(writer)),
+            writer: crate::sync::warm_mutex(Some(writer)),
             session,
             channel,
             max,

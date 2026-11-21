@@ -447,6 +447,7 @@ impl<'owner> Router<'owner> {
                 &mut reserved,
                 array_bytes(producers, crate::storage::FileLedger::PRODUCER_BYTES)?,
             )?;
+            add(&mut reserved, crate::storage::FileLedger::LEDGER_BYTES)?;
             add(
                 &mut reserved,
                 array_bytes(target.pending_slots, size_of::<Option<Pending<'_>>>())?,

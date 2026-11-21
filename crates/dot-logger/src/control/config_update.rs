@@ -175,7 +175,7 @@ impl State {
             channels: channels.iter().map(|c| c.channel_id).collect(),
             targets: routing.targets.iter().map(|t| t.id).collect(),
             memory: memory.clone(),
-            management: Mutex::new(Management {
+            management: crate::sync::warm_mutex(Management {
                 slot: 0,
                 revision,
                 previous: None,
@@ -188,7 +188,7 @@ impl State {
     /// cannot represent. Shared with the facade sizing so the derived budget
     /// and the actual reservation cannot diverge.
     pub(crate) fn required(channels: usize, producers: usize, targets: usize) -> Option<usize> {
-        let mut bytes = size_of::<Self>();
+        let mut bytes = size_of::<Self>().checked_add(crate::sync::MUTEX_BYTES)?;
         for (n, size) in [
             (channels, 2 * size_of::<Policy>() + size_of::<u32>()),
             (channels.checked_mul(targets)?, 2 * size_of::<AtomicUsize>()),

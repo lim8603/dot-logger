@@ -216,12 +216,13 @@ impl Bank {
         producers
             .checked_mul(size_of::<CounterCell>())?
             .checked_add(size_of::<Self>())?
+            .checked_add(crate::sync::MUTEX_BYTES)?
             .checked_add(History::required())
     }
     pub(crate) fn new(producers: usize, epoch: u64) -> Self {
         Self {
             cells: (0..producers).map(|_| CounterCell::new()).collect(),
-            history: Mutex::new(History::new()),
+            history: crate::sync::warm_mutex(History::new()),
             epoch,
         }
     }

@@ -50,6 +50,7 @@ pub mod config;
 pub mod loss;
 pub mod platform;
 pub mod pool;
+mod sync;
 
 /// Bounded management-path fanout, retries, and output retention accounting.
 pub mod routing;

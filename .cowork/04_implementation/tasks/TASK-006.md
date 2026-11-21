@@ -124,7 +124,7 @@ Human 「다음단계로」에 따라 앞서 안내한 최종 리뷰를 진행�
 | 수정 | [CI](../../../.github/workflows/ci.yml) | 기존 raw-memory job에 완료·제어 Miri 대상 추가; 실행은 후속 검증 |
 | 수정 | [도메인](../../03_design_artifacts/domain_model.md), [인터페이스](../../03_design_artifacts/interface_contract.md), [Task 목록](../task_registry.md), [MS 목록](../milestone_registry.md), [MS-002](../milestones/MS-002.md), 이 문서 | 구현/계약과 진행 상태 정렬 |
 | 수정 | [전략](../../05_verification/test_strategy.md), [TC/추적표](../../05_verification/test_case.md), [EV](../../05_verification/verification_evidence.md), [공유 상태](../../06_evolution/project_state.md), [개인 상태](../../members/lim8603/workspace/my_state.md) | 현재 근거·미검증/승인·다음 시작점 |
-| 생성 | 증거 폴더(비공개 원시 근거), [세션 로그](../../members/lim8603/workspace/session_logs/session_2026-10-28_002.md) | Red/Green·환경/명령·hash와 작업 연속성 |
+| 생성 | 증거 폴더(비공개 원시 근거: `imported_context/task_006_2026-10-28/`), 세션 로그(비공개 세션 로그: `session_logs/session_2026-10-28_002.md`) | Red/Green·환경/명령·hash와 작업 연속성 |
 
 ## 클래스·타입 변경표
 

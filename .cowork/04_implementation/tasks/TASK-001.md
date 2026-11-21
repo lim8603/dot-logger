@@ -23,4 +23,4 @@
 
 문서 작업이므로 제품 단위 테스트를 만들거나 통과 처리하지 않았다. MS-001의 검증은 설계 리뷰/정합성 점검이며 제품 TC 실행은 전부 Not Run이다. FR-015·실장비/의존성 확인은 승인된 잔여 범위다.
 
-근거: [Gate 3](../../05_verification/quality_gate.md), [추적표](../../05_verification/test_case.md), [세션 로그](../../members/lim8603/workspace/session_logs/session_2026-10-26_001.md). 검증 대상은 이 세션의 미커밋 문서 변경이며 코드/배포 변경은 없다.
+근거: [Gate 3](../../05_verification/quality_gate.md), [추적표](../../05_verification/test_case.md), 세션 로그(비공개 세션 로그: `session_logs/session_2026-10-26_001.md`). 검증 대상은 이 세션의 미커밋 문서 변경이며 코드/배포 변경은 없다.

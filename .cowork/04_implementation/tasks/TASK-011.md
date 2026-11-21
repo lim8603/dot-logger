@@ -59,7 +59,7 @@ EV-018 source54개/검사10개 exit0, 두 Rust 각16features·독립 실제 File
 
 ## 세션 마감·게시 — 2026-10-30
 
-Human 「커밋, 푸쉬해주고 세션마무리」에 따라 EV-018 source54개·검사10개 exit0·로그19개의 원본/뷰 hash 일치를 확인했고, 동일 성공 시험은 반복하지 않았다. 소스 `ccecf4a`를 커밋·origin/main 게시했으며 모든 source commit blob hash도 일치한다. 커밋 대조(비공개 원시 근거)·소스 게시 근거(비공개 원시 근거). 검증/마감 문서는 별도 커밋·[skip ci]로 게시한다. 위 미커밋/미게시 문장은 검증 당시 이력이다.
+Human 「커밋, 푸쉬해주고 세션마무리」에 따라 EV-018 source54개·검사10개 exit0·로그19개의 원본/뷰 hash 일치를 확인했고, 동일 성공 시험은 반복하지 않았다. 소스 `ccecf4a`를 커밋·origin/main 게시했으며 모든 source commit blob hash도 일치한다. 커밋 대조(비공개 원시 근거: `imported_context/task_011_2026-10-30/commit.json`)·소스 게시 근거(비공개 원시 근거: `imported_context/task_011_2026-10-30/push.json`). 검증/마감 문서는 별도 커밋·[skip ci]로 게시한다. 위 미커밋/미게시 문장은 검증 당시 이력이다.
 
 공유/개인 상태와 세션 로그를 종료로 동기화했다. 다음 시작점은 TASK-011·REV-015·EV-018의 Human 최종 구현 리뷰다. 커밋/게시 요청을 별도 최종 구현 승인으로 해석하지 않아 REV-015 Resolved·TASK-011/MS-004 In Progress·native GAP-004/장비·Gate4/5 Not Ready를 유지하며 TASK-012를 자동 착수하지 않는다.
 
@@ -82,7 +82,7 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 
 ## 세션 마감·게시 — 2026-10-31
 
-Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `c6cc5a5`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거)·소스 게시 근거(비공개 원시 근거). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
+Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `c6cc5a5`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/commit.json`)·소스 게시 근거(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/push.json`). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
 
 TASK-011 Human 승인·REV-015/016 Closed, ADR-011 Accepted를 유지한다. 현재 PC 실측/UPS 시뮬레이션을 수락하며 native는 공개 완료 후(T3) 진행한다. 다음 시작점은 TASK-022의 실행 커널 확인·P0/제어 부하/기한/경로/예산 프로필 준비다. 현재 generic 실행/RT 설치를 구분하며 재부팅·부트 변경은 수행하지 않았다. TASK-008/010 Human 리뷰·PC 실측/UPS/24h 미실행·Gate4/5 Not Ready는 잔여다. 검증/수락/마감 문서는 별도 docs(cowork)·[skip ci] 커밋으로 게시하며 세션 종료 후 새 Task를 자동 착수하지 않는다.
 

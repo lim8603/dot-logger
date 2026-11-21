@@ -6,7 +6,7 @@
 - 대상: `control::emergency`·`platform::power`·기존 `ControlOwner` 통합·UPS 공유 실행/예제·TC-011·할당/경합 시험.
 - 상태: **Closed** — Open → In Progress → RV-084/085 조치·최종 검증 Resolved → 기존 위임으로 로컬 구현/UPS 시뮬레이션 수락.
 - 판정: **Pass — 로컬 구현·승인된 UPS 시뮬레이션**, 새 미해결 지적 없음. 실물 UPS는 ADR-011 및 Human 재확인에 따라 수락 선행조건이 아니다.
-- 근거: [EV-043](../verification_evidence.md#ev-043)·검사(비공개 원시 근거).
+- 근거: [EV-043](../verification_evidence.md#ev-043)·검사(비공개 원시 근거: `imported_context/task_021_2026-11-02/checks.json`).
 
 ## 리뷰 요약
 
@@ -27,7 +27,7 @@
 
 ## [처리담당] RV-084
 
-- 수용. `control::tests::earlier_alarm_during_report_cannot_leave_protected_complete_using_old_deadline`의 test-only Barrier scheduler로 report 중3초→500ms 알람을 실제 게시했다. 수정 전 보고서가3초를 반환해 실패했다(Red(비공개 원시 근거)).
+- 수용. `control::tests::earlier_alarm_during_report_cannot_leave_protected_complete_using_old_deadline`의 test-only Barrier scheduler로 report 중3초→500ms 알람을 실제 게시했다. 수정 전 보고서가3초를 반환해 실패했다(Red(비공개 원시 근거: `imported_context/task_021_2026-11-02/red-report-race.log`)).
 - 최종 deadline 재관측과 동일 coordinator의 보수적 재poll 후 protection을 판정하도록 수정했다. 이후에 게시된 사건은 다음 poll의 snapshot으로 처리한다. InFlight 상태/원본 소유권을 초기화하지 않는다.
 - 최종 source `3a82ce3`·검증파일139개 blob 일치, 두 Rust workspace각434/16features·Miri112·RT0/0·ext4 보호량/지연16조건·child 복구를 EV-043으로 수락/Closed 처리했다.
 

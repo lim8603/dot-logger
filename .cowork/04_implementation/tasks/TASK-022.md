@@ -55,7 +55,7 @@ Human 결정 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 | native | 공개 완료 후 source hash 고정·6 contracts+audit+raw-memory. 현재 미실행 이월 |
 | 남은 프로필 | 제어 주기/deadline·대표 입력/보호량·P0 도구·NIC/원격 범위·CPU affinity/우선순위·시험 경로/예산을 실행 전에 선언 |
 
-환경 관측 원문(비공개 원시 근거). 이 기록은 환경 확인이며 제품 성능·RT 지연·UPS 합격 증거가 아니다. 실물 UPS/별도 장치 미제공을 착수 차단 사유로 사용하지 않는다. 커널/부트 설정 변경·재부팅은 수행하지 않았다.
+환경 관측 원문(비공개 원시 근거: `imported_context/verification_policy_2026-10-31/environment.json`). 이 기록은 환경 확인이며 제품 성능·RT 지연·UPS 합격 증거가 아니다. 실물 UPS/별도 장치 미제공을 착수 차단 사유로 사용하지 않는다. 커널/부트 설정 변경·재부팅은 수행하지 않았다.
 
 <a id="현재-pc-수치-프로필-초안--2026-10-31"></a>
 ## 현재 PC 수치 프로필 — 2026-10-31 Approved
@@ -83,9 +83,9 @@ Human 「승인, 다음작업 진행하자」에 따라 TASK-008/010/011 리뷰�
 
 ### 관측과 실행 준비
 
-현재 환경 관측(비공개 원시 근거): `/data/build` 여유341,256,384,512B, cap+reserve240,518,168,576B보다 큼. 실제 run 시 다시 검사한다. CPU2↔10·3↔11 SMT 대응을 확인했다. cyclictest/perf/rtla/stress-ng/iostat 설치, fio/iperf3 부재. 파일 P0는 동기화/회전 조건을 맞출 수 있는 Rust harness를 예정하므로 fio 설치를 선행 차단으로 사용하지 않는다. 원격 iperf3 대안/설치는 해당 Task에서 결정한다.
+현재 환경 관측(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/preflight.json`): `/data/build` 여유341,256,384,512B, cap+reserve240,518,168,576B보다 큼. 실제 run 시 다시 검사한다. CPU2↔10·3↔11 SMT 대응을 확인했다. cyclictest/perf/rtla/stress-ng/iostat 설치, fio/iperf3 부재. 파일 P0는 동기화/회전 조건을 맞출 수 있는 Rust harness를 예정하므로 fio 설치를 선행 차단으로 사용하지 않는다. 원격 iperf3 대안/설치는 해당 Task에서 결정한다.
 
-원참조 제어 주기20ms/안전10ms와 priority는 dot-probe `control_thread.rs:327`/`safety_thread.rs:91`/`realtime.rs:92`의 로컬 코드 관측이며 실제 배포 설정·승인된 deadline은 아니다. 참조 HEAD와 파일 작업 트리 SHA-256은 점검 근거(비공개 원시 근거)에 고정했다. 다른 저장소는 읽기만 했다. 본 합성 행은 dot-probe 실사용 통합(TASK-026) 수락을 대체하지 않는다.
+원참조 제어 주기20ms/안전10ms와 priority는 dot-probe `control_thread.rs:327`/`safety_thread.rs:91`/`realtime.rs:92`의 로컬 코드 관측이며 실제 배포 설정·승인된 deadline은 아니다. 참조 HEAD와 파일 작업 트리 SHA-256은 점검 근거(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/checks.json`)에 고정했다. 다른 저장소는 읽기만 했다. 본 합성 행은 dot-probe 실사용 통합(TASK-026) 수락을 대체하지 않는다.
 
 [EV-021](../../05_verification/verification_evidence.md#ev-021): 선언 유효성·실행 준비 미충족 분리, 5개 부정 입력 거절·기존 source54개 불변 확인. 제품 성능/RT/UPS 시험은 Not Run이다. 수치 프로필 승인/approval 필드 갱신을 완료했다. 실제 실행 revision·환경·선행 harness/capability를 고정한 뒤 실행한다. TASK-022 In Progress·Gate4/5 Not Ready 유지.
 
@@ -93,13 +93,13 @@ Human 「승인, 다음작업 진행하자」에 따라 TASK-008/010/011 리뷰�
 
 Human 「20ms를 10ms로 줄일 수있을까?」에 따라 합성 제어 주기와 완료 기한을 모두10ms(100Hz)로 반영했다. 주기당 목표 연산500µs는 유지하므로 합성 연산만의 시간 비중은2.5%→5%, 초당 실행 횟수는50→100회다. calibration 뒤 고정 연산량을 사용하며 OS/로깅 오버헤드는 실제 off/on 시험으로 별도 판정한다. 실제 dot-probe 코드의20ms 기본값은 수정하지 않았다. 이 변경을 전체 프로필 수치의 일괄 승인으로 확대하지 않으며 나머지 초안/미실행 경계를 유지한다.
 
-10ms 선언 점검(비공개 원시 근거)은 수정된 프로필 hash/선언 Valid·성능 NotRun을 기록한다. 기존 checks.json의20ms 프로필은 당시 스냅샷(비공개 원시 근거)으로 보존한다.
+10ms 선언 점검(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/control-10ms-checks.json`)은 수정된 프로필 hash/선언 Valid·성능 NotRun을 기록한다. 기존 checks.json의20ms 프로필은 당시 스냅샷(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/profile-control20ms.toml`)으로 보존한다.
 
 ### Human 수치 프로필 승인 — 2026-10-31
 
 10ms 조정 보고 뒤 Human 「승인」을 local-pc-v1 수치 프로필 수락으로 반영했다. 주기/기한10ms·주기당 합성500µs, 안전 루프10ms·200µs, 메모리2GiB·P3 120초×3회·cap160GiB/reserve64GiB·UPS 모의3초/8·64MiB 및 위 표의 조건을 확정했다. 앞선 Draft/승인 대기는 당시 이력이다. approval=Approved·execution=NotRun이며 구현/부팅/실행 결과를 승인으로 대신하지 않는다.
 
-승인 프로필 스냅샷/사전 점검(비공개 원시 근거)에서 선언 Valid exit0·준비 점검 exit2, 승인 대기 이유 제거를 확인했다. 선행 성능 harness·실앱 통합/UPS adapter 및 RT 부팅/capability 확인은 잔여다. TASK-022 In Progress·TC-011/012 NotRun·Gate4/5 Not Ready 유지. 기존 조건을 재승인받지 않고 다음 준비에서 사용한다.
+승인 프로필 스냅샷/사전 점검(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/approval-checks.json`)에서 선언 Valid exit0·준비 점검 exit2, 승인 대기 이유 제거를 확인했다. 선행 성능 harness·실앱 통합/UPS adapter 및 RT 부팅/capability 확인은 잔여다. TASK-022 In Progress·TC-011/012 NotRun·Gate4/5 Not Ready 유지. 기존 조건을 재승인받지 않고 다음 준비에서 사용한다.
 
 ## REV-022 RV-049 포화 회복 실측 후속 — 2026-10-31
 

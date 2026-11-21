@@ -36,7 +36,7 @@ unlink와 directory sync는 서로 다른 관측이다. sync 실패 시 durable 
 
 ## 최종 검증
 
-[EV-012](../verification_evidence.md#ev-012)·source49개/명령/로그 hash(비공개 원시 근거)를 확인했다. `97 tests × 8 seeds = 776` Miri 실행 모두 Pass이며 실제 파일 통합1개는 Miri 범위 밖의 일반 Linux 실행이다. 소스/manifest/lock 49개와 최종 검사10개의 source hash가 일치한다. 현재 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 최종 구현 Human 승인 전이므로 Closed로 승격하지 않는다.
+[EV-012](../verification_evidence.md#ev-012)·source49개/명령/로그 hash(비공개 원시 근거: `imported_context/task_008_2026-10-30/results.json`)를 확인했다. `97 tests × 8 seeds = 776` Miri 실행 모두 Pass이며 실제 파일 통합1개는 Miri 범위 밖의 일반 Linux 실행이다. 소스/manifest/lock 49개와 최종 검사10개의 source hash가 일치한다. 현재 검토에서 추가 미해결 P1/P2는 확인하지 못했다. 최종 구현 Human 승인 전이므로 Closed로 승격하지 않는다.
 
 2026-10-30 로컬 커밋 `e6669ac`는 EV-012 source49개와 일치한다. 커밋·세션 종료 요청을 최종 구현 승인으로 확대하지 않으며 Resolved를 유지한다. 푸시는 수행하지 않았다.
 

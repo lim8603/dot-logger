@@ -30,5 +30,5 @@ Human은 Q6의 센서 구성이 순간 처리 능력의 설계 가정이며, 저
 ## 관련 문서
 
 - [요구사항](../../02_project_definition/requirement_spec.md)
-- 센서 용량 조사(비공개 원시 근거)
+- 센서 용량 조사(비공개 원시 근거: `imported_context/research_2026-10-25_sensor_volume.md`)
 - [공유 상태](../../06_evolution/project_state.md)

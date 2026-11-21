@@ -5,7 +5,7 @@
 - 일자/담당: 2026-11-03 #001 / AI 개발 세션 자가 점검. 독립 리뷰가 아니다.
 - 대상: `telemetry::operations::OperationsHost`, `RemoteError::{Conflict, Busy, RestartRequired}`와 server/client 매핑, `ManagementReply::Status.report`, CLI status/compare/config apply 출력, TC-009 operations·CLI 종단 시험.
 - 상태: **Closed** — 아래 P3 3건은 문서화로 처리하고, 결함 수정이 필요한 항목은 없다. 사전 존재 불안정 시험은 GAP-008로 분리했다.
-- 판정: **Pass — 로컬 기능 범위.** 근거: [EV-044](../verification_evidence.md#ev-044)·결과(비공개 원시 근거).
+- 판정: **Pass — 로컬 기능 범위.** 근거: [EV-044](../verification_evidence.md#ev-044)·결과(비공개 원시 근거: `imported_context/ops_backend_2026-11-03/results.json`).
 
 ## 리뷰 요약
 

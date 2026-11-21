@@ -24,7 +24,7 @@
 ### [처리담당]
 
 - 판정: 수용(A — 승인된 만료/읽기 보호 계약의 구현 세부 수정).
-- `observed_expiry_cannot_be_reversed_with_an_older_time_argument`에서 컴파일되는 반례 Red를 확인했다(Red(비공개 원시 근거)). scan 인수 tuple 정리의 컴파일 오류는 별도 harness 로그이며 행동 Red로 세지 않는다.
+- `observed_expiry_cannot_be_reversed_with_an_older_time_argument`에서 컴파일되는 반례 Red를 확인했다(Red(비공개 원시 근거: `imported_context/task_010_2026-10-30/red-expiry.log`)). scan 인수 tuple 정리의 컴파일 오류는 별도 harness 로그이며 행동 Red로 세지 않는다.
 - `Snapshot::alive`가 최대 observed 시각을 Cell에 보관한다. snapshot deadline은 source pin deadline과 요청 deadline의 최소값이며, 모든 start/page/blob 경로에서 검사한다. 실제 진행 중 IO는 반환을 기다리고 source Drop 전에 pin을 풀지 않는다.
 - 최종 Green/소스 근거는 [EV-016](../verification_evidence.md#ev-016)이다.
 
@@ -37,7 +37,7 @@
 ### [처리담당]
 
 - 판정: 수용(A — 이미 승인된 오류 계약과의 정렬).
-- 기존 blob 범위 통합에 deadline 시각 및 과거 시각으로 재호출하는 Gone 기대를 추가해 행동 Red(비공개 원시 근거)를 확인했다.
+- 기존 blob 범위 통합에 deadline 시각 및 과거 시각으로 재호출하는 Gone 기대를 추가해 행동 Red(비공개 원시 근거: `imported_context/task_010_2026-10-30/red-blob-expiry.log`)를 확인했다.
 - `read_blob`의 IO 전/후 alive 실패 중 Expired만 Gone으로 매핑한다. 취소·원 OS 오류·범위/한도 분류는 보존한다. cursor는 Expired를 유지한다.
 - 직전 matrix9 명령·Miri1024 Pass 뒤 변경이므로 원본을 interim에 보존하고 최종53 source로 전체 matrix/Miri를 재실행한다. interim matrix의 최종 manifest guard는 README 설명의 일시 수정/원복 시점 때문에 exit1이었다. 실행 명령9개는 모두0이며 실행 코드 변동은 없었다. 이를 최종 소스 증거로 대체하지 않고 아래 EV-016 최종 실행만 현재 근거로 사용한다.
 
@@ -50,7 +50,7 @@
 ### [처리담당]
 
 - 판정: 수용(A — 승인된 유한 조회/오류 분류의 구현 세부 정렬).
-- `malformed_or_over_limit_sources_do_not_produce_partial_snapshots`에 body 크기 한도 Limit 기대를 추가해 행동 Red(비공개 원시 근거)를 확인했다.
+- `malformed_or_over_limit_sources_do_not_produce_partial_snapshots`에 body 크기 한도 Limit 기대를 추가해 행동 Red(비공개 원시 근거: `imported_context/task_010_2026-10-30/red-frame-limit.log`)를 확인했다.
 - `scan_stop`에서 scanner의 Limit·지원하지 않는 압축·손상을 각 QueryError로 유지한다. 실제 IO 원인은 그대로 보존한다.
 - 해당 테스트 확장으로 fake reader의 공유 seek 위치가 writer에 영향을 주는 fixture 결함도 드러났다. host 계약처럼 clone별 독립 offset과 공유 bytes를 사용하도록 수정했다. 이는 제품 코드 결함으로 세지 않는다. 중간 실패/중단 로그는 interim-frame-limit에 보존하고 query9 Green 뒤 최종 source53을 동결했다.
 
@@ -66,9 +66,9 @@
 
 ## 최종 검증
 
-[EV-016](../verification_evidence.md#ev-016)·source53개/명령/로그 hash(비공개 원시 근거)로 고정했다. 최종 matrix9+Miri1=검사10개 exit0, source53개가 두 실행/현재 작업 트리와 일치한다. 두 Rust16 features/독립 실제 파일 consumer·예제·clippy/rustdoc/fmt·allocator10 및 Miri128×8=1024 Pass다. query256B/8MiB peak11143/25176199 ≤ external 예약110776/67217592 bytes, 잔여0·기존 RT0/0을 유지한다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. Human 최종 구현 승인 전 Closed로 바꾸지 않는다. native/장비·closed summary scan 생략 최적화/재생/remote/CLI 미구현 범위를 유지한다.
+[EV-016](../verification_evidence.md#ev-016)·source53개/명령/로그 hash(비공개 원시 근거: `imported_context/task_010_2026-10-30/results.json`)로 고정했다. 최종 matrix9+Miri1=검사10개 exit0, source53개가 두 실행/현재 작업 트리와 일치한다. 두 Rust16 features/독립 실제 파일 consumer·예제·clippy/rustdoc/fmt·allocator10 및 Miri128×8=1024 Pass다. query256B/8MiB peak11143/25176199 ≤ external 예약110776/67217592 bytes, 잔여0·기존 RT0/0을 유지한다. 자가 검토에서 추가 미해결 P1/P2는 확인하지 못했다. Human 최종 구현 승인 전 Closed로 바꾸지 않는다. native/장비·closed summary scan 생략 최적화/재생/remote/CLI 미구현 범위를 유지한다.
 
-후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `4a54bcf`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
+후속 커밋 — 2026-10-30: Human 「커밋해줘」에 따라 TASK-010 소스 `4a54bcf`를 로컬 커밋했다. EV-016 source53개와 commit blob hash가 일치하여 기존 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거: `imported_context/task_010_2026-10-30/commit.json`). 문서는 소스와 분리 커밋하며 푸시는 하지 않는다. 커밋 요청을 최종 구현 승인으로 해석하지 않고 REV-013 Resolved·Human 리뷰/native·장비 대기와 세션 종료 상태를 유지한다. 위 미커밋/commit 미실행 문장은 검증·마감 당시 이력이다.
 
 ## Human 최종 구현 승인 — 2026-10-31
 

@@ -62,14 +62,14 @@ Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)�
 
 - `--dashboard ADDR`로 loopback HTTP 대시보드를 연다. `/api/status`는 `dot_logger.viewer.dashboard.v1`이다. 상류 `status.v1`을 그대로 넘기고, 마지막 성공 값과 최근 실패 사유·시각을 분리해 담는다.
 - 화면은 연결 머리줄, 최근 표본(Capture·전체·필수 출력), 10/60/300초 window, snapshot 목록을 보여준다. `status.v1`에 대상별 분해가 없어 출력은 전체·필수 합계로 표시한다([화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)).
-- 시험 5건(값 상태 보존, 지표 없음, 실패 뒤 마지막 값 유지, HTTP 경계, 실제 hub 응답·권한 거절·호스트 종료)이 stub에서 Red였고 구현 뒤 Green이다. 브라우저 확인 캡처 3종은 근거(비공개 원시 근거)에 있다.
+- 시험 5건(값 상태 보존, 지표 없음, 실패 뒤 마지막 값 유지, HTTP 경계, 실제 hub 응답·권한 거절·호스트 종료)이 stub에서 Red였고 구현 뒤 Green이다. 브라우저 확인 캡처 3종은 근거(비공개 원시 근거: `imported_context/task_032_s2_2026-11-21/README.md`)에 있다.
 
 ## S3 결과 — 2026-11-21
 
 - `/api/compare?before=&after=`와 `/api/plan?id=`는 호스트의 `compare.v1`·`check.v1` plan을 그대로 담거나, 이름 있는 실패(gone·unsupported·viewer_busy 등)를 돌려준다.
 - 상태 조회와 조회 요청은 작업자 하나가 한 번에 하나씩 처리한다(상류 명령 슬롯 1개).
 - 화면은 보유 snapshot 두 개의 비교(양쪽 조건, 다른 조건, 변화 8항목)와 계획 미리보기를 보여준다. 실행 버튼은 없다.
-- 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. 근거(비공개 원시 근거)
+- 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. 근거(비공개 원시 근거: `imported_context/task_032_s3_2026-11-21/README.md`)
 
 ## 독립 리뷰 REV-070 — 2026-11-21
 

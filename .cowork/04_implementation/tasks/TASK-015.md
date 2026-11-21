@@ -49,7 +49,7 @@ Human 「세션 마무리해줘. 다음 세션에서 TASK-015 시작하자」. �
 
 ## 로컬 구현·검증·위임 수락 — 2026-10-31 #012
 
-- EV-028 source100개/검사13개·Miri168·소스95a63a6, 결과·환경·명령·hash(비공개 원시 근거). 두 Rust 각16feature/workspace/core-client·clippy/rustdoc -D warnings·fmt·공개 consumer·기존 RT allocator 회귀 Pass.
+- EV-028 source100개/검사13개·Miri168·소스95a63a6, 결과·환경·명령·hash(비공개 원시 근거: `imported_context/task_015_2026-10-31/results.json`). 두 Rust 각16feature/workspace/core-client·clippy/rustdoc -D warnings·fmt·공개 consumer·기존 RT allocator 회귀 Pass.
 - `ReportInput::from_window`는 실제 window의 session/revision/epoch/구간과 global producer/channel 범위를 보존한다. host 공급 output/physical buffer/disk 관측은 같은 구간·조건이어야 하며 기본은 MissingMeasurement다. Rate/Ratio 정수 유리수·Value 근거/만료·검증 profile 일치/유효성·분리된 limit/retention을 구현했다.
 - 리포트 TC-009 14개, 기존 계측7개(실제 window→report 추가1), Miri8seeds×21=168. 할당 guard 추가1은 관리 build1024회 heap 할당0/해제0이다. 안정 합성 12조합의 step simulation으로 5초 이상 예측의 오차≤20%를 확인했으며 실제 PC/RT IO 수락은 아니다.
 - RV-056~059의 profile session/독립 quota/BeyondRange/Estimated 과부하 provenance는 assertion Red→Green으로 조치했다. 초기 MSRV lint 실패 원본은 before-lint-fix에 보존하고 공통 표현으로 정리한 최종 소스를 재검증했다.

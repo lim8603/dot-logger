@@ -93,7 +93,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `new`(`InvalidInput`), `register_snapshot`(`Limit`: 슬롯 가득/ID 소진), `forget_snapshot`·`compare`(`Gone`)에 더해 `apply`에도 `# Errors`를 추가해 §15.8 오류 매핑 전체(`Unsupported`·`InvalidInput`·`RestartRequired`·`Conflict`·`Busy`·`Limit`·`Gone`·`Transport`)를 명시했다. 동작 변경은 없다.
-- **검증 근거:** 소스 `ee57f44`; `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps` exit0. 검증 원문(비공개 원시 근거)
+- **검증 근거:** 소스 `ee57f44`; `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger -p dot-logger-client -p dot-logger-cli --all-features --no-deps` exit0. 검증 원문(비공개 원시 근거: `imported_context/rev045_2026-11-03/rev045-verify.log`)
 
 ---
 
@@ -111,7 +111,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 (`Closed`)
 - **처리 내용:** `#[derive(Debug)]`를 추가했다.
-- **검증 근거:** 소스 `ee57f44`; `host_slots_are_bounded`에 `{host:?}` 포맷 검사를 추가했다(추가 전 E0277 컴파일 Red → derive 후 Pass). 검증 원문(비공개 원시 근거)
+- **검증 근거:** 소스 `ee57f44`; `host_slots_are_bounded`에 `{host:?}` 포맷 검사를 추가했다(추가 전 E0277 컴파일 Red → derive 후 Pass). 검증 원문(비공개 원시 근거: `imported_context/rev045_2026-11-03/rev045-verify.log`)
 
 ---
 
@@ -131,5 +131,5 @@
 #### [처리담당]
 - **판정 결과:** 수용·조치 — 대안 A (`Closed`)
 - **처리 내용:** ID가 인스턴스 안에서 재사용되지 않으므로 ID 오름차순은 곧 등록 순서다. 정렬 비용은 일반 worker의 64개 이하 항목이고 RT 경로와 무관하므로, 문서로 비정렬을 허용하기보다 안정 순서를 보장했다. `status`가 보유 snapshot을 ID 기준 정렬 후 직렬화하며, API §15.8에 「ID 오름차순 = 등록 순서」를 명시했다.
-- **검증 근거:** 소스 `ee57f44`; `compare_preserves_differences_and_rejects_unknown_or_exhausted_ids` 끝에 forget 후 첫 슬롯 재사용 목록 검사를 추가했다(Red: `["3","2"]` → Pass: `["2","3"]`). `cargo test -p dot-logger --features remote`, `-p dot-logger-cli`, `-p dot-logger-rt-allocation`(16/16, RT 0할당/0해제) 전체 Pass. 검증 원문(비공개 원시 근거)
+- **검증 근거:** 소스 `ee57f44`; `compare_preserves_differences_and_rejects_unknown_or_exhausted_ids` 끝에 forget 후 첫 슬롯 재사용 목록 검사를 추가했다(Red: `["3","2"]` → Pass: `["2","3"]`). `cargo test -p dot-logger --features remote`, `-p dot-logger-cli`, `-p dot-logger-rt-allocation`(16/16, RT 0할당/0해제) 전체 Pass. 검증 원문(비공개 원시 근거: `imported_context/rev045_2026-11-03/rev045-verify.log`)
 

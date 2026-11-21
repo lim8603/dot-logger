@@ -6,7 +6,7 @@
 - 대상: 소스 `966d832`, numeric query API/같은 session 예약·고정 DB harness·TC-008·README/선택 의존 연결.
 - 판정: **Pass — S2 로컬 구현/실제 DB 기능 검증 범위**. 미해결 P1/P2/P3 없음.
 - 상태: **Closed** — Open → In Progress → Resolved → 기존 위임에 따른 로컬 수락. Task/MS/TC 전체는 미완료.
-- 근거: [EV-038](../verification_evidence.md#ev-038)·최종 명령/소스111개 hash·commit blob 대조(비공개 원시 근거).
+- 근거: [EV-038](../verification_evidence.md#ev-038)·최종 명령/소스111개 hash·commit blob 대조(비공개 원시 근거: `imported_context/task_019_query_2026-11-01/results.json`).
 
 ## 리뷰 항목 요약표
 
@@ -27,7 +27,7 @@
 ## [처리담당] RV-075 판정·처리
 
 - **수용:** 실제 첫 live3개 모두 Corrupt 실패. 독립 synthetic protocol probe의 CSV가 annotation 없이 header/data만 있음을 확인했다. 기존 검증 강도를 낮추지 않고 `/api/v2/query`의 JSON `dialect.annotations=[datatype,group,default]`/header를 명시했다. 기존 serde_json pin을 influxdb 선택 feature에 연결했다.
-- **검증:** 수정 전 live(비공개 원시 근거)·실제 bare Flux CSV(비공개 원시 근거)·최종 annotated CSV(비공개 원시 근거). Rust1.96/MSRV1.85 별도 격리 DB각3개 Pass/cleanup0. 원 ns·i64 MIN/MAX·u64 MAX/u32 MAX receipt·typed value 대조, duplicate DB merge/adapter 거절, partial type failure 뒤 valid bool 행 잔존 확인.
+- **검증:** 수정 전 live(비공개 원시 근거: `imported_context/task_019_query_2026-11-01/live-1.96/live.log`)·실제 bare Flux CSV(비공개 원시 근거: `imported_context/task_019_query_2026-11-01/protocol-probe/protocol.csv`)·최종 annotated CSV(비공개 원시 근거: `imported_context/task_019_query_2026-11-01/final-live-1.96/protocol.csv`). Rust1.96/MSRV1.85 별도 격리 DB각3개 Pass/cleanup0. 원 ns·i64 MIN/MAX·u64 MAX/u32 MAX receipt·typed value 대조, duplicate DB merge/adapter 거절, partial type failure 뒤 valid bool 행 잔존 확인.
 - **최종 회귀:** 두 Rust workspace각394 Pass/실제 DB3개 명시 ignore, 신규 TCP/한계9개. 개발 Rust16features/독립 core consumer/RT allocator·MSRV influx-only·fmt/clippy(-D warnings)/core-client API rustdoc(-D warnings) Pass. 모든 최종 source111개 commit blob 일치. Miri/native 새 실행 없음.
 - **수락 경계:** S2 기능 단위만 Closed. S3 Router Delivery/projection·DatabaseAcknowledged/Unknown·원본/진행 IO 수명·DB 실패의 파일 영향 계측, 통합/실측/native/Task·TC 전체·Gate4/5는 미완료.
 

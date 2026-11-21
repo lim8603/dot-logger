@@ -69,7 +69,7 @@ _아직 이관된 항목이 없다._
 | 마지막 갱신일 | 2026-10-25 |
 | 마지막 갱신자 | AI |
 | 최근 세션 상태 | 2026-10-25 #003 종료 — 6대 설계 반영·플랫폼 Tier 1/2 및 코어 격리 확정·C++ 쌍둥이 프로젝트 생성·Git 첫 커밋 완료. 다음 세션은 첫 구현 범위 실행 구조 결정부터 재개 |
-| 참조 세션 로그 | [lim8603 / session_2026-10-25_003.md](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md) — 6대 설계 반영·Tier 1/2 확정·cpp-logger 생성·Git 커밋 및 다음 시작점 |
+| 참조 세션 로그 | lim8603 / session_2026-10-25_003.md(비공개 세션 로그: `session_logs/session_2026-10-25_003.md`) — 6대 설계 반영·Tier 1/2 확정·cpp-logger 생성·Git 커밋 및 다음 시작점 |
 
 ### 한 줄 상태
 
@@ -97,13 +97,13 @@ ADR-005·006 기준선에 플랫폼 Tier 1/2 계층화 및 CPU 코어 격리를 
 
 ### 이번 작업에서 다음에 읽을 문서
 
-- 개인 담당/기록 맥락이 필요하면 [lim8603 프로필](../members/lim8603/profile.md)·[개인 상태](../members/lim8603/workspace/my_state.md)·[최신 로그](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md)를 추가로 읽는다. 공유 상태를 개인 상태에 복제하지 않는다.
+- 개인 담당/기록 맥락이 필요하면 [lim8603 프로필](../members/lim8603/profile.md)·[개인 상태](../members/lim8603/workspace/my_state.md)·최신 로그(비공개 세션 로그: `session_logs/session_2026-10-25_002.md`)를 추가로 읽는다. 공유 상태를 개인 상태에 복제하지 않는다.
 
 - 우선 [도메인/모듈](../03_design_artifacts/domain_model.md), [인터페이스 계약](../03_design_artifacts/interface_contract.md), [기술스택](../03_design_artifacts/tech_stack.md). 설계 문서는 Draft이며 승인된 요구/미결과 기술 채택을 구분한다.
 - [요구사항 §15~16](../02_project_definition/requirement_spec.md#15-설계-진입-준비-점검과-기준선-검토), [승인 Story/AC](../02_project_definition/user_story_registry.md), [산출물 계획](../02_project_definition/deliverable_plan.md): Gate 1·2 Pass와 승인된 Design 보완 범위.
 - [핵심 강점 §13.5](../02_project_definition/requirement_spec.md#135-핵심-강점과-개발자-조절-지원), [설정/간편 점검 §14](../02_project_definition/requirement_spec.md#14-질문-프리셋설정-추천간편-점검-검토안): 관측·검증·추정/손실과 개발자 조절의 구분. FR-015 질문/추천 상세는 제안이다.
-- 근거가 필요할 때만 조사: 초기 후보(비공개 원시 근거), 공개 성능 비교(비공개 원시 근거)·수치 JSON(비공개 원시 근거), 실사용/TCP(비공개 원시 근거), 버퍼(비공개 원시 근거), 리포트(비공개 원시 근거).
-- 센서/연동 근거가 필요할 때만 과거 센서 용량(비공개 원시 근거)·계산 JSON(비공개 원시 근거), 시각화 연동(비공개 원시 근거), ROS 2 검토(비공개 원시 근거). 과거 제품 가정/당시 미승인을 현재 기준으로 오해하지 않는다.
+- 근거가 필요할 때만 조사: 초기 후보(비공개 원시 근거: `imported_context/research_2026-10-25_logging_telemetry.md`), 공개 성능 비교(비공개 원시 근거: `imported_context/research_2026-10-25_public_benchmarks.md`)·수치 JSON(비공개 원시 근거: `imported_context/research_2026-10-25_benchmark_data.json`), 실사용/TCP(비공개 원시 근거: `imported_context/research_2026-10-25_end_to_end_tcp.md`), 버퍼(비공개 원시 근거: `imported_context/research_2026-10-25_buffer_budget.md`), 리포트(비공개 원시 근거: `imported_context/research_2026-10-25_capacity_reporting.md`).
+- 센서/연동 근거가 필요할 때만 과거 센서 용량(비공개 원시 근거: `imported_context/research_2026-10-25_sensor_volume.md`)·계산 JSON(비공개 원시 근거: `imported_context/research_2026-10-25_sensor_volume_calculations.json`), 시각화 연동(비공개 원시 근거: `imported_context/research_2026-10-25_observability_integrations.md`), ROS 2 검토(비공개 원시 근거: `imported_context/research_2026-10-25_rosbag2_interop.md`). 과거 제품 가정/당시 미승인을 현재 기준으로 오해하지 않는다.
 
 ## 이월 백로그 (Carryover Backlog)
 
@@ -169,14 +169,14 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 | 파일 | 변경 요약 | 관련 작업 |
 |------|----------|----------|
-| project_state / my_state / session_2026-10-25_003 | [세션 #003](../members/lim8603/workspace/session_logs/session_2026-10-25_003.md) 종료: 6대 설계 반영·Tier 1/2 및 코어 격리 확정·C++ 쌍둥이 프로젝트(`~/src/cpp-logger`) 생성·Git 첫 커밋(`4d6d39a`) 완료 및 다음 시작점(실행 구조 결정) 동기화 | INT-001 |
+| project_state / my_state / session_2026-10-25_003 | 세션 #003(비공개 세션 로그: `session_logs/session_2026-10-25_003.md`) 종료: 6대 설계 반영·Tier 1/2 및 코어 격리 확정·C++ 쌍둥이 프로젝트(`~/src/cpp-logger`) 생성·Git 첫 커밋(`4d6d39a`) 완료 및 다음 시작점(실행 구조 결정) 동기화 | INT-001 |
 | requirement_spec / domain_model / interface_contract | 플랫폼 역할 계층화(Tier 1 Linux RT: Full SLA/성능 보장 vs Tier 2 Win/Mac: 기능 호환/Best-effort) 및 백그라운드 I/O 워커 CPU 코어 격리(Affinity/Pinning) 명문화 반영 | INT-001 |
 | domain_model / interface_contract | 6대 설계 고려사항(RT 메모리 역방향 회수·타임스탬프 삼원화·스키마 진화·ENOSPC 페일세이프·OS별 영속/락 플래그·FR-018 3단계 긴급 차단 프로토콜)을 설계 초안 및 인터페이스 계약에 반영 | INT-001 |
-| project_state / my_state / session_2026-10-25_002 | [세션 #002](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md) 종료: API 상세안·FR-018 사용 정책·TDD 승인 반영을 기록하고 다음 시작점을 실행 구조 대안/권고안 검토로 동기화 | INT-001 |
+| project_state / my_state / session_2026-10-25_002 | 세션 #002(비공개 세션 로그: `session_logs/session_2026-10-25_002.md`) 종료: API 상세안·FR-018 사용 정책·TDD 승인 반영을 기록하고 다음 시작점을 실행 구조 대안/권고안 검토로 동기화 | INT-001 |
 | test_strategy / coding_convention / review_checklist / deliverable_plan / 상태·로그 | Human 최종 승인으로 TDD 개발 순서·실제 환경 검증 병행 명문화, 테스트 시나리오 수집중. 핵심 API 상세안은 계속 리뷰 전이며 Gate 3 미평가 | INT-001 |
 | requirement_spec §17 / FUNC-002 / US-002·registry / INT-001 / interface_contract §12 / domain_model / risk_register / 상태·로그 | FR-018 선택 옵션·기본 비활성 확정. 활성 시 UPS 신호 발생→차단 전체 약 3초·중요 파일 우선 기록, 상세 계약/AC·실물 검증 미완료 | INT-001 |
 | interface_contract / domain_model / project_state / my_state / session_2026-10-25_002 | 핵심 API 소유권·회수·중요도/포화·완료/실패 상세 권고안과 소비자별 리뷰 시나리오 작성. Human 검토·구현/실행 검증 전 | INT-001 |
-| members/lim8603 / .gitignore / project_state·requirement_spec·deliverable_plan | lim8603·solo 기록 체계 초기화와 기존 작업 복원을 마치고 [세션 로그](../members/lim8603/workspace/session_logs/session_2026-10-25_001.md)에 종료 요약·다음 시작점을 남김 | INT-001 |
+| members/lim8603 / .gitignore / project_state·requirement_spec·deliverable_plan | lim8603·solo 기록 체계 초기화와 기존 작업 복원을 마치고 세션 로그(비공개 세션 로그: `session_logs/session_2026-10-25_001.md`)에 종료 요약·다음 시작점을 남김 | INT-001 |
 | INT-001 / requirement_spec §9·16 / NFR-007·US-005 / ADR-006·ADR-001·registry / tech_stack / risk_register / deliverable_plan | 3개 OS 공통 지원 추가, 대표 센서를 UHD급2D LiDAR1개·카메라4개로 일반화 | INT-001 |
 | domain_model / interface_contract / functional_spec | 모듈·OS/실행/자원 경계·핵심 계약 초안. 실제 채택/구현 전 | INT-001 |
 | ADR-005 / requirement_spec §12·15 / Story·AC / intent_registry / deliverable_plan / project_state | Human 「확정」 반영, Gate 1·2 Pass/Design. 승인과 성능 달성 구분 | INT-001 |
@@ -241,28 +241,28 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 ## 2026-10-26 TASK-002 상태 동기화 시 이관
 
-- 2026-10-25 #002: 핵심 API 초안·FR-018 기본 off·TDD 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md).
+- 2026-10-25 #002: 핵심 API 초안·FR-018 기본 off·TDD 승인 — 로그(비공개 세션 로그: `session_logs/session_2026-10-25_002.md`).
 
 ## 2026-10-28 #003 상태 인덱스 이관
 
-- 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-27_003.md).
+- 2026-10-27 #003: TASK-004 구현·EV-003 로컬/Miri Pass·Human 승인·게시 완료, CI 계정 사유 차단·세션 종료 — 로그(비공개 세션 로그: `session_logs/session_2026-10-27_003.md`).
 
 ## 2026-10-29 #001 세션 마감 상태 인덱스 이관
 
-- 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md).
-- 이전 개인 상태의 TASK-005/006 목표·결과는 [2026-10-28 #001](../members/lim8603/workspace/session_logs/session_2026-10-28_001.md), [#002](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md), [#003](../members/lim8603/workspace/session_logs/session_2026-10-28_003.md) 및 TASK-006/EV-007에 있다. 현재 my_state는 활성 MS-003/TASK-007과 최신 로그만 유지한다.
+- 2026-10-28 #001: Human 사용량 소진 확인·TASK-005 선행 CI 대기 중 착수 지시, 구현·EV-004 로컬 Pass·Human 리뷰 승인 — 로그(비공개 세션 로그: `session_logs/session_2026-10-28_001.md`).
+- 이전 개인 상태의 TASK-005/006 목표·결과는 2026-10-28 #001(비공개 세션 로그: `session_logs/session_2026-10-28_001.md`), #002(비공개 세션 로그: `session_logs/session_2026-10-28_002.md`), #003(비공개 세션 로그: `session_logs/session_2026-10-28_003.md`) 및 TASK-006/EV-007에 있다. 현재 my_state는 활성 MS-003/TASK-007과 최신 로그만 유지한다.
 
 ## 2026-10-29 #002 세션 마감 상태 인덱스 이관
 
-- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-28_002.md).
-- 이전 개인 상태의 2026-10-29 #001 세션 Intent: INT-001 / MS-002·003 / TASK-006·007 — 개선 검토·종료 경합 수정·MCAP 파일 구현/검증. 결과 TASK-006 Human 승인, TASK-007 EV-010 로컬 Pass — [로그](../members/lim8603/workspace/session_logs/session_2026-10-29_001.md).
+- 2026-10-28 #002: TASK-006 구현·EV-005 로컬 Pass·Human 승인·커밋·push·세션 종료, native 이월 — 로그(비공개 세션 로그: `session_logs/session_2026-10-28_002.md`).
+- 이전 개인 상태의 2026-10-29 #001 세션 Intent: INT-001 / MS-002·003 / TASK-006·007 — 개선 검토·종료 경합 수정·MCAP 파일 구현/검증. 결과 TASK-006 Human 승인, TASK-007 EV-010 로컬 Pass — 로그(비공개 세션 로그: `session_logs/session_2026-10-29_001.md`).
 
 ## 2026-10-30 #003 상태 인덱스 이관
 
 `project_state.md` 최근3세션을 #003/#002/#001로 정렬하며 기존 요약을 보존한다.
 
-- 2026-10-29 #004: 리뷰 절차 공식화·`reviews/` 신설·REV-001~003 복원·문서/진입점 갱신 및 커밋 푸시 마감 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_004.md).
-- 2026-10-29 #003: RV-006~010 수정·EV-011 로컬 회귀 Pass·소스 c932ee4 게시·세션 종료, 최신 구현 Human 리뷰/native·장비 이월 — [수정 로그](../members/lim8603/workspace/session_logs/session_2026-10-29_003.md).
+- 2026-10-29 #004: 리뷰 절차 공식화·`reviews/` 신설·REV-001~003 복원·문서/진입점 갱신 및 커밋 푸시 마감 — 작업 로그(비공개 세션 로그: `session_logs/session_2026-10-29_004.md`).
+- 2026-10-29 #003: RV-006~010 수정·EV-011 로컬 회귀 Pass·소스 c932ee4 게시·세션 종료, 최신 구현 Human 리뷰/native·장비 이월 — 수정 로그(비공개 세션 로그: `session_logs/session_2026-10-29_003.md`).
 
 ## 2026-10-30 #003 세션 마감 — 완료 서사·상세 재개 메모 이관
 
@@ -322,22 +322,22 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 ## 2026-10-30 #007 마감 — 이전 세션 요약 이관
 
-- 2026-10-30 #004: REV-012 조치·TASK-009 승인/게시·REV-011/012 Closed 후 TASK-010 EV-016 Pass·REV-013 Resolved, 후속 소스4a54bcf 로컬 커밋·미게시/Human 리뷰 대기로 종료 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_004.md).
-- 2026-10-30 #003: TASK-008 조치 게시·TASK-009 복구 구현/EV-014 Pass·REV-011 Resolved 및 소스5bbb45c 게시 — [작업 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_003.md).
-- 2026-10-30 #002: TASK-008 심층 리뷰·REV-010 Open 등록·과거 리뷰 안건 감사 — [리뷰 로그](../members/lim8603/workspace/session_logs/session_2026-10-30_002.md).
+- 2026-10-30 #004: REV-012 조치·TASK-009 승인/게시·REV-011/012 Closed 후 TASK-010 EV-016 Pass·REV-013 Resolved, 후속 소스4a54bcf 로컬 커밋·미게시/Human 리뷰 대기로 종료 — 작업 로그(비공개 세션 로그: `session_logs/session_2026-10-30_004.md`).
+- 2026-10-30 #003: TASK-008 조치 게시·TASK-009 복구 구현/EV-014 Pass·REV-011 Resolved 및 소스5bbb45c 게시 — 작업 로그(비공개 세션 로그: `session_logs/session_2026-10-30_003.md`).
+- 2026-10-30 #002: TASK-008 심층 리뷰·REV-010 Open 등록·과거 리뷰 안건 감사 — 리뷰 로그(비공개 세션 로그: `session_logs/session_2026-10-30_002.md`).
 
 ## 2026-10-31 #006 상태 인덱스 이관
 
-- 2026-10-31 #003: REV-017 조치/EV-020 Pass 후 TASK-008/010/011 승인·리뷰5건 Closed, TASK-022 10ms 수치 승인·EV-021 준비 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_003.md).
-- 2026-10-31 #002: TASK-011 최종 안전성 코드리뷰·REV-017 Open 등록(제품 미수정) — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_002.md).
+- 2026-10-31 #003: REV-017 조치/EV-020 Pass 후 TASK-008/010/011 승인·리뷰5건 Closed, TASK-022 10ms 수치 승인·EV-021 준비 — 로그(비공개 세션 로그: `session_logs/session_2026-10-31_003.md`).
+- 2026-10-31 #002: TASK-011 최종 안전성 코드리뷰·REV-017 Open 등록(제품 미수정) — 로그(비공개 세션 로그: `session_logs/session_2026-10-31_002.md`).
 
 ## 2026-10-31 #007 상태 인덱스 이관
 
-- 2026-10-31 #004: TASK-012 구현·EV-022 Pass·d63fdea 소스/문서 분리 게시 후 종료·REV-018 Human 리뷰 대기 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_004.md).
+- 2026-10-31 #004: TASK-012 구현·EV-022 Pass·d63fdea 소스/문서 분리 게시 후 종료·REV-018 Human 리뷰 대기 — 로그(비공개 세션 로그: `session_logs/session_2026-10-31_004.md`).
 
 ## 2026-10-31 #008 상태 인덱스 이관
 
-- 2026-10-31 #005: 프로젝트 종합 심층 코드리뷰 수행·REV-019 등록(RV-036~038 관측, 제품 코드 미수정)·저장 및 원격 동기화 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_005.md).
+- 2026-10-31 #005: 프로젝트 종합 심층 코드리뷰 수행·REV-019 등록(RV-036~038 관측, 제품 코드 미수정)·저장 및 원격 동기화 — 로그(비공개 세션 로그: `session_logs/session_2026-10-31_005.md`).
 
 
 ## 2026-10-31 #014 상태 문서 정리 — 이전 승인·재개 메모
@@ -396,20 +396,20 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 ## #014 최근 이력 이관
 
-- 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — [로그](../members/lim8603/workspace/session_logs/session_2026-10-31_011.md).
+- 2026-10-31 #011: REV-022 EV-026·TASK-014 EV-027 로컬 수락/게시·세션 종료, 다음 세션 TASK-015 착수 승인 — 로그(비공개 세션 로그: `session_logs/session_2026-10-31_011.md`).
 
 ## 2026-11-01 #002 종료 — 최근 이력 포인터 정리
 
-- 2026-10-31 #012 TASK-015 완료 상세는 [당시 세션 로그](../members/lim8603/workspace/session_logs/session_2026-10-31_012.md)와 [EV-028](../05_verification/verification_evidence.md#ev-028)에 보존한다. 공유 상태의 최근 이력은 #002·#014·#013 세 회차로 유지한다.
+- 2026-10-31 #012 TASK-015 완료 상세는 당시 세션 로그(비공개 세션 로그: `session_logs/session_2026-10-31_012.md`)와 [EV-028](../05_verification/verification_evidence.md#ev-028)에 보존한다. 공유 상태의 최근 이력은 #002·#014·#013 세 회차로 유지한다.
 
 ## 2026-11-01 #006 상태 인덱스 이관
 
-- 2026-11-01 #003: TASK-016 독립 리뷰 Pass/P3 2건을 REV-028 Open으로 남기고 Human 요청으로 종료했다(후속 #004에서 조치/Closed) — [리뷰](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md)·[로그](../members/lim8603/workspace/session_logs/session_2026-11-01_003.md).
+- 2026-11-01 #003: TASK-016 독립 리뷰 Pass/P3 2건을 REV-028 Open으로 남기고 Human 요청으로 종료했다(후속 #004에서 조치/Closed) — [리뷰](../05_verification/reviews/REV-028_TASK-016_INDEPENDENT_REVIEW.md)·로그(비공개 세션 로그: `session_logs/session_2026-11-01_003.md`).
 
 
 ## #015 — 2026-11-01 #007 상태 갱신의 이전 완료 요약 이관
 
-- 2026-11-01 #004: REV-028 RV-063/064 조치/Closed 및 TASK-017 S1 계획·예산을 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_004.md)·[EV-031](../05_verification/verification_evidence.md#ev-031).
+- 2026-11-01 #004: REV-028 RV-063/064 조치/Closed 및 TASK-017 S1 계획·예산을 로컬 수락했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_004.md`)·[EV-031](../05_verification/verification_evidence.md#ev-031).
 
 
 ## #015 — 2026-11-01 #010 상태 인덱스 R2 계약 설명 이관
@@ -425,28 +425,28 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 ## #016 — 2026-11-01 #011 R1 최근 완료 요약 이관
 
-- 2026-11-01 #007: S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_007.md)·[EV-034](../05_verification/verification_evidence.md#ev-034).
+- 2026-11-01 #007: S3 raw/routing·실제 ACK·실앱 snapshot 첫 단위를 수락하고 Human 요청으로 종료했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_007.md`)·[EV-034](../05_verification/verification_evidence.md#ev-034).
 
 
 ## #017 — 2026-11-01 #012 R1/R2 상태 인덱스 이관
 
 원문을 보존하며 현재 계약/잔여는 해당 Task/API에 유지한다.
 
-- 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 잔여 조건 동기화 후 종료했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_008.md)·[EV-035](../05_verification/verification_evidence.md#ev-035).
+- 2026-11-01 #008: 고정 routed RunCheck·원 source/CLI 권한·호스트 시계 경계를 수락하고 잔여 조건 동기화 후 종료했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_008.md`)·[EV-035](../05_verification/verification_evidence.md#ev-035).
 
 - **TASK-017 현재 계약:** EV-031~034·REV-029~032 수락에 [EV-035](../05_verification/verification_evidence.md#ev-035)/[REV-033](../05_verification/reviews/REV-033_TASK-017_ROUTED_HOST.md)를 추가했다. `CheckHost`의 고정 File/Routed 슬롯·단일 사용·원 source 검증·Read/Manage/응답 preflight·native evidence를 유지한다. client `SnapshotCheck`가 host-selected≤64KiB 한 건을 실제 raw/routing→TCP 수신 큐/ACK→원 receipt 완료·원본/예약 회수로 연결한다. host 원 session/revision/mono clock과 source Report/profile는 분리 보존한다. 예제2초/요구24MiB·허용32MiB, 물리 쓰기0이며 capacity/freshness/LAN/RSS 미측정이다. 로컬 기능 구현 잔여는 처리했으나 지속 수집/기존 화면/off-on(TASK-020/026)·통합 PC/RT/UPS/장기(TASK-021~024)·공개 후 native(T3)/다른 OS는 미수락이다. 전체 Task In Progress·TC Partial 유지. [TASK-017](../04_implementation/tasks/TASK-017.md)·[API §15.7](../03_design_artifacts/interface_contract.md#157-task-017-고정-routed-runcheck--2026-11-01).
 
 
 ## #018 — 2026-11-01 #014 R1/R2 상태 인덱스 이관
 
-- 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_011.md).
+- 2026-11-01 #011: TASK-019 S2 query·OSS2.9.1 실제 DB를 EV-038/REV-036으로 수락하고 단계 전체 표 브리핑을 반영했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_011.md`).
 
 - **TASK-013 기능 기준:** EV-025/source29e55da 뒤 [EV-026](../05_verification/verification_evidence.md#ev-026)/eb39cb2로 handoff·진단/CLI·유휴 next를 보강했다(검사14개/Miri32). local wait timeout은 같은 구독 유지, server lease/명시 cancel은 종료한다. ttl은 record/idle lease 겸용, 별도 구독 간 Gap 연속성은 미보장이고 TASK-020 화면에서 불연속 표시한다. 현재 workspace는 REV-025 EV-029/9fecaae로 전체 회귀했다. CLI runtime metrics Unavailable·config apply/compare backend Unsupported·실앱/native/성능 후속은 유지한다. 점검 host/CLI는 EV-033 범위다.
 
 
 ## #019 — 2026-11-01 #015 R1/R2 상태 인덱스 이관
 
-- 2026-11-01 #012: TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037로 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_012.md).
+- 2026-11-01 #012: TASK-019 S3 원 Delivery/완료·로컬 파일 격리를 EV-039/REV-037로 수락했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_012.md`).
 
 - **TASK-019 현재 계약:** S1/S2/S3 [EV-037~039](../05_verification/verification_evidence.md#ev-039)/소스`86b1f67`·[REV-037](../05_verification/reviews/REV-037_TASK-019_ROUTED_COMPLETION.md) Closed. 새 독점 namespace·equal/older timestamp 거절·typed write/query·원 schema/receipt/real ns·실제 로컬 IO 종료와 원 guard/게시 수명을 유지한다. DB 정지·포화 중 MCAP6건/3508B·원문 보존 관측, 정량 성능 수락 아님. 실앱/환경/native 잔여. 전체 단계 표는 [TASK-019](../04_implementation/tasks/TASK-019.md)·[API§14.8](../03_design_artifacts/interface_contract.md#148-task-019-s3-원-deliverydb-완료파일-격리--2026-11-01).
 
@@ -455,7 +455,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - **TASK-014/015 현재 계약·형상:** [EV-029](../05_verification/verification_evidence.md#ev-029) source101개/검사14개·Miri224·소스9fecaae commit blob일치, REV-025 Closed. EV-027/028의 계측·report 기반에 제출/대여 capacity/contract/lifecycle 범주를 추가하고 총계는 보존했다. 거절 중 capacity만 과부하로 사용하며 기존 출력 실패/자원 한계 판정은 유지한다. 부하율은 accepted+rejected_capacity **시도율**(재시도 포함·고유 입력/손실 아님)이다. acquire·계약/수명 거절·skip은 분자 제외. CounterCell128B/RT 할당·해제0, 추가 Sample 크기는 checked control 예약으로 검사한다. history_len은 Observation<usize>, 독점 reset은 이력/poison을 초기화한다.
 - **리포트/호스트 경계:** 실제 Window session/revision/epoch/구간·장비/부하/target/boundary와 검증 능력의 session clock/유효성을 유지한다. 물리 bytes/slots·출력정지·filesystem/quota·순환 보존/retained span을 분리한다. host는 성공 sample과 target_totals의 유한 이력에서 실제 from/to를 대조하고 terminal checked 차분·최종 pending을 공급한다. 누락/foreign/Busy/overflow는 Unavailable이며 가까운 시점 혼합/배출 후 정확 계약이다. 물리 gauge/출력 출처·capacity evidence·자동 worker/CLI runtime backend·실앱과 실제 PC/RT 오차≤20%·계측 비용≤5%·native는 후속이다. 상세 [TASK-014](../04_implementation/tasks/TASK-014.md)·[TASK-015](../04_implementation/tasks/TASK-015.md)·[API§15](../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안).
 
-- 2026-11-01 #013: TASK-019 InfluxDB v2 어댑터 독립 코드리뷰를 수행하여 Pass 판정 및 REV-038(Open)을 등록했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_013.md).
+- 2026-11-01 #013: TASK-019 InfluxDB v2 어댑터 독립 코드리뷰를 수행하여 Pass 판정 및 REV-038(Open)을 등록했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_013.md`).
 
 ## #021 — 2026-11-02 #001 TASK-021 수락 시 R2 이관
 
@@ -483,11 +483,11 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 - 2026-11-03 #002: TASK-016 운영 backend(status·apply·compare)에 대한 독립 코드리뷰([REV-045](../05_verification/reviews/REV-045_TASK-016_OPERATIONS_BACKEND_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 권고 3건: rustdoc #Errors 명시, Debug derive, 스냅샷 정렬 계약)
 - 2026-11-03 #001: 운영 backend(status 지표·ApplyConfig·Compare, 새 오류 3종) EV-044/REV-044 로컬 수락(소스 7f9fbd5). GAP-008 사전 존재 불안정 시험 등록.
-- 2026-11-03 #001: REV-043 RV-086/087 rustdoc 보강(소스 dd7aaaf)·검증 후 Closed, 미처리 리뷰 없음 — [2026-11-03 #001](../members/lim8603/workspace/session_logs/session_2026-11-03_001.md).
+- 2026-11-03 #001: REV-043 RV-086/087 rustdoc 보강(소스 dd7aaaf)·검증 후 Closed, 미처리 리뷰 없음 — 2026-11-03 #001(비공개 세션 로그: `session_logs/session_2026-11-03_001.md`).
 - 2026-11-02 #002: TASK-021 UPS 긴급 계획·모의 시험에 대한 독립 코드리뷰([REV-043](../05_verification/reviews/REV-043_TASK-021_INDEPENDENT_REVIEW.md))를 수행하여 Open 상태로 등록했다. (P1/P2 0건, P3 문서 권고 2건)
-- 2026-11-02 #001: TASK-020 S3 화면 예제·TASK-021 UPS 시뮬레이션을 EV-042/043·REV-041/042로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-02_001.md).
-- 2026-11-01 #015: TASK-020 S2 실제 파일/DB/구독·명시 설정 비교 예제를 EV-041/REV-040으로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_015.md).
-- 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — [로그](../members/lim8603/workspace/session_logs/session_2026-11-01_014.md).
+- 2026-11-02 #001: TASK-020 S3 화면 예제·TASK-021 UPS 시뮬레이션을 EV-042/043·REV-041/042로 로컬 수락했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-02_001.md`).
+- 2026-11-01 #015: TASK-020 S2 실제 파일/DB/구독·명시 설정 비교 예제를 EV-041/REV-040으로 로컬 수락했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_015.md`).
+- 2026-11-01 #014: REV-038 문서 조치와 TASK-020 S1 일반 로그 입력을 EV-040/REV-039로 로컬 수락했다 — 로그(비공개 세션 로그: `session_logs/session_2026-11-01_014.md`).
 
 ## #023 — 2026-11-07 #001 세션 종료 R1/R2 하베스트
 
@@ -588,9 +588,9 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 - 2026-11-07 #003(이어서): TASK-023 S2a 채널별 출력 선택(Human 결정)·S2b facade 경로 측정 도구. 측정 중 제품 결함 ①~⑤를 TDD로 조치(부분 라우팅 sync coverage·Delivery drop 순서 폐기·batch 예산 붕괴·연속 부하 주기 sync 미발급·기록 수 회전 대응), ⑥ 보존 segment 개수(Human 「권고대로」)·⑦ Busy 보고·⑧ `.active` 잔존까지 조치 — [EV-054](../05_verification/verification_evidence.md#ev-054).
 
-- 2026-11-07 #003: REV-051 RV-120~127을 TDD로 조치(Writer Drop reaper 경쟁·유휴 spin·시작 실패 정리·오버플로·facade 메모리 예산·IO 실패 분류·공개 표면·perf CLI). 1.96/1.85 각 493 Pass — [EV-053](../05_verification/verification_evidence.md#ev-053), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
+- 2026-11-07 #003: REV-051 RV-120~127을 TDD로 조치(Writer Drop reaper 경쟁·유휴 spin·시작 실패 정리·오버플로·facade 메모리 예산·IO 실패 분류·공개 표면·perf CLI). 1.96/1.85 각 493 Pass — [EV-053](../05_verification/verification_evidence.md#ev-053), 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-07_003.md`).
 
-- 2026-11-05 #001: TASK-027 S1 ADR-012·API §18 승인과 S2 facade·기본 worker 구현(EV-047) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-05_001.md).
+- 2026-11-05 #001: TASK-027 S1 ADR-012·API §18 승인과 S2 facade·기본 worker 구현(EV-047) — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-05_001.md`).
 
 1. **단독 작업(2026-11-03 결정, 2026-11-04 MS-008/009로 확장):** ~~운영 backend~~ EV-044·~~REV-045~~·~~GAP-008~~ EV-045·TASK-023 S1 EV-046 완료 → ~~TASK-027 S1~~ 승인 → ~~S2~~ EV-047(`04a7cfa`·`1e651b4`) → ~~S3a~~ EV-048(`691f937`: `health()`·계측·CPU 고정·GAP-009/010) → ~~S3b~~ EV-049(`bbc0b28`: tracing/log 연결 +2줄) → ~~S3c~~ EV-050(`d595122`: remote 관측 사본·상태 조회) → ~~S3e~~ EV-051(`46e833a`: api-consumer·feature matrix) → ~~TASK-028 S1~~ EV-052(`c92fb98` 정확 배정·`d23de85` preset/plan) → ~~[REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) 조치~~ EV-053(`559f2b9`, Closed) → **다음 TASK-023 S2**(S3d slot 직접 encode는 2026-11-07 Human 승인으로 S3 제외, 재설계 조건은 이월 T4; facade 경로 P1 256B·P2 8MiB·P3 혼합, 32생산자/16파일/128채널, P3 혼합은 `StorageWorkload` 확장 필요)/S3(120초×3·P5·계측 비용, P4 배정 확인) → RT 요청/승인 후 RT 행 → TASK-028 S2 auto preset → TASK-029 → MS-009(TASK-030~032) → probe 연동 인계 패키지.
 
@@ -618,8 +618,8 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 ### 이전 최근 작업·이력
 
 - 2026-11-11 #002(계속): TASK-028 S2 — 결정 3건 권고안, calibrate·프로필·`Sizing::profile`·plan 경고·CLI(TDD, 신규 시험 13), 1.96.0/1.85.0 각 559 Pass, T500 정확도 3회 Pass·SSD 12.89 GB — [EV-071](../05_verification/verification_evidence.md#ev-071).
-- 2026-11-11 #002: RT 행 — RT 부팅 확인(첫 RT 세션은 Human 재시작으로 무측정, 재예약), `run-perf-rt.sh` RT 실행 miss 0, generic/RT 대조 [EV-070](../05_verification/verification_evidence.md#ev-070), SSD 약 70.5 GB — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_002.md).
-- 2026-11-11 #001: T5 해소 — ⑪ 원인 규명([EV-066](../05_verification/verification_evidence.md#ev-066)), ⑫ 종료 drain 조치 `236ef59`([EV-067](../05_verification/verification_evidence.md#ev-067)), vendor mcap 무압축 chunk CRC 1회 `6187768`·ADR-010 개정 1·T6([EV-068](../05_verification/verification_evidence.md#ev-068)), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). RT 요청 승인·도구 FIFO 모드·부팅 스크립트(`a6dcc72`·`9764df3`), 1단계 generic FIFO 행 miss 0(SSD 70.4 GB) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
+- 2026-11-11 #002: RT 행 — RT 부팅 확인(첫 RT 세션은 Human 재시작으로 무측정, 재예약), `run-perf-rt.sh` RT 실행 miss 0, generic/RT 대조 [EV-070](../05_verification/verification_evidence.md#ev-070), SSD 약 70.5 GB — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-11_002.md`).
+- 2026-11-11 #001: T5 해소 — ⑪ 원인 규명([EV-066](../05_verification/verification_evidence.md#ev-066)), ⑫ 종료 drain 조치 `236ef59`([EV-067](../05_verification/verification_evidence.md#ev-067)), vendor mcap 무압축 chunk CRC 1회 `6187768`·ADR-010 개정 1·T6([EV-068](../05_verification/verification_evidence.md#ev-068)), rustix 1.1.6([EV-069](../05_verification/verification_evidence.md#ev-069)). RT 요청 승인·도구 FIFO 모드·부팅 스크립트(`a6dcc72`·`9764df3`), 1단계 generic FIFO 행 miss 0(SSD 70.4 GB) — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-11_001.md`).
 - 2026-11-10: ⑪ 비차단·T5 등록(Human 「1」), 축소 S3 1회차 실행(584 GB, 40분) — P3 효율 미달로 T5 도래 [EV-064](../05_verification/verification_evidence.md#ev-064). 후속 진단 149 GB: P3 미달 재현 안 됨·raw 거절은 풀 사이징·계측 비용 2.5% [EV-065](../05_verification/verification_evidence.md#ev-065).
 - 2026-11-09 #001(계속): ⑪ 4차 — reconcile 게이트 정정(실제 abandon만 세대 증가, EV-062 정정), tmpfs 측정 +4%·거부 절반, 대기 설정 영향 ≤3%, 남은 logger 상한 tmpfs P3 2.6 GB/s(장치 S·요구보다 높음) — [EV-063](../05_verification/verification_evidence.md#ev-063).
 - 2026-11-09 #001(계속): ⑪ 3차 — host 장부 훑기(reconcile·sync 적용) 제거 TDD, host R 99% → 52~66%, 처리량 개선은 잡음 안, 남은 한계는 파이프라인 대기(IO 배치 10 ms·유휴 1 ms) — [EV-062](../05_verification/verification_evidence.md#ev-062). 11-09 쓰기 누적 약 585 GB.
@@ -628,10 +628,10 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-08 #001(계속): TASK-023 S3 — 범위(P4·P5 이월, P1 3조합)·장시간 기준(S·0.6×S·효율 0.8·sync 판정) Human 결정, 발견 ⑩(출력 예산 CAS `Busy`) 조치 `5eacfa3`, 발견 ⑪ Open — [EV-059](../05_verification/verification_evidence.md#ev-059).
 - 2026-11-08 #001(계속): TASK-023 S2d 발견 ⑨ — facade가 turn마다 완료 장부 전체(window × writers)를 sweep → writer 1개 window로(`5511eb3`), P3 20초 smoke 성공 — [EV-058](../05_verification/verification_evidence.md#ev-058).
 - 2026-11-08 #001(계속): TASK-023 S2c — `Channel::metadata`(Human 「메타데이터 헬퍼」)·혼합 P2/P3 도구, RV-128 정정(`11f44d9`, 부분 라우팅 종료 sync 거절 회귀), smoke에서 발견 ⑨ — [EV-057](../05_verification/verification_evidence.md#ev-057).
-- 2026-11-08 #001: REV-052 RV-128(target별 파일 장부로 다른 파일의 미동기화 기록 증명 요구)·RV-129(연속 구간만 watermark 전진, Enqueued 기준 target 분리)·RV-130(공통 `Gate` 시작·`LoadWindow` 중첩 판정) TDD 조치, 1.96/1.85 각 522 Pass — [EV-056](../05_verification/verification_evidence.md#ev-056), [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-08_001.md).
-- 2026-11-07 #004: REV-051 조치·TASK-023 S2a/S2b 누적 변경을 독립 리뷰하여 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional: P1 2·P2 1), 제품 무수정·공개 API 재현 2건 Red·1.96/1.85 각509 Pass — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_004.md).
-- 2026-11-07 #003: REV-051 RV-120~127 조치·Closed(EV-053), TASK-023 S2a 채널별 출력 선택·S2b facade 측정 도구와 측정 중 제품 결함 ①~⑧ 조치(EV-054·055) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_003.md).
-- 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`b330818..8eecc90`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-07_002.md).
+- 2026-11-08 #001: REV-052 RV-128(target별 파일 장부로 다른 파일의 미동기화 기록 증명 요구)·RV-129(연속 구간만 watermark 전진, Enqueued 기준 target 분리)·RV-130(공통 `Gate` 시작·`LoadWindow` 중첩 판정) TDD 조치, 1.96/1.85 각 522 Pass — [EV-056](../05_verification/verification_evidence.md#ev-056), 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-08_001.md`).
+- 2026-11-07 #004: REV-051 조치·TASK-023 S2a/S2b 누적 변경을 독립 리뷰하여 [REV-052](../05_verification/reviews/REV-052_SYNC_BOUNDARY_PERF_REVIEW.md) Open(Conditional: P1 2·P2 1), 제품 무수정·공개 API 재현 2건 Red·1.96/1.85 각509 Pass — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-07_004.md`).
+- 2026-11-07 #003: REV-051 RV-120~127 조치·Closed(EV-053), TASK-023 S2a 채널별 출력 선택·S2b facade 측정 도구와 측정 중 제품 결함 ①~⑧ 조치(EV-054·055) — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-07_003.md`).
+- 2026-11-07 #002: 직전 독립 리뷰(REV-045) 이후 누적 변경분(`b330818..8eecc90`, 32파일) 전수 독립 코드리뷰 수행, [REV-051](../05_verification/reviews/REV-051_FACADE_PRESET_PERF_INDEPENDENT_REVIEW.md) Open 등록(Conditional Pass: P1 1·P2 5·P3 2, 제품 코드 무수정) — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-07_002.md`).
 
 ## #027 — 2026-11-12 #001 세션 종료 최근 이력 하베스트(최대 3세션 유지)
 
@@ -641,7 +641,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 - 2026-11-12: TASK-029 S3 [EV-074](../05_verification/verification_evidence.md#ev-074) `a2f0dce` — README 250→136줄(quickstart·레시피 중심), 계약 상세 11개 모듈 rustdoc 이동, crate quickstart doctest·README 동기화 가드. S1·S2 Human 승인.
 - 2026-11-12: TASK-029 S1·S2 [EV-073](../05_verification/verification_evidence.md#ev-073) `681acd7` — 표면 가드(이름 있는 항목 30/60·snapshot), 레시피 L1 20줄·6개념/L2 40·7/L3 +3·+5, `Shutdown::is_success()`.
 - 2026-11-12: REV-053 RV-131~133 조치 [EV-072](../05_verification/verification_evidence.md#ev-072) `71e5a72` — reconcile 진입 claim(Red `CompletionCapacity` → Green), 비 Linux calibrate 타입 오류(nightly build-std 교차 검사 E0308 8 → 0), core-only rustdoc CI 단계.
-- 2026-11-11 #001: T5 해소(EV-066~068)·rustix 1.1.6(EV-069)·RT 요청 1단계 — [세션 로그](../members/lim8603/workspace/session_logs/session_2026-11-11_001.md).
+- 2026-11-11 #001: T5 해소(EV-066~068)·rustix 1.1.6(EV-069)·RT 요청 1단계 — 세션 로그(비공개 세션 로그: `session_logs/session_2026-11-11_001.md`).
 - 2026-11-10: 축소 S3 1회차·후속 진단([EV-064](../05_verification/verification_evidence.md#ev-064)·[EV-065](../05_verification/verification_evidence.md#ev-065)).
 
 
@@ -681,7 +681,7 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 | 현재 담당 | TASK-030 착수 전 — 직전 TASK-029 S1~S4 Human 승인([EV-073](../../../05_verification/verification_evidence.md#ev-073)~[EV-075](../../../05_verification/verification_evidence.md#ev-075)) |
 | 리뷰 | 미처리 없음 — [REV-053](../../../05_verification/reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md) Closed(2026-11-12 Human 「승인」) |
 | 갱신/세션 | 2026-11-12 / #001 종료 — Human 「세션 마무리하고 다음 세션에서 시작하자」 |
-| 로그 | [2026-11-12 #001](session_logs/session_2026-11-12_001.md) |
+| 로그 | 2026-11-12 #001(비공개 세션 로그: `session_logs/session_2026-11-12_001.md`) |
 
 다음 개발 시작점: TASK-030(MCAP 표준 호환) 착수 — Task 문서의 Human 확인 4건(MCAP sequence u32↔Envelope u64 매핑, `log_time` mono/real, 메시지별 level·importance·producer 보존 방식, ROS 2 encoding T1 유지)부터. S1 export는 ADR 없이, S2 native 표준 모드는 ADR 채번·승인 후. 확인 필요(11-11부터 이월): TASK-027 「Human 리뷰 대기」 표기가 REV-051(11-07 승인) 뒤 남은 것인지. 이후 순서·승인·검증 공백은 [공유 상태](../../../06_evolution/project_state.md). 개인 이월 없음.
 ```
@@ -716,9 +716,9 @@ ADR-001은 ADR-006으로, ADR-002는 ADR-003으로 대체됐다. 초기 판단�
 
 ## #030 — 2026-11-18 #002 세션 종료 최근 이력 이관
 
-- 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `ca89b69`, [EV-086](../05_verification/verification_evidence.md#ev-086), [로그](../members/lim8603/workspace/session_logs/session_2026-11-17_003.md)).
-- 2026-11-17 #002: `fa72a1a..5be17b5` 독립 리뷰 REV-059 Open 생성 후 #003에서 Closed([로그](../members/lim8603/workspace/session_logs/session_2026-11-17_002.md)).
+- 2026-11-17 #003: REV-059 RV-149~152 조치·자가검토·위임 마감(제품 `ca89b69`, [EV-086](../05_verification/verification_evidence.md#ev-086), 로그(비공개 세션 로그: `session_logs/session_2026-11-17_003.md`)).
+- 2026-11-17 #002: `fa72a1a..5be17b5` 독립 리뷰 REV-059 Open 생성 후 #003에서 Closed(로그(비공개 세션 로그: `session_logs/session_2026-11-17_002.md`)).
 
 ## #031 — 2026-11-18 #005 세션 종료 최근 이력 이관
 
-- 2026-11-18 #001~002: ADR-013 E와 TASK-033 S4 수락 및 .logger 예약 토픽·standard/2 적용([EV-088](../05_verification/verification_evidence.md#ev-088)~[EV-090](../05_verification/verification_evidence.md#ev-090), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)·[REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), [로그 #001](../members/lim8603/workspace/session_logs/session_2026-11-18_001.md)·[#002](../members/lim8603/workspace/session_logs/session_2026-11-18_002.md)).
+- 2026-11-18 #001~002: ADR-013 E와 TASK-033 S4 수락 및 .logger 예약 토픽·standard/2 적용([EV-088](../05_verification/verification_evidence.md#ev-088)~[EV-090](../05_verification/verification_evidence.md#ev-090), [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md)·[REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md), 로그 #001(비공개 세션 로그: `session_logs/session_2026-11-18_001.md`)·#002(비공개 세션 로그: `session_logs/session_2026-11-18_002.md`)).

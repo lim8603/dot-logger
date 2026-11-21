@@ -125,7 +125,7 @@
 
 Human 「프로젝트 진행상황 브리핑하고, 리뷰 반입 및 처리, TASK-011 요약 리포트 해줘」에 따라 기존 리뷰를 개발 세션에 반입했다. 리뷰어의 원문은 이력으로 보존하고 위 처리담당 판정으로 현 판단을 구분한다. RV-026은 방어 개선, RV-027/028은 수용·반영으로 전 항목 Resolved다.
 
-[EV-019](../verification_evidence.md#ev-019)·검사10개/source54개/로그 hash(비공개 원시 근거): Rust1.85/1.96 workspace all-features(각 replay12 포함)·독립 실제 파일 core consumer·clippy/rustdoc·fmt 및 replay Miri96 Pass. RT/unsafe/의존성·lock·feature 구성은 변경하지 않았다. feature 16조합 전체·query/retention Miri 전체는 기존 EV-018 이력이며 이번에는 영향 범위를 검증했다. native GAP-004·장비/실제 timer·fresh audit는 미실행이다. 신규 미해결 P1/P2는 이번 변경 자가 점검에서 확인되지 않았다.
+[EV-019](../verification_evidence.md#ev-019)·검사10개/source54개/로그 hash(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/results.json`): Rust1.85/1.96 workspace all-features(각 replay12 포함)·독립 실제 파일 core consumer·clippy/rustdoc·fmt 및 replay Miri96 Pass. RT/unsafe/의존성·lock·feature 구성은 변경하지 않았다. feature 16조합 전체·query/retention Miri 전체는 기존 EV-018 이력이며 이번에는 영향 범위를 검증했다. native GAP-004·장비/실제 timer·fresh audit는 미실행이다. 신규 미해결 P1/P2는 이번 변경 자가 점검에서 확인되지 않았다.
 
 커밋/푸시·Human 최종 구현 리뷰 승인은 이 요청에 포함하지 않는다. REV-015/016 Resolved·TASK-011/MS-004 In Progress를 유지하며 TASK-012는 자동 착수하지 않는다.
 
@@ -137,6 +137,6 @@ native GAP-004·다른 OS/장비·실제 timer/성능 검증은 잔여이며 TAS
 
 ## 세션 마감·게시 — 2026-10-31
 
-Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `c6cc5a5`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거)·소스 게시 근거(비공개 원시 근거). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
+Human 「커밋 푸쉬 후 세션 마무리해줘」에 따라 리뷰 조치 소스 `c6cc5a5`를 origin/main에 게시하고 원격 hash 일치를 확인했다. EV-019 source54개·검사10개 exit0·Miri96·원본/뷰 로그12쌍 hash와 source commit blob54개가 일치해 동일 성공 시험을 반복하지 않았다. 커밋 대조(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/commit.json`)·소스 게시 근거(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/push.json`). 이전 미커밋/미게시 문장은 검증 당시 이력이다.
 
 TASK-011 Human 승인·REV-015/016 Closed, ADR-011 Accepted를 유지한다. 현재 PC 실측/UPS 시뮬레이션을 수락하며 native는 공개 완료 후(T3) 진행한다. 다음 시작점은 TASK-022의 실행 커널 확인·P0/제어 부하/기한/경로/예산 프로필 준비다. 현재 generic 실행/RT 설치를 구분하며 재부팅·부트 변경은 수행하지 않았다. TASK-008/010 Human 리뷰·PC 실측/UPS/24h 미실행·Gate4/5 Not Ready는 잔여다. 검증/수락/마감 문서는 별도 docs(cowork)·[skip ci] 커밋으로 게시하며 세션 종료 후 새 Task를 자동 착수하지 않는다.

@@ -12,13 +12,13 @@
 
 | ID | 중요도 | 발견/반례 | 조치 | 검증 | 상태 |
 |---|---|---|---|---|---|
-| RV-039 | P2 | 유효하지 않은 재생 배속도 endpoint connect가 먼저 실행되어 입력 오류가 IO 실패 exit4로 가림 | CLI Context preflight에서 입력/모드/범위를 연결 전에 검증 | Red(비공개 원시 근거) exit4→기대2·Green | Closed |
-| RV-040 | P2 | 중복 channel 등록을 config validate가 valid/exit0으로 수락 | channel ID 중복·동일 schema/version의 descriptor 불일치·metadata 형식/예산 검사 | Red(비공개 원시 근거) exit0→기대2·Green | Closed |
-| RV-041 | P2 | 요청한 완료 boundary가 없는데 host Complete를 수락. 불량 응답 ID도 사용자 InvalidInput으로 분류 | native 응답을 요청 boundary와 대조, 불량 wire metadata는 Corrupt로 거절 | Complete Red(비공개 원시 근거)·분류 Red(비공개 원시 근거)→Green | Closed |
-| RV-042 | P2 | generation9 제어에 generation1 응답을 정상 전환으로 수락 | 양수 generation precondition 대조, seek는 checked +1·다른 전환은 동일 generation | Red(비공개 원시 근거)→Green | Closed |
-| RV-043 | P2 | 일반 파일 아닌 offline source를 Limit/부분 완료로 분류하고 open 전 파일 종류 검사가 없음 | 경로 종류를 open 전에 검사하고 열린 descriptor도 재검사. 경로 불변성은 host 책임 유지 | 디렉터리 Red(비공개 원시 근거) exit3→기대2·Green. FIFO 실제 실행 시험으로 확대하지 않음 | Closed |
-| RV-044 | P2 | non-Unicode token env를 `.ok()`로 None으로 낮춰 잘못된 인증 설정이 가려짐 | NotPresent만 무토큰, NotUnicode는 입력 오류. String token의 길이/형식은 native client 검사 | Red(비공개 원시 근거) exit4→기대2·Unix Green. 실제 인증 우회 실증 주장은 하지 않음 | Closed |
-| RV-045 | P2 | host Gone capability가 CLI의 일반 IO 오류로 합쳐져 만료/부재를 구분하지 못함 | `gone_or_expired`/exit3, permission/version도 별도 고정 코드로 표시 | Red(비공개 원시 근거) exit4→기대3·실제 host Gone Green. TTL 경과를 직접 기다린 시험이 아님 | Closed |
+| RV-039 | P2 | 유효하지 않은 재생 배속도 endpoint connect가 먼저 실행되어 입력 오류가 IO 실패 exit4로 가림 | CLI Context preflight에서 입력/모드/범위를 연결 전에 검증 | Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-input-preflight.log`) exit4→기대2·Green | Closed |
+| RV-040 | P2 | 중복 channel 등록을 config validate가 valid/exit0으로 수락 | channel ID 중복·동일 schema/version의 descriptor 불일치·metadata 형식/예산 검사 | Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-duplicate-channel.log`) exit0→기대2·Green | Closed |
+| RV-041 | P2 | 요청한 완료 boundary가 없는데 host Complete를 수락. 불량 응답 ID도 사용자 InvalidInput으로 분류 | native 응답을 요청 boundary와 대조, 불량 wire metadata는 Corrupt로 거절 | Complete Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-completion-claim.log`)·분류 Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-response-classification.log`)→Green | Closed |
+| RV-042 | P2 | generation9 제어에 generation1 응답을 정상 전환으로 수락 | 양수 generation precondition 대조, seek는 checked +1·다른 전환은 동일 generation | Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-replay-generation.log`)→Green | Closed |
+| RV-043 | P2 | 일반 파일 아닌 offline source를 Limit/부분 완료로 분류하고 open 전 파일 종류 검사가 없음 | 경로 종류를 open 전에 검사하고 열린 descriptor도 재검사. 경로 불변성은 host 책임 유지 | 디렉터리 Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-non-regular-source.log`) exit3→기대2·Green. FIFO 실제 실행 시험으로 확대하지 않음 | Closed |
+| RV-044 | P2 | non-Unicode token env를 `.ok()`로 None으로 낮춰 잘못된 인증 설정이 가려짐 | NotPresent만 무토큰, NotUnicode는 입력 오류. String token의 길이/형식은 native client 검사 | Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-invalid-token-env.log`) exit4→기대2·Unix Green. 실제 인증 우회 실증 주장은 하지 않음 | Closed |
+| RV-045 | P2 | host Gone capability가 CLI의 일반 IO 오류로 합쳐져 만료/부재를 구분하지 못함 | `gone_or_expired`/exit3, permission/version도 별도 고정 코드로 표시 | Red(비공개 원시 근거: `imported_context/task_013_2026-10-31/red-expired-capability.log`) exit4→기대3·실제 host Gone Green. TTL 경과를 직접 기다린 시험이 아님 | Closed |
 
 ## 처리담당 검토 근거
 
@@ -56,6 +56,6 @@
 
 ## 검증 및 다음 행동
 
-[EV-025](../verification_evidence.md#ev-025)·source92개/검사15개 및 로그 hash(비공개 원시 근거)·commit blob92개 일치(비공개 원시 근거). 두 Rust1.85.0/1.96.0 각16feature·workspace/기본client/core consumer·clippy/rustdoc -D warnings·fmt·proto 두 사본·CLI 선언 예제·cached audit·Miri32 Pass다. CLI10·transport7·codec1·기존 수신 수명3을 포함한다. Miri는 수신 수명3×8=24+codec1×8=8이며 socket/TLS/process/file/signal을 Miri로 실행했다고 주장하지 않는다.
+[EV-025](../verification_evidence.md#ev-025)·source92개/검사15개 및 로그 hash(비공개 원시 근거: `imported_context/task_013_2026-10-31/results.json`)·commit blob92개 일치(비공개 원시 근거: `imported_context/task_013_2026-10-31/commit.json`). 두 Rust1.85.0/1.96.0 각16feature·workspace/기본client/core consumer·clippy/rustdoc -D warnings·fmt·proto 두 사본·CLI 선언 예제·cached audit·Miri32 Pass다. CLI10·transport7·codec1·기존 수신 수명3을 포함한다. Miri는 수신 수명3×8=24+codec1×8=8이며 socket/TLS/process/file/signal을 Miri로 실행했다고 주장하지 않는다.
 
 로컬 구현은 수락한다. TASK-013은 로컬 완료/native 이월 상태이며 실제 dot-probe 적용·후속 backend·다른 OS/native·LAN/RSS/PC 성능/RT/UPS·Gate4/5는 잔여다. 다음 개발 후보는 TASK-014이고 이번 요청으로 자동 착수하지 않는다.

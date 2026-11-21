@@ -57,7 +57,7 @@ F-11 소비자: remote feature 서버/수신 재조립/관리 요청·query/repl
 
 ## 세션 마감·게시 — 2026-10-31
 
-Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 EV-022 source70개/검사11개·Miri48·원본/뷰 로그16쌍의 hash 일치를 확인하고 동일 성공 시험은 반복하지 않았다. 소스 `d63fdea`를 source/docs 분리·[skip ci] 커밋으로 origin/main 게시했으며 EV-022 commit blob70개와 원격 hash가 일치한다. commit 대조(비공개 원시 근거)·게시 근거(비공개 원시 근거). 검증/승인/마감 문서는 별도 docs(cowork) 커밋으로 게시한다. 앞선 미커밋/미게시 본문은 검증 당시 이력이다.
+Human 「세션 마감해줘」·「커밋 푸쉬도 해줘야해」에 따라 EV-022 source70개/검사11개·Miri48·원본/뷰 로그16쌍의 hash 일치를 확인하고 동일 성공 시험은 반복하지 않았다. 소스 `d63fdea`를 source/docs 분리·[skip ci] 커밋으로 origin/main 게시했으며 EV-022 commit blob70개와 원격 hash가 일치한다. commit 대조(비공개 원시 근거: `imported_context/task_012_2026-10-31/commit.json`)·게시 근거(비공개 원시 근거: `imported_context/task_012_2026-10-31/source-push.json`). 검증/승인/마감 문서는 별도 docs(cowork) 커밋으로 게시한다. 앞선 미커밋/미게시 본문은 검증 당시 이력이다.
 
 공유/개인 상태와 세션 로그를 종료로 동기화했다. 마감/게시 요청을 별도 최종 구현 승인으로 확대하지 않아 REV-018 Resolved·TASK-012/MS-004 In Progress·Human 리뷰·native/실측 이월·Gate4/5 Not Ready를 유지한다. 다음 시작점은 TASK-012 최종 구현 리뷰이며 승인 뒤 TASK-013으로 진행한다. 새 Task는 자동 착수하지 않는다.
 

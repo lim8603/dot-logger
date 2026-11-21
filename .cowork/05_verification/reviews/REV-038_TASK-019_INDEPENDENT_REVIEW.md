@@ -79,7 +79,7 @@
 #### [처리담당]
 - **판정 결과:** 수용·Closed.
 - **처리 내용:** `RoutedWriter::new` rustdoc에 5개 선행조건과 metadata 예약 실패 조건을 명시했다. 새 오류 variant나 동작 변경은 없다.
-- **검증 근거:** 소스 `73edb7a`; `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`, `cargo fmt --check` exit0. rustdoc 원문(비공개 원시 근거).
+- **검증 근거:** 소스 `73edb7a`; `RUSTDOCFLAGS='-D warnings' cargo doc --locked -p dot-logger --all-features --no-deps`, `cargo fmt --check` exit0. rustdoc 원문(비공개 원시 근거: `imported_context/task_020_s1_2026-11-01/rev038-doc.log`).
 
 ---
 

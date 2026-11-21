@@ -20,7 +20,7 @@ TASK-034 D의 RT 계약과 native 저장·손실 연계를 최종 점검했다. 
 | 구분 | 파일 | 내용 |
 |---|---|---|
 | 수정 | [`tc_013_tracing.rs`](../../../crates/dot-logger/tests/tc_013_tracing.rs) | 실제 trace/log와 파일을 쓰는 회귀 시험 1개 |
-| 추가 | E 재현 자료(비공개 원시 근거) | GUI 판독·비용·커버리지 증거 |
+| 추가 | E 재현 자료(비공개 원시 근거: `imported_context/adr_013_e_2026-11-18/README.md`) | GUI 판독·비용·커버리지 증거 |
 
 ## 클래스 변경표
 

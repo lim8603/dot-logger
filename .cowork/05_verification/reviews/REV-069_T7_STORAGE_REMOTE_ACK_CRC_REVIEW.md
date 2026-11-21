@@ -30,7 +30,7 @@
 | 생성 | [REV-069](REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` 독립 코드리뷰 결과(`RV-163~165`) 및 중점 ①~⑥ 대조 기록 (`Open`) |
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | 미처리 리뷰 목록·코드리뷰 현황에 REV-069 (`Open`, P2 2·P3 1) 등록 및 다음 시작점 동기화 |
 | 수정 | [my_state.md](../../members/lim8603/workspace/my_state.md) | 개인 상태 인덱스 리뷰·세션·다음 시작점 동기화 |
-| 생성 | [session_2026-11-21_002.md](../../members/lim8603/workspace/session_logs/session_2026-11-21_002.md) | 코드리뷰 세션 로그 (`2026-11-21 #002`) |
+| 생성 | session_2026-11-21_002.md(비공개 세션 로그: `session_logs/session_2026-11-21_002.md`) | 코드리뷰 세션 로그 (`2026-11-21 #002`) |
 
 ### 검토 대상 코드 파일 (`b016fe8..98aa5bd`)
 

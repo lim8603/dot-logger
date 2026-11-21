@@ -77,7 +77,7 @@
 
 ## 최종 처리 결과 — 2026-10-30
 
-[EV-013](../verification_evidence.md#ev-013) / source49개·명령/로그 hash(비공개 원시 근거): 보존 통합17개(신규2)·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt, 보존 Miri16×8=128회 Pass다. RV-012의 잔여 위험은 문서와 TASK-010 체크에 명시했으며 토큰 유실을 자동 복구한 것은 아니다. Human 구현 리뷰/native·장비는 잔여로 Conditional/Resolved를 유지한다. 새 REV를 만들어 처리 이력을 분산하지 않았고 제품 수정은 리뷰 전용 세션이 아닌 개발 세션 #003에서 수행했다. commit/push는 수행하지 않았다.
+[EV-013](../verification_evidence.md#ev-013) / source49개·명령/로그 hash(비공개 원시 근거: `imported_context/task_008_review_fixes_2026-10-30/results.json`): 보존 통합17개(신규2)·두 Rust core/all-features workspace/consumer/예제/allocator8/clippy/rustdoc/fmt, 보존 Miri16×8=128회 Pass다. RV-012의 잔여 위험은 문서와 TASK-010 체크에 명시했으며 토큰 유실을 자동 복구한 것은 아니다. Human 구현 리뷰/native·장비는 잔여로 Conditional/Resolved를 유지한다. 새 REV를 만들어 처리 이력을 분산하지 않았고 제품 수정은 리뷰 전용 세션이 아닌 개발 세션 #003에서 수행했다. commit/push는 수행하지 않았다.
 
 ## Human 최종 구현 승인 — 2026-10-31
 

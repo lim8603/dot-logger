@@ -65,7 +65,7 @@
 | 수정 | [MS 목록](../milestone_registry.md), [MS-002](../milestones/MS-002.md), [Task 목록](../task_registry.md), [TASK-004](TASK-004.md), 이 문서 | 선행 CI 예외·착수/로컬 Pass·리뷰 대기 정렬 |
 | 수정 | [전략](../../05_verification/test_strategy.md), [TC/추적표](../../05_verification/test_case.md), [EV](../../05_verification/verification_evidence.md) | 실행 범위·미실행·근거·GAP-004 정렬 |
 | 수정 | [공유 상태](../../06_evolution/project_state.md), [개인 상태](../../members/lim8603/workspace/my_state.md) | 다음 시작점·Human 확인 원인·T2 공개 준비 |
-| 생성 | 증거 폴더(비공개 원시 근거), [세션 로그](../../members/lim8603/workspace/session_logs/session_2026-10-28_001.md) | source/log hash·환경/명령/Red/Green·결정/재개 기록(로그는 기존 gitignore 적용) |
+| 생성 | 증거 폴더(비공개 원시 근거: `imported_context/task_005_2026-10-28/`), 세션 로그(비공개 세션 로그: `session_logs/session_2026-10-28_001.md`) | source/log hash·환경/명령/Red/Green·결정/재개 기록(로그는 기존 gitignore 적용) |
 
 ## 클래스·타입 변경표
 

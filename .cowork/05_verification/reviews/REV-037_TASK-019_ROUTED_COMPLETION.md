@@ -6,7 +6,7 @@
 - 대상: 소스 `86b1f67`, RoutedWriter/DeliveryAttempt·명시 schema mapping·원 guard/실제 로컬 IO·completion Busy·파일 격리 및 기존 TCP proxy fixture 정리.
 - 판정: **Pass — S3 로컬 기능·파일 영향 관측 범위**. 미해결 P1/P2/P3 없음.
 - 상태: **Closed** — Open → In Progress → Resolved → 기존 위임에 따른 로컬 수락. Task/MS/TC 전체·실앱/정량 성능/native는 미완료.
-- 근거: [EV-039](../verification_evidence.md#ev-039)·최종12개 검사/소스114개 hash·commit blob 대조(비공개 원시 근거).
+- 근거: [EV-039](../verification_evidence.md#ev-039)·최종12개 검사/소스114개 hash·commit blob 대조(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/results.json`).
 
 ## 요약표
 
@@ -28,15 +28,15 @@
 
 ## [처리담당] 조치·검증
 
-- **RV-076 수용:** 복구 계약 Red(비공개 원시 근거) 후 `into_delivery -> Result<Delivery,Self>`로 제한했다. foreign target/nested runtime 미시도 guard만 복구·원 Pending 보존, ACK 뒤 terminal 복구는 Err(owner)로 유지하고 Drop 뒤 raw 회수1을 확인했다. S1 방어가 있어 기존 중복 DB 쓰기를 관측했다는 의미는 아니다.
-- **RV-077 수용:** 초기 cancel+invalid scalar Red(비공개 원시 근거)에서 잘못된 AdapterFailure를 확인, identity 확인 뒤 decode/runtime/HTTP 전에 cancel 처리해 NotSent/Cancelled·Dropped(Cancelled)를 확인했다.
-- **RV-078 수용:** 수정 전 MSRV 회귀(비공개 원시 근거)를 보존했다. proxy upload JoinHandle을 oneshot으로 test owner에 전달하고 부모/자식 모두 abort/await 후 기존 budget0 검사를 유지한다. 두 Rust각5회와 최종 전체 회귀 Pass. 제품 remote transport/예산 반환을 바꾸거나 예약0 기대를 완화하지 않았다.
+- **RV-076 수용:** 복구 계약 Red(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/red-recovery.log`) 후 `into_delivery -> Result<Delivery,Self>`로 제한했다. foreign target/nested runtime 미시도 guard만 복구·원 Pending 보존, ACK 뒤 terminal 복구는 Err(owner)로 유지하고 Drop 뒤 raw 회수1을 확인했다. S1 방어가 있어 기존 중복 DB 쓰기를 관측했다는 의미는 아니다.
+- **RV-077 수용:** 초기 cancel+invalid scalar Red(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/red-cancel.log`)에서 잘못된 AdapterFailure를 확인, identity 확인 뒤 decode/runtime/HTTP 전에 cancel 처리해 NotSent/Cancelled·Dropped(Cancelled)를 확인했다.
+- **RV-078 수용:** 수정 전 MSRV 회귀(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/msrv-first.log`)를 보존했다. proxy upload JoinHandle을 oneshot으로 test owner에 전달하고 부모/자식 모두 abort/await 후 기존 budget0 검사를 유지한다. 두 Rust각5회와 최종 전체 회귀 Pass. 제품 remote transport/예산 반환을 바꾸거나 예약0 기대를 완화하지 않았다.
 - 신규 routed6개·private completion Busy1개. final Rust1.96/MSRV1.85 workspace각401 Pass/실제 DB4개 일반 회귀에서 ignore, 별도 실제 DB각4개 Pass/cleanup0. 16features·독립 core consumer·RT allocator·MSRV influx-only·fmt/clippy/API docs(-D warnings) Pass. 소스114개 commit blob 일치, 새 Miri/native 실행 없음.
 - 실제 DB routed 시험은 원 capture→DB API ACK→원 completion→query receipt/ns와 실제 type failure(400/422·attempts1)→Unknown·guard Drop/raw 회수를 대조했다.
 
 ## 파일 영향 관측
 
-구성·수치(비공개 원시 근거)·실행 원문 뷰(비공개 원시 근거). 동일 원본6건·raw2슬롯·file required/DB optional·DB retained8B·queue1/pending0, OS 임시 namespace 실제 파일로 비교했다.
+구성·수치(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/file-isolation.json`)·실행 원문 뷰(비공개 원시 근거: `imported_context/task_019_routed_2026-11-01/routed.log`). 동일 원본6건·raw2슬롯·file required/DB optional·DB retained8B·queue1/pending0, OS 임시 namespace 실제 파일로 비교했다.
 
 | DB 조건 | file records | file bytes | file phase ns | DB in-flight |
 |---|---:|---:|---:|---:|

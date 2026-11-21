@@ -37,8 +37,8 @@
 
 ## 최종 검증
 
-[EV-014](../verification_evidence.md#ev-014)·source51개/명령/로그 hash(비공개 원시 근거)를 확인했다. 검사10개 exit0·Miri7 programs×8 seeds/56개 성공 summary·936회 Pass이며 두 Rust16조합/독립 consumer/예제/allocator9/lint/doc/fmt가 같은 source51개를 가리킨다. 현재 점검에서 추가 미해결 P1/P2는 확인하지 못했지만 Human/native·실물 검증을 대신하지 않으며 Conditional/Resolved를 유지한다. TASK-009 소스 5bbb45c은 게시 요청을 받아 커밋했으며 Human 최종 구현 리뷰 대상이다.
+[EV-014](../verification_evidence.md#ev-014)·source51개/명령/로그 hash(비공개 원시 근거: `imported_context/task_009_2026-10-30/results.json`)를 확인했다. 검사10개 exit0·Miri7 programs×8 seeds/56개 성공 summary·936회 Pass이며 두 Rust16조합/독립 consumer/예제/allocator9/lint/doc/fmt가 같은 source51개를 가리킨다. 현재 점검에서 추가 미해결 P1/P2는 확인하지 못했지만 Human/native·실물 검증을 대신하지 않으며 Conditional/Resolved를 유지한다. TASK-009 소스 5bbb45c은 게시 요청을 받아 커밋했으며 Human 최종 구현 리뷰 대상이다.
 
-세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `5bbb45c`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서6626690와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. 커밋 근거(비공개 원시 근거).
+세션 마감 — 2026-10-30: Human 「세션 마무리해줘」 및 「커밋 푸쉬도 해줘」에 따라 TASK-009 소스 `5bbb45c`를 커밋했다. EV-014 source51개/commit blob 및 검사10개 근거가 일치하여 시험을 반복하지 않았다. `.cowork` 검증/마감 문서6626690와 분리해 origin/main 게시 완료했으며, 구현 Human 승인·Resolved 리뷰·native/장비 이월 상태는 유지한다. 커밋 근거(비공개 원시 근거: `imported_context/task_009_2026-10-30/commit.json`).
 
 2026-10-30 후속 승인: Human이 TASK-009 최신 구현·REV-012 조치를 승인했다. 소스 `5c60399`은 EV-015 source51개/commit blob hash와 일치한다. 본 리뷰를 Closed로 전환하며 과거 Resolved/Human 대기 문장은 당시 이력으로 보존한다. native GAP-004·실장비 검증은 미완료다.

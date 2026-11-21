@@ -64,7 +64,7 @@ Gate 4·5 판단에 사용할 결과는 [검증 근거](verification_evidence.md
 
 ## 6. 관련 기준과 승인 근거
 
-- Human의 2026-10-25 TDD 제안 최종 승인. [세션 로그 #002](../members/lim8603/workspace/session_logs/session_2026-10-25_002.md)에 승인 문맥을 기록한다.
+- Human의 2026-10-25 TDD 제안 최종 승인. 세션 로그 #002(비공개 세션 로그: `session_logs/session_2026-10-25_002.md`)에 승인 문맥을 기록한다.
 - [요구사항 §15~17](../02_project_definition/requirement_spec.md#154-미결을-설계에서-확정할-보완-계획), [Story 목록](../02_project_definition/user_story_registry.md), [인터페이스 계약](../03_design_artifacts/interface_contract.md).
 - [코딩 규칙](../04_implementation/coding_convention.md), [리뷰 체크리스트](../04_implementation/review_checklist.md), [품질 게이트](quality_gate.md).
 

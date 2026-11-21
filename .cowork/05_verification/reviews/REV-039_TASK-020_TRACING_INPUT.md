@@ -3,7 +3,7 @@
 ## 개요
 
 - 일자/담당: 2026-11-01 #014 / AI 개발 세션 자가 점검. [code-review 스킬](../../../.agents/skills/code-review/SKILL.md) 적용, 독립 리뷰 세션과 구분한다.
-- 대상: 선택 `tracing-adapter` 입력 모듈·TC-007 하위 시험·general_logs 예제·Cargo/README. 소스 hash는 최종 결과(비공개 원시 근거)에서 고정한다.
+- 대상: 선택 `tracing-adapter` 입력 모듈·TC-007 하위 시험·general_logs 예제·Cargo/README. 소스 hash는 최종 결과(비공개 원시 근거: `imported_context/task_020_s1_2026-11-01/results.json`)에서 고정한다.
 - 종합 판정: **Pass — S1 로컬 기능 범위**. 미해결 지적 없음.
 - 상태: **Closed** — Open → In Progress → 검증/조치로 Resolved → 기존 위임으로 S1 로컬 수락. 소스 `1b6efe0`.
 
@@ -23,7 +23,7 @@
 
 ## [처리담당] 판정·검증
 
-- RV-081 수용. 초기 MSRV 컴파일 실패(비공개 원시 근거)의 E0716 두 곳을 수정했다. 라이브러리 API·capture 동작 변경은 없다.
+- RV-081 수용. 초기 MSRV 컴파일 실패(비공개 원시 근거: `imported_context/task_020_s1_2026-11-01/msrv-initial-failure.log`)의 E0716 두 곳을 수정했다. 라이브러리 API·capture 동작 변경은 없다.
 - API 부재 compile Red(exit101) 뒤 최소 인코딩/수집 연결로 Green. 신규8개 시험: scoped subscriber 실제 trace/debug/info/warn/error와 own fields, JSON target/문자열/C0·Unicode, 숫자/bool text, exact-size/short 모든 prefix, Debug/Display 실패·swallowed overflow, capture identity/time/importance·Capacity/Closing·Skipped/schema/slot 크기를 확인했다.
 - 최종 검증: Rust1.96/MSRV1.85 workspace 각각392개+doctest17개 Pass, 기존 실제 DB4개 ignore. 두 Rust 각각16 feature 조합·독립 core/default client graph·RT allocator15개/remote15개·예제, fmt/clippy/rustdoc(-D warnings), 새 예제 두 Rust 실행 Pass. [EV-040](../verification_evidence.md#ev-040).
 - 새 unsafe/동시성 제어 변경이 없어 Miri 새 실행은 하지 않는다. native(T3)·다른 OS/RT/성능 수락도 미실행이다.

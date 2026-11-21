@@ -31,7 +31,7 @@
 | 생성 | [REV-066](REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | `0c82bcf..54a2653` 통합 코드리뷰 결과(`RV-156~159`) 및 처리담당 영역 기록 (`Open`) |
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | 미처리 리뷰 목록·코드리뷰 현황에 REV-066 (`Open`, P2 3·P3 1) 등록 및 다음 시작점 동기화 |
 | 수정 | [my_state.md](../../members/lim8603/workspace/my_state.md) | 개인 상태 인덱스 리뷰·세션·다음 시작점 동기화 |
-| 생성 | [session_2026-11-18_004.md](../../members/lim8603/workspace/session_logs/session_2026-11-18_004.md) | 코드리뷰 세션 로그 (`2026-11-18 #004`) |
+| 생성 | session_2026-11-18_004.md(비공개 세션 로그: `session_logs/session_2026-11-18_004.md`) | 코드리뷰 세션 로그 (`2026-11-18 #004`) |
 
 ### 검토 대상 코드 파일
 

@@ -26,7 +26,7 @@
 | 수정 | [project_state.md](../../06_evolution/project_state.md) | Open 리뷰 등록·다음 개발 시작점 동기화 |
 | 수정 | [TASK-023.md](../../04_implementation/tasks/TASK-023.md) | 리뷰 조치 후 S2c로 다음 액션 정렬 |
 | 수정 | [my_state.md](../../members/lim8603/workspace/my_state.md) | 오래된 REV-051 Open 표기를 현재 REV-052로 교체 |
-| 생성(로컬·git 제외) | [세션 #004](../../members/lim8603/workspace/session_logs/session_2026-11-07_004.md) | 리뷰 인계와 실행 로그 위치 |
+| 생성(로컬·git 제외) | 세션 #004(비공개 세션 로그: `session_logs/session_2026-11-07_004.md`) | 리뷰 인계와 실행 로그 위치 |
 
 검토한 제품 변경은 `logger/{mod,budget,host,writer,preset,remote,tests}.rs`, `lib.rs`, `routing/mod.rs`, `control/mod.rs`, `storage/{mod,retention}.rs`, 성능 예제 3파일과 통합 시험 5파일이다.
 

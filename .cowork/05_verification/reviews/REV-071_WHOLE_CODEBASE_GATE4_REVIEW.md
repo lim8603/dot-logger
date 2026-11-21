@@ -8,8 +8,8 @@
 | 리뷰어 | Antigravity AI — 리뷰 전용 세션 |
 | 대상 | Workspace 전체(`crates/dot-logger`, `crates/dot-logger-client`, `crates/dot-logger-cli`, `crates/dot-logger-viewer`, `examples/`, `tests/`, `proto/`, `scripts/`, `.github/workflows/ci.yml`, `vendor/mcap-0.26.0/`, `test-profiles/`) — `HEAD` `a46c2d7` (요청 등록 `a354f3c`, 근거 기준 `1b0fe85`, 마지막 코드 변경 `8bab94b`) |
 | 관련 Task / Gate | [TASK-025](../../04_implementation/tasks/TASK-025.md) — Gate 4 최종 수락 및 리포지토리 공개(`gh repo edit --visibility public` + T3 native CI) 직전 전체 코드 독립 점검 |
-| 종합 판정 | **Fail** (Gate 4 수락 및 공개 전환 전 `RV-171~184` 조치 필수 — **P1 3건 · P2 11건 · P3 4건**, 총 18건 `RV-171~188`) |
-| 상태 | **Resolved** — 2026-11-21 개발 세션 조치(§6). 재검증·Human 수락 뒤 Closed |
+| 종합 판정 | **Conditional (보충 리뷰 보완 필요)** — 1차 `RV-171~188` 중 15건+범위 밖 2건 적절/타당한 조정, 보충 리뷰에서 잔여 **P1 1건(4항목) · P2 2건 · P3 1건**(`RV-189~192`) 식별 |
+| 상태 | **Open (보충 리뷰 보완 대기)** — 2026-11-21 1차 조치(§6) 검증 완료, `RV-189~192` 추가 조치 및 재검증 뒤 Closed |
 
 Gate 4 수락과 저장소 공개 및 T3(GitHub Actions multi-OS native CI) 발동을 앞둔 시점에서 diff가 아닌 현재 workspace 코드 전체를 대상으로 **테마 1(역대 최다 지적 3대 영역 A·B·C)**, **테마 2(보안 ①~⑥)**, **테마 3(신뢰성 ①~⑥)** 관점에서 독립 심층 리뷰를 수행했다.
 
@@ -447,3 +447,68 @@ TDD 순서(재현 시험 Red → 최소 수정 → 회귀)로 처리했다. 재�
 
 - **F1 — 비공개 폴더를 읽는 시험:** `tc_015_native.rs`가 `include_bytes!`로 `.cowork/06_evolution/imported_context/` 안의 MCAP 파일을 읽고 있었다. 이 폴더는 2026-11-21에 git 추적에서 빠졌으므로 새로 clone한 저장소와 CI에서 컴파일이 실패한다. 파일을 `crates/dot-logger/tests/fixtures/standard-v2-registrations-in-chunk.mcap`으로 옮겼다(개인 정보 없음 확인). 다른 `include_bytes!`·`include_str!` 경로가 모두 추적 파일임을 확인했다 (`f0d77fa`).
 - **F2 — RV-175 첫 구현의 예약 밖 할당:** 파일별 빚 범위를 `Vec`·`Box`로 담은 첫 구현이 관리 경로에서 예약 밖 96바이트를 할당했고, RT 할당 가드 시험 2건이 이를 잡았다. 미리 할당한 슬롯 방식으로 바꿔 할당 없이 동작한다 (`ba23932`).
+
+---
+
+## 7. 보충 리뷰 — 2026-11-21 (조치 검증 및 잔여 보완)
+
+- **대상 범위:** 1차 조치 코드 커밋 8건(`e12584a`..`55e6b1e`) 및 문서 동기화 2건(`c68b8bb`, `a6ca60e`), 회귀 근거 [EV-111](../verification_evidence.md#ev-111). 제품 코드·테스트·스크립트·CI 설정 변경 **0건**(Strict Read-Only).
+- **보충 종합 판정:** **Conditional — 보완 필요.** `RV-171~188` 및 범위 밖 발견 `F1`·`F2` 중 **15건 + `F1`·`F2`는 적절하거나 부분 수용/조정 근거가 타당**하나, 비-Linux(`macos-14`·`windows-2025`) CI 컴파일·Clippy·테스트 실패 **4항목(`RV-189`)**, `Boundary::Synced` 계약에서의 `RV-175` 시나리오 A 우회(**`RV-190`**), 소켓 종료 시 `RemoteSubscription` 미정산 ACK 검사 우회(**`RV-191`**), 테스트 `cfg` 중복/Miri `dead_code` 정리(**`RV-192`**)가 확인되어 `REV-071` 상태를 **`Open (보충 리뷰 보완 대기)`**로 유지한다.
+
+### 7.1 `RV-171~188` 및 `F1`·`F2` 조치별 적정성 판정
+
+| 항목 | 커밋 | 보충 판정 | 확인 근거 및 평가 |
+|---|---|---|---|
+| `RV-171` | `e12584a` | **적절 (Pass)** | [logger/host.rs](../../../crates/dot-logger/src/logger/host.rs#L735-L742) `ordinary_sync`에서 `if snapshot.finished`로 `pending` 잔여 여부와 무관하게 `release_sync` 호출. 단위 시험 `expired_ordinary_sync_releases_its_slot` 확인 |
+| `RV-172` | `ba23932`·`55e6b1e` | **보완 필요 (`RV-189`, `RV-192`)** | 대부분 Linux 전용 가드가 적용됐으나 비-Linux CI를 깨는 누락·unused import·모듈 불일치 4건(`RV-189`)과 중복 `cfg` 1건(`RV-192`) 잔존 |
+| `RV-173` | `fe9c648` | **적절 (Pass)** | [.github/workflows/ci.yml](../../../.github/workflows/ci.yml#L35-L40)에 `dot-logger-client --no-default-features` 및 `client`·`cli`·`viewer` `--all-features` 테스트 단계 추가 |
+| `RV-174` | `e12584a` | **적절 (Pass)** | [logger/host.rs](../../../crates/dot-logger/src/logger/host.rs#L840-L939)에서 `syncs: Vec<(SyncWork, bool)>` + `retry`로 턴당 1회 시도, `Busy` 시 `busy = true` 미설정 및 `checkpointed` 재실행 차단 |
+| `RV-175` | `e12584a`·`93bbf9e`·`ba23932` | **보완 필요 (`RV-190`)** | `FileLedger` 4-slot 사전할당 + overflow hull([storage/mod.rs](../../../crates/dot-logger/src/storage/mod.rs#L171-L396)), writer별 `unsynced` 추적은 적절. 단 [control/mod.rs](../../../crates/dot-logger/src/control/mod.rs#L1017-L1026)의 `if !ended_is_synced` 분기가 남아 `Boundary::Synced` 계약에서 `strict` 검증을 건너뜀(`RV-190`) |
+| `RV-176` | `07346a9` | **적절 (Pass)** | [control/mod.rs](../../../crates/dot-logger/src/control/mod.rs#L532-L543)에서 `shutdown_slot` 미선택 타깃을 `NONE`으로 전환, [logger/host.rs](../../../crates/dot-logger/src/logger/host.rs#L767-L796)에서 `!report.is_success()`일 때 일관되게 `unconfirmed` 채움 |
+| `RV-177` | `427939b` | **보완 필요 (`RV-191`)** | `next_inner`의 `in_flight` select, EOF 시 잔여 ACK 정산, `next` 에러 경로 미정산 우선, [bridge.rs](../../../crates/dot-logger-viewer/src/bridge.rs#L281-L286) `flush` 추가는 적절. 단 `next()`/`handoff()`의 `state.closed` 조기 분기가 미정산 ACK 검사를 우회(`RV-191`) |
+| `RV-178` | `427939b` | **적절 (Pass, Note 있음)** | [hub.rs](../../../crates/dot-logger/src/adapters/remote/hub.rs#L195-L197) `expire`가 `s.waker.take()`를 깨워 즉시 `Gone` 전환. 후속 트래픽이 전혀 없는 완전 유휴 상태에서 `server.rs:465` 타이머가 1 lease 늦게 `TimedOut`으로 종료되는 경계만 `RV-192` Note로 기록 |
+| `RV-179` | `427939b` | **적절 (Pass)** | [dashboard.rs](../../../crates/dot-logger-viewer/src/dashboard.rs#L293-L314) `AbortOnDrop` + `queue.recv() => None => return`으로 `work` 누수 차단. [websocket.rs](../../../crates/dot-logger-viewer/src/websocket.rs#L134-L210) `loopback_host` 및 `valid_port` `1..=65535` 검증 확인 |
+| `RV-180` | `f0d77fa` | **타당한 부분 수용 (Pass)** | 워크스페이스 전수 `mcap::` grep으로 비테스트 제품 코드의 reader 호출이 모든 길이 사전 검증 직후인 [storage/read.rs](../../../crates/dot-logger/src/storage/read.rs#L388-L391) `mcap::parse_record`(Schema/Channel) 1곳뿐임을 확인. [VENDORED.md](../../../vendor/mcap-0.26.0/VENDORED.md) 및 호출부 경계 문서화 타당 |
+| `RV-181` | `f0d77fa` | **타당한 일부 유지 (Pass)** | [storage/read.rs](../../../crates/dot-logger/src/storage/read.rs#L229-L231), [recovery.rs](../../../crates/dot-logger/src/storage/recovery.rs), [query/mod.rs](../../../crates/dot-logger/src/query/mod.rs#L565-L633)에서 선행 `MessageIndex` 및 등록 중 미지 opcode 거절 확인. [query/mod.rs](../../../crates/dot-logger/src/query/mod.rs#L523-L528) `end == 0` 유지는 미검증 활성 파일의 정상 표현·보수적 loss 판정과 정합 |
+| `RV-182` | `f0d77fa` | **타당한 방식 조정 (Pass)** | [loss.rs](../../../crates/dot-logger/src/loss.rs#L151-L160) `LossRange::holds` part 구간 검사, 빈 v1 거절, [loss.rs](../../../crates/dot-logger/src/loss.rs#L864-L893) 중복 `counter_key` 발견 시 전체 쿼리 실패 대신 해당 checkpoint를 `complete = false`(delta·0 합성·tail 확정 제외)로 격리. `RV-164` 호환 유지 타당 |
+| `RV-183` | `fe9c648` | **적절 (Pass)** | `single-crc.patch` 제거 → [local-changes.patch](../../../vendor/mcap-0.26.0/local-changes.patch) (209줄) 생성, [Cargo.toml](../../../Cargo.toml#L49-L50) · [run-perf-rt.sh](../../../scripts/run-perf-rt.sh#L26-L29) · [run-perf-s3.sh](../../../scripts/run-perf-s3.sh) 정리 완료. 레포 내 개인 경로 0건(`README.md:52` 공개 GitHub URL 제외) 확인 |
+| `RV-184` | `fe9c648` | **적절 (Pass)** | [routed_check_host.rs](../../../crates/dot-logger-cli/tests/routed_check_host.rs#L85), [routed_host.rs](../../../crates/dot-logger-client/tests/routed_host.rs#L157)에서 `std::env::temp_dir().join(...)` 사용 확인 |
+| `RV-185` | `07346a9` | **적절 (Pass)** | [completion/mod.rs](../../../crates/dot-logger/src/completion/mod.rs#L326-L332) `Registry::reported` + `AbandonMarker` + `classify`(`!(boundary == Boundary::Enqueued && (4..=8).contains(&term))`) 정합 확인 |
+| `RV-186` | `427939b` | **적절 (Pass)** | [commands.rs](../../../crates/dot-logger-cli/src/commands.rs#L538) · [#L756](../../../crates/dot-logger-cli/src/commands.rs#L756) · [wire.rs](../../../crates/dot-logger/src/adapters/remote/wire.rs#L440) 검증 및 회귀 테스트 확인 |
+| `RV-187` | `f0d77fa` | **적절 (Pass)** | [query/mod.rs](../../../crates/dot-logger/src/query/mod.rs#L343-L348) `u16::MAX as usize - 2` 상한 및 `storage::registration_bytes` 적용 확인 |
+| `RV-188` | `ba23932`·`fe9c648` | **타당한 일부 유지 + 미세 보완 (`RV-192`)** | Miri `--skip logger::` 제거·`writer.rs` ignore·`Drop` 정리 가드 추가·`local-pc.toml` 정합성(`check-test-profile.py` rc 2 확인) 및 RT allocation 수동 정리 유지 타당. 단 [fault_storage.rs](../../../crates/dot-logger/tests/fault_storage.rs#L993) `Cleanup`이 Miri 제외를 누락(`RV-192`) |
+| `F1` | `f0d77fa` | **적절 (Pass)** | `tc_015_native.rs` fixture를 [standard-v2-registrations-in-chunk.mcap](../../../crates/dot-logger/tests/fixtures/standard-v2-registrations-in-chunk.mcap)으로 이전해 fresh clone 컴파일 실패 차단 |
+| `F2` | `ba23932` | **적절 (Pass)** | `FileLedger` 4-slot 사전할당 전환 및 [routing/mod.rs](../../../crates/dot-logger/src/routing/mod.rs#L448) `FileLedger::PRODUCER_BYTES` 예약 반영으로 RT 관리 경로 무할당 유지 |
+
+### 7.2 보충 리뷰 후속 조치 항목 (`RV-189~192`)
+
+| ID | 중요도 | 관련 RV | 위치 | 문제 요약 |
+|---|---|---|---|---|
+| `RV-189` | **P1** | `RV-172` | [logger/host.rs](../../../crates/dot-logger/src/logger/host.rs#L1189-L1200) · [logger/writer.rs](../../../crates/dot-logger/src/logger/writer.rs#L393-L401) · [tc_013_calibrate.rs](../../../crates/dot-logger/tests/tc_013_calibrate.rs#L12) · [tc_017_loss.rs](../../../crates/dot-logger/tests/tc_017_loss.rs#L1144-L1181) | 비-Linux(`macos-14`·`windows-2025`) T3 CI에서 즉시 컴파일/Clippy `-D warnings`/테스트 실패하는 4개 지점 잔존 |
+| `RV-190` | **P2** | `RV-175` | [control/mod.rs](../../../crates/dot-logger/src/control/mod.rs#L986-L1026) | `if !ended_is_synced`가 남아 있어 `Boundary::Synced` 계약에서 `foreign.spans` (`strict = true`) 검증이 통째로 우회됨 |
+| `RV-191` | **P2** | `RV-177` | [transport.rs](../../../crates/dot-logger-client/src/transport.rs#L584) · [#L717-L720](../../../crates/dot-logger-client/src/transport.rs#L717-L720) · [#L847-L849](../../../crates/dot-logger-client/src/transport.rs#L847-L849) | `next()`·`handoff()`의 `state.closed` 조기 반환이 미정산 `acks`/`in_flight` 검사를 우회하고, `in_flight`만 남은 경우 `close()`가 `self.lost`를 설정하지 않음 |
+| `RV-192` | **P3** | `RV-172`·`178`·`188` | [tc_005_retention.rs](../../../crates/dot-logger/tests/tc_005_retention.rs#L789-L790) · [fault_storage.rs](../../../crates/dot-logger/tests/fault_storage.rs#L993) · ([server.rs](../../../crates/dot-logger/src/adapters/remote/server.rs#L465)) | 중복 `#[cfg(unix)]` 제거, Linux Miri `Cleanup` `dead_code` 경고 방지, `RV-178` 완전 유휴 시 타이머 경계 Note |
+
+#### 상세 내역
+
+- **`RV-189` (P1) — `[리뷰어]` 비-Linux(`macos-14`·`windows-2025`) T3 CI 컴파일·Clippy·테스트 실패 4건:**
+  1. **컴파일 실패 (`macos-14`):** [logger/host.rs:1189](../../../crates/dot-logger/src/logger/host.rs#L1189)의 `mod tests`는 `#[cfg(all(test, unix))]`로 macOS에서도 컴파일되며 [:1200](../../../crates/dot-logger/src/logger/host.rs#L1200)에서 `super::super::tests::Temp::new()`를 호출한다. 그러나 [logger/mod.rs:49](../../../crates/dot-logger/src/logger/mod.rs#L49)에서 `mod tests;`가 `#[cfg(all(test, target_os = "linux"))]`로 제한되어 macOS `cargo test`·`clippy --all-targets`에서 `error[E0433]`으로 컴파일이 실패한다. → `host::tests`를 `#[cfg(all(test, target_os = "linux"))]`로 맞추거나 `Temp`를 공용 `#[cfg(test)]` 모듈로 분리한다.
+  2. **Clippy `-D warnings` 실패 (`macos-14`·`windows-2025`):** [logger/writer.rs:393-401](../../../crates/dot-logger/src/logger/writer.rs#L393-L401)에서 `#[cfg(target_os = "linux")]`를 `mod closing_tests`가 아닌 내부 함수에만 붙여 비-Linux에서 모듈이 비어 있는 상태로 `use super::*;`와 `use crate::logger::{Budget, Logger, Retention, WriterQuota};`가 남아 `unused_imports` 에러가 발생한다. → `#[cfg(all(test, target_os = "linux"))]`를 `mod closing_tests` 자체로 이동한다.
+  3. **Clippy `-D warnings` 실패 (`macos-14`·`windows-2025`, `--all-features`):** [tc_013_calibrate.rs:12](../../../crates/dot-logger/tests/tc_013_calibrate.rs#L12)의 `PlanWarning`, `Shutdown` import는 `#[cfg(target_os = "linux")]`인 [:375-376](../../../crates/dot-logger/tests/tc_013_calibrate.rs#L375-L376) `f20_plan_warns_on_memory_and_load_but_start_is_not_blocked` 안에서만 사용된다. 비-Linux `--all-features` Clippy에서 `unused_imports`로 실패한다. → 해당 `use`를 Linux 전용으로 분리하거나 테스트 함수 안으로 옮긴다.
+  4. **런타임 테스트 패닉 (`macos-14`):** [tc_017_loss.rs:1144](../../../crates/dot-logger/tests/tc_017_loss.rs#L1144)의 `facade_encode_failures_are_persisted_and_only_returned_writers_confirm_the_tail`이 여전히 `#[cfg(unix)]`이며 [:1177-1181](../../../crates/dot-logger/tests/tc_017_loss.rs#L1177-L1181)에서 `Logger::builder()...file_output(&temp.0, ...).start().unwrap()`을 호출하므로 macOS에서 `linux_available_bytes` `Unsupported`로 패닉한다. → `#[cfg(target_os = "linux")]`로 변경한다.
+
+- **`RV-190` (P2) — `[리뷰어]` `Boundary::Synced` 계약에서 `if !ended_is_synced`로 `strict` 검증 우회:**
+  - [control/mod.rs:1062-1067](../../../crates/dot-logger/src/control/mod.rs#L1062-L1067) `settled()`에 `strict && status.confirmed.contains(Boundary::Written) && !status.confirmed.contains(Boundary::Synced)` 검사를 추가했으나, [:1017-1026](../../../crates/dot-logger/src/control/mod.rs#L1017-L1026)의 `if !ended_is_synced` 가드가 그대로 남아 있다.
+  - `TargetContract { completion: Boundary::Synced }`를 사용하면 `ended_is_synced == true`가 되어 `foreign.spans` (`strict = true`) 루프 전체가 건너뛰어지고 [:1030-1036](../../../crates/dot-logger/src/control/mod.rs#L1030-L1036) `settled(..., false)`만 실행된다. 그 결과 이전 파일에서 `Written` 이후 `SyncFailure`·`Unknown`·`Expired`로 `FileLedger::stuck`에 남은 레코드를 새 파일이 `SyncResult::Synced`로 오승인할 수 있다(`tc_004_storage.rs`의 1차 회귀 테스트는 `Boundary::Written`만 검증).
+  - **제안:** `Foreign::spans`의 `earlier`는 미동기화 빚(`self.owed`)만 포함하고 이미 동기화·정산된 파일은 제외되므로, [:1017](../../../crates/dot-logger/src/control/mod.rs#L1017) `if !ended_is_synced` 조건을 제거해 `Boundary::Synced` 계약에서도 `foreign.spans`에 `strict = true` 검증을 적용하고 `Boundary::Synced` 회귀 테스트를 추가한다.
+
+- **`RV-191` (P2) — `[리뷰어]` `RemoteSubscription::next`/`handoff`의 `state.closed` 조기 반환 시 미정산 ACK 검사 우회:**
+  - [transport.rs:717-720](../../../crates/dot-logger-client/src/transport.rs#L717-L720)(`next`)과 [:847-849](../../../crates/dot-logger-client/src/transport.rs#L847-L849)(`handoff`)가 `self.state.closed.load(Ordering::Acquire)`(또는 `self.stream.is_none()`)일 때 곧바로 `Err(ClientError::Disconnected)`를 반환한다.
+  - 이전 호출 이후 `self.acks` 또는 `self.in_flight`에 미정산 ACK가 남아 있는 상태에서 TCP 연결이 닫히면 [:735-738](../../../crates/dot-logger-client/src/transport.rs#L735-L738)의 미정산 검사에 도달하지 못해 `AcknowledgementUnknown` 대신 `Disconnected`가 반환된다. 특히 `self.acks`가 비고 `self.in_flight`만 남은 경우 `close()`([:584](../../../crates/dot-logger-client/src/transport.rs#L584))의 `self.lost |= !self.acks.is_empty()`도 `self.lost`를 세우지 못한다.
+  - **제안:** `next()`와 `handoff()`의 `self.stream.is_none() || self.state.closed.load(Ordering::Acquire)` 분기에서도 `self.reap().is_err() || !self.acks.is_empty() || !self.in_flight.is_empty()`이면 `Err(self.unknown())`을 반환하도록 통일하고 단위 테스트를 추가한다.
+
+- **`RV-192` (P3) — `[리뷰어]` 테스트 `cfg` 중복·Miri `dead_code` 정리 및 `RV-178` 유휴 타이머 Note:**
+  1. [tc_005_retention.rs:789-790](../../../crates/dot-logger/tests/tc_005_retention.rs#L789-L790): `#[cfg(all(unix, not(miri)))]` 아래 중복 `#[cfg(unix)]`를 제거한다.
+  2. [fault_storage.rs:993](../../../crates/dot-logger/tests/fault_storage.rs#L993): 유일한 사용처가 `#[cfg(all(unix, not(miri)))]`이므로 `#[cfg_attr(not(all(unix, not(miri))), allow(dead_code))]`로 맞춰 Linux Miri 실행 시 `dead_code` 경고를 막는다.
+  3. **참고 Note (`RV-178`, 수정 선택):** [server.rs:465](../../../crates/dot-logger/src/adapters/remote/server.rs#L465)에서 `SubscriptionStream`이 후행 레코드를 보낼 때 `self.timer`가 `now + age`로 리셋되므로, 이후 추가 `offer`/`ack`/`discard_generations` 호출이 전혀 없는 완전 유휴 상태에서는 선행 레코드 만료 시점보다 최대 1 lease(`age`) 뒤 타이머 만료로 종료되며 `RemoteError::TimedOut`을 반환한다(호스트는 이미 `expire`로 구독을 닫은 상태).
+

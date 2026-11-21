@@ -14,7 +14,7 @@
 | MS-006 | 외부 연동과 긴급 기록 | Build | Done | TASK-019·TASK-020·TASK-021 | DB·dot-probe 통합 예제·UPS 소프트웨어 경로 완성 | 8~14 | [상세](milestones/MS-006.md) |
 | MS-007 | 장비 검증과 인수 | Verify | In Progress | TASK-022·TASK-023·TASK-024·TASK-025·TASK-026·TASK-033 | 현재 PC 프로필 준비·실측/24h·UPS 모의 수락·공개 후 OS 교환 | 8~14 | [상세](milestones/MS-007.md) |
 | MS-008 | 소비처 통합 접점 경량화 | Build | Done | TASK-027·TASK-028·TASK-029·TASK-034 | facade 기본 worker·preset/auto preset·support 없는 레시피 | 8~13 | [상세](milestones/MS-008.md) |
-| MS-009 | 표준 호환과 원격 시각화 | Build | In Progress | TASK-030·TASK-031·TASK-032·TASK-035 | 표준 MCAP 판독·분리된 viewer 시각화·운영 대시보드 | 8~13 | [상세](milestones/MS-009.md) |
+| MS-009 | 표준 호환과 원격 시각화 | Build | Done(2026-11-21) | TASK-030·TASK-031·TASK-032·TASK-035 | 표준 MCAP 판독·분리된 viewer 시각화·운영 대시보드 | 8~13 | [상세](milestones/MS-009.md) |
 
 필수 합계 **61~102 인일**(주 5일 전담 기준 약 12.2~20.4주; 2026-11-04 MS-008/009 16~26 인일 추가), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
 

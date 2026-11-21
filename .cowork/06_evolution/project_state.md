@@ -6,20 +6,22 @@
 |---|---|
 | 프로젝트 | dot-logger — 범용 로보틱스/RTOS Rust 로그 라이브러리(첫 사용처 dot-probe) |
 | 팀/실행 모드 | lim8603 프로젝트 오너, AI 지원 / solo |
-| 현재 Phase | Build/Verify — MS-001~006·008 Done, MS-007·009 In Progress |
+| 현재 Phase | Build/Verify — MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실·원격 viewer 완료, 운영 대시보드(TASK-032) 진행 중. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | [TASK-032](../04_implementation/tasks/TASK-032.md) In Progress — S1(ADR-016)·S2(`704d055`)·S3(`277de2d`) Done, REV-070 조치(`6b736c9`) Closed. Task 수락 판단 대기 |
+| 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
+| 활성 Task | 없음 — TASK-032 Done(2026-11-21 Human 「승인」). 다음 [TASK-025](../04_implementation/tasks/TASK-025.md) 사용 문서·추적표·인수 정리 |
 | 미처리 리뷰 | 없음 — REV-001~070 Closed. 최근 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치·수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
-| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / REV-070 조치·마감 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #003.** REV-070 반입·RV-166~170 조치(`6b736c9`)·마감. 다음 TASK-032 수락 판단 |
+| 갱신 | 2026-11-21 / TASK-032 수락·MS-009 마감 / AI |
+| 세션 상태 | **진행 — 2026-11-21 #003.** REV-069·070 마감, TASK-032 수락·MS-009 Done. 다음 TASK-025 |
 | 최근 완료 세션 | 2026-11-21 — TASK-032 S2·S3 독립 코드리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) |
 
 ## 현재 결정과 제약
+
+- **2026-11-21 Human 「승인」 — TASK-032 수락·MS-009 마감:** 운영 대시보드(ADR-016, S1~S3)와 독립 리뷰 REV-070 조치(`6b736c9`, [EV-109](../05_verification/verification_evidence.md#ev-109))를 수락했다. MS-009의 소속 Task 네 개가 모두 Done이 되어 MS-009를 Done으로 마감했다. native(T3)·실사용처·장기 잔여는 MS-007 쪽에 유지하며 Gate 4·5는 Not Ready다. [MS-009](../04_implementation/milestones/MS-009.md#마감--2026-11-21)
 
 - **2026-11-21 Human 「A. viewer 내장 웹」·「읽기 전용」 — [ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md):** TASK-032 대시보드는 viewer가 loopback HTTP로 내장 정적 페이지와 JSON 경로를 제공한다. 새 crate·외부 CDN·빌드 도구는 쓰지 않는다. GetStatus(1초, 한 번에 하나)·Compare·PlanCheck만 조회하고 ApplyConfig·RunCheck는 CLI로 둔다. 값 상태를 보존하고 실패 시 마지막 값·시각과 사유를 구분한다. [화면 §7](../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)
 
@@ -70,14 +72,13 @@
 
 ## 활성 Task 요약
 
-Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(30건: TASK-001~017·019~023·027~031·033~035).
+Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(31건: TASK-001~017·019~023·027~035).
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
-| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
+| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-21 | 다음 작업. 선행 TASK-033·TASK-032 Done(MS-009 마감 2026-11-21) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-032 | viewer 대시보드 | AI | In Progress | 2026-11-21 | S1~S3 Done(ADR-016, `704d055`·`277de2d`, EV-107·108), REV-070 Closed(`6b736c9`, EV-109). Task 수락 판단 대기 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -102,9 +103,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-1. **TASK-032 수락·MS-009 마감 판단.** S1([ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md)), S2(`704d055`, [EV-107](../05_verification/verification_evidence.md#ev-107)), S3(`277de2d`, [EV-108](../05_verification/verification_evidence.md#ev-108))이 끝났고, 독립 리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md)은 `6b736c9`로 조치해 Closed다([EV-109](../05_verification/verification_evidence.md#ev-109)). Task 수락과 MS-009 마감 뒤 추적표 MS 칸을 갱신한다. 다음은 TASK-025다. [TASK-032](../04_implementation/tasks/TASK-032.md)
-2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
-3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
+1. **TASK-025 인수 정리:** 선행 조건(TASK-033·TASK-032)이 모두 Done이고 MS-009도 2026-11-21에 마감됐다. 사용 문서(설치·통합·관측·조절·장애·보존 예제)와 실제 기능의 불일치를 점검하고 MS 추적표를 정리한다. 11월 16일 주 목표에 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다. [TASK-025](../04_implementation/tasks/TASK-025.md)
+2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약
 

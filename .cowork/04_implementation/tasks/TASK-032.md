@@ -8,9 +8,9 @@
 | 설계 | [인터페이스 §15](../../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안) · [CLI/화면](../../03_design_artifacts/ui_spec.md) |
 | ADR | ADR-007·009·014 Accepted. [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md) Accepted(S1, 2026-11-21) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | S1~S3 구현 완료, 독립 리뷰 REV-070 조치·Closed(`6b736c9`, EV-109). Task 수락 판단 |
+| 다음 액션 | 없음 — 2026-11-21 Human 「승인」으로 수락·MS-009 마감 |
 | 의존 | TASK-031·TASK-016·TASK-017 |
 | 예상 소요 | 2~4 인일, 리뷰 대기 제외 |
 
@@ -43,11 +43,11 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 ## 완료 기준
 
 - [x] 운영 화면 구현과 값 구분·권한 경계 검증(EV-107·108).
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다(FR-006·NFR-008의 MS-009 칸, TC-014).
 - [x] 실패/연결 끊김·취소/종료를 해당 범위에서 검증한다(EV-107·108).
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] Human 리뷰 완료(독립 리뷰 REV-070 조치 뒤 2026-11-21 Human 「승인」). 새 H/J 결정은 ADR-016에 기록했다.
 
-테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). 결과: S2 [EV-107](../../05_verification/verification_evidence.md#ev-107), S3 [EV-108](../../05_verification/verification_evidence.md#ev-108). 추적표 MS 칸은 Task 수락 때 갱신한다.
+테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). 결과: S2 [EV-107](../../05_verification/verification_evidence.md#ev-107), S3 [EV-108](../../05_verification/verification_evidence.md#ev-108). 추적표 MS 칸은 수락 때 갱신했다.
 
 ## S1 결정 — 2026-11-21
 
@@ -75,3 +75,10 @@ Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)�
 
 Codex의 독립 리뷰가 P1 1건과 P2 4건(RV-166~170)을 냈다. `6b736c9`에서 모두 수용해 조치했고(RV-170은 기준 조정), 위임 범위에서 Closed로 마감했다. 상류 주소 노출 방지, 렌더링 실패 뒤 갱신 계속, 포트 80 Host, 최신 조회 결과만 반영, 호스트 기준 1초 간격이 바뀌었다. [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) · [EV-109](../../05_verification/verification_evidence.md#ev-109)
 
+## 수락 — 2026-11-21
+
+Human 「승인」으로 TASK-032를 수락하고 Done으로 마감했다.
+
+- **근거:** S1 [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), S2 `704d055`([EV-107](../../05_verification/verification_evidence.md#ev-107)), S3 `277de2d`([EV-108](../../05_verification/verification_evidence.md#ev-108)), 독립 리뷰 [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) 조치 `6b736c9`([EV-109](../../05_verification/verification_evidence.md#ev-109)).
+- **회귀:** 마지막 상태에서 Rust 1.85.0·1.96.0 각 724 Pass·5 ignored.
+- **남은 범위(이 Task 밖):** native 실행(T3·GAP-004), 실사용처 화면(TASK-026), 브라우저 렌더링 자동 시험. 원격 `CheckHost` 데모가 없어 PlanCheck 성공 화면은 하네스로만 확인했다.

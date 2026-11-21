@@ -23,7 +23,7 @@
 | 관련 Milestone | MS-001~009 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-21 / EV-001~110 |
+| 버전 | 2026-11-21 / EV-001~111 |
 
 ---
 
@@ -1745,6 +1745,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **발견 2 — CI Miri 설정 낡음:** CI와 같은 플래그의 Miri가 lib 시험에서 두 단계로 실패했다. ① 격리 모드에서 `clock_gettime(REALTIME)` 미지원: 손실 checkpoint(`5be17b5`, 2026-11-17)가 게시 시각을 실제 시계로 기록한다. ② 시계를 허용하면 기본 경로 `logger::` 단위 시험(TASK-027 이후)이 실제 파일과 디렉터리 `fsync`를 써서 Miri 미지원으로 멈춘다. 로컬 EV는 그동안 시계를 허용한 Miri로 일부 시험만 돌렸고 CI 설정은 그대로였으므로, 공개 뒤 첫 CI 실행에서 실패했을 것이다. CI에 `-Zmiri-disable-isolation`을 넣고 lib에서 `logger::`를 제외했다(`-- --skip logger::`). 이 17개는 일반 테스트 작업에서 두 Rust 버전으로 돈다. 제품 동작은 그대로다.
 - **환경 주의:** 저장소 안의 `target/`에 13:35에 만든 다른 빌드가 남아 있었다. 그 `live_host`는 지표가 `no_runtime_metrics_backend`로 나왔다. 설정된 빌드 디렉터리(`/data/build/target`)의 현재 빌드로 다시 실행해 위 결과를 얻었다. 판정에는 현재 빌드 결과만 쓴다.
 - **판정에 쓰는 범위:** Gate 4 단위·lint·F-11 근거(이 PC 로컬). native·3 OS(GAP-004/TASK-024)·24h·실사용처는 Not Run 그대로다. 원자료: `/tmp/.../s4_reg`(세션 임시, 보관하지 않음).
+
+<a id="ev-111"></a>
+### EV-111 — REV-071 조치 뒤 전체 회귀와 종단 확인
+
+- **대상:** main `55e6b1e`(REV-071 조치 커밋 `e12584a`·`07346a9`·`427939b`·`93bbf9e`·`f0d77fa`·`ba23932`·`fe9c648`·`55e6b1e`). 이 PC(Ubuntu generic 7.0.0-43, x86_64), 빌드 디렉터리 `/data/build/target`. AI 실행.
+- **CI와 같은 검사 묶음:**
+  - Rust 1.96.0·1.85.0 workspace all-features 각 **739 Pass, 실패 0, 5 ignored**(외부 DB). 새 시험 15개 포함.
+  - 두 버전 Clippy `-D warnings`(1.85에서 중복 cfg 1건을 찾아 `55e6b1e`로 수정 후 통과), fmt, strict rustdoc(workspace·core 전용).
+  - feature 조합 1.96.0 406초·1.85.0 486초, client 기능 없는 시험, 통합 표면 검사와 자체 시험, 원격 프로토콜 검사, `cargo audit --deny unsound`(`paste` 경고 1건).
+  - Miri(CI 범위, `--skip logger::` 없이, strict provenance·시계 허용·seed 0..8): 종료 코드 0, 797초, 실패 seed 0. 출력이 섞여 결과 줄 53개를 파싱했고 그 안에서 1,233 Pass·실패 0·77 ignored.
+- **종단:** `live_host` → viewer·대시보드 → CLI. 대시보드는 관측 지표를 담은 `dot_logger.viewer.dashboard.v1`, `tail --limit 10`은 10건 수신·10건 ACK·Gap 0. WebSocket 핸드셰이크는 Host `127.0.0.1`·`localhost`이면 101, `evil.example`이면 403(RV-179). 처음 확인에서는 viewer 바이너리가 수정 전 빌드여서 101이 나왔고, 다시 빌드해 확인했다.
+- **판정에 쓰는 범위:** REV-071 조치의 로컬 회귀·종단 근거. macOS·Windows 실행(RV-172·184의 실제 효과)은 공개 뒤 T3 native CI에서 확인한다(GAP-004).
 
 ## Open Evidence Gaps
 

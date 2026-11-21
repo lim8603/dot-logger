@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1~S4 Done, **[REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md)(Open: 3 P1, 11 P2, 4 P3) 조치·마감 뒤 Human 수락**: Gate 4 판정안 Pass(로컬 범위)·Gate 5 Not Ready([판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)) |
-| 미처리 리뷰 | **[REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) Open(2026-11-21)** — 코드 전체 독립 리뷰(RV-171~188: 3 P1, 11 P2, 4 P3). 개발 세션 조치·리뷰 마감 뒤 Gate 4 수락. REV-001~070 Closed |
-| 상태 | 31/35 Task Done, MS-009 Done. 현재 HEAD 재검증 [EV-110](../05_verification/verification_evidence.md#ev-110): 두 Rust 각 724 Pass·5 ignored, feature 조합·CI 범위 Miri·종단 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089) 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. **REV-071 Open(Fail — 3 P1, 11 P2, 4 P3) 조치 뒤 Gate 4 수락·공개 전환** |
+| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1~S4 Done, REV-071 조치 완료. **Human 수락 대기**: REV-071 조치와 Gate 4 판정안 Pass(로컬 범위)·Gate 5 Not Ready([판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)) |
+| 미처리 리뷰 | **[REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) Resolved(2026-11-21)** — RV-171~188 조치·재검증([EV-111](../05_verification/verification_evidence.md#ev-111)). Human 수락 뒤 Closed. REV-001~070 Closed |
+| 상태 | 31/35 Task Done, MS-009 Done. REV-071 조치 뒤 재검증 [EV-111](../05_verification/verification_evidence.md#ev-111): 두 Rust 각 739 Pass·5 ignored, feature 조합·CI 범위 Miri(`logger::` 제외 없음)·종단 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089). **Gate 4 판정안 Pass(로컬 범위, Human 수락 대기)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / #004 REV-071 코드 전체 독립 리뷰 수행(Open: RV-171~188, 3 P1·11 P2·4 P3) / AI |
-| 세션 상태 | **대기(인계 완료) — 2026-11-21 #004(리뷰).** REV-071 코드 전체 독립 리뷰 완료(Open). 다음 개발 세션에서 RV-171~188 조치 후 Gate 4 수락 및 공개 전환 |
+| 갱신 | 2026-11-21 / #004 REV-071 RV-171~188 조치·EV-111 / AI |
+| 세션 상태 | **진행 — 2026-11-21 #004.** REV-071 조치·재검증 완료, Human 수락(REV-071·Gate 4) 대기 |
 | 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
 
 ## 현재 결정과 제약
@@ -106,17 +106,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
-| [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성(HEAD `a46c2d7`, 코드 마지막 변경 `8bab94b`) | **Open** | **Fail — RV-171~188(3 P1, 11 P2, 4 P3) 도출.** 주기 sync 만료 슬롯 누수(RV-171), 비-Linux CI 가드 누락(RV-172), client/cli/viewer CI 테스트 미실행(RV-173) 등 조치·마감 뒤 Gate 4 수락 |
+| [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 | **Resolved** | RV-171~188 수용 14·부분/일부 유지 4(RV-180·181·182·188), 범위 밖 발견 2(비공개 폴더 fixture, 예약 밖 할당). 재검증 [EV-111](../05_verification/verification_evidence.md#ev-111). Human 수락 뒤 Closed |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **REV-071 코드 전체 독립 리뷰 조치([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md), Open — RV-171~188: 3 P1, 11 P2, 4 P3):** 2026-11-21 리뷰 전용 세션에서 workspace 전체(HEAD `a46c2d7`, 코드 `8bab94b`)에 대해 3대 중점 영역·보안·신뢰성 독립 심층 리뷰를 마치고 18건(P1 3, P2 11, P3 4)을 도출했다. 다음 개발 세션은 TDD(재현 실패 테스트 → 최소 수정 → 회귀 검증)로 RV-171~188을 처리해 `Resolved`로 갱신하고 재검증 뒤 `Closed`로 마감한다. **REV-071 마감 뒤 아래 1(TASK-025 Gate 4 수락)과 0-1(공개 전환·T3 발동)을 진행한다.**
-   - **P1(3):** `RV-171` 주기적 sync 만료 시 단일 sync 슬롯 영구 누수·주기 sync 중단·`SyncOverdue` 고착·종료 `sync_failed` 오염(`logger/host.rs`, `control/mod.rs`), `RV-172` 비-Linux(`macos-14`·`windows-2025`) CI 즉시 실패(`file_output`/`FileStore::new` 테스트·하네스 14곳 플랫폼 가드 누락), `RV-173` `dot-logger-client`·`dot-logger-cli`·`dot-logger-viewer` CI 테스트 미실행(`.github/workflows/ci.yml`, `check-feature-matrix.py`).
-   - **P2(11):** `RV-174` `io_loop` `StorageError::Busy` 무한 스핀·중복 손실 checkpoint 기록, `RV-175` `SyncWork::settled`/`covers_file` 타파일 `Written` 오승인 및 `FileLedger::settle` 구간 미축소, `RV-176` `begin_shutdown` 후 전원 경보 시 선택 타깃 `EXPIRED` 오전이 및 `FacadeReport.unconfirmed` 누락, `RV-177` `RemoteSubscription::next`/`handoff` `self.lost`·in-flight `select!`·EOF `acks`·viewer `flush`, `RV-178` `Subscription::expire` waker 미깨움 및 타이머 밀림, `RV-179` `dashboard::serve` `work` 태스크 누수 및 WS `Host`/`Origin` 포트 검증 공백, `RV-180` vendored `mcap` `Attachment`/인덱스 슬라이스 패닉·`McapString` 선할당, `RV-181` 선행 `op == 7` 허용·`_ => continue` 및 `Snapshot::scan` `end == 0` 검증 우회, `RV-182` `loss::summarize` part 간 `counter_key` 중복·빈 v1 decode·`LossRange::holds` `part` 경계, `RV-183` `single-crc.patch` 개인 홈 경로(`/home/lim8603/...`)·누락 패치 및 성능 스크립트 `/data/build`, `RV-184` `/nonexistent/...` Windows 절대경로 실패.
-   - **P3(4):** `RV-185` `Boundary::Enqueued` 타깃 유기 오인·폐기 후 `Complete` 오집계, `RV-186` CLI `recover` 중복 sequence `target: None` 사전 검사 및 원격 `Query` `blob`/`snapshot` 일관성, `RV-187` `QueryConfig::reservation` `channels.len()`·`PayloadSchema::name` 누락, `RV-188` `writer.rs` Miri ignore·`--skip logger::` 과잉 제외, 8개 테스트 `/tmp` RAII 정리 누락, `local-pc.toml` readiness 낡음.
-   - 2026-11-21 #004의 공개 전환 준비 요약은 아래 0-1에 있다.
+0. **REV-071 조치 완료 — Human 수락 대기:** RV-171~188을 TDD로 처리했다(판정·조치·확인은 [REV-071 §6](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md#6-조치-결과--2026-11-21-개발-세션)). 부분 수용·일부 유지는 RV-180(vendor 일반 읽기 API는 제품 경로 밖, 경계 명시), RV-181(`safe_offset 0` 유지), RV-182(중복 키는 거절 대신 불완전 처리), RV-188(RT 할당 시험 수동 정리 유지)이다. 리뷰 범위 밖 발견 2건(비공개 `imported_context`를 읽던 시험 fixture, RV-175 첫 구현의 예약 밖 할당)도 조치했다. 재검증은 [EV-111](../05_verification/verification_evidence.md#ev-111). Human이 수락하면 REV-071 Closed, Gate 4 수락, TASK-025 Done, Phase Verify 전환 순서로 진행한다.
 0-1. **공개 전환(T2 잔여):** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
    - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
      - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).

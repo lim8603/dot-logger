@@ -207,6 +207,8 @@ F-11 소비자 목록(최근 계약 강화와 영향 경로):
 | ADR-013 `standard/2`·manifest v2 전용 | 오프라인 CLI, `recover`, viewer 파일 열기, Foxglove | [EV-088](verification_evidence.md#ev-088)·[EV-090](verification_evidence.md#ev-090)·[EV-096](verification_evidence.md#ev-096), 회귀 시험 |
 | 손실 checkpoint 실제 시각 | Miri CI 작업 | CI 설정 낡음 발견 → 조치 |
 
+**REV-071 반영(2026-11-21):** 수락 전 코드 전체 독립 리뷰([REV-071](reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md))가 Fail(P1 3·P2 11·P3 4)이었다. 모두 조치하고 재검증했다([EV-111](verification_evidence.md#ev-111): 두 Rust 각 739 Pass, CI 범위 Miri 통과, 종단 통과). 위 표의 단위 테스트·컨벤션·F-11 근거는 EV-111로 갱신한다.
+
 범위 한계: 위 근거는 이 PC(Linux x86_64)의 로컬 실행이다. native·다른 OS CI는 GAP-004로 Not Run이며 공개 뒤 TASK-024(T3)가 소유한다. Gate 4 Pass는 이 범위를 넘어서 해석하지 않는다.
 
 ### Gate 5 (Verification → Release) — 판정: Not Ready

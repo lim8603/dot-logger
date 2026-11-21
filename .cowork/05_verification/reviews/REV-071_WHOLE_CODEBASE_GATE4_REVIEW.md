@@ -9,7 +9,7 @@
 | 대상 | Workspace 전체(`crates/dot-logger`, `crates/dot-logger-client`, `crates/dot-logger-cli`, `crates/dot-logger-viewer`, `examples/`, `tests/`, `proto/`, `scripts/`, `.github/workflows/ci.yml`, `vendor/mcap-0.26.0/`, `test-profiles/`) — `HEAD` `a46c2d7` (요청 등록 `a354f3c`, 근거 기준 `1b0fe85`, 마지막 코드 변경 `8bab94b`) |
 | 관련 Task / Gate | [TASK-025](../../04_implementation/tasks/TASK-025.md) — Gate 4 최종 수락 및 리포지토리 공개(`gh repo edit --visibility public` + T3 native CI) 직전 전체 코드 독립 점검 |
 | 종합 판정 | **Fail** (Gate 4 수락 및 공개 전환 전 `RV-171~184` 조치 필수 — **P1 3건 · P2 11건 · P3 4건**, 총 18건 `RV-171~188`) |
-| 상태 | **Open** — 2026-11-21 리뷰 전용 세션 등록 (`RV-171~188`) |
+| 상태 | **Resolved** — 2026-11-21 개발 세션 조치(§6). 재검증·Human 수락 뒤 Closed |
 
 Gate 4 수락과 저장소 공개 및 T3(GitHub Actions multi-OS native CI) 발동을 앞둔 시점에서 diff가 아닌 현재 workspace 코드 전체를 대상으로 **테마 1(역대 최다 지적 3대 영역 A·B·C)**, **테마 2(보안 ①~⑥)**, **테마 3(신뢰성 ①~⑥)** 관점에서 독립 심층 리뷰를 수행했다.
 
@@ -80,24 +80,24 @@ Gate 4 수락과 저장소 공개 및 T3(GitHub Actions multi-OS native CI) 발�
 
 | ID | 중요도 | 테마 | 위치 | 문제 요약 | 판정 | 상태 |
 |---|---|---|---|---|---|---|
-| **RV-171** | **P1** | 1-A, 3-③/④ | `logger/host.rs:705-745`, `control/mod.rs:434-440, 535-540, 818-835` | 주기적 sync 만료(`EXPIRED`) 시 `Host::hand`가 `pending`에 잔류시켜 `release_sync` 미호출 → 단일 sync 슬롯 영구 누수·주기 sync 영구 중단·`SyncOverdue` 고착·종료 `sync_failed` 오염 | Open | Open |
-| **RV-172** | **P1** | 3-⑥ | `.github/workflows/ci.yml:16,33-37`, `check-feature-matrix.py:18-50`, `logger/host.rs:330-339`, `diagnostics/host.rs:354-364`, `storage/retention.rs:55-58` 외 14개 파일 | `file_output`/`FileStore::new` 비-Linux 비지원 경로에 플랫폼 가드가 없는 14개 테스트/하네스로 `macos-14`·`windows-2025` CI 즉시 실패 | Open | Open |
-| **RV-173** | **P1** | 3-⑥ | `.github/workflows/ci.yml:33-37`, `check-feature-matrix.py:18-50`, `Cargo.toml:3` | `dot-logger-client`, `dot-logger-cli`, `dot-logger-viewer` 테스트가 CI 어디에서도 실행되지 않음 | Open | Open |
-| **RV-174** | **P2** | 1-A, 3-②/④ | `logger/host.rs:885-927` | `io_loop`에서 `sync_work`가 `Busy` 반환 시 `index` 증가 없이 재시도하여 매 회전마다 중복 손실 checkpoint chunk를 기록하며 무한 스핀 | Open | Open |
-| **RV-175** | **P2** | 1-A, 1-C | `control/mod.rs:1007-1053`, `storage/mod.rs:215-236`, `storage/writer.rs:330-334,1054-1056,1091-1094,1115-1119`, `storage/retention.rs:235-237,766,940` | `SyncWork::settled`/`covers_file`의 미동기화 타파일 `Written` 오승인, sync 후 `first`/`last` 미초기화, `FileLedger::settle` 구간 미축소 | Open | Open |
-| **RV-176** | **P2** | 1-A, 3-③ | `control/mod.rs:532-540`, `logger/host.rs:629-642, 666-668, 763-794` | `begin_shutdown` 이후 전원 경보 시 선택 타깃 `EXPIRED` 오전이 및 `target.log.finish` 실패·`Incomplete` 시 `FacadeReport.unconfirmed` 빈 벡터 | Open | Open |
-| **RV-177** | **P2** | 1-B, 3-③ | `dot-logger-client/src/transport.rs:709-794, 801-843`, `dot-logger-viewer/src/bridge.rs:281-282, 303-330` | `RemoteSubscription::next`/`handoff` `self.lost` 미검사, 유휴 스트림 시 `in_flight` ACK `select!` 누락(`TimedOut` 지연 반환), EOF 시 `acks` 조용한 폐기, viewer `flush` 미호출 | Open | Open |
-| **RV-178** | **P2** | 1-B, 3-③ | `adapters/remote/hub.rs:185-203`, `adapters/remote/server.rs:462-494` | `Subscription::expire` waker 미깨움 및 `SubscriptionStream` 타이머 리셋으로 만료 구독 `Gone` 지연/`TimedOut` 오종료 | Open | Open |
-| **RV-179** | **P2** | 1-B, 2-①, 3-④ | `dot-logger-viewer/src/dashboard.rs:290-305,319-339`, `main.rs:256-274`, `websocket.rs:127-175` | `dashboard::serve` 취소/드롭 시 `work` 태스크 누수(영구 1초 폴링), WS `Host` 헤더 미검증 및 `local_origin` 범위 밖 포트(`:99999`) 통과 | Open | Open |
-| **RV-180** | **P2** | 1-C, 2-①/③ | `vendor/mcap-0.26.0/src/read.rs:170-177,716-725,800-805,849-858,926-931,954-959`, `records.rs:142-152,163-175,226-245,293-313` | vendored `mcap` 손상 `Attachment`/Index 슬라이스 패닉·오프셋 오버플로, `McapString` 선할당, vec/map `byte_len` 경계 미검사 | Open | Open |
-| **RV-181** | **P2** | 1-C, 3-① | `storage/read.rs:227,339`, `storage/recovery.rs:305,472`, `query/mod.rs:530-532,635` | 첫 `Chunk`/`Metadata` 이전 `op == 7` 허용 및 `read.rs:339` `_ => continue`, `Snapshot::scan` `end == 0` 조기 반환 | Open | Open |
-| **RV-182** | **P2** | 1-C, 2-① | `loss.rs:147-153, 593-610, 799-908` | `summarize`의 part 간 `counter_key` 중복 미검사로 손상 checkpoint `complete` 오승인, `decode`의 빈 v1 허용, `LossRange::holds` `part` 경계 미대조 | Open | Open |
-| **RV-183** | **P2** | 2-⑥, 3-⑥ | `vendor/mcap-0.26.0/single-crc.patch:1-24`, `Cargo.toml:46-49`, `run-perf-rt.sh:26`, `run-perf-s3.sh:28` | `single-crc.patch` 개인 홈 경로(`/home/lim8603/...`) 및 2개 패치 누락/줄번호 어긋남, 성능 스크립트 `/data/build` 하드코딩 | Open | Open |
-| **RV-184** | **P2** | 3-⑥ | `dot-logger-cli/tests/routed_check_host.rs:84`, `dot-logger-client/tests/routed_host.rs:17,45`, `diagnostics/mod.rs:148` | `"/nonexistent/..."` Unix 경로 하드코딩으로 Windows `CheckPlan::build` `InvalidDirectory` 실패 | Open | Open |
-| **RV-185** | **P3** | 1-A | `completion/mod.rs:310-322, 980-998, 1013-1034` | `Boundary::Enqueued` 타깃에서 정상 드롭 유기 오인(`0b11110`) 및 취소/만료 폐기 후 `Complete` 오집계 | Open | Open |
-| **RV-186** | **P3** | 1-B, 2-① | `dot-logger-cli/src/model.rs:179-187`, `commands.rs:530-565,747-782`, `client/codec.rs:220-224`, `adapters/remote/wire.rs:439-441` | CLI `recover` 중복 sequence 시 `target: None` 사전 검사 누락, `Query` `blob != 0 && payload_len == 0` 및 `snapshot` 변경 미거절 | Open | Open |
-| **RV-187** | **P3** | 1-C | `query/mod.rs:341, 345-360` | `QueryConfig::reservation`의 `channels.len()` 상한(`u16::MAX`) 및 `PayloadSchema::name` 바이트 누락 | Open | Open |
-| **RV-188** | **P3** | 3-⑤/⑥ | `logger/writer.rs:394,399`, `ci.yml:89`, `test-profiles/local-pc.toml:4,57-58,99-106`, 8개 테스트 파일 | `writer.rs` Miri ignore 누락 및 `--skip logger::` 과잉 제외, 8개 테스트 `/tmp` RAII `Drop` 누락, `local-pc.toml` readiness 낡음 | Open | Open |
+| **RV-171** | **P1** | 1-A, 3-③/④ | `logger/host.rs:705-745`, `control/mod.rs:434-440, 535-540, 818-835` | 주기적 sync 만료(`EXPIRED`) 시 `Host::hand`가 `pending`에 잔류시켜 `release_sync` 미호출 → 단일 sync 슬롯 영구 누수·주기 sync 영구 중단·`SyncOverdue` 고착·종료 `sync_failed` 오염 | 수용 | Resolved |
+| **RV-172** | **P1** | 3-⑥ | `.github/workflows/ci.yml:16,33-37`, `check-feature-matrix.py:18-50`, `logger/host.rs:330-339`, `diagnostics/host.rs:354-364`, `storage/retention.rs:55-58` 외 14개 파일 | `file_output`/`FileStore::new` 비-Linux 비지원 경로에 플랫폼 가드가 없는 14개 테스트/하네스로 `macos-14`·`windows-2025` CI 즉시 실패 | 수용 | Resolved |
+| **RV-173** | **P1** | 3-⑥ | `.github/workflows/ci.yml:33-37`, `check-feature-matrix.py:18-50`, `Cargo.toml:3` | `dot-logger-client`, `dot-logger-cli`, `dot-logger-viewer` 테스트가 CI 어디에서도 실행되지 않음 | 수용 | Resolved |
+| **RV-174** | **P2** | 1-A, 3-②/④ | `logger/host.rs:885-927` | `io_loop`에서 `sync_work`가 `Busy` 반환 시 `index` 증가 없이 재시도하여 매 회전마다 중복 손실 checkpoint chunk를 기록하며 무한 스핀 | 수용 | Resolved |
+| **RV-175** | **P2** | 1-A, 1-C | `control/mod.rs:1007-1053`, `storage/mod.rs:215-236`, `storage/writer.rs:330-334,1054-1056,1091-1094,1115-1119`, `storage/retention.rs:235-237,766,940` | `SyncWork::settled`/`covers_file`의 미동기화 타파일 `Written` 오승인, sync 후 `first`/`last` 미초기화, `FileLedger::settle` 구간 미축소 | 수용 | Resolved |
+| **RV-176** | **P2** | 1-A, 3-③ | `control/mod.rs:532-540`, `logger/host.rs:629-642, 666-668, 763-794` | `begin_shutdown` 이후 전원 경보 시 선택 타깃 `EXPIRED` 오전이 및 `target.log.finish` 실패·`Incomplete` 시 `FacadeReport.unconfirmed` 빈 벡터 | 수용 | Resolved |
+| **RV-177** | **P2** | 1-B, 3-③ | `dot-logger-client/src/transport.rs:709-794, 801-843`, `dot-logger-viewer/src/bridge.rs:281-282, 303-330` | `RemoteSubscription::next`/`handoff` `self.lost` 미검사, 유휴 스트림 시 `in_flight` ACK `select!` 누락(`TimedOut` 지연 반환), EOF 시 `acks` 조용한 폐기, viewer `flush` 미호출 | 수용 | Resolved |
+| **RV-178** | **P2** | 1-B, 3-③ | `adapters/remote/hub.rs:185-203`, `adapters/remote/server.rs:462-494` | `Subscription::expire` waker 미깨움 및 `SubscriptionStream` 타이머 리셋으로 만료 구독 `Gone` 지연/`TimedOut` 오종료 | 수용 | Resolved |
+| **RV-179** | **P2** | 1-B, 2-①, 3-④ | `dot-logger-viewer/src/dashboard.rs:290-305,319-339`, `main.rs:256-274`, `websocket.rs:127-175` | `dashboard::serve` 취소/드롭 시 `work` 태스크 누수(영구 1초 폴링), WS `Host` 헤더 미검증 및 `local_origin` 범위 밖 포트(`:99999`) 통과 | 수용 | Resolved |
+| **RV-180** | **P2** | 1-C, 2-①/③ | `vendor/mcap-0.26.0/src/read.rs:170-177,716-725,800-805,849-858,926-931,954-959`, `records.rs:142-152,163-175,226-245,293-313` | vendored `mcap` 손상 `Attachment`/Index 슬라이스 패닉·오프셋 오버플로, `McapString` 선할당, vec/map `byte_len` 경계 미검사 | 부분 수용 | Resolved |
+| **RV-181** | **P2** | 1-C, 3-① | `storage/read.rs:227,339`, `storage/recovery.rs:305,472`, `query/mod.rs:530-532,635` | 첫 `Chunk`/`Metadata` 이전 `op == 7` 허용 및 `read.rs:339` `_ => continue`, `Snapshot::scan` `end == 0` 조기 반환 | 수용(일부 유지) | Resolved |
+| **RV-182** | **P2** | 1-C, 2-① | `loss.rs:147-153, 593-610, 799-908` | `summarize`의 part 간 `counter_key` 중복 미검사로 손상 checkpoint `complete` 오승인, `decode`의 빈 v1 허용, `LossRange::holds` `part` 경계 미대조 | 수용(방식 조정) | Resolved |
+| **RV-183** | **P2** | 2-⑥, 3-⑥ | `vendor/mcap-0.26.0/single-crc.patch:1-24`, `Cargo.toml:46-49`, `run-perf-rt.sh:26`, `run-perf-s3.sh:28` | `single-crc.patch` 개인 홈 경로(`/home/lim8603/...`) 및 2개 패치 누락/줄번호 어긋남, 성능 스크립트 `/data/build` 하드코딩 | 수용 | Resolved |
+| **RV-184** | **P2** | 3-⑥ | `dot-logger-cli/tests/routed_check_host.rs:84`, `dot-logger-client/tests/routed_host.rs:17,45`, `diagnostics/mod.rs:148` | `"/nonexistent/..."` Unix 경로 하드코딩으로 Windows `CheckPlan::build` `InvalidDirectory` 실패 | 수용 | Resolved |
+| **RV-185** | **P3** | 1-A | `completion/mod.rs:310-322, 980-998, 1013-1034` | `Boundary::Enqueued` 타깃에서 정상 드롭 유기 오인(`0b11110`) 및 취소/만료 폐기 후 `Complete` 오집계 | 수용 | Resolved |
+| **RV-186** | **P3** | 1-B, 2-① | `dot-logger-cli/src/model.rs:179-187`, `commands.rs:530-565,747-782`, `client/codec.rs:220-224`, `adapters/remote/wire.rs:439-441` | CLI `recover` 중복 sequence 시 `target: None` 사전 검사 누락, `Query` `blob != 0 && payload_len == 0` 및 `snapshot` 변경 미거절 | 수용 | Resolved |
+| **RV-187** | **P3** | 1-C | `query/mod.rs:341, 345-360` | `QueryConfig::reservation`의 `channels.len()` 상한(`u16::MAX`) 및 `PayloadSchema::name` 바이트 누락 | 수용 | Resolved |
+| **RV-188** | **P3** | 3-⑤/⑥ | `logger/writer.rs:394,399`, `ci.yml:89`, `test-profiles/local-pc.toml:4,57-58,99-106`, 8개 테스트 파일 | `writer.rs` Miri ignore 누락 및 `--skip logger::` 과잉 제외, 8개 테스트 `/tmp` RAII `Drop` 누락, `local-pc.toml` readiness 낡음 | 수용(일부 유지) | Resolved |
 
 ---
 
@@ -415,3 +415,35 @@ Gate 4 수락과 저장소 공개 및 T3(GitHub Actions multi-OS native CI) 발�
 - **Gate 4 수락 및 저장소 공개 전환(`gh repo edit --visibility public`) 전**, 다음 개발 세션에서 **우선순위에 따라 `RV-171~188`을 TDD(실패 재현 테스트 작성 → 최소 수정 → 회귀 검증)로 처리**한다.
   - 특히 **`RV-171~173` (P1)**과 **`RV-174~184` (P2)**는 런타임 장기 안정성, 공개 후 T3 multi-OS CI 통과, 보안/입력 검증 및 개인 경로 제거에 직결되므로 Gate 4 최종 수락 전 반드시 해결한다.
   - `RV-185~188` (P3)도 함께 정리해 `Open` 리뷰가 없는 상태로 `REV-071`을 `Closed`로 마감한 뒤, [TASK-025](../../04_implementation/tasks/TASK-025.md) S4 및 Gate 4 수락과 공개 전환 절차를 진행한다.
+
+---
+
+## 6. 조치 결과 — 2026-11-21 개발 세션
+
+TDD 순서(재현 시험 Red → 최소 수정 → 회귀)로 처리했다. 재현 시험을 쓰지 못한 항목은 이유를 적었다. 최종 회귀는 [EV-111](../verification_evidence.md#ev-111)이다.
+
+| RV | 판정 | 조치 | 확인 |
+|---|---|---|---|
+| RV-171 | 수용 | `ordinary_sync`가 배리어가 끝나면(`finished`) 남은 대상과 상관없이 슬롯을 반환 | Host 단위 시험 `expired_ordinary_sync_releases_its_slot` Red→Green (`e12584a`) |
+| RV-174 | 수용 | 턴마다 배리어당 한 번만 시도, `Busy`는 다음 턴으로 미루고 진행으로 세지 않음, 재시도에서 checkpoint 생략 | `Busy`는 다른 스레드가 완료 슬롯을 잡은 순간에만 생겨 결정적 재현 수단이 없음. 구조로 보장하고 기본 경로 시험 회귀 (`e12584a`) |
+| RV-175 | 수용 | A: 다른 파일에서 `Written`만 확인된 기록은 `Synced` 증명 없이는 승인하지 않음. B: writer별 첫 미동기화 sequence를 따로 추적. C: 닫힌 파일의 빚을 파일별 슬롯(미리 할당한 4개, 넘치면 공유 hull)으로 기억해 정리 시 그 파일 범위만 제거 | A `an_unknown_written_record_cannot_let_a_new_segment_claim_its_sync` Red→Green, C `settling_one_owed_file_shrinks_the_owed_range`. B는 배리어 결과로 구분해 관찰할 수 없어 구조로 보장. 첫 구현의 동적 할당을 RT 할당 가드가 잡아 슬롯 방식으로 바꿈 (`e12584a`, `ba23932`) |
+| RV-176 | 수용 | 종료 슬롯에서 경보가 선택하지 않은 대상은 `NONE`(경보가 먼저 온 경우와 같음). `unconfirmed`는 facade 보고가 성공이 아닐 때마다 채움 | `alarm_after_the_shutdown_freeze_leaves_unselected_targets_out_like_before`, f4 단언 Red→Green (`07346a9`) |
+| RV-185 | 수용 | 대상 자신의 완료 경계에 도달하면 유기가 아님. `Enqueued`만 확인된 뒤 드롭되면 `Dropped`로 집계 | 완료 장부 단위 시험 2건 Red→Green (`07346a9`) |
+| RV-177 | 수용 | `next`·`handoff`가 이전 ACK 유실을 먼저 보고, 유휴 대기 중 진행 중인 ACK RPC도 기다림, 스트림 종료 시 남은 ACK를 정산하고 미정산이면 스트림 오류보다 `AcknowledgementUnknown` 우선, viewer는 구독을 놓기 전 `flush` | `stream_end_with_unsettled_acks_reports_unknown_not_a_clean_end` Red(`Gone`)→Green (`427939b`) |
+| RV-178 | 수용 | `expire`가 구독을 닫을 때 대기 중인 스트림을 깨움 | 오류 종류는 수정 전에도 `Gone`이었고 문제는 지연이었다. 지연 기준 시험 Red(251 ms)→Green (`427939b`) |
+| RV-179 | 수용 | 상태 폴링 작업은 대기열이 닫히면 종료하고 `serve`가 드롭되면 abort, WebSocket 핸드셰이크에 Host 검사, Origin 포트 1~65535 | viewer 단위 시험 3건 (`427939b`) |
+| RV-186 | 수용 | 중복 sequence가 있으면 target 없는 소스를 출력 생성 전에 거절, blob이 있는 항목은 payload가 있어야 함, 이후 페이지는 같은 snapshot | `recovery_refuses_a_missing_target_before_creating_output` Red→Green. blob·snapshot 검사는 조건식이라 별도 시험 없음 (`427939b`) |
+| RV-180 | 부분 수용 | vendor 일반 읽기 API는 dot-logger가 신뢰할 수 없는 입력에 쓰지 않는다(유일한 호출은 자체 경계 검사 뒤 Schema·Channel의 `parse_record`). 상류와의 차이를 넓히는 대신 이 경계를 VENDORED.md와 호출 지점에 명시 | 사용처 전수 확인 (`f0d77fa`) |
+| RV-181 | 수용(일부 유지) | MessageIndex는 chunk 뒤에만, 등록 사이의 알 수 없는 레코드는 손상(NativeReader·복구·조회). `safe_offset == 0`은 유지: 검증된 것이 없는 활성 파일의 정상 상태이며 기존 시험이 의도적으로 쓰고, 읽을 기록이 없어 중복 검출 대상이 없고, 손실 수집 불가로 세는 것이 보수적 보고 | `a_message_index_before_any_chunk_is_rejected` Red→Green (`f0d77fa`) |
+| RV-182 | 수용(방식 조정) | part 간 키 중복은 `CorruptData`로 손실 조회 전체를 실패시키지 않고 그 checkpoint를 불완전으로 처리(차이·0 합성 없음). 빈 v1 거절, v2 part 구간을 part 번호와 대조. RV-164의 빈 후행 part 호환 유지 | `a_key_repeated_across_parts_makes_the_checkpoint_incomplete` Red→Green (`f0d77fa`) |
+| RV-187 | 수용 | 조회 예약이 writer의 `registration_bytes`(schema 이름 포함)와 채널 상한 `u16::MAX - 2`를 씀 | `schema_names_count_toward_the_query_metadata_limit` Red→Green (`f0d77fa`) |
+| RV-172 | 수용 | 기본 경로 파일 출력과 `FileStore`를 시작하는 시험을 Linux(또는 unix) 전용으로 표시(파일·모듈·시험 단위), api-consumer와 RT 할당 facade 검사도 Linux 전용 | Linux 전체 회귀. macOS·Windows 실제 실행은 공개 뒤 T3 native CI에서 확인 (`ba23932`) |
+| RV-173 | 수용 | CI에 client(기능 유무)·CLI·viewer 시험 단계 추가 | 로컬에서 같은 명령 실행 (`fe9c648`) |
+| RV-184 | 수용 | `/nonexistent/...` 대신 임시 디렉터리 아래 만들지 않는 절대 경로 | 해당 시험 통과 (`fe9c648`) |
+| RV-188 | 수용(일부 유지) | writer 닫힘 시험 Miri 제외, CI Miri에서 `--skip logger::` 제거, 시험 8곳에 Drop 정리 가드, local-pc 준비 상태 갱신(harness·UPS 시뮬레이션 구현, dot-probe 미연동). RT 할당 시험 5곳은 측정 구간 안의 할당을 바꾸지 않도록 수동 정리 유지 | `logger::` Miri 7 Pass·11 ignored, CI 범위 Miri는 EV-111 (`ba23932`, `fe9c648`) |
+| RV-183 | 수용 | `single-crc.patch`(개인 경로, 변경 3개 중 1개) → `local-changes.patch`(crates.io 원본 대비 전체 diff, 적용하면 `vendor/src`와 정확히 같음). 성능 스크립트 기본 경로를 저장소 target으로. Cargo.toml 주석에 TASK-031 S3 추가 | 원본에 `patch -p1` 적용 후 `diff -r` 일치 (`fe9c648`) |
+
+### 리뷰 범위 밖에서 함께 찾은 것
+
+- **F1 — 비공개 폴더를 읽는 시험:** `tc_015_native.rs`가 `include_bytes!`로 `.cowork/06_evolution/imported_context/` 안의 MCAP 파일을 읽고 있었다. 이 폴더는 2026-11-21에 git 추적에서 빠졌으므로 새로 clone한 저장소와 CI에서 컴파일이 실패한다. 파일을 `crates/dot-logger/tests/fixtures/standard-v2-registrations-in-chunk.mcap`으로 옮겼다(개인 정보 없음 확인). 다른 `include_bytes!`·`include_str!` 경로가 모두 추적 파일임을 확인했다 (`f0d77fa`).
+- **F2 — RV-175 첫 구현의 예약 밖 할당:** 파일별 빚 범위를 `Vec`·`Box`로 담은 첫 구현이 관리 경로에서 예약 밖 96바이트를 할당했고, RT 할당 가드 시험 2건이 이를 잡았다. 미리 할당한 슬롯 방식으로 바꿔 할당 없이 동작한다 (`ba23932`).

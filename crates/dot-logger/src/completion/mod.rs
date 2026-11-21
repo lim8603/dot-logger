@@ -312,13 +312,23 @@ impl Registry {
         let value = cell.word.load(Ordering::Acquire);
         if value & NOT_ROUTED == 0
             && value & TERM_MASK == 0
-            && value & 0b11110 == 0
+            && !self.reported(value, target)
             && cell.abandoned.load(Ordering::Acquire) == sequence
         {
             value | (9 << TERM_SHIFT)
         } else {
             value
         }
+    }
+    /// Whether a delivery for `target` reported anything that ends its duty:
+    /// any boundary past Enqueued, or the target's own completion boundary
+    /// (an Enqueued contract ends at Enqueued, REV-071 RV-185).
+    fn reported(&self, word: u32, target: usize) -> bool {
+        word & 0b11110 != 0
+            || self
+                .targets
+                .get(target)
+                .is_some_and(|t| Boundaries(word & 31).contains(t.completion))
     }
     fn settled(&self, slot: &RecordSlot) -> bool {
         slot.cells.iter().zip(&self.targets).all(|(cell, target)| {
@@ -988,8 +998,10 @@ impl Drop for AbandonMarker<'_> {
             // Every guard drops armed after its report; only a record still
             // unconfirmed here is abandoned and needs a sweep (`effective`).
             // Counted after the cell, so a sweep started for it sees the mark.
+            let word = cell.word.load(Ordering::Acquire);
             if slot.sequence.load(Ordering::Acquire) == self.sequence
-                && cell.word.load(Ordering::Acquire) & (NOT_ROUTED | TERM_MASK | 0b11110) == 0
+                && word & (NOT_ROUTED | TERM_MASK) == 0
+                && !registry.reported(word, usize::from(self.target))
             {
                 registry.abandons.fetch_add(1, Ordering::Release);
             }
@@ -1012,12 +1024,17 @@ fn terminal(update: Update) -> u32 {
 }
 fn classify(word: u32, boundary: Boundary) -> RecordStatus {
     let confirmed = Boundaries(word & 31);
+    let term = (word & TERM_MASK) >> TERM_SHIFT;
     let outcome = if word & NOT_ROUTED != 0 {
         QueryOutcome::NotRouted
-    } else if confirmed.contains(boundary) {
+    } else if confirmed.contains(boundary)
+        // Reaching only Enqueued and then being dropped is a loss, not a
+        // completion, whatever the contract (REV-071 RV-185).
+        && !(boundary == Boundary::Enqueued && (4..=8).contains(&term))
+    {
         QueryOutcome::Complete
     } else {
-        match (word & TERM_MASK) >> TERM_SHIFT {
+        match term {
             1 => QueryOutcome::Failed(FailureReason::IoFailure),
             2 => QueryOutcome::Failed(FailureReason::SyncFailure),
             3 => QueryOutcome::Failed(FailureReason::AdapterFailure),

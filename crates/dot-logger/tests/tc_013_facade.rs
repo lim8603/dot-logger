@@ -305,6 +305,8 @@ fn f4_expired_deadline_reports_incomplete_then_closes_without_forced_release() {
     };
     assert!(report.core.deadline_elapsed);
     assert!(!report.is_success());
+    // REV-071 RV-176: an unsuccessful report names what it did not confirm.
+    assert!(!report.unconfirmed.is_empty(), "{report:?}");
     // The worker keeps draining after the deadline; nothing was force-released.
     let Shutdown::Closed(last) = pending.wait(Duration::from_secs(10)).unwrap() else {
         panic!("cleanup must finish after the deadline");
@@ -333,6 +335,7 @@ fn f5_file_failure_is_reported_and_never_success() {
     assert!(report.io_failed, "{report:?}");
     assert!(!report.worker_failed);
     assert!(!report.is_success());
+    assert!(!report.unconfirmed.is_empty(), "{report:?}");
 }
 
 #[test]

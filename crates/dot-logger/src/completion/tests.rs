@@ -12,6 +12,11 @@ use crate::{
 };
 use std::time::{Duration, Instant};
 fn setup() -> (CaptureOwner, crate::config::ValidatedConfig, RoutingConfig) {
+    setup_with(Boundary::Written)
+}
+fn setup_with(
+    completion: Boundary,
+) -> (CaptureOwner, crate::config::ValidatedConfig, RoutingConfig) {
     let plan = SessionBuilder::new(SessionConfig {
         memory: MemoryBudget {
             total_bytes: 1024 * 1024,
@@ -78,7 +83,7 @@ fn setup() -> (CaptureOwner, crate::config::ValidatedConfig, RoutingConfig) {
             id: 10,
             required: true,
             supported: Boundaries::FILE,
-            completion: Boundary::Written,
+            completion,
         }],
     };
     let owner = CaptureOwner::new_tracked(
@@ -540,6 +545,45 @@ fn accept(p: &mut crate::capture::Producer<'_>, byte: u8) -> CaptureReceipt {
         panic!()
     };
     receipt
+}
+
+/// REV-071 RV-185: under an Enqueued contract a delivery dropped after the
+/// record was enqueued ended normally; it is not an abandonment to sweep.
+#[test]
+fn an_enqueued_contract_delivery_dropped_after_enqueue_is_not_abandoned() {
+    let (mut owner, _, _) = setup_with(Boundary::Enqueued);
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        c.report(first, 10, Update::Confirmed(Boundary::Enqueued))
+            .unwrap();
+        drop(c.marker(first, 10).unwrap());
+        assert_eq!(c.registry.abandons.load(Ordering::Acquire), 0);
+        c.reconcile(2);
+        assert_eq!(c.totals(false).unknown, 0);
+    });
+}
+
+/// REV-071 RV-185: an enqueued record later dropped (cancelled) is counted
+/// as dropped, matching the loss it records, not as complete.
+#[test]
+fn an_enqueued_record_dropped_later_counts_as_dropped() {
+    let (mut owner, _, _) = setup_with(Boundary::Enqueued);
+    owner.scope(|mut scope| {
+        let c = scope.completion().unwrap();
+        let (mut p, mut reader) = scope.next().unwrap();
+        let first = accept(&mut p, 1);
+        reader.try_read(&mut [0; 16]).unwrap();
+        c.report(first, 10, Update::Confirmed(Boundary::Enqueued))
+            .unwrap();
+        c.report(first, 10, Update::Dropped(DropReason::Cancelled))
+            .unwrap();
+        c.reconcile(2);
+        let totals = c.totals(false);
+        assert_eq!((totals.complete, totals.dropped), (0, 1), "{totals:?}");
+    });
 }
 
 #[test]

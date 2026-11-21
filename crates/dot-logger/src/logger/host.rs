@@ -629,15 +629,15 @@ fn run(
                         Some(ShutdownPoll::Incomplete(report)) => {
                             if !state.incomplete_sent {
                                 state.incomplete_sent = true;
-                                let report = facade_report(report, &control, mailboxes, config);
+                                let report =
+                                    facade_report(report, &control, producers, mailboxes, config);
                                 if let Some(reply) = &state.reply {
                                     let _ = reply.send(Progress::Incomplete(report));
                                 }
                             }
                         }
                         Some(ShutdownPoll::Closed(report)) => {
-                            let unconfirmed = unconfirmed(&report, &control, producers);
-                            break (report, unconfirmed, state.reply.take());
+                            break (report, state.reply.take());
                         }
                     }
                 }
@@ -659,12 +659,11 @@ fn run(
             drop(senders);
             Ok(closed)
         })
-        .map(|(report, unconfirmed, reply)| {
+        .map(|(report, reply)| {
             // IO threads are joined here; finish errors are already flagged.
             // The listener closes before Closed is reported.
             remote.stop();
-            let mut report = facade_report(report, &control, mailboxes, config);
-            report.unconfirmed = unconfirmed;
+            let report = facade_report(report, &control, producers, mailboxes, config);
             if let Some(reply) = reply {
                 let _ = reply.send(Progress::Closed(report));
             }
@@ -681,7 +680,7 @@ fn run(
 /// Telemetry samples are retained at one-second resolution.
 const SAMPLE_PERIOD: Duration = Duration::from_secs(1);
 
-type Closed = (ShutdownReport, Vec<ProducerRange>, Option<Sender<Progress>>);
+type Closed = (ShutdownReport, Option<Sender<Progress>>);
 
 struct ShutdownState {
     reply: Option<Sender<Progress>>,
@@ -763,14 +762,9 @@ impl<'c, 'o> Host<'c, 'o> {
     }
 }
 
-fn unconfirmed(
-    report: &ShutdownReport,
-    control: &ControlOwner<'_>,
-    producers: usize,
-) -> Vec<ProducerRange> {
-    if report.is_success() {
-        return Vec::new();
-    }
+/// Frozen shutdown ranges, reported whenever the facade report is not a
+/// success (REV-071 RV-176): an Incomplete report, a late file failure.
+fn unconfirmed(control: &ControlOwner<'_>, producers: usize) -> Vec<ProducerRange> {
     let mut ranges = vec![ProducerRange::default(); producers];
     match control.shutdown_ranges(&mut ranges) {
         Ok(n) => {
@@ -783,17 +777,22 @@ fn unconfirmed(
 
 fn facade_report(
     core: ShutdownReport,
-    _control: &ControlOwner<'_>,
+    control: &ControlOwner<'_>,
+    producers: usize,
     mailboxes: &[rtrb::Consumer<Owned>],
     config: &Config<'_>,
 ) -> FacadeReport {
-    FacadeReport {
+    let mut report = FacadeReport {
         core,
         writers_outstanding: writers_outstanding(mailboxes),
         worker_failed: config.flags.worker_failed.load(Ordering::Acquire),
         io_failed: config.flags.io_failed.load(Ordering::Acquire),
         unconfirmed: Vec::new(),
+    };
+    if !report.is_success() {
+        report.unconfirmed = unconfirmed(control, producers);
     }
+    report
 }
 
 /// One file target served by an IO thread. The consumer and log are borrowed

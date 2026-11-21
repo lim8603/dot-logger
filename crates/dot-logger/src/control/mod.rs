@@ -529,9 +529,19 @@ impl<'owner> ControlOwner<'owner> {
             };
             for (index, target) in slot.targets.iter().enumerate() {
                 let state = target.state.load(Ordering::Acquire);
-                let emergency_skip = self.emergency_active()
-                    && (!std::ptr::eq(slot, &self.slots[self.config.sync_slots])
-                        || !self.emergency_target_selected(index));
+                let shutdown_slot = std::ptr::eq(slot, &self.slots[self.config.sync_slots]);
+                // An alarm leaves an unselected target out of the shutdown
+                // barrier, as when it arrives before the freeze (REV-071
+                // RV-176); ordinary barriers it cuts short expire.
+                if state == QUEUED
+                    && shutdown_slot
+                    && self.emergency_active()
+                    && !self.emergency_target_selected(index)
+                {
+                    target.state.store(NONE, Ordering::Release);
+                    continue;
+                }
+                let emergency_skip = self.emergency_active() && !shutdown_slot;
                 if state == QUEUED
                     && (emergency_skip || tick >= slot.deadline.load(Ordering::Acquire))
                 {

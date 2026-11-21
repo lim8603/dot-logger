@@ -184,6 +184,60 @@ fn written<'a>(
     receipt
 }
 
+/// REV-071 RV-176: an alarm that arrives after shutdown froze its barrier
+/// leaves an unselected target out of the plan, as an earlier alarm does,
+/// instead of failing the shutdown sync for it.
+#[test]
+fn alarm_after_the_shutdown_freeze_leaves_unselected_targets_out_like_before() {
+    let only_ten = EmergencyConfig {
+        files: vec![EmergencyFile {
+            target: 10,
+            rank: 1,
+            protected_bytes: 64,
+            estimated_drain_sync: Duration::from_millis(10),
+        }],
+        safety_margin: Duration::from_millis(200),
+    };
+    session_with(
+        only_ten,
+        |_completion, mut p, mut router, control, start| {
+            router.scope(|mut d, mut outputs| {
+                written(&mut p, &mut d, &mut outputs, start);
+                control
+                    .begin_shutdown(
+                        ShutdownPlan { sync_files: true },
+                        start,
+                        start + Duration::from_secs(180),
+                        &mut d,
+                    )
+                    .unwrap();
+                let token = control.shutdown_sync().unwrap();
+                control
+                    .notify_power(
+                        PowerAlarm::new(1, start, Duration::from_secs(3)).unwrap(),
+                        start + Duration::from_millis(10),
+                    )
+                    .unwrap();
+                let at = start + Duration::from_millis(20);
+                let mut frozen = [ProducerRange::default(); 2];
+                let io = control
+                    .next_sync(token, 10, at, &mut d, &mut frozen)
+                    .unwrap()
+                    .unwrap();
+                io.complete(SyncResult::Synced);
+                let mut last = None;
+                for _ in 0..32 {
+                    last = control.poll_emergency(at, &mut d).unwrap();
+                }
+                assert!(
+                    matches!(last.unwrap().shutdown, ShutdownPoll::Closed(r) if !r.sync_failed),
+                    "the unselected target failed the shutdown sync"
+                );
+            });
+        },
+    );
+}
+
 #[test]
 fn alarm_tightens_normal_shutdown_and_retains_late_sync_guard_until_real_completion() {
     session(|completion, mut p, mut router, control, start| {
@@ -485,6 +539,19 @@ fn session<R>(
         Instant,
     ) -> R,
 ) -> R {
+    session_with(emergency(), run)
+}
+
+fn session_with<R>(
+    config: EmergencyConfig,
+    run: impl for<'a> FnOnce(
+        dot_logger::completion::Completion<'a>,
+        dot_logger::capture::Producer<'a>,
+        Router<'a>,
+        ControlOwner<'a>,
+        Instant,
+    ) -> R,
+) -> R {
     let plan = plan();
     let route = routing();
     let mut owner = CaptureOwner::new_tracked(
@@ -509,7 +576,7 @@ fn session<R>(
             now,
         )
         .unwrap();
-        control.enable_emergency(&plan, emergency()).unwrap();
+        control.enable_emergency(&plan, config).unwrap();
         let (p, a) = scope.next().unwrap();
         let (_, b) = scope.next().unwrap();
         run(

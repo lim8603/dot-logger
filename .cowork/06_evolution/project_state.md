@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실·원격 viewer 완료, 운영 대시보드(TASK-032) 진행 중. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | [TASK-032](../04_implementation/tasks/TASK-032.md) In Progress — S1 Done([ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md) 내장 웹·읽기 전용). 다음 S2 |
+| 활성 Task | [TASK-032](../04_implementation/tasks/TASK-032.md) In Progress — S1 Done(ADR-016), S2 Done(`704d055`, [EV-107](../05_verification/verification_evidence.md#ev-107)). 다음 S3 |
 | 미처리 리뷰 | 없음 — REV-001~069 Closed. 최근 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) RV-163~165 조치·수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
-| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 조치 [EV-106](../05_verification/verification_evidence.md#ev-106) 두 Rust 각 711 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 조치 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 S2 [EV-107](../05_verification/verification_evidence.md#ev-107) 두 Rust 각 716 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / TASK-032 S1 결정(ADR-016) / AI |
-| 세션 상태 | **진행 — 2026-11-21 #003.** REV-069 조치 마감(`5daf22b`), TASK-032 S1 Done(ADR-016). 다음 S2 |
+| 갱신 | 2026-11-21 / TASK-032 S2 대시보드 상태 화면 / AI |
+| 세션 상태 | **진행 — 2026-11-21 #003.** REV-069 마감(`5daf22b`), TASK-032 S1(ADR-016)·S2(`704d055`) Done. 다음 S3 |
 | 최근 완료 세션 | 2026-11-21 #002 — bd02d49..078ca6c 독립 코드리뷰([REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md), RV-163~165) |
 
 ## 현재 결정과 제약
@@ -77,7 +77,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-032 | viewer 대시보드 | AI | In Progress | 2026-11-21 | S1 Done(ADR-016). S2 상태 JSON 계약 실패 시험 → 내장 HTTP·상태 화면 → S3 비교·PlanCheck |
+| TASK-032 | viewer 대시보드 | AI | In Progress | 2026-11-21 | S1·S2 Done(ADR-016, `704d055`·EV-107). 다음 S3 snapshot 비교·PlanCheck 미리보기 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
 ## 코드리뷰 현황 (Reviews)
@@ -101,7 +101,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-1. **TASK-032 S2.** S1은 2026-11-21 [ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md)으로 끝났다(내장 웹·읽기 전용). 먼저 상태 JSON 계약의 실패 시험을 쓴다: Unavailable/Stale를 0·정상으로 바꾸지 않고, 끊김·권한 없음에서 마지막 값·시각과 사유를 구분한다. 그 뒤 viewer 내장 HTTP와 상태 화면, S3 비교·PlanCheck 순서로 진행한다. [TASK-032](../04_implementation/tasks/TASK-032.md) · [화면 §7](../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)
+1. **TASK-032 S3.** S1([ADR-016](../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md))과 S2(`704d055`, [EV-107](../05_verification/verification_evidence.md#ev-107))는 끝났다. S3은 snapshot 두 개의 Compare(`compare.v1`)와 PlanCheck(`check.v1`) 미리보기를 읽기 전용으로 추가한다. facade처럼 Gone·Unsupported인 호스트에서는 기능 미제공으로 표시한다. [TASK-032](../04_implementation/tasks/TASK-032.md) · [화면 §7](../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -151,7 +151,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
-- 2026-11-21 #003 — REV-069 반입·RV-163~165 조치(`5daf22b`)·위임 마감, TASK-032 S1 ADR-016 결정([EV-106](../05_verification/verification_evidence.md#ev-106), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_003.md)).
+- 2026-11-21 #003 — REV-069 반입·RV-163~165 조치(`5daf22b`)·위임 마감, TASK-032 S1 ADR-016 결정·S2 대시보드 상태 화면 `704d055`·[EV-107](../05_verification/verification_evidence.md#ev-107)([EV-106](../05_verification/verification_evidence.md#ev-106), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_003.md)).
 - 2026-11-21 #002 — `bd02d49..078ca6c` T7 저장·원격 변경 독립 코드리뷰 [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) Open(`RV-163~165`)([로그](../members/lim8603/workspace/session_logs/session_2026-11-21_002.md)).
 - 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, ADR-015 묶음·파이프라인 ACK로 P4 소형 Pass, 하드웨어 CRC로 유선 P4-bulk Pass, T7 해소 및 TASK-031 Done([EV-101~105](../05_verification/verification_evidence.md#ev-101), [로그](../members/lim8603/workspace/session_logs/session_2026-11-21_001.md)).
 - 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다([EV-098~100](../05_verification/verification_evidence.md#ev-098), [로그](../members/lim8603/workspace/session_logs/session_2026-11-19_001.md)).

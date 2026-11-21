@@ -23,6 +23,39 @@ Use `--allow-origin` to grant a trusted web frontend's exact Origin or set
 `--allow-origin file://` for a desktop app that sends that Origin. Native
 clients that omit the Origin can connect from loopback.
 
+## Operations dashboard
+
+Add `--dashboard 127.0.0.1:0` (or a fixed loopback address) to serve a
+read-only operations dashboard. The viewer prints its `http://` URL after the
+WebSocket URL. Open it in a browser on the same PC.
+
+```sh
+cargo run --locked -p dot-logger-viewer -- \
+    --upstream http://127.0.0.1:PORT --catalog ./viewer-demo/viewer-catalog.json \
+    --dashboard 127.0.0.1:0
+```
+
+The viewer sends `GetStatus` to the upstream at most once per second, one
+request at a time, over its own connection. The page shows the host's
+`dot_logger.status.v1` report as it arrived: the latest sample, the capture
+counts, all and required outputs (complete, failed, dropped, Unknown,
+pending), the 10/60/300-second windows and held snapshots. Each value keeps
+its Observed, Stale or Unavailable state and reason; a missing value is shown
+as not observed, never as zero. The `live_host` demo enables telemetry. A host
+without telemetry reports `no_runtime_metrics_backend`.
+
+If a request fails (disconnected, permission denied, timed out, unsupported),
+the page keeps the last status, marks it as not current with its time, and
+shows the failure reason and time separately. If the viewer itself stops,
+the page says so.
+
+The dashboard is read-only. Use the CLI to change configuration or run checks.
+It listens on loopback only, answers `GET` requests whose `Host` is a loopback
+name with its port, and admits only a loopback Origin or the `--allow-origin`
+value. The upstream credential is never sent to the browser. The page loads
+no external resources. `GET /api/status` returns the same document as
+`dot_logger.viewer.dashboard.v1` JSON.
+
 ## Catalog
 
 ```json

@@ -292,7 +292,7 @@ ADR-012·API §18 승인에 따른 S2/S3 첫 실패 시험이다. 성능 수치�
 ### TC-014 — 표준 MCAP 판독·원격 시각화
 
 - 관련: MS-009 / FR-003·005·006·010·014·016·017 / NFR-001·006·007·008
-- 상태: In Progress. TASK-030·035의 파일·손실은 EV-077·082~090. TASK-031 S2 실제 viewer와 Lichtblick 라이브, 종료/포화/자원 반환 로컬 Pass([EV-092](verification_evidence.md#ev-092)). S3 새 native 파일 및 복구 사본 재생([EV-093](verification_evidence.md#ev-093)), Query/ReadBlob·이동·배속·Lichtblick 원격 재생([EV-094](verification_evidence.md#ev-094)) 로컬 Pass. 구독 교체·스냅샷 만료·등록 검증 회귀는 [EV-095](verification_evidence.md#ev-095). Foxglove Desktop 실시간·원격 기록 재생 [EV-096](verification_evidence.md#ev-096) 및 루프백 포화 정량 [EV-097](verification_evidence.md#ev-097) 확인. T7 P3·P5([EV-103](verification_evidence.md#ev-103)), LAN P4([EV-104](verification_evidence.md#ev-104)·[EV-105](verification_evidence.md#ev-105)) Pass. TASK-031 수락(2026-11-21). TASK-032 대시보드 시나리오가 남아 있다.
+- 상태: In Progress. TASK-030·035의 파일·손실은 EV-077·082~090. TASK-031 S2 실제 viewer와 Lichtblick 라이브, 종료/포화/자원 반환 로컬 Pass([EV-092](verification_evidence.md#ev-092)). S3 새 native 파일 및 복구 사본 재생([EV-093](verification_evidence.md#ev-093)), Query/ReadBlob·이동·배속·Lichtblick 원격 재생([EV-094](verification_evidence.md#ev-094)) 로컬 Pass. 구독 교체·스냅샷 만료·등록 검증 회귀는 [EV-095](verification_evidence.md#ev-095). Foxglove Desktop 실시간·원격 기록 재생 [EV-096](verification_evidence.md#ev-096) 및 루프백 포화 정량 [EV-097](verification_evidence.md#ev-097) 확인. T7 P3·P5([EV-103](verification_evidence.md#ev-103)), LAN P4([EV-104](verification_evidence.md#ev-104)·[EV-105](verification_evidence.md#ev-105)) Pass. TASK-031 수락(2026-11-21). TASK-032 S2 대시보드 상태 화면(값 상태 보존·연결 끊김·권한 없음) 로컬 Pass([EV-107](verification_evidence.md#ev-107)). S3 비교·PlanCheck 화면이 남아 있다.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

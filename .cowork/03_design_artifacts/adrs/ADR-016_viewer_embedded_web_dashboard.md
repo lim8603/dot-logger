@@ -29,3 +29,11 @@ TASK-032는 Foxglove 계열 도구가 보여주지 않는 dot-logger 고유의 �
 - 화면 구현(HTML·JS)은 저장소 안에서 직접 유지한다. JS는 표시만 하는 얇은 층으로 두고, 상태 판정은 Rust 쪽 JSON 계약 시험으로 검증한다. 브라우저 렌더링 자체의 자동 시험은 이 결정의 범위 밖이며 수동 확인 기록으로 대신한다.
 - facade 호스트에서는 GetStatus만 채워진다. Compare는 snapshot이 없어 Gone, PlanCheck는 Unsupported다. 화면은 이 경우를 기능 미제공으로 표시한다.
 - 변경 동작이 빠지므로 브라우저 쪽 공격 면과 Manage credential 보관이 생기지 않는다. 대신 설정 변경은 CLI로 해야 한다.
+
+## 구현 기록 — 2026-11-21
+
+제품 `704d055`(TASK-032 S2)는 다음과 같다.
+
+- **HTTP 처리:** hyper 대신 이미 잠긴 `httparse`(hyper가 쓰는 파서)로 GET만 받는 작은 처리부를 두었다. 연결마다 요청 하나를 처리하고 닫는다. keep-alive·chunked 같은 기능이 필요 없어 표면이 더 작다. 외부 crate 수는 그대로(lockfile 패키지 203개)이며 의존 관계 한 줄만 추가됐다.
+- **의존성:** viewer는 GetStatus 요청 타입 때문에 workspace의 `dot-logger`를 일반 의존성으로 쓴다(이전에는 개발 의존성).
+- **경로·형식:** [화면 §7.1](../ui_spec.md#71-s2-구현--2026-11-21)에 있다. [EV-107](../../05_verification/verification_evidence.md#ev-107)

@@ -1625,6 +1625,26 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   - client lib·transport, CLI `remote_tail`, core remote 시험을 10회 반복해 실패 0.
 - **범위:** 파일 형식은 그대로다. 판독은 `af68578`이 쓴 빈 후행 part(`end == rows`)를 계속 받는다. EV-104·105의 LAN 수치는 `commands: 1`(ACK RPC가 사실상 하나씩 진행) 조건에서 이미 목표를 충족했으므로 다시 측정하지 않았다.
 
+<a id="ev-107"></a>
+### EV-107 — TASK-032 S2 viewer 내장 대시보드(상태 화면)
+
+- **변경:** 제품 `704d055`.
+  - `dot-logger-viewer --dashboard ADDR`가 loopback HTTP로 내장 페이지와 `/api/status`(`dot_logger.viewer.dashboard.v1`)를 제공한다.
+  - poller는 GetStatus를 1초에 한 번 이하, 한 번에 하나만 보낸다. 마지막 성공 보고와 최근 실패 사유·시각을 분리해 보관한다.
+  - HTTP는 `httparse`(이미 잠김)로 GET만 받는다. Host·Origin·본문·머리 크기·동시 연결에 한도를 두고, CSP 등 보안 헤더를 붙인다.
+  - `live_host` 예제는 telemetry를 켠다. 외부 crate 수는 그대로(203)다.
+- **TDD:** 동작 없는 stub에서 새 시험 5건이 모두 실패(Red)하는 것을 확인한 뒤 구현해 Green이 됐다.
+  - 값 상태 보존(Unavailable·Stale를 숫자로 바꾸지 않음), 빈 보고는 `no_runtime_metrics_backend`.
+  - 권한 거절·끊김·시간 초과·Unsupported·schema 불일치·비상태 응답 뒤에도 마지막 값과 그 시각을 유지하고, 사유·시각을 따로 기록.
+  - HTTP 경계: 외부 Host 403, 빈 Host 400, 외부 Origin 403, POST 405, 본문 400, 404, 9 KB 머리 431. 거절 응답에는 상태가 없다.
+  - 실제 hub: 보고 → 권한 거절 → 호스트 종료 순서에서 마지막 값을 유지했다.
+  - 구현 중 머리 크기 검사가 끝 표시 위치를 보지 않던 결함을 시험이 잡아 고쳤다.
+- **결과:**
+  - Rust 1.85.0·1.96.0 workspace all-features 각 **716 Pass, 실패 0, 5 ignored**.
+  - 두 버전의 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사 통과. viewer 시험 10회 반복 실패 0.
+- **브라우저:** headless Firefox(geckodriver)로 `live_host`에 연결해 정상, 상류 실패, viewer 무응답을 캡처했다. [근거](../06_evolution/imported_context/task_032_s2_2026-11-21/README.md)
+- **범위:** 브라우저 렌더링은 자동 시험이 아니라 수동 확인이다. Compare·PlanCheck 화면은 S3다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -64,13 +64,13 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
 
 ## 7. TASK-032 운영 대시보드 — 2026-11-21
 
-[ADR-016](adrs/ADR-016_viewer_embedded_web_dashboard.md)에 따라 viewer 내장 웹(읽기 전용)으로 제공한다. 운영 PC에서 viewer를 대시보드 옵션과 함께 실행하면 loopback HTTP URL이 출력된다. 이 URL을 브라우저로 연다. Foxglove 연결용 WS URL은 그대로 따로 출력된다. 옵션 이름·JSON 경로·필드는 S2 구현에서 확정해 이 절과 viewer README에 기록한다.
+[ADR-016](adrs/ADR-016_viewer_embedded_web_dashboard.md)에 따라 viewer 내장 웹(읽기 전용)으로 제공한다. 운영 PC에서 `dot-logger-viewer ... --dashboard 127.0.0.1:0`으로 실행하면 WS URL 다음 줄에 `http://` URL이 출력된다. 이 URL을 브라우저로 연다. [viewer README](../../crates/dot-logger-viewer/README.md#operations-dashboard)
 
 | 단계 | 화면 | 데이터 | 표시 규칙 |
 |---|---|---|---|
 | S2 | 연결 머리줄 | viewer 설정과 마지막 GetStatus 결과 | endpoint, session, revision·`posted_revision`, 마지막 성공 시각. 실패하면 사유(끊김·권한 없음·시간 초과·Unsupported)와 실패 시각을 따로 표시 |
 | S2 | 최근 표본·window | `status.v1`의 `latest`, `windows`(10/60/300초) | 각 값의 상태 배지(Observed·Stale·Unavailable+사유). 실제 from/to 구간. 없는 필드는 "미관측"이며 0으로 그리지 않음 |
-| S2 | 대상별 출력 | `latest`·`windows`의 outputs·required_outputs | 대상별 완료·실패·폐기·Unknown·pending. Unknown은 실패와 다른 색 |
+| S2 | 전체·필수 출력 | `latest`의 `outputs`·`required_outputs` | 완료·실패·폐기·Unknown·pending 합계. `status.v1`에는 대상별 분해가 없어 두 합계로 표시한다. 0이 아닌 실패·폐기와 Unknown만 강조하고 Unknown은 실패와 다른 색 |
 | S2 | snapshot 목록 | `status.v1`의 `snapshots` | ID·revision·epoch·구간. 등록 순서(ID 오름차순) |
 | S3 | 전후 비교 | 두 snapshot ID로 Compare → `compare.v1` | `comparable`, 차이 8항목, 변화값 8개와 출처. 비교 불가면 수치 없이 사유만 |
 | S3 | 점검 계획 | 계획 ID로 PlanCheck → `check.v1` 미리보기 | 선언 내용만 표시. 실행 버튼 없음(RunCheck는 CLI) |
@@ -80,3 +80,20 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
 - **변경 동작 없음:** ApplyConfig·RunCheck는 CLI(`config apply`, `check run`)를 사용한다.
 - **범위 구분:** dot-probe 기존 화면(TASK-026)은 별도로 유지한다.
 
+### 7.1 S2 구현 — 2026-11-21
+
+- **경로:** `GET /`(페이지), `/dashboard.js`, `/dashboard.css`, `/api/status`. 그 밖의 경로는 404, GET 외 메서드는 405다.
+- **`/api/status`(`dot_logger.viewer.dashboard.v1`):** `upstream`, `now_unix_ms`, `poll`, `last`로 이뤄진다.
+  - `poll`: `interval_ms`, `attempts`, `state`(`pending`·`ok`·`failed`), `last_attempt_unix_ms`, `failure`(`reason`, `at_unix_ms` 또는 null).
+  - `last`: 마지막 성공 응답의 `received_at_unix_ms`, `session`, `revision`, `metrics`. 성공 전에는 null이다.
+  - `metrics`: 상류 `status.v1`을 그대로 넘긴다. 빈 보고는 `{"state":"Unavailable","reason":"no_runtime_metrics_backend"}`다.
+  - 상태 응답이 아니거나 schema가 다르면 `failure.reason="corrupt"`로 기록하고 `last`는 유지한다.
+- **실패 사유:** `disconnected`·`permission_denied`·`timed_out`·`unsupported`·`transport`·`corrupt` 등 원격 오류 이름을 snake_case로 쓴다.
+- **화면 상태:**
+  - 상류 실패: 머리줄에 사유와 시각, 마지막 상태 시각과 경과를 표시한다. 본문은 흐리게 남기고 "Not current" 안내를 붙인다.
+  - viewer 무응답: 상류 배지를 내리고 "viewer unreachable since …"로 표시한다.
+- **접근 경계:**
+  - `Host`는 loopback 이름·주소이면서 listener 포트여야 한다. 형식이 틀리면 400, 다른 이름이면 403이다.
+  - Origin은 loopback 또는 `--allow-origin` 값만 허용하고 나머지는 403이다.
+  - 본문(Content-Length≠0·Transfer-Encoding)이 있으면 400, 머리 8 KiB 초과는 431이다.
+  - 동시 연결은 8개, 머리 읽기 기한 2초, 연결당 요청 1개다. 응답은 `Cache-Control: no-store`와 제한적인 CSP를 붙인다.

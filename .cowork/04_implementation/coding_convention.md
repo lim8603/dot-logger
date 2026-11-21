@@ -134,6 +134,7 @@
 - Cargo workspace·edition 2024. MSRV 1.85 후보와 실제 dependency patch/feature 호환은 TASK-002에서 검증하고 고정한다.
 - 공개 API에 외부 crate의 내부 wire/runtime 타입을 강제 노출하지 않는다. core와 DB/remote feature 의존을 분리한다.
 - RT 호출/거절/Drop 경로의 할당·해제·I/O·blocking·무한 재시도·사용자 콜백을 금지한다. 등록/예열과 최종 owner 해제는 일반 경로다.
+- core의 std `Mutex`는 `crate::sync::warm_mutex`로 만든다. Apple 대상의 std `Mutex`는 첫 잠금 때 `pthread_mutex_t`를 할당하므로 생성 시 예열해 운영 중 할당을 막는다. 그 구조가 예약 회계에 들어가면 `crate::sync::MUTEX_BYTES`를 더한다(2026-11-21 Human 「A로 진행」, TASK-036 S5).
 - `unsafe`가 필요한 수명/원자 연산 경계는 최소 모듈로 한정하고 Safety 불변식·메모리 순서·소유권 증명과 실패 테스트를 함께 둔다. 후보 queue의 특성으로 전체 API 안전성을 대체하지 않는다.
 - 예상 가능한 오류는 고정 코드/`Result`로 반환하고 RT 경로에서 문자열을 포맷하지 않는다. 일반 I/O 오류에 `unwrap`/`expect`를 사용하지 않는다.
 - 형식/계약에 영향 없는 내부 변경은 자율 수행한다. 공개 소유권·오류·완료 의미나 MSRV/기술 계열 변경은 ADR 영향도를 검토한다.

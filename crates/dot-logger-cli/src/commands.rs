@@ -838,6 +838,8 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                 .await?;
             let limit = ctx.limit()?;
             let mut gaps = 0;
+            // Handoffs whose ACK the server has not confirmed yet (ADR-015).
+            let mut handed = 0;
             while let Some(event) = stream.next(&ctx.cancel).await? {
                 match event {
                     RemoteEvent::Gap { first, last } => {
@@ -868,8 +870,10 @@ pub async fn remote(ctx: &Context, out: &mut Output) -> Result<Value, Failure> {
                             return Err(failure);
                         }
                         accepted?;
-                        out.acknowledged += 1;
+                        handed += 1;
                         if out.records == limit {
+                            stream.flush(&ctx.cancel).await?;
+                            out.acknowledged += handed;
                             return Ok(json!({"gaps":gaps,"stopped":"record_limit"}));
                         }
                     }

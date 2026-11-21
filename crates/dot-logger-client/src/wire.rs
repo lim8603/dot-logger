@@ -191,4 +191,20 @@ pub(crate) struct AckRequest {
     pub producer: u32,
     #[prost(uint64, tag = "7")]
     pub sequence: u64,
+    /// ADR-015 batch; when nonempty the single-item fields above are unused.
+    #[prost(message, repeated, tag = "8")]
+    pub items: Vec<AckItem>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub(crate) struct AckItem {
+    #[prost(uint64, tag = "1")]
+    pub transfer: u64,
+    #[prost(uint64, tag = "2")]
+    pub generation: u64,
+    #[prost(bytes = "vec", tag = "3")]
+    pub session: Vec<u8>,
+    #[prost(uint32, tag = "4")]
+    pub producer: u32,
+    #[prost(uint64, tag = "5")]
+    pub sequence: u64,
 }

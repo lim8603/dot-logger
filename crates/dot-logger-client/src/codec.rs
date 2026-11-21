@@ -322,15 +322,22 @@ pub(crate) fn chunk(f: wire::Frame) -> Result<Chunk, RemoteError> {
         late: f.late,
     })
 }
-pub(crate) fn ack(a: Ack) -> wire::AckRequest {
-    wire::AckRequest {
-        major: PROTOCOL_MAJOR,
-        subscription: a.subscription,
+pub(crate) fn ack_item(a: Ack) -> wire::AckItem {
+    wire::AckItem {
         transfer: a.transfer,
         generation: a.generation,
         session: a.receipt.session_id.to_le_bytes().to_vec(),
         producer: a.receipt.producer_id,
         sequence: a.receipt.accepted_seq,
+    }
+}
+/// One ADR-015 batch; items keep their handoff order.
+pub(crate) fn acks(subscription: u64, items: Vec<wire::AckItem>) -> wire::AckRequest {
+    wire::AckRequest {
+        major: PROTOCOL_MAJOR,
+        subscription,
+        items,
+        ..wire::AckRequest::default()
     }
 }
 #[cfg(test)]

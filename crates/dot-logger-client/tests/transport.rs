@@ -168,6 +168,7 @@ fn native_status_and_large_subscription_ack_use_the_actual_connection() {
             )
             .await
             .unwrap();
+        stream.flush(&cancel).await.unwrap();
         assert_eq!(ack.state(), AckState::Acknowledged);
         let pending = hub.offer(ids[0], record(2, 1), &[9], false, 1).unwrap();
         client.disconnect();
@@ -328,6 +329,7 @@ fn local_next_timeout_preserves_subscription_but_server_lease_and_cancel_close_i
             panic!("record")
         };
         stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+        stream.flush(&cancel).await.unwrap();
         assert_eq!(ack.state(), AckState::Acknowledged);
         drop(stream);
         let mut stream = client
@@ -510,6 +512,7 @@ fn next_timeout_during_partial_tcp_frame_retains_decoder_and_record() {
             .handoff(ready, |_, data| data == payload, &cancel)
             .await
             .unwrap();
+        stream.flush(&cancel).await.unwrap();
         assert_eq!(ack.state(), AckState::Acknowledged);
         drop((stream, client, ack, inbox));
         proxy.abort();
@@ -1048,6 +1051,97 @@ fn config_conflict_busy_restart_and_status_report_keep_their_meaning() {
         }
         host.await.unwrap();
         drop(client);
+        stop.send(()).unwrap();
+        server.await.unwrap().unwrap();
+        drop(hub);
+        assert_eq!(budget.used_bytes(), 0);
+    });
+}
+
+// ADR-015: handoff queues the ACK and returns without waiting for the server;
+// flush sends what is queued and waits for every ACK RPC, and a failure after
+// handoff surfaces on a later call as AcknowledgementUnknown.
+#[test]
+fn pipelined_handoffs_are_confirmed_by_flush_and_later_failures_stay_unknown() {
+    runtime().block_on(async {
+        let budget = budget();
+        let window = 64;
+        let (hub, inbox, addr, stop, server) = start(
+            ServerConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            RemoteLimits {
+                subscription_records: window,
+                ..limits()
+            },
+            &budget,
+        )
+        .await;
+        let cancel = Cancellation::new();
+        let mut client =
+            RemoteClient::connect(RemoteConfig::new(format!("http://{addr}")), &cancel)
+                .await
+                .unwrap();
+        let mut stream = client
+            .subscribe(
+                &budget,
+                SubscriptionFilter {
+                    channel: None,
+                    minimum_level: Level::Trace,
+                    originals: false,
+                    overflow: OverflowPolicy::Gap,
+                },
+                ReceiverConfig {
+                    records: window,
+                    record_bytes: 8,
+                    ttl: Duration::from_secs(10),
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
+        let mut ids = [0; 2];
+        assert_eq!(hub.subscriptions(&mut ids), 1);
+        let mut pending = Vec::new();
+        for round in 0..4u64 {
+            for i in 0..window as u64 {
+                let seq = round * window as u64 + i + 1;
+                pending.push(
+                    hub.offer(ids[0], record(seq, 1), &[seq as u8], false, 1)
+                        .unwrap(),
+                );
+            }
+            for _ in 0..window {
+                let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap()
+                else {
+                    panic!("record")
+                };
+                stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+            }
+            stream.flush(&cancel).await.unwrap();
+            assert!(pending.iter().all(|p| p.state() == AckState::Acknowledged));
+        }
+        let last = hub.offer(ids[0], record(1000, 1), &[1], false, 1).unwrap();
+        let RemoteEvent::Record(ready) = stream.next(&cancel).await.unwrap().unwrap() else {
+            panic!("record")
+        };
+        stream.handoff(ready, |_, _| true, &cancel).await.unwrap();
+        client.disconnect();
+        assert_eq!(
+            stream.flush(&cancel).await,
+            Err(ClientError::AcknowledgementUnknown)
+        );
+        drop(stream);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while last.state() == AckState::Pending {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_ne!(last.state(), AckState::Pending);
+        drop((pending, last, inbox, client));
         stop.send(()).unwrap();
         server.await.unwrap().unwrap();
         drop(hub);

@@ -417,6 +417,93 @@ mod sockets {
             .build()
             .unwrap()
     }
+    fn ack_item(ack: &Ack) -> wire::AckItem {
+        wire::AckItem {
+            transfer: ack.transfer,
+            generation: ack.generation,
+            session: ack.receipt.session_id.to_le_bytes().to_vec(),
+            producer: ack.receipt.producer_id,
+            sequence: ack.receipt.accepted_seq,
+        }
+    }
+    async fn ack_rpc(
+        c: &mut Grpc<Channel>,
+        request: wire::AckRequest,
+    ) -> Result<wire::Reply, tonic::Status> {
+        c.ready().await.unwrap();
+        c.unary(
+            Request::new(request),
+            PathAndQuery::from_static("/dot_logger.remote.v1.Logger/Ack"),
+            tonic::codec::ProstCodec::default(),
+        )
+        .await
+        .map(tonic::Response::into_inner)
+    }
+    // ADR-015: one Ack RPC settles several handed-off records in order, stops at
+    // the first invalid item, rejects a batch beyond the subscription window
+    // before applying any item, and still accepts the single-item form.
+    #[test]
+    fn actual_grpc_batched_ack_settles_in_order_and_keeps_the_single_form() {
+        runtime().block_on(async {
+            let (hub, inbox, addr, tx, task, b) = start(config(), limits()).await;
+            let mut c = client(addr).await;
+            let mut stream = subscribe(&mut c).await;
+            let started = stream.message().await.unwrap().unwrap();
+            let sub = started.subscription;
+            let pending: Vec<_> = (1..=2)
+                .map(|seq| {
+                    hub.offer(sub, record(seq, 1), &[seq as u8], false, 3)
+                        .unwrap()
+                })
+                .collect();
+            let mut rx = Reassembler::new(&b, 2, 1, Duration::from_secs(10)).unwrap();
+            let mut acks = Vec::new();
+            while acks.len() < 2 {
+                let f = stream.message().await.unwrap().unwrap();
+                if let Some(r) = rx.push(f.native().unwrap(), Instant::now()).unwrap() {
+                    acks.push(r.handoff(|_, _| true).ok().unwrap());
+                }
+            }
+            let batch = |items: Vec<wire::AckItem>| wire::AckRequest {
+                major: 1,
+                subscription: sub,
+                items,
+                ..wire::AckRequest::default()
+            };
+            let over = batch(vec![
+                ack_item(&acks[0]),
+                ack_item(&acks[1]),
+                ack_item(&acks[0]),
+            ]);
+            assert!(ack_rpc(&mut c, over).await.is_err());
+            assert!(pending.iter().all(|p| p.state() == AckState::Pending));
+            let mut stale = ack_item(&acks[1]);
+            stale.generation += 1;
+            assert!(
+                ack_rpc(&mut c, batch(vec![ack_item(&acks[0]), stale]))
+                    .await
+                    .is_err()
+            );
+            assert_eq!(pending[0].state(), AckState::Acknowledged);
+            assert_eq!(pending[1].state(), AckState::Pending);
+            let single = wire::AckRequest {
+                major: 1,
+                subscription: sub,
+                transfer: acks[1].transfer,
+                generation: acks[1].generation,
+                session: acks[1].receipt.session_id.to_le_bytes().to_vec(),
+                producer: acks[1].receipt.producer_id,
+                sequence: acks[1].receipt.accepted_seq,
+                ..wire::AckRequest::default()
+            };
+            ack_rpc(&mut c, single).await.unwrap();
+            assert_eq!(pending[1].state(), AckState::Acknowledged);
+            drop((stream, c));
+            stop(tx, task).await;
+            drop((hub, inbox, pending, rx));
+            assert_eq!(b.used_bytes(), 0);
+        });
+    }
     #[test]
     fn actual_grpc_large_record_handoff_ack_and_disconnect_unknown() {
         runtime().block_on(async {
@@ -461,6 +548,7 @@ mod sockets {
                         session: ack.receipt.session_id.to_le_bytes().to_vec(),
                         producer: ack.receipt.producer_id,
                         sequence: ack.receipt.accepted_seq,
+                        items: Vec::new(),
                     }),
                     PathAndQuery::from_static("/dot_logger.remote.v1.Logger/Ack"),
                     tonic::codec::ProstCodec::default(),
@@ -1138,6 +1226,7 @@ mod sockets {
                                         session: receipt.session_id.to_le_bytes().to_vec(),
                                         producer: receipt.producer_id,
                                         sequence: receipt.accepted_seq,
+                                        items: Vec::new(),
                                     }),
                                     PathAndQuery::from_static("/dot_logger.remote.v1.Logger/Ack"),
                                     tonic::codec::ProstCodec::default(),

@@ -332,6 +332,8 @@ async fn grpc_receiver(
             _ => return Err(format!("stream ended or reordered at sequence {next}").into()),
         }
     }
+    // Every handoff is confirmed before the receiver reports (ADR-015).
+    subscription.flush(&cancellation).await?;
     println!(
         "{}",
         json!({

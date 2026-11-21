@@ -529,6 +529,11 @@ pub(super) fn execute(
                             &cancel,
                         )
                         .await;
+                    // The ACK is confirmed only by flush (ADR-015).
+                    let result = match result {
+                        Ok(()) => stream.flush(&cancel).await,
+                        error => error,
+                    };
                     match result {
                         Ok(()) => {}
                         Err(

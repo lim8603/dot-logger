@@ -2180,6 +2180,13 @@ fn remote_tail_reports_overflow_gaps_or_disconnects() {
                     assert_eq!(rows[1]["kind"], "gap", "{text}");
                     assert_eq!(rows[1]["data"]["reason"], "overflow");
                     assert_eq!(rows[1]["data"]["first"], rows[1]["data"]["last"]);
+                    // The handoff ACK is pipelined (ADR-015): offer the next
+                    // record once the server has freed the one-record window.
+                    let start = Instant::now();
+                    while first.state() != dot_logger::adapters::remote::AckState::Acknowledged {
+                        assert!(start.elapsed() < Duration::from_secs(3), "first ACK");
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
                     let third = hub
                         .offer(ids[0], remote_record(3, 1), &[9], false, 1)
                         .unwrap();

@@ -131,6 +131,8 @@ impl Remote {
             }
             match handoff {
                 Ok(()) => {
+                    // Confirm the queued ACK before reporting delivery (ADR-015).
+                    stream.flush(&cancel).await?;
                     let received = consumer.try_recv()?;
                     if received != expected {
                         return Err(invalid("consumer queue bytes changed"));

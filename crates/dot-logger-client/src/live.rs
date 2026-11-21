@@ -145,4 +145,10 @@ impl LiveSubscription {
             )
             .await
     }
+
+    /// Send queued acknowledgements and wait until the server confirmed every
+    /// handoff so far (ADR-015). A failure reports AcknowledgementUnknown.
+    pub async fn flush(&mut self, cancel: &Cancellation) -> Result<(), ClientError> {
+        self.stream.flush(cancel).await
+    }
 }

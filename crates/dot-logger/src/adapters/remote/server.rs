@@ -264,6 +264,11 @@ impl Stream for Incoming {
             match self.listener.poll_accept(cx) {
                 Poll::Ready(Ok((stream, _))) => match self.permits.clone().try_acquire_owned() {
                     Ok(permit) => {
+                        // Small frames and ACK replies must not wait for Nagle
+                        // coalescing (EV-100, ADR-015); bulk rate is unchanged.
+                        if let Err(error) = stream.set_nodelay(true) {
+                            return Poll::Ready(Some(Err(error)));
+                        }
                         return Poll::Ready(Some(Ok(LimitedIo {
                             stream,
                             _permit: permit,
@@ -369,8 +374,12 @@ impl tonic::server::UnaryService<wire::AckRequest> for AckRpc {
         let s = self.0.clone();
         Box::pin(async move {
             let peer = s.security.check(&request, false).map_err(status)?;
-            let ack = request.into_inner().native().map_err(status)?;
-            s.hub.ack(ack, peer).map_err(status)?;
+            let max = s.hub.shared.limits.subscription_records;
+            // Settle in order and stop at the first failure; earlier items stay
+            // acknowledged and later ones remain pending until their TTL (ADR-015).
+            for ack in request.into_inner().native(max).map_err(status)? {
+                s.hub.ack(ack, peer).map_err(status)?;
+            }
             Ok(Response::new(wire::Reply {
                 major: PROTOCOL_MAJOR,
                 ..wire::Reply::default()

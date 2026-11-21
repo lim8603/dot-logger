@@ -224,7 +224,15 @@ pub async fn receive(
                 )
                 .await
             {
-                Ok(()) => Ok(Step::Acknowledged),
+                // A screen step reports a server-confirmed ACK, so flush the
+                // queued ACK first (ADR-015).
+                Ok(()) => match stream.flush(cancel).await {
+                    Ok(()) => Ok(Step::Acknowledged),
+                    Err(error) => {
+                        screen.end(segment, EndReason::Client(error))?;
+                        Ok(Step::Ended)
+                    }
+                },
                 Err(error) => {
                     screen.end(segment, EndReason::Client(error))?;
                     Ok(Step::Ended)

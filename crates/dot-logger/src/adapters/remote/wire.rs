@@ -199,6 +199,22 @@ pub(crate) struct AckRequest {
     pub producer: u32,
     #[prost(uint64, tag = "7")]
     pub sequence: u64,
+    /// ADR-015 batch; when nonempty the single-item fields above are unused.
+    #[prost(message, repeated, tag = "8")]
+    pub items: Vec<AckItem>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub(crate) struct AckItem {
+    #[prost(uint64, tag = "1")]
+    pub transfer: u64,
+    #[prost(uint64, tag = "2")]
+    pub generation: u64,
+    #[prost(bytes = "vec", tag = "3")]
+    pub session: Vec<u8>,
+    #[prost(uint32, tag = "4")]
+    pub producer: u32,
+    #[prost(uint64, tag = "5")]
+    pub sequence: u64,
 }
 
 pub(crate) fn version(major: u32) -> Result<(), RemoteError> {
@@ -552,17 +568,44 @@ impl Frame {
     }
 }
 impl AckRequest {
-    pub fn native(self) -> Result<Ack, RemoteError> {
+    /// The single-item form, or every batch item in order (ADR-015). A batch
+    /// longer than `max_items` is rejected before any item is decoded.
+    pub fn native(self, max_items: usize) -> Result<Vec<Ack>, RemoteError> {
         version(self.major)?;
-        Ok(Ack {
-            subscription: self.subscription,
-            transfer: self.transfer,
-            generation: self.generation,
-            receipt: CaptureReceipt {
-                session_id: id(&self.session)?,
-                producer_id: self.producer,
-                accepted_seq: self.sequence,
-            },
-        })
+        let subscription = self.subscription;
+        let ack = |transfer, generation, session: &[u8], producer, sequence| {
+            Ok(Ack {
+                subscription,
+                transfer,
+                generation,
+                receipt: CaptureReceipt {
+                    session_id: id(session)?,
+                    producer_id: producer,
+                    accepted_seq: sequence,
+                },
+            })
+        };
+        if self.items.is_empty() {
+            return Ok(vec![ack(
+                self.transfer,
+                self.generation,
+                &self.session,
+                self.producer,
+                self.sequence,
+            )?]);
+        }
+        if self.items.len() > max_items
+            || self.transfer != 0
+            || self.generation != 0
+            || !self.session.is_empty()
+            || self.producer != 0
+            || self.sequence != 0
+        {
+            return Err(RemoteError::InvalidInput);
+        }
+        self.items
+            .iter()
+            .map(|i| ack(i.transfer, i.generation, &i.session, i.producer, i.sequence))
+            .collect()
     }
 }

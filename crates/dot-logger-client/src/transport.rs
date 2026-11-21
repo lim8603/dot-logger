@@ -476,6 +476,10 @@ impl RemoteClient {
             receiver,
             id,
             subscription: first.subscription,
+            acks: Vec::new(),
+            oldest: None,
+            in_flight: std::collections::VecDeque::new(),
+            batch: ACK_BATCH.min(limits.records),
         })
     }
 }
@@ -493,6 +497,12 @@ pub enum RemoteEvent {
         last: u64,
     },
 }
+// ADR-015 ACK pipeline: at most this many queued ACKs per RPC, the longest a
+// queued ACK waits while `next` blocks, and the concurrent ACK RPCs.
+const ACK_BATCH: usize = 64;
+const ACK_DELAY: Duration = Duration::from_millis(5);
+const ACK_IN_FLIGHT: usize = 4;
+type AckRpc = tokio::task::JoinHandle<Result<(), ClientError>>;
 /// Stream/receiver/ACK owner bound to the originating actual connection.
 /// Drop closes only this stream; dropping its parent client closes all connection IO.
 pub struct RemoteSubscription {
@@ -504,6 +514,10 @@ pub struct RemoteSubscription {
     receiver: ClientReceiver,
     id: ConnectionId,
     subscription: u64,
+    acks: Vec<wire::AckItem>,
+    oldest: Option<Instant>,
+    in_flight: std::collections::VecDeque<AckRpc>,
+    batch: usize,
 }
 impl Drop for RemoteSubscription {
     fn drop(&mut self) {
@@ -513,7 +527,100 @@ impl Drop for RemoteSubscription {
 impl RemoteSubscription {
     fn close(&mut self) {
         self.stream = None;
+        // Unsent ACKs are never claimed; the server settles them as Unknown.
+        self.acks.clear();
+        self.oldest = None;
         let _ = self.receiver.end_connection(&self.id);
+    }
+    // Any failed ACK RPC makes its records' outcome unknown and ends the stream.
+    fn unknown(&mut self) -> ClientError {
+        self.close();
+        ClientError::AcknowledgementUnknown
+    }
+    // Check finished ACK RPCs without waiting; the first failure is reported.
+    fn reap(&mut self) -> Result<(), ClientError> {
+        while self.in_flight.front().is_some_and(|rpc| rpc.is_finished()) {
+            let Some(mut rpc) = self.in_flight.pop_front() else {
+                break;
+            };
+            // A finished JoinHandle is ready; a no-op waker is never stored.
+            let mut cx = Context::from_waker(Waker::noop());
+            match std::future::Future::poll(Pin::new(&mut rpc), &mut cx) {
+                Poll::Ready(Ok(Ok(()))) => {}
+                _ => return Err(self.unknown()),
+            }
+        }
+        Ok(())
+    }
+    // Wait for the oldest ACK RPC.
+    async fn settle_one(&mut self) -> Result<(), ClientError> {
+        if let Some(rpc) = self.in_flight.pop_front() {
+            match rpc.await {
+                Ok(Ok(())) => {}
+                _ => return Err(self.unknown()),
+            }
+        }
+        Ok(())
+    }
+    // Send every queued ACK as one RPC, after making room in the bounded window.
+    async fn send_acks(&mut self) -> Result<(), ClientError> {
+        self.reap()?;
+        if self.acks.is_empty() {
+            return Ok(());
+        }
+        while self.in_flight.len() >= ACK_IN_FLIGHT {
+            self.settle_one().await?;
+        }
+        if self.state.closed.load(Ordering::Acquire) {
+            return Err(self.unknown());
+        }
+        let request = codec::acks(self.subscription, std::mem::take(&mut self.acks));
+        self.oldest = None;
+        let mut grpc = self.grpc.clone();
+        let request = auth(request, &self.token, self.timeout);
+        let timeout = self.timeout;
+        self.in_flight.push_back(tokio::spawn(async move {
+            tokio::time::timeout(timeout, async move {
+                grpc.ready()
+                    .await
+                    .map_err(|_| ClientError::Remote(RemoteError::Transport))?;
+                let reply: tonic::Response<wire::Reply> = grpc
+                    .unary(
+                        request,
+                        PathAndQuery::from_static("/dot_logger.remote.v1.Logger/Ack"),
+                        tonic::codec::ProstCodec::default(),
+                    )
+                    .await
+                    .map_err(rpc_error)?;
+                let reply = reply.into_inner();
+                codec::version(reply.major).map_err(ClientError::Remote)?;
+                if reply.kind != 0 {
+                    return Err(ClientError::Remote(RemoteError::Corrupt));
+                }
+                Ok(())
+            })
+            .await
+            .map_err(|_| ClientError::Remote(RemoteError::TimedOut))?
+        }));
+        Ok(())
+    }
+    /// Send queued ACKs and wait for every ACK RPC of this subscription. Ok means
+    /// the server confirmed every record handed off so far. A failure closes the
+    /// stream with AcknowledgementUnknown; no ACK is retried (ADR-015).
+    pub async fn flush(&mut self, cancel: &Cancellation) -> Result<(), ClientError> {
+        let result = cancel
+            .guard(self.timeout, async {
+                self.send_acks().await?;
+                while !self.in_flight.is_empty() {
+                    self.settle_one().await?;
+                }
+                Ok(())
+            })
+            .await;
+        if result.is_err() {
+            return Err(self.unknown());
+        }
+        Ok(())
     }
     /// Invalidate queued/ready fragments before accepting a newer replay generation.
     /// Host replay/stream generation must be advanced separately by its owner.
@@ -552,10 +659,28 @@ impl RemoteSubscription {
     }
     async fn next_inner(&mut self) -> Result<Option<RemoteEvent>, ClientError> {
         loop {
+            self.reap()?;
+            let deadline = self
+                .oldest
+                .map(|t| tokio::time::Instant::from_std(t + ACK_DELAY));
             let Some(stream) = self.stream.as_mut() else {
                 return Ok(None);
             };
-            let Some(frame) = stream.message().await.map_err(rpc_error)? else {
+            // Streaming::message keeps its decoder state in the stream, so the
+            // ACK timer may drop the wait future (tonic 0.13.1).
+            let message = match deadline {
+                Some(deadline) => tokio::select! {
+                    biased;
+                    message = stream.message() => Some(message),
+                    () = tokio::time::sleep_until(deadline) => None,
+                },
+                None => Some(stream.message().await),
+            };
+            let Some(message) = message else {
+                self.send_acks().await?;
+                continue;
+            };
+            let Some(frame) = message.map_err(rpc_error)? else {
                 self.close();
                 return Ok(None);
             };
@@ -586,9 +711,12 @@ impl RemoteSubscription {
             }
         }
     }
-    /// Synchronously hand off data, then ACK on the same non-reconnecting socket.
-    /// Consumer rejection produces no ACK. A send error after acceptance reports
+    /// Synchronously hand off data, then queue its ACK for the same
+    /// non-reconnecting socket and return without waiting for the server
+    /// (ADR-015). Consumer rejection produces no ACK. Cancellation after
+    /// acceptance, or a failure of an earlier ACK RPC, reports
     /// AcknowledgementUnknown, never successful receiving-application completion.
+    /// Use [`Self::flush`] to learn that the server confirmed the handoffs.
     pub async fn handoff(
         &mut self,
         record: PendingRecord,
@@ -616,35 +744,19 @@ impl RemoteSubscription {
                 }
             })?;
         let ack = self.receiver.take_ack(&self.id, receipt)?;
-        let result = cancel
-            .guard(self.timeout, async {
-                if self.state.closed.load(Ordering::Acquire) {
-                    return Err(ClientError::Disconnected);
-                }
-                self.grpc
-                    .ready()
-                    .await
-                    .map_err(|_| ClientError::Remote(RemoteError::Transport))?;
-                let reply: tonic::Response<wire::Reply> = self
-                    .grpc
-                    .unary(
-                        auth(codec::ack(ack), &self.token, self.timeout),
-                        PathAndQuery::from_static("/dot_logger.remote.v1.Logger/Ack"),
-                        tonic::codec::ProstCodec::default(),
-                    )
-                    .await
-                    .map_err(rpc_error)?;
-                let reply = reply.into_inner();
-                codec::version(reply.major).map_err(ClientError::Remote)?;
-                if reply.kind != 0 {
-                    return Err(ClientError::Remote(RemoteError::Corrupt));
-                }
-                Ok(())
-            })
-            .await;
-        if result.is_err() {
-            self.close();
-            return Err(ClientError::AcknowledgementUnknown);
+        if cancel.is_cancelled() || self.state.closed.load(Ordering::Acquire) {
+            return Err(self.unknown());
+        }
+        self.acks.push(codec::ack_item(ack));
+        self.oldest.get_or_insert_with(Instant::now);
+        self.reap()?;
+        // Send at once while no ACK RPC is outstanding; otherwise queue until a
+        // full batch, the next idle moment, or the ACK delay in `next`.
+        if self.in_flight.is_empty() || self.acks.len() >= self.batch {
+            let sent = cancel.guard(self.timeout, self.send_acks()).await;
+            if sent.is_err() {
+                return Err(self.unknown());
+            }
         }
         Ok(())
     }

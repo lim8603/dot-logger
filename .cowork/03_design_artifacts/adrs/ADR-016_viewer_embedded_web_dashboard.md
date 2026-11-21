@@ -39,3 +39,9 @@ TASK-032는 Foxglove 계열 도구가 보여주지 않는 dot-logger 고유의 �
 - **경로·형식:** [화면 §7.1](../ui_spec.md#71-s2-구현--2026-11-21)에 있다. [EV-107](../../05_verification/verification_evidence.md#ev-107)
 
 S3(`277de2d`)에서는 Compare·PlanCheck 조회를 같은 상류 작업자로 보낸다. 상태 조회와 합쳐 동시에 하나만 진행하므로 결정 2의 상한(명령 슬롯 1개)을 유지한다. 대기열은 4개이고, 넘치면 `viewer_busy`다. 형식은 [화면 §7.2](../ui_spec.md#72-s3-구현--2026-11-21)에 있다. [EV-108](../../05_verification/verification_evidence.md#ev-108)
+
+REV-070 조치(`6b736c9`)로 다음이 바뀌었다.
+
+- 결정 2의 조회 간격은 "이전 GetStatus 종료 1초 뒤"로 구현한다.
+- 결정 4의 Host 검사는 포트가 생략되면 80으로 본다.
+- 상류 주소는 시작할 때 검사하고, 검증된 authority만 표시한다. [화면 §7.3](../ui_spec.md#73-rev-070-조치--2026-11-21) · [EV-109](../../05_verification/verification_evidence.md#ev-109)

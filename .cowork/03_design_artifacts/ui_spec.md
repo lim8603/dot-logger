@@ -112,3 +112,11 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
   - 변화 8항목을 상태 배지·방향·`after − before`·출처로 보인다. 비율은 /s(바이트 비율은 B/s)로 환산하고, 정확한 분수는 툴팁에 둔다. `cpu_rate`는 분수 그대로다. Unavailable은 사유와 "—"로 표시한다.
 - **계획 미리보기:** 계획 필드를 모두 나열하고 "preview only, not run" 배지와 CLI 실행 안내를 붙인다. 실행 버튼은 없다.
 - **기능 미제공:** `unsupported`는 "This host does not provide …", `gone`은 snapshot 해제나 미등록 계획 안내로 표시한다.
+
+### 7.3 REV-070 조치 — 2026-11-21
+
+- **상류 주소:** viewer는 리스너를 열기 전에 `--upstream`을 `RemoteConfig::checked_endpoint()`로 검사한다. 대시보드의 `upstream`에는 검증된 `scheme://host:port`만 나간다. 범위를 넘는 포트, userinfo, 경로, 쿼리는 원문 없이 거절한다.
+- **조회 간격:** GetStatus는 이전 GetStatus가 끝난 지 1초 뒤에 보낸다(연결 실패 포함). 호스트가 관측하는 간격은 1초 이상이다.
+- **상태 형식:** `latest`·`windows`·`snapshots`·`posted_revision`의 타입이 맞지 않으면 `corrupt`다. 화면은 마지막으로 렌더링된 상태를 유지하고 "status not understood"를 표시하며, 갱신을 계속한다.
+- **Host:** 포트가 없으면 80이다. IPv6는 `[::1]` 형식만 받는다.
+- **조회 결과:** 같은 종류에서는 가장 최근 요청의 결과만 표시한다.

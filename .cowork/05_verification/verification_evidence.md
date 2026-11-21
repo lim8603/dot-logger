@@ -1666,6 +1666,25 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   - PlanCheck 성공 화면: 실제 JS에 고정 응답을 넣은 하네스로 확인했다. [근거](../06_evolution/imported_context/task_032_s3_2026-11-21/README.md)
 - **범위:** 실제 원격 `CheckHost` 데모는 없다. 브라우저 렌더링은 수동 확인이다.
 
+<a id="ev-109"></a>
+### EV-109 — REV-070 대시보드 조치
+
+- **변경:** 제품 `6b736c9`. [REV-070](reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치.
+  - `RemoteConfig::checked_endpoint()`를 추가하고 `connect`와 문법 검사를 공유했다. 범위를 넘는 포트도 이제 거절한다.
+  - viewer는 시작 전에 상류 주소를 검사하고, 대시보드에는 검증된 authority만 표시한다.
+  - `status.v1` 구조 타입을 검사한다.
+  - Host는 포트가 없으면 80으로 보고, IPv6는 괄호가 필요하다.
+  - GetStatus는 이전 요청 종료 1초 뒤에 보낸다.
+  - JS는 렌더링 실패 뒤에도 갱신을 계속하고, 조회는 최신 요청만 반영한다.
+- **TDD:**
+  - Rust 새 시험 5건이 stub 또는 수정 전 코드에서 Red였다: client `checked_endpoint`, viewer 표시 주소, 구조 타입, Host 파싱, 느린 연결 뒤 간격(43 ms).
+  - RV-170은 "RPC 시작 + 1초" 구현에서도 3.5 ms로 실패해 "종료 + 1초"로 바꿨다.
+  - JS 두 건은 수정 전·후 JS를 같은 브라우저 하네스로 비교했다(갱신 2회에서 멈춤 → 6회, 늦은 결과가 덮음 → 최신 유지). [근거](../06_evolution/imported_context/rev_070_2026-11-21/README.md)
+- **결과:**
+  - Rust 1.85.0·1.96.0 workspace all-features 각 **724 Pass, 실패 0, 5 ignored**.
+  - 두 버전의 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사 통과. viewer·client 시험 10회 반복 실패 0.
+  - viewer는 잘못된 `--upstream` 세 가지를 리스너를 열기 전에 원문 없이 거절했다. `live_host` 연결은 정상이다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

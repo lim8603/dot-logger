@@ -70,6 +70,10 @@ cargo run --locked -p dot-logger-viewer --example operations_host
 ```
 
 The dashboard is read-only. Use the CLI to change configuration or run checks.
+The viewer checks `--upstream` before it opens any listener: it must be an
+`http` or `https` URL with only a host and an optional port. The dashboard
+shows only that scheme, host and port. Status requests are sent one second
+after the previous one finished.
 It listens on loopback only, answers `GET` requests whose `Host` is a loopback
 name with its port, and admits only a loopback Origin or the `--allow-origin`
 value. The upstream credential is never sent to the browser. The page loads

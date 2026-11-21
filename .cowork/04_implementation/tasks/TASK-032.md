@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | S1~S3 구현 완료. Task 수락 전 리뷰(완료 기준의 Human 리뷰) |
+| 다음 액션 | S1~S3 구현 완료, 독립 리뷰 REV-070 조치·Closed(`6b736c9`, EV-109). Task 수락 판단 |
 | 의존 | TASK-031·TASK-016·TASK-017 |
 | 예상 소요 | 2~4 인일, 리뷰 대기 제외 |
 
@@ -70,3 +70,8 @@ Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)�
 - 상태 조회와 조회 요청은 작업자 하나가 한 번에 하나씩 처리한다(상류 명령 슬롯 1개).
 - 화면은 보유 snapshot 두 개의 비교(양쪽 조건, 다른 조건, 변화 8항목)와 계획 미리보기를 보여준다. 실행 버튼은 없다.
 - 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. [근거](../../06_evolution/imported_context/task_032_s3_2026-11-21/README.md)
+
+## 독립 리뷰 REV-070 — 2026-11-21
+
+Codex의 독립 리뷰가 P1 1건과 P2 4건(RV-166~170)을 냈다. `6b736c9`에서 모두 수용해 조치했고(RV-170은 기준 조정), 위임 범위에서 Closed로 마감했다. 상류 주소 노출 방지, 렌더링 실패 뒤 갱신 계속, 포트 80 Host, 최신 조회 결과만 반영, 호스트 기준 1초 간격이 바뀌었다. [REV-070](../../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) · [EV-109](../../05_verification/verification_evidence.md#ev-109)
+

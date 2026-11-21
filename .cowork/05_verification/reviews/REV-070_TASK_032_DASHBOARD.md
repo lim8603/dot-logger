@@ -1,6 +1,6 @@
 # REV-070 — TASK-032 운영 대시보드 독립 코드리뷰
 
-2026-11-21 · Codex · **Conditional / Open** · P1 1건, P2 4건
+2026-11-21 · Codex · **Conditional → Pass / Closed** · P1 1건, P2 4건 — 2026-11-21 #003 `6b736c9` 조치·위임 수락([EV-109](../verification_evidence.md#ev-109))
 
 제품 범위는 `5daf22b..277de2d`의 S2 상태 화면·HTTP(`704d055`)와 S3 Compare·PlanCheck(`277de2d`)다. [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md), [화면 명세 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21), [viewer README](../../../crates/dot-logger-viewer/README.md#operations-dashboard)의 사용 계약과 대조했다.
 
@@ -8,11 +8,11 @@
 
 | ID | 중요도 | 위치·계약 | 영향 | 처리 제안 | 처리 판정 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-166 | P1 | dashboard.rs 173·260행, credential 경계 | 잘못 입력한 상류 주소의 민감 정보가 상태 응답에 포함됨 | 시작 시 주소 검증, 표시용 주소 구성 | 대기 | Open |
-| RV-167 | P2 | dashboard.js 354~366행, 화면 갱신 | 상태 렌더링 예외 후 폴링 중단 | 렌더링까지 오류 처리, 다음 갱신 보장 | 대기 | Open |
-| RV-168 | P2 | dashboard.rs 508행, Host 검사 | HTTP 기본 포트에서 정상 브라우저 요청 거절 | 생략된 포트를 80으로 해석 | 대기 | Open |
-| RV-169 | P2 | dashboard.js 241~253행, 조회 결과 | 이전 조회가 최신 선택의 결과를 덮음 | 조회 종류별 최신 요청 식별 | 대기 | Open |
-| RV-170 | P2 | dashboard.rs 293~300·318~322행, 조회 주기 | 재연결 직후 GetStatus 간격이 1초 미만일 수 있음 | 실제 RPC 시작을 기준으로 다음 조회 예약 | 대기 | Open |
+| RV-166 | P1 | dashboard.rs 173·260행, credential 경계 | 잘못 입력한 상류 주소의 민감 정보가 상태 응답에 포함됨 | 시작 시 주소 검증, 표시용 주소 구성 | 수용 | Closed |
+| RV-167 | P2 | dashboard.js 354~366행, 화면 갱신 | 상태 렌더링 예외 후 폴링 중단 | 렌더링까지 오류 처리, 다음 갱신 보장 | 수용 | Closed |
+| RV-168 | P2 | dashboard.rs 508행, Host 검사 | HTTP 기본 포트에서 정상 브라우저 요청 거절 | 생략된 포트를 80으로 해석 | 수용 | Closed |
+| RV-169 | P2 | dashboard.js 241~253행, 조회 결과 | 이전 조회가 최신 선택의 결과를 덮음 | 조회 종류별 최신 요청 식별 | 수용 | Closed |
+| RV-170 | P2 | dashboard.rs 293~300·318~322행, 조회 주기 | 재연결 직후 GetStatus 간격이 1초 미만일 수 있음 | 실제 RPC 시작을 기준으로 다음 조회 예약 | 수용(기준 조정) | Closed |
 
 ## 리뷰어 상세 및 수락 기준
 
@@ -32,4 +32,24 @@
 
 ## 처리담당 기록
 
-RV-166~170의 처리 판정·변경 함수·검증 근거는 후속 개발 세션에서 항목별로 기록한다. TASK-032 수락은 조치 검증 후 판단한다.
+2026-11-21 #003, 제품 `6b736c9`. 다섯 건 모두 수용했다(RV-170은 기준 조정). 수정 전 Red와 수정 후 Green을 확인했다.
+
+- **RV-166 — 수용.**
+  - client에 `RemoteConfig::checked_endpoint()`(추가형 공개 API)를 두었다. `connect`와 같은 문법 검사(`parse_endpoint`)를 공유하고, 검증된 `scheme://host:port`만 돌려준다.
+  - viewer `run`은 리스너를 열기 전에 이 검사를 하고, 실패 메시지에 원문을 넣지 않는다. `dashboard::serve`도 같은 검사 뒤 표시용 주소만 `Status`에 넣는다.
+  - 조치 중 기존 결함도 고쳤다: 범위를 넘는 포트(`:99999`)는 `http::Uri`에서 포트 없음으로 해석되어 `connect`가 기본 포트로 연결할 수 있었다. 이제 host 뒤 포트 표기를 직접 검사해 `InvalidInput`이다.
+  - 시험: client 단위 시험(유효 5종·거절 8종)이 stub에서 Red였다. viewer 시험(userinfo 주소 거절과 메시지에 secret 없음, `http://127.0.0.1:9/` → `http://127.0.0.1:9` 표시)도 수정 전에는 serve가 거절하지 않아 Red였다. 수정 후 viewer는 세 잘못된 주소를 시작 단계에서 exit 1로 거절했다.
+- **RV-167 — 수용.**
+  - Rust `well_formed`가 화면이 쓰는 필드의 타입을 검사한다: `latest`는 state가 있는 객체, `windows`는 seconds·state가 있는 배열, `snapshots`는 문자열 필드 배열, `posted_revision`은 문자열 또는 null. 어기면 `corrupt`이고 마지막 값을 유지한다(시험 5종, 수정 전 Red).
+  - JS는 렌더링이 끝난 상태만 `latest`로 삼는다. 렌더링 오류는 마지막 유효 상태와 "status not understood" 배지로 표시하고, `finally`에서 다음 갱신을 항상 예약한다. 하네스에서 수정 전 2회에서 갱신이 멈췄고, 수정 후 6회 계속 갱신되며 복구됐다.
+- **RV-168 — 수용.** `loopback_host`를 다시 작성했다. 포트가 없으면 80이다. IPv6는 괄호 안 주소를 `Ipv6Addr`로 파싱하고, 포트는 숫자만 받는다. 시험 14종(localhost·IPv4·괄호 IPv6의 기본 포트 성공, 포트 불일치·외부 이름은 403, 괄호 없는 IPv6·빈 포트·이름 없음·숫자 아님은 400)이 수정 전 Red였다.
+- **RV-169 — 수용.** JS `lookup`에 조회 종류별 요청 번호를 두어 최신 요청만 결과를 갱신한다. 하네스에서 수정 전에는 늦게 온 계획 1 성공이 표시됐고, 수정 후에는 최신 계획 2의 `unsupported`가 남았다.
+- **RV-170 — 수용, 기준 조정.**
+  - 제안은 "실제 RPC 시작 + 1초"였다. 그러나 1.3초 지연 relay로 재현해 보니 지연이 `connect`가 아니라 첫 RPC 안에서 생겼고, 그 기준으로도 호스트에서 3.5 ms 간격이 관측됐다.
+  - 호스트가 이전 요청을 받는 시점은 RPC 종료 전 어디든 될 수 있다. 그래서 다음 GetStatus를 이전 GetStatus 종료 + 1초에 예약했다(연결 실패 포함). 주기는 1초 + 왕복 시간이 되며 ADR-016의 "1초 이상 간격"과 맞는다.
+  - 시험: relay가 첫 연결을 1.3초 붙잡을 때 호스트가 관측한 두 GetStatus 간격 ≥ 900 ms. 수정 전 43 ms로 Red, 수정 후 Green.
+- **검증:**
+  - Rust 1.85.0·1.96.0 workspace all-features 각 **724 Pass, 실패 0, 5 ignored**.
+  - 두 버전의 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사 통과. viewer·client 시험 10회 반복 실패 0. [EV-109](../verification_evidence.md#ev-109)
+- 리뷰의 참고 사항(단일 슬롯 시험을 조회가 대기열에 들어간 시점과 동기화)은 RV가 아니어서 이번에는 바꾸지 않았다. 반복 시험에서 실패는 없었다.
+- 기존 위임 범위에서 수락하고 Closed로 마감한다. TASK-032 수락 여부는 따로 판단한다.

@@ -15,9 +15,9 @@
 | 상태 | 31/35 Task Done, MS-009 Done. REV-071 조치 뒤 재검증 [EV-111](../05_verification/verification_evidence.md#ev-111): 두 Rust 각 739 Pass·5 ignored, feature 조합·CI 범위 Miri(`logger::` 제외 없음)·종단 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089). **Gate 4 판정안 Pass(로컬 범위, Human 수락 대기)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / #004 REV-071 RV-171~188 조치·EV-111 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #004.** REV-071 조치·재검증 완료, Human 수락(REV-071·Gate 4) 대기 |
-| 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
+| 갱신 | 2026-11-21 / #005 세션 마감 / AI |
+| 세션 상태 | **종료 — 2026-11-21 #005(개발) 마감.** 다음 세션은 REV-071 조치·Gate 4 판정안의 Human 수락부터 |
+| 최근 완료 세션 | 2026-11-21 #005 — 공개 준비(이력 정리·비공개 재업로드), TASK-025 S3·S4, REV-071 요청·반입·RV-171~188 조치(EV-111), INT-002 Draft |
 
 ## 현재 결정과 제약
 
@@ -174,6 +174,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
+- 2026-11-21 #005 — 공개 준비(`imported_context` 비공개, 이력 정리 후 비공개 단일 저장소 재업로드, 라이선스), TASK-025 S3(`07_delivery`)·S4(EV-110, Gate 4 판정안), REV-071 요청·반입·RV-171~188 조치([EV-111](../05_verification/verification_evidence.md#ev-111)), INT-001 갱신·INT-002 Draft(로그(비공개 세션 로그: `session_logs/session_2026-11-21_005.md`)).
 - 2026-11-21 #004(리뷰) — Gate 4 수락·공개 전환 전 전체 코드베이스 독립 리뷰 [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) Fail / Open(`RV-171~188`: 3 P1, 11 P2, 4 P3)(로그(비공개 세션 로그: `session_logs/session_2026-11-21_004.md`)).
 - 2026-11-21 — TASK-032 독립 리뷰 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) Conditional / Open, RV-166~170 등록.
 - 2026-11-21 #003 — REV-069 반입·RV-163~165 조치(`0a9bc4d`)·위임 마감, TASK-032 S1 ADR-016 결정·S2 대시보드 상태 화면 `c876395`·[EV-107](../05_verification/verification_evidence.md#ev-107)·S3 비교·계획 미리보기 `97ece7f`·REV-070 조치 `007b25c`·[EV-109](../05_verification/verification_evidence.md#ev-109)·[EV-108](../05_verification/verification_evidence.md#ev-108)([EV-106](../05_verification/verification_evidence.md#ev-106), 로그(비공개 세션 로그: `session_logs/session_2026-11-21_003.md`)).

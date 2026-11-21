@@ -1,17 +1,63 @@
 # dot-logger
 
-로보틱스 프로젝트에 내장하는 Rust 로깅·텔레메트리 라이브러리입니다. 실시간(RT) 스레드는
-대기·할당 없이 기록을 넘기고, 기본 worker가 MCAP 파일로 회전·동기화·보존합니다.
-메모리와 손실 한도는 모두 유한하게 선언합니다.
+Bounded logging and telemetry for robotics, in Rust.
 
-## 빠른 시작
+Real-time threads hand records off without waiting or allocating. A default
+worker writes them to standard [MCAP](https://mcap.dev) files that Foxglove,
+Lichtblick and the `mcap` tools read directly. Every queue, pool, file and
+reservation has a declared limit, and every record that does not make it is
+counted rather than silently lost.
 
-`dot_logger::logger`(facade)가 기본 경로입니다. 아래는 L1 레시피
-[`examples/recipes/l1_file.rs`](examples/recipes/l1_file.rs) 전문입니다(검사 스크립트가 원본과 같은지 확인합니다).
+> **Status:** pre-release (0.1). The API may still change. Linux is the
+> verified platform; see [Verification](#verification). The license has not
+> been chosen yet; see [License](#license).
+
+## Features
+
+- **Real-time safe capture.** `try_log` never blocks or allocates. A full
+  queue is a counted rejection. Important records can have reserved slots.
+- **Bounded memory.** Memory partitions, queues and file budgets are declared
+  up front. Presets compute them from a control-loop rate.
+- **Standard files.** Records are stored as native MCAP with your own schema
+  and encoding (for example protobuf, JSON or raw bytes). Loss counters and
+  record metadata are stored in the same file.
+- **Retention.** Ring retention, event windows that keep a period before and
+  after a mark, rotation when the configuration changes, and recovery of
+  interrupted files into new files.
+- **Live and recorded access.** An optional gRPC server for subscribe, query,
+  replay and status; the `dot-logger` CLI; and a Rust client library.
+- **Visualization.** `dot-logger-viewer` streams live or recorded data to
+  Foxglove or Lichtblick and serves a read-only operations dashboard.
+- **Operations.** Runtime level and sampling changes, telemetry windows,
+  before/after comparison, file-system checks, and an emergency flush on a
+  power alarm.
+- **Integrations.** `tracing`/`log` input and InfluxDB v2 output.
+
+## Workspace
+
+| Crate | What it is |
+|---|---|
+| [`dot-logger`](crates/dot-logger) | The library: capture, storage, query/replay, adapters and telemetry |
+| [`dot-logger-cli`](crates/dot-logger-cli) | The `dot-logger` command: status, query, replay, tail, recover, loss, compare, checks |
+| [`dot-logger-client`](crates/dot-logger-client) | Rust client for the gRPC server and for offline files |
+| [`dot-logger-viewer`](crates/dot-logger-viewer) | Foxglove WebSocket bridge and operations dashboard |
+
+## Getting started
+
+Rust 1.85 or newer is required. dot-logger is not published on crates.io yet;
+use it as a git dependency:
+
+```toml
+[dependencies]
+dot-logger = { git = "https://github.com/lim8603/dot-logger" }
+```
+
+`dot_logger::logger` is the default path. This is the complete L1 recipe,
+[`examples/recipes/l1_file.rs`](examples/recipes/l1_file.rs):
 
 <!-- recipe:l1_file.rs -->
 ```rust
-//! L1 recipe (NFR-008): record typed messages from a real-time thread into
+//! L1 recipe: record typed messages from a real-time thread into
 //! files and judge the shutdown. No support module, `unsafe` or lifetimes.
 use dot_logger::logger::{EncodeError, Logger, Preset, Record, Retention, Schema};
 use std::time::Duration;
@@ -59,18 +105,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 cargo run --locked -p dot-logger --example recipe_l1_file
 ```
 
-- `Preset::control(1000)`이 메모리·sync 주기·종료 기한·writer 할당량을 채웁니다. 직접 정하려면 `Budget`을 씁니다.
-- `try_log`는 기다리지 않습니다. 큐가 차면 거절되고 그 수가 집계됩니다.
-- `shutdown(..).is_success()`는 모든 기록이 기한 안에 쓰이고 동기화됐을 때만 true입니다.
+- `Preset::control(1000)` fills in memory, sync interval, shutdown deadline
+  and writer quotas for a 1 kHz loop. Use `Budget` to set them yourself.
+- `try_log` never waits. When the queue is full the record is rejected and
+  counted.
+- `shutdown(..).is_success()` is true only when every record was written and
+  synchronized before the deadline.
 
-## 레시피
+## Recipes
 
-| 레시피 | 내용 | NFR-008 한도 | 현재 |
+Each recipe is a complete program kept small on purpose. A check script
+counts its lines (after rustfmt, without `use`, comments, blank lines and the
+message type) and the `dot_logger` names it uses.
+
+| Recipe | Shows | Limit | Now |
 |---|---|---|---|
-| [L1 `l1_file.rs`](examples/recipes/l1_file.rs) | 사용자 타입 기록 → RT 스레드 기록 → 종료 판정 | ≤ 20줄·개념 ≤ 6 | 20줄·6 |
-| [L2 `l2_rt_writers.rs`](examples/recipes/l2_rt_writers.rs) | RT writer 2개, raw loan으로 무복사 프레임 기록 | ≤ 40줄·≤ 10 | 40줄·7 |
-| [L3 `l3_tracing.rs`](examples/recipes/l3_tracing.rs) | L1 + `tracing`/`log` 연결 | L1 대비 +6줄 이하 | +3 |
-| [L3 `l3_remote.rs`](examples/recipes/l3_remote.rs) | L1 + loopback gRPC 서버(`dot-logger tail`로 구독) | L1 대비 +6줄 이하 | +5 |
+| [`l1_file.rs`](examples/recipes/l1_file.rs) | Typed records from a real-time thread into files, judged shutdown | ≤ 20 lines, ≤ 6 names | 20, 6 |
+| [`l2_rt_writers.rs`](examples/recipes/l2_rt_writers.rs) | Two real-time writers, zero-copy frames from a loaned slot | ≤ 40 lines, ≤ 10 names | 40, 7 |
+| [`l3_tracing.rs`](examples/recipes/l3_tracing.rs) | L1 plus `tracing`/`log` input | ≤ 6 lines more than L1 | +3 |
+| [`l3_remote.rs`](examples/recipes/l3_remote.rs) | L1 plus a loopback gRPC server | ≤ 6 lines more than L1 | +5 |
 
 ```sh
 cargo run --locked -p dot-logger --example recipe_l2_rt_writers
@@ -78,14 +131,14 @@ cargo run --locked -p dot-logger --features tracing-adapter --example recipe_l3_
 cargo run --locked -p dot-logger --features remote --example recipe_l3_remote
 ```
 
-줄은 rustfmt 결과에서 `use`·주석·빈 줄·사용자 메시지 타입과 `Record` 구현을 빼고 셉니다. 개념은
-사용자 코드가 이름으로 쓰는 `dot_logger` 타입·trait·함수 수입니다(계약 [API §18.6·§20](.cowork/03_design_artifacts/interface_contract.md#20-task-029-레시피접점-회귀-가드--2026-11-12)).
+The L3 remote recipe prints its server address and exits after writing. To
+try subscriptions, use the longer-running `live_host` example described in
+[Live view and dashboard](#live-view-and-dashboard).
 
-## 선택 옵션: 중요도·최소 level·이벤트 보존
+## Options on the default path
 
-기본 경로에 필요할 때만 붙이는 옵션입니다. 계약은 [API §22](.cowork/03_design_artifacts/interface_contract.md#22-task-034-facade에-core-기능-노출--계약안-2026-11-15)에 있습니다.
-
-호스트 프로젝트에 통합할 때는 앱이 정한 `project_root` 아래에 `.logger/`를 만들어 넘길 수 있습니다. dot-logger라는 이름에는 호스트의 `.logger/` 폴더에 기록을 모아 두고 뒤에서 조용히 지원한다는 뜻을 담았습니다.
+Add these only when you need them. They are documented on
+`LoggerBuilder`, `ChannelOptions`, `WriterQuota` and `EventWindow`.
 
 ```rust
 let log_dir = project_root.join(".logger");
@@ -95,75 +148,151 @@ let logger = Logger::builder()
     .file_output(&log_dir, Retention::ring(4 << 30)
         .events(EventWindow::new(Duration::from_secs(30), Duration::from_secs(10))
             .hold(Duration::from_secs(3600))
-            .limits(8, 512 << 20)))                       // 이벤트 전후 구간 보존
+            .limits(8, 512 << 20)))                       // keep 30 s before and 10 s after a mark
     .channel_with::<Status>("robot/status", ChannelOptions::new()
-        .minimum(Level::Info)                             // Info 미만은 Skipped
-        .important_from(Level::Warn))                     // Warn 이상은 중요 기록
-    .writer_with("control", WriterQuota::small(64, 256).important(8)) // 중요 기록 예약
+        .minimum(Level::Info)                             // below Info is skipped
+        .important_from(Level::Warn))                     // Warn and above are Important
+    .writer_with("control", WriterQuota::small(64, 256).important(8)) // reserved Important slots
     .start()?;
-writer.try_log(alarm.important(), &msg)?;                 // 기록 하나만 중요로 표시
-let revision = logger.set_channel(alarm, Level::Warn, 3)?; // 일반 thread: level·Normal 샘플링
-let mark = logger.mark_event()?;                          // 지금 시각 기준 [-30 s, +10 s] 보호
+writer.try_log(alarm.important(), &msg)?;                 // mark one record Important
+let revision = logger.set_channel(alarm, Level::Warn, 3)?; // change level and Normal sampling
+let mark = logger.mark_event()?;                          // protect [-30 s, +10 s] around now
 ```
 
-- **중요 기록:** writer 예약(`WriterQuota::important`)이 있을 때만 포화에서 보호됩니다. 예약 없이 `important_from`을 쓰면 `plan()`이 `PlanWarning::NoImportantReserve`를 보고합니다.
-- **level·샘플링 변경:** `set_channel(channel, minimum, sample_every)`는 게시된 revision을 반환합니다. Normal 기록은 첫 번째와 매 `sample_every`번째를 남기며(1은 모두), Important는 샘플링하지 않습니다. level 하한은 Important에도 적용됩니다. 파일은 기록이 적용받은 revision 경계에서 회전합니다.
-- **쉬는 writer:** 다음 `try_log`에서 새 설정을 적용합니다. 사용자가 꺼낸 writer가 쉬고 있으면 후속 변경이 `ConfigError::Busy`일 수 있으므로 그 thread에서 주기적으로 `writer.refresh()`를 부릅니다. 꺼내지 않은 writer·tracing writer·반납한 writer는 facade가 ack합니다. 다른 로컬 설정 요청이 대기 중이어도 Busy를 반환합니다. 이 응답은 파일 sync 완료를 뜻하지 않습니다.
-- **이벤트 보존:**
-  - `mark_event`는 일반 thread에서 부릅니다. RT thread는 그 thread에 알리면 됩니다.
-  - `hold`가 끝나거나 `release_event`를 부르면 보호가 풀립니다.
+- **Important records** are protected from saturation only when the writer
+  reserves slots (`WriterQuota::important`). Using `important_from` without a
+  reserve makes `plan()` report `PlanWarning::NoImportantReserve`.
+- **Level and sampling** changes return the posted configuration revision.
+  Normal records keep the first and every `sample_every`-th record (1 keeps
+  all); Important records are never sampled, but the minimum level applies to
+  them too. Files rotate at the revision boundary.
+- **Idle writers** apply a new configuration on their next `try_log`. A writer
+  you took that stays idle can make a later change return `ConfigError::Busy`;
+  call `writer.refresh()` on its thread from time to time. A posted revision
+  does not mean the files are synchronized.
+- **Event windows:** call `mark_event` on an ordinary thread (a real-time
+  thread can signal one). Protection ends after `hold` or on `release_event`.
 
-## 두 계층과 문서
+A host application can pass a `.logger/` directory under its own project root,
+as above; the name dot-logger comes from that quiet `.logger/` folder.
 
-- **기본 경로 — `logger`:** builder, 기본 worker, 스레드 간 이동 가능한 `'static` writer, preset·장비 측정 프로필(`calibrate` feature), health·종료 보고.
-- **고급 경로 — 나머지 모듈:** 메모리 분할(`config`), 수집(`capture`), 분배(`routing`), 완료 추적(`completion`), sync·종료·UPS 긴급 저장(`control`), MCAP 파일·보존·복구(`storage`), 조회·재생(`query`·`replay`), 어댑터(`adapters`: gRPC·InfluxDB·tracing), 운영 계측·리포트(`telemetry`), 점검(`diagnostics`).
+## Live view and dashboard
 
-계약 상세는 각 모듈의 rustdoc에 있습니다.
+Enable the gRPC server on the default path with `LoggerBuilder::remote`. It
+binds to loopback by default, on a port chosen by the system; read the actual
+address from `logger.remote_addr()`. Remote hosts need HTTPS and a token.
+
+The viewer turns that server into a Foxglove WebSocket and an operations
+dashboard. With the demo host:
+
+```sh
+cargo run --locked -p dot-logger-viewer --example live_host -- ./viewer-demo
+# In another terminal, use the URL the demo printed:
+cargo run --locked -p dot-logger-viewer -- \
+    --upstream http://127.0.0.1:PORT --catalog ./viewer-demo/viewer-catalog.json \
+    --dashboard 127.0.0.1:0
+```
+
+Open the printed `ws://` URL in Foxglove or Lichtblick and the `http://` URL
+in a browser. See the [viewer README](crates/dot-logger-viewer/README.md).
+
+From a terminal, the CLI subscribes to the same server. `--record-bytes` must
+fit the host's record limit (64 KiB in the demo):
+
+```sh
+cargo run -p dot-logger-cli -- tail --endpoint http://127.0.0.1:PORT --record-bytes 65536 --limit 10
+```
+
+See the [CLI README](crates/dot-logger-cli/README.md).
+
+## Two layers
+
+- **Default path — `logger`:** a builder, a default worker, `'static` writers
+  that can move between threads, presets and machine calibration profiles
+  (`calibrate` feature), health and a shutdown report.
+- **Advanced path — the other modules:** memory partitions (`config`),
+  capture (`capture`), fan-out (`routing`), completion tracking
+  (`completion`), sync, shutdown and power-alarm handling (`control`), MCAP
+  files, retention and recovery (`storage`), query and replay (`query`,
+  `replay`), adapters (`adapters`: gRPC, InfluxDB, tracing), operational
+  telemetry and reports (`telemetry`) and checks (`diagnostics`). The default
+  path is built on these.
+
+Each module documents its contract in rustdoc:
 
 ```sh
 cargo doc --open -p dot-logger --all-features
 ```
 
-## Feature
+## Cargo features
 
-기본 feature는 없습니다.
+No feature is enabled by default.
 
-| Feature | 추가 내용 |
+| Feature | Adds |
 |---|---|
-| `remote` | gRPC 서버·클라이언트(tonic·Tokio) |
-| `influxdb` | InfluxDB v2 유한 write·수치 조회(reqwest·Tokio) |
-| `tracing-adapter` | `tracing`·`log` 입력 |
-| `compression-zstd` | 의존성의 MCAP zstd(제품 writer는 무압축) |
-| `calibrate` | 장비 측정과 preset용 JSON 프로필 |
+| `remote` | gRPC server and client types (tonic, Tokio) |
+| `influxdb` | Bounded InfluxDB v2 writes and numeric queries (reqwest, Tokio) |
+| `tracing-adapter` | `tracing` and `log` input |
+| `compression-zstd` | zstd support in the MCAP dependency (dot-logger itself writes uncompressed chunks) |
+| `calibrate` | Machine calibration and JSON profiles for presets |
 
-## 다른 예제와 도구
+## Examples
 
-| 예제 | 내용 |
+| Example | Shows |
 |---|---|
-| [`dot-logger-cli`](crates/dot-logger-cli) | `dot-logger` CLI(`status`·`query`·`replay`·`tail`·`recover`·`calibrate` 등) |
-| [`dot_probe_facade`](examples/dot_probe_facade.rs) | dot-probe 형태 통합(로그·1 kHz 관절·30 Hz 프레임 → 파일 + gRPC)을 facade만으로, support 없음 |
-| [`dot_probe_*`](crates/dot-logger-client/examples) | 고급 경로 통합 예제(InfluxDB 경로·설정 변경 비교 포함), [client README](crates/dot-logger-client/README.md) |
-| [`general_logs`](examples/general_logs.rs) | 고급 경로의 tracing/log 입력 |
-| [`ups_simulation`](crates/dot-logger/examples/ups_simulation.rs) | UPS 알람·차단 기한 시뮬레이션(`--plan`, `--run DIR`) |
-| [`tests/api-consumer`](tests/api-consumer/src/main.rs) | 독립 crate에서의 공개 API 사용 |
+| [`dot_probe_facade`](examples/dot_probe_facade.rs) | A robot-application integration on the default path only: `tracing` logs, 1 kHz joint telemetry and 30 Hz camera frames into files plus a gRPC server. Modeled on dot-probe, the first application that uses dot-logger |
+| [`dot_probe_*`](crates/dot-logger-client/examples) | Advanced-path integrations modeled on the same application, including InfluxDB output and a configuration before/after comparison; see the [client README](crates/dot-logger-client/README.md) |
+| [`general_logs`](examples/general_logs.rs) | `tracing`/`log` input on the advanced path |
+| [`ups_simulation`](crates/dot-logger/examples/ups_simulation.rs) | Power-alarm and shutdown-deadline simulation (`--plan`, `--run DIR`) |
+| [`live_host`](crates/dot-logger-viewer/examples/live_host.rs), [`operations_host`](crates/dot-logger-viewer/examples/operations_host.rs) | Demo hosts for the viewer and dashboard |
+| [`tests/api-consumer`](tests/api-consumer/src/main.rs) | Using the public API from a separate crate |
 
-## 개발
+## Verification
 
-개발 도구체인은 Rust 1.96.0(`rust-toolchain.toml`), 최소 지원 버전(MSRV)은 1.85입니다. `Cargo.lock`으로 의존성을 고정합니다.
+- **Tests.** The workspace has about 720 unit and integration tests, run with
+  Rust 1.96.0 and the 1.85 MSRV. The library's unit tests and its pool,
+  routing, completion, control, retention, storage-fault, query and replay
+  tests also run under Miri.
+- **Platform.** Measured on one Linux x86_64 PC, with both a generic and a
+  PREEMPT_RT kernel. A CI workflow for Ubuntu 24.04, Windows Server 2025 and
+  macOS 14 is configured but has not produced results yet, so macOS and
+  Windows are unverified.
+- **Power loss** was verified with simulated UPS signals and real file IO,
+  not with a physical UPS.
+- **Not yet done:** a 24-hour soak test and a production integration.
+- **Dependencies** are audited with RustSec. One indirect dependency, `paste`,
+  is reported as unmaintained.
+
+Results measured on that PC over a wired 1 GbE LAN (not guarantees for other
+hardware):
+
+| Scenario | Result |
+|---|---|
+| 256-byte records, 10,000 per second, 60,000 in total | All acknowledged by the receiver; acknowledgement p99 4.12 ms |
+| 8 MiB records over gRPC | 115.9–116.4 MB/s, 99–100 % of a raw TCP baseline |
+
+## Development
+
+The development toolchain is Rust 1.96.0 (`rust-toolchain.toml`); the minimum
+supported version is 1.85. `Cargo.lock` pins dependencies.
 
 ```sh
 cargo test --workspace --all-features --locked
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 python3 scripts/check-feature-matrix.py --toolchain 1.85.0
-python3 scripts/check-integration-surface.py   # facade 표면 snapshot·레시피 한도(nightly-2026-10-26 필요)
+python3 scripts/check-integration-surface.py   # needs nightly-2026-10-26
 cargo run --locked -p dot-logger-api-consumer
 ```
 
-`check-integration-surface.py`가 facade 표면 변경을 보고하면 내용을 검토한 뒤 `--bless`로 snapshot을 갱신하고, 같은 커밋에 포함해 리뷰합니다.
+`check-integration-surface.py` guards the `logger` API surface and the recipe
+limits. When it reports a surface change, review it, update the snapshot with
+`--bless`, and commit the snapshot with the change.
 
-## 검증 범위
+## License
 
-CI는 Ubuntu 24.04, Windows Server 2025, macOS 14에서 두 Rust 버전과 feature 조합을 검사하도록 구성되어 있습니다. 다만 원격 실행 결과가 나오기 전에는 해당 OS 통과로 판정하지 않습니다. 성능·RT·UPS는 현재 PC 실측과 시뮬레이션으로 검증했습니다(ADR-011). 실제 dot-probe 적용, 장기 시험, 다른 OS의 native 검증은 후속 작업입니다. 보안 검사는 MCAP 0.26.0(ADR-010)과 RustSec 기준이며, 간접 의존성 `paste`의 유지보수 중단 경고 1건을 추적하고 있습니다.
+Not yet chosen. Until a license is added, no license is granted.
 
-프로젝트 상태·설계·검증 근거는 [`.cowork/06_evolution/project_state.md`](.cowork/06_evolution/project_state.md)를 따릅니다.
+The vendored [`mcap`](vendor/mcap-0.26.0) 0.26.0 crate is MIT-licensed by its
+authors; see [`VENDORED.md`](vendor/mcap-0.26.0/VENDORED.md) for the local
+changes.

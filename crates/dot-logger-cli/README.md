@@ -1,49 +1,69 @@
 # dot-logger CLI
 
+`dot-logger` reads a dot-logger host over gRPC, or immutable recorded files
+offline. Every command is a bounded task: it has a deadline, an output limit
+and a record limit, and it never starts a daemon or a background worker.
+
 ```sh
 cargo run -p dot-logger-cli -- --help
-cargo run -p dot-logger-cli -- status --endpoint http://127.0.0.1:50051 --json
-cargo run -p dot-logger-cli -- query --endpoint http://127.0.0.1:50051 --from 0 --to 1000000000 --json
+cargo run -p dot-logger-cli -- status --endpoint http://127.0.0.1:PORT --json
+cargo run -p dot-logger-cli -- query --endpoint http://127.0.0.1:PORT --from 0 --to 1000000000 --json
 ```
 
-서버는 호스트가 명시적으로 활성화해야 한다. CLI는 daemon/운영 worker를 시작하지 않는다. token은 기본 `DOT_LOGGER_TOKEN` 환경 변수에서 읽으며 `--token-env NAME`으로 바꿀 수 있다. token을 argv로 받거나 오류에 출력하지 않는다. 외부 endpoint는 HTTPS+token, HTTPS는 `--ca <PEM>`을 요구한다. 인증서 이름을 명시할 때 `--tls-domain NAME`을 사용한다. 평문은 literal loopback IP만 허용한다.
+Replace `PORT` with the port the host reports (for the default path,
+`Logger::remote_addr()`); the server picks a free loopback port unless the
+host configures one.
 
-## 명령과 결과
+## Connecting
 
-| 명령 | 용도 |
+- The host must enable its server explicitly.
+- Plain HTTP is accepted only for a literal loopback IP. Any other endpoint
+  needs HTTPS, a CA certificate (`--ca <PEM>`) and a token. Use
+  `--tls-domain NAME` to override the certificate name.
+- The token is read from the `DOT_LOGGER_TOKEN` environment variable, or from
+  the variable named by `--token-env NAME`. It is never accepted as an
+  argument and never printed.
+- After a failure the CLI does not reconnect or resend anything.
+
+## Commands
+
+| Command | Purpose |
 |---|---|
-| `status` | session/revision과 host의 `dot_logger.status.v1` 지표. 지표 backend가 없는 host는 Unavailable |
-| `loss` | offline native 손실 누적 watermark·nullable 차분·미관측 상태. 관측 구간/채널 필터, 사용자 record/replay와 별도 |
-| `query` | `[from,to)`·mono/real/source·channel/level 필터와 유한 페이지 |
-| `blob` | `--snapshot --blob --offset --length`로 원격 capability 범위 읽기 |
-| `replay` | remote `--handle --action start/pause/resume/seek/stop/speed --generation --speed N/D`; offline timed playback |
-| `tail` | `--records --record-bytes --age-ms` 구독, 원본은 `--originals` opt-in, overflow는 Gap 또는 `--disconnect-on-overflow` |
-| `completion` | `--session <32자리hex> --producer --sequence --target --boundary`의 완료 관측 |
-| `config validate` | offline manifest의 등록/제한·메모리 예약 검증. 원본 scan/runtime 검증이 아님 |
-| `config diff` | `--before FILE --after FILE`의 차이 여부만 표시하고 값은 숨김 |
-| `config apply` | Manage 권한으로 `--base-revision --patch FILE`(`dot_logger.config_patch.v1`)을 host에 게시 |
-| `check plan`, `check run` | `--plan ID`로 등록된 host 계획을 무부하 조회/명시 실행 |
-| `compare` | `--before ID --after ID`로 host가 등록한 snapshot을 비교한 `dot_logger.compare.v1` 결과 |
-| `recover` | manifest의 파일별 revision으로 독립 복구. 단일 source는 `--output NEW_FILE`, 여러 source는 `--output NEW_DIRECTORY` 아래 `<sequence>.mcap`. 기존 경로 덮어쓰기 없음 |
+| `status` | Session and revision, plus the host's `dot_logger.status.v1` metrics. A host without a metrics backend reports them as Unavailable |
+| `query` | Records in `[from, to)` by monotonic, real or source time, filtered by channel and level, in bounded pages |
+| `blob` | Read a range of a remote blob (`--snapshot --blob --offset --length`) |
+| `replay` | Remote replay control (`--handle --action start/pause/resume/seek/stop/speed --generation --speed N/D`), or timed offline playback |
+| `tail` | Subscribe (`--records --record-bytes --age-ms`). `--record-bytes` (default 8 MiB) and `--records` must fit the host's limits, or the request is `invalid_input`. Originals are opt-in with `--originals`. On overflow, report a Gap or stop with `--disconnect-on-overflow` |
+| `completion` | Observe whether a record reached a boundary (`--session <32 hex> --producer --sequence --target --boundary`) |
+| `loss` | Offline loss counters stored in the files: cumulative values, differences and unobserved ranges |
+| `compare` | Compare two snapshots the host registered (`--before ID --after ID`) |
+| `config validate` | Check an offline manifest's registrations, limits and memory reservations (it does not scan the files) |
+| `config diff` | Report only whether two declarations differ (`--before FILE --after FILE`); values are not shown |
+| `config apply` | Post a live change to the host (`--base-revision --patch FILE`); needs the Manage permission |
+| `check plan`, `check run` | Preview, or run once, a check plan the host registered (`--plan ID`) |
+| `recover` | Recover recorded files into new, independent files |
+| `calibrate` | Measure an output file system once (writes up to `--write-limit`) and save a preset profile |
 
-간편 점검은 호스트가 `diagnostics::CheckHost`에 전용 경로/입력/예산을 등록하고 일반 worker에서 Command를 명시 처리해야 한다. CLI는 등록 ID만 받는다. `check plan`은 경로 생성·실제 capability probe 없이 예산/입력/출처를 보여주며, `check run`은 Manage token이 필요하고 ID를 한 번만 소비한다. 호스트에 backend가 없거나 구 서버의 PlanCheck 미지원이면 Unsupported이며 실행으로 fallback하지 않는다.
+## Status, live changes and comparison
 
-```sh
-# 7은 예시다. 호스트가 등록해 전달한 ID를 사용한다.
-cargo run -p dot-logger-cli -- check plan --endpoint http://127.0.0.1:50051 --plan 7 --json
-cargo run -p dot-logger-cli -- check run --endpoint http://127.0.0.1:50051 --plan 7 --json
-```
+On the default path, `LoggerBuilder::remote` answers `status` and channel
+level/sampling changes. Changes work with or without telemetry. Output routes
+are fixed at start, so a route change is `invalid_input`, and a memory change
+is `restart_required`. The default path cannot register comparison
+snapshots, so `compare` has nothing to compare there.
 
-점검 응답은 `dot_logger.check.v1` JSON이다. 실제 파일 결과 Pass는 exit0, Fail은 exit4, Aborted/Inconclusive는 exit3이다. 시간/취소는 새 부하를 중지하며 actual footer/sync/close/정리가 끝난 뒤 결과를 만든다. timeout 뒤에는 `completion_unconfirmed`를 유지하며 자동 재실행하지 않는다. 호스트 message 한도는 최소5120B가 필요하고 부족하면 IO/ID 소비 전 Limit이다. Linux의 실제 free probe는 statvfs를 사용한다. 합성 파일 결과·원래 운영 Report/profile을 분리하며, 서로 다른 source/check session 시각을 빼거나 profile 만료를 갱신하지 않는다. `capacity`/`network_measurement`는 Unavailable이며 실제 생산 capture/수신 ACK·dot-probe/성능 인증은 후속이다.
+On the advanced path the host creates a `telemetry::operations::OperationsHost`
+and answers `GetStatus`, `ApplyConfig` and `Compare` commands with
+`handle_command(command, telemetry, config_updates, now_ns)` on an ordinary
+worker. The host also samples telemetry every second, registers snapshots
+(`register_snapshot`) and lets producers apply changes
+(`apply_pending_config()`); nothing does this automatically.
 
-## 운영 상태·설정 적용·비교
-
-고급 경로에서는 호스트가 `telemetry::operations::OperationsHost`를 만들고 일반 worker에서 `GetStatus`/`ApplyConfig`/`Compare` Command를 `handle_command(command, telemetry, config_updates, now_ns)`로 명시 처리해야 한다. 1초 `Telemetry::sample`·비교용 snapshot 등록(`register_snapshot`)·producer의 `apply_pending_config()` 호출은 호스트 책임이며 자동 worker는 없다.
-
-facade `LoggerBuilder::remote`는 기본 worker가 status와 채널 level·샘플링 ApplyConfig를 처리한다. telemetry가 꺼져 있어도 ApplyConfig는 동작한다. facade의 출력 route는 시작 시 고정이어서 route patch는 InvalidInput, memory patch는 RestartRequired다. 게시 revision 응답은 파일 회전·sync 완료를 뜻하지 않으며, 사용자가 꺼내 쉰 writer는 그 thread에서 `Writer::refresh()`로 ack해야 후속 변경이 가능하다. facade에는 비교용 snapshot 등록 경로가 없어 Compare로 결과를 만들 수 없다.
-
-- `status`의 `metrics`는 최근 표본과 10/60/300초 window를 각각 Observed/Stale/Unavailable로 표시하고, 비교에 쓸 수 있는 snapshot ID 목록을 함께 준다. 미관측 값은 0으로 채우지 않는다.
-- `config apply` patch 예시. 알 수 없는 필드는 거절한다. level은 trace/debug/info/warn/error이고, 생략한 목록은 바꾸지 않는다:
+- `status` shows the latest sample and the 10/60/300-second windows, each as
+  Observed, Stale or Unavailable, and lists snapshot IDs usable for
+  `compare`. An unobserved value is never shown as zero.
+- A `config apply` patch. Unknown fields are rejected; levels are trace,
+  debug, info, warn and error; omitted lists are unchanged:
 
 ```json
 {"schema":"dot_logger.config_patch.v1",
@@ -51,21 +71,63 @@ facade `LoggerBuilder::remote`는 기본 worker가 status와 채널 level·샘�
  "routes":[{"channel":7,"targets":[10]}]}
 ```
 
-| 결과 | outcome / exit | 의미 |
+| Result | outcome / exit | Meaning |
 |---|---|---|
-| 적용 | `applied` / 0 | posted revision. 각 producer의 실제 전환은 별도 |
-| base 불일치 | `revision_conflict` / 3 | 게시 없음. status로 revision을 다시 읽고 재시도 |
-| 이전 변경 배출 중 | `revision_busy` / 3 | 게시 없음. idle producer poll·old record 배출 후 재시도 |
-| memory 변경 | `restart_required` / 2 | 게시 없음. owner 재시작 필요 |
-| 잘못된 patch | `invalid_input` / 2 | 게시 없음 |
+| Applied | `applied` / 0 | The posted revision. Each producer switches separately |
+| Stale base | `revision_conflict` / 3 | Nothing posted. Read the revision with `status` and retry |
+| Previous change draining | `revision_busy` / 3 | Nothing posted. Retry after idle producers poll and old records drain |
+| Memory change | `restart_required` / 2 | Nothing posted. Restart the owner |
+| Bad patch | `invalid_input` / 2 | Nothing posted |
 
-세 거절 모두 게시가 없으므로 `posted_host_io`를 붙이지 않는다. `compare`는 두 snapshot의 조건 차이를 모두 보존하며 비교 불가 조건이면 `comparable:false`와 수치 Unavailable을 준다. CPU/메모리/지연은 호스트가 측정해 넣지 않으면 Unavailable이다.
+A posted revision does not mean that files rotated or synchronized. On the
+default path, a writer your code took and left idle must call
+`Writer::refresh()` on its thread before a later change can post.
 
-Query 결과의 snapshot을 Replay handle로 전달한다. 제어 요청에는 확인된 generation을 유지하고 seek 응답의 새 generation을 반영한다. Snapshot/blob/cursor는 호스트의 유한 수명 capability이며 파일 경로가 아니다. CLI는 실패 후 자동 재연결·재전송하지 않는다.
+`compare` keeps every condition difference between the two snapshots. If the
+conditions make them incomparable it reports `comparable:false` and no
+numbers. CPU, memory and latency are Unavailable unless the host measured
+them.
 
-## 오프라인 파일
+A query's snapshot is the handle for `replay`. Keep the confirmed generation
+for control requests and use the new generation a seek returns. Snapshots,
+blobs and cursors are bounded host capabilities, not file paths.
 
-[offline_session.json](examples/offline_session.json)을 호스트 프로젝트의 `.logger/session.json`에 복사하고 원본 session·생산자 수·채널 등록 순서·각 source의 revision/sequence/경로와 예산을 입력한다. 상대 source 경로는 `.logger/session.json`이 있는 디렉터리를 기준으로 해석한다. schema/descriptor가 있으면 channel의 `descriptor: {"encoding": "...", "data_hex": "..."}`를 원래 값으로 지정한다. 예제 값은 사용 예이며 제품/장비 기본값이 아니다.
+## Checks
+
+A check needs a host that registered a dedicated path, input and budget with
+`diagnostics::CheckHost` and handles commands on an ordinary worker. The CLI
+only passes the registered ID.
+
+```sh
+# 7 is an example; use the ID the host registered.
+cargo run -p dot-logger-cli -- check plan --endpoint http://127.0.0.1:PORT --plan 7 --json
+cargo run -p dot-logger-cli -- check run --endpoint http://127.0.0.1:PORT --plan 7 --json
+```
+
+- `check plan` shows the budget, input and source without creating paths or
+  probing the system.
+- `check run` needs the Manage permission and consumes the ID; run it again
+  only with a newly registered plan. If the host has no check backend the
+  answer is Unsupported; it never falls back to running.
+- The answer is `dot_logger.check.v1` JSON. Pass exits 0, Fail 4, Aborted or
+  Inconclusive 3. A deadline or cancellation stops new load; the result comes
+  after the footer, sync, close and cleanup finished. After a timeout the
+  result keeps `completion_unconfirmed` and nothing is rerun.
+- The host's message limit must be at least 5120 bytes; otherwise the run is
+  refused with `limit` before any IO.
+- Free space is probed with `statvfs` on Linux. The synthetic result is kept
+  apart from the host's operating report and profile; `capacity` and
+  `network_measurement` are Unavailable.
+
+## Offline files
+
+Copy [`examples/offline_session.json`](examples/offline_session.json) to
+`.logger/session.json` in the host project and fill in the original session,
+producer count, channel registration order, each source's revision, sequence
+and path, and the budgets. Relative source paths are relative to the manifest.
+If a channel has a schema descriptor, give its original value as
+`descriptor: {"encoding": "...", "data_hex": "..."}`. The example values are
+illustrations, not product or device defaults.
 
 ```sh
 cargo run -p dot-logger-cli -- config validate --manifest .logger/session.json --json
@@ -74,40 +136,131 @@ cargo run -p dot-logger-cli -- replay --manifest .logger/session.json --speed 2/
 cargo run -p dot-logger-cli -- recover --manifest .logger/session.json --output .logger/recovered.mcap --json
 ```
 
-manifest는 `schema_version: 2`이고 전역 revision 대신 각 `sources[]`에 `revision`을 필수로 둔다. v1과 전역 `revision`·형식 선택 필드는 지원하지 않는다. 파일 Metadata의 session/revision/sequence와 등록을 대조하며, 중복 경로·같은 target/sequence·동일 receipt의 재등장을 거절한다. 서로 다른 출력의 같은 sequence는 각각 `sources[].target`을 명시해야 하며 실제 파일 target과 대조한다. loss-only 조회는 사용자 fanout receipt를 replay/index하지 않는다. standalone `SegmentWriter`의 sequence는 0이고, 회전 파일은 catalog의 실제 sequence를 사용한다. offline status는 `sources` 배열에 파일별 sequence/revision을 표시한다.
+- The manifest is `schema_version: 2`; each `sources[]` entry needs its own
+  `revision`. Version 1, a global `revision` and format selection fields are
+  not supported.
+- Each file's session, revision and sequence are checked against the
+  manifest. Duplicate paths, a repeated target and sequence, and a repeated
+  receipt are rejected. Outputs that reuse a sequence must each name
+  `sources[].target`, which is checked against the file. Offline `status`
+  lists each file's sequence and revision.
+- Source files are opened read-only and their prefix must not change while in
+  use. An active file needs an explicit `safe_offset` at a complete chunk.
+- Offline cursors and blobs live as long as the process's snapshot. Results
+  contain metadata and descriptors by default; add `--include-payload` for
+  the bytes. Large reads use both the blob budgets and the output budget.
+- Offline replay supports a start position and the real caller clock. For
+  interactive control use the Rust replay API, or a remote replay. Ctrl-C
+  cancels cooperatively and waits for the reader to finish, then returns the
+  partial result.
 
-manifest의 상대 source 경로는 manifest가 위치한 디렉터리 기준이다. 원본 파일은 읽기 전용이며 사용 중 불변 prefix를 유지해야 한다. active 파일은 명시적인 완전 chunk `safe_offset`이 필요하다. 여러 파일 복구는 manifest 순서로 진행하고 source마다 recovery 행에 sequence/revision·복구/제외 범위를 보고한다. `max_segments`는 파일 수, `max_source_bytes`는 개별 파일, `read_bytes`는 전체 원본 길이 합계, `max_records`는 전체 복구 사용자 기록 수, `limits.max_loss_reports`는 전체 복구 loss report part 수를 제한한다. sequence가 겹치는 다중 출력 복구 파일명은 `<target>-<sequence>.mcap`이다. 뒤 파일 실패 시 이미 완료한 앞 파일과 실패 파일의 부분 출력은 유지하며 재시도·합치기·덮어쓰기는 하지 않는다. file sync와 namespace sync는 구분하며 CLI 복구는 `namespace_synced:false`다. 정상 완료에도 과거 프로세스의 Written/Synced를 복원했다고 주장하지 않는다.
+### Recovery
 
-단독 offline CLI의 cursor/blob는 프로세스의 Snapshot 수명에 한정된다. 기본 결과는 metadata/descriptor이며 실제 bytes는 `--include-payload`로 명시한다. 대형 원본 읽기는 개별/누적 blob 예산과 출력 예산을 함께 소비한다.
+- Each source is recovered independently, in manifest order, into a new
+  file. One source writes `--output NEW_FILE`; several sources write
+  `<sequence>.mcap` (or `<target>-<sequence>.mcap` when sequences repeat)
+  under `--output NEW_DIRECTORY`. Existing paths are never overwritten.
+- The recovered range is the whole immutable file, or a `safe_offset` equal to
+  its length; recovering a partial active prefix is Unsupported.
+- Each recovery row reports the sequence, revision and the recovered and
+  excluded ranges. The excluded tail includes the replaced index and summary,
+  so it is not a count of lost messages.
+- `max_segments` limits the files, `max_source_bytes` each file, `read_bytes`
+  the total source length, `max_records` the recovered user records and
+  `limits.max_loss_reports` the recovered loss parts. Exceeding a budget is
+  never reported as success.
+- If a later file fails, earlier outputs and the partial output stay for
+  inspection; nothing is retried, merged, overwritten or deleted.
+- Outputs are file-synced with a rebuilt index, but the parent directory is
+  not synced (`namespace_synced:false`). Recovery does not claim that records
+  were written or synced by the original process.
 
-offline replay는 start와 실제 caller clock을 지원한다. 실행 중 제어/화면은 Rust Replay API, 프로세스 간 제어는 remote replay를 사용한다. Ctrl-C는 협력 취소 후 실제 reader/진행 IO 정리를 기다려 부분 결과를 반환한다. 진행 중 OS IO의 강제 취소나 정확한 종료 시간은 보장하지 않는다.
+### Loss counters
 
-복구는 단일 immutable source의 전체 파일(또는 길이와 같은 safe_offset)을 대상으로 한다. 부분 active prefix의 복구는 Unsupported다. 제외 suffix에는 교체되는 옛 index/summary도 포함되므로 그 전체를 손실된 메시지로 세지 않는다. 생성한 출력의 file sync와 rebuilt index를 확인하나 parent directory sync는 수행하지 않으며 결과에도 `namespace_synced:false`로 표시한다. 오류 시 부분 출력은 조사용으로 남기고 자동 삭제/재시도하지 않는다. writer는 128MiB output partition·1024 chunk 한도를 사용한다. source/writer 예산 초과는 성공으로 보고하지 않는다.
+`loss --manifest .logger/session.json --json` prints the loss counters stored
+in `.logger/loss` as separate `loss` rows.
 
-## 출력·취소·한도
+- Set a positive part limit in `limits.max_loss_reports` and size
+  `external_bytes` for it. Without it, ordinary queries skip the counters, and
+  a loss query is `limit`.
+- Files recorded without loss collection are listed under
+  `unavailable_sources`; that is not proof of zero loss.
+- `--from/--to` select overlapping observation windows on the counter
+  clock (`observation_clock:counter_epoch_monotonic_ns`), not record times or
+  the time of a loss. `--channel` filters a product channel; `--basis`
+  supports `mono` only.
+- Values are cumulative per session, epoch and original target; output
+  replicas are not added up. A missing part, an overflow or a decreasing
+  value makes the difference `null`. `tail_confirmed:false` means the tail
+  after the last sample is unconfirmed.
+- Rows with a zero count and no overflow are omitted. `summary.records` is 0
+  for `loss`; `loss_rows` and `report_parts` count the rows.
 
-`--json`은 각 줄이 독립 객체인 NDJSON이다. 공통 필드는 `schema_version:1`, `command`, `kind`, `data`다. record/gap/status 등 뒤에 summary 또는 error가 온다. 128-bit ID는 32자리 hex, 손실 없는 u64/i128 시각·sequence/revision/handle은 문자열이다. `data_hex`는 명시 payload 출력에서만 제공한다. summary·error의 `records`는 이 명령이 stdout에 낸 `record` 줄 수, `acknowledged`는 그중 ACK한 수다 — `record` 줄을 내지 않는 명령(`calibrate`·`config` 등)은 항상 0이다. 임의 payload나 credential을 오류 메시지에 포함하지 않는다.
+## Output
 
-| 종료 코드 | 의미 |
+`--json` prints NDJSON: one object per line with `schema_version:1`,
+`command`, `kind` and `data`. Data rows such as `record`, `gap` or `status`
+end with a `summary` or `error` row.
+
+- 128-bit IDs are 32 hex digits. Lossless u64/i128 times, sequences,
+  revisions and handles are strings.
+- `data_hex` appears only when payload output was requested.
+- In `summary` and `error`, `records` is the number of `record` rows this
+  command printed and `acknowledged` the number of those the server
+  confirmed. Commands that print no records report 0.
+- Payloads and credentials are never included in error messages.
+
+| Exit code | Meaning |
 |---|---|
-| 0 | 요청한 유한 작업/관측 완료 |
-| 2 | 입력·설정·권한·미지원 |
-| 3 | 부분 완료·취소·기한/출력·읽기 한도·Gone/만료·ACK 불명 |
-| 4 | IO·통신·불량 응답 |
+| 0 | The requested bounded task or observation completed |
+| 2 | Input, configuration, permission or unsupported |
+| 3 | Partial result, cancellation, deadline, output or read limit, gone or expired, unknown acknowledgement |
+| 4 | IO, transport or invalid response |
 
-기본 전체 작업 기한 5초(`--timeout-ms`, 최대1시간), output 16MiB(`--max-output-bytes`, 1024B~256MiB), 기록 상한1000(`--limit`, 최대100만), message cap263168B다. 데이터 출력은 terminal summary 공간을 남긴다. `tail --limit`은 명시한 기록 수를 stdout에 인계하고 ACK한 뒤 정상 종료한다. query/replay가 전체 선택을 끝내기 전에 한도에 닿으면 부분 완료다. stdout write/flush가 실패한 기록에는 ACK하지 않는다. 소비 인계 뒤 ACK 확인 실패는 Unknown이며 재전송으로 성공을 추정하지 않는다.
+`gone_or_expired`, `permission_denied`, `incompatible_protocol`,
+`revision_conflict`, `revision_busy` and `restart_required` are reported apart
+from ordinary transport errors.
 
-`gone_or_expired`, `permission_denied`, `incompatible_protocol`, `revision_conflict`, `revision_busy`, `restart_required`를 일반 통신 오류와 구분한다.
+## Limits
 
-Ctrl-C/기한 초과가 이미 게시한 host 명령/IO를 취소하거나 미완료를 성공으로 바꾸지 않는다. 원격 취소/기한 결과의 `posted_host_io` 안내와 완료/상태 조회를 함께 사용한다. Metrics 없는 status에 0·성능 합격 같은 값을 만들어 넣지 않는다. 알 수 없는 status/compare report schema는 `invalid_data`/exit4다.
+| Limit | Default | Range |
+|---|---|---|
+| Whole-command deadline (`--timeout-ms`) | 5 s | up to 1 hour |
+| Output (`--max-output-bytes`) | 16 MiB | 1024 B – 256 MiB |
+| Records (`--limit`) | 1000 | up to 1,000,000 |
+| Encoded request/reply size (`--message-bytes`) | 263,168 B | 2048 B – 16 MiB |
 
-REV-022 보강: `tail`의 전체 입력/예약 검증은 연결 전에 수행한다. local replay는 정확히 limit개로 선택 범위가 끝나면 정상 완료하고 추가 기록이 있을 때만 부분 완료(exit3)다. `--limit` 이후 추가 기록은 출력하지 않는다. tail은 계속 전체 `--timeout-ms`에 제한되며, SDK의 로컬 next 대기 재시도와 무관하게 전체 기한을 자동 연장하지 않는다. `--age-ms`는 기록 수명 및 서버 idle lease 요청을 겸한다. 서버 lease 종료/새 구독 사이 누락은 Gap으로 보장되지 않으므로 별도 구독을 연속 수신이라고 해석하지 않는다.
+- Data output always leaves room for the final summary.
+- `tail --limit N` hands N records to stdout, waits for their
+  acknowledgements and exits normally. A record whose stdout write failed is
+  never acknowledged. If an acknowledgement cannot be confirmed after the
+  handoff, the result is unknown; nothing is resent to guess success.
+- A query or replay that reaches a limit before finishing its selection is a
+  partial result. A local replay that ends exactly at the limit is complete.
+- `tail` checks its whole input and reservation before connecting and stays
+  within `--timeout-ms` in total. `--age-ms` sets both the record lifetime and
+  the server idle lease. Records missed between two subscriptions are not
+  reported as a Gap; do not treat separate subscriptions as one continuous
+  stream.
+- A handoff refused because the record expired or its generation was
+  discarded is `gone_or_expired` (exit 3) with no acknowledgement. Corrupt
+  input is `invalid_data` (exit 4) and an oversized message `limit` (exit 3).
 
-만료/세대 폐기로 handoff가 사전 거절되면 `gone_or_expired`/exit3이고 ACK는 없다. 원본 손상은 `invalid_data`/exit4, 메시지 크기 상한은 `limit`/exit3이다. 원격 config apply/check run/replay의 Gone도 이미 게시된 호스트 작업의 완료를 증명하지 않으므로 `posted_host_io: completion_unconfirmed`를 표시한다. 읽기 전용 capability Gone과 Unsupported 응답의 기존 분류는 유지한다.
+## Cancellation and unknown outcomes
 
-저장 파일은 `dot-logger/standard/2` native MCAP이며 사용자 payload와 schema를 직접 담는다. `.logger/meta`가 원래 receipt·시계·설정 정보를 보존한다. 별도 `export --standard` 변환은 제공하지 않는다. 이전 개발 파일 `dot-logger/standard/1`은 판독·복구 입력으로 지원하지 않는다.
+Ctrl-C or a deadline does not cancel host commands or IO already posted, and
+never turns an unfinished task into success. A cancelled or timed-out remote
+command, and a `gone` answer to `config apply`, `check run` or `replay`, add
+`posted_host_io: completion_unconfirmed`; check `status` or `completion`
+afterwards. The three refused changes above post nothing and carry no such
+note. A status without metrics never gets invented zeros or a pass, and an
+unknown status or compare report schema is `invalid_data` (exit 4).
 
+## File format
 
-`loss --manifest .logger/session.json --json`은 native `.logger/loss`만 별도 `loss` 행으로 출력한다. `limits.max_loss_reports`에 양수 part 상한을 지정하고 external_bytes도 그 예약에 맞춘다. 생략/0이면 일반 query는 control을 검증하고 건너뛰지만, 수집된 loss를 조회할 때는 Limit이다. 수집 비활성 파일은 summary의 unavailable_sources로 보고하며 손실 0을 증명하지 않는다.
-
-loss의 `--from/--to`는 `observation_clock:counter_epoch_monotonic_ns` 관측 구간의 겹침이며 사용자 record 시각·손실 발생 시각이 아니다. `--channel`은 제품 채널이고 `--basis`는 mono만 지원한다. 누적값은 session/epoch/원래 assignment target별 watermark로 비교하며 출력 replica를 합산하지 않는다. part 누락·overflow·관측 감소 등에서는 delta가 null이다. tail_confirmed가 false이면 마지막 표본 뒤 꼬리는 미확인이다. summary.records는 사용자 record 줄 수이므로 0이고 loss_rows/report_parts는 별도다. 손실 수를 고유한 원본 메시지 수로 합산하지 않는다. count0/overflow=false 행은 생략한다. 사용자 복구 quota를 채운 뒤에도 남은 control allowance 안에서 control-only source를 복구하며 뒤 사용자 기록은 Limit(exit3)이다.
+Files are native MCAP with the profile `dot-logger/standard/2`. They hold the
+user payload and schema directly, so standard MCAP tools can decode them;
+there is no separate export step. The `.logger/meta` channel keeps the
+original receipts, clocks and configuration, and `.logger/loss` the loss
+counters. Earlier development files (`dot-logger/standard/1`) are not
+supported as input.

@@ -660,6 +660,13 @@ impl RemoteSubscription {
     async fn next_inner(&mut self) -> Result<Option<RemoteEvent>, ClientError> {
         loop {
             self.reap()?;
+            // Send queued ACKs once the pipeline is idle or the oldest is due, so
+            // a stream that keeps delivering frames cannot starve them.
+            if self.oldest.is_some_and(|t| t.elapsed() >= ACK_DELAY)
+                || (!self.acks.is_empty() && self.in_flight.is_empty())
+            {
+                self.send_acks().await?;
+            }
             let deadline = self
                 .oldest
                 .map(|t| tokio::time::Instant::from_std(t + ACK_DELAY));

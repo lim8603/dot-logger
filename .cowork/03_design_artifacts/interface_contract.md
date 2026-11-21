@@ -1388,6 +1388,14 @@ facade는 L=max(16384, 4K)로 baseline·final과 주기 관측 두 번의 여유
 - `loss::summarize`는 완전한 version-2 checkpoint에 없는 키를, 같은 session·epoch에서 관측된 키에 한해 0으로 비교한다. 이렇게 채운 표본도 `max_rows`에 포함되며, 넘으면 `NeedRotation`이다. 어떤 report에도 0이 아닌 값으로 나타나지 않은 키는 결과 행에 나오지 않는다. CLI `loss`는 원래 0인 행을 출력하지 않으므로 출력 형식은 바뀌지 않는다.
 - `LossCount`는 `Copy`를 구현한다. protobuf에는 `optional uint64 rows = 14`와 `rows_end = 15`를 추가했다. 복구는 이전 descriptor로 기록된 파일도 받는다. [ADR-013 개정](adrs/ADR-013_native_standard_loss_revision_storage.md#손실-checkpoint-0-행-생략-개정--2026-11-21) · [EV-103](../05_verification/verification_evidence.md#ev-103)
 
+### 23.7 원격 수신 ACK 묶음·파이프라인 — 2026-11-21
+
+- `RemoteSubscription::handoff`와 `LiveSubscription::handoff`는 소비자가 수락하면 ACK를 대기열에 넣고, 서버 응답을 기다리지 않고 반환한다. 아직 보내지 않은 ACK는 다음 시점에 Ack RPC 하나로 보낸다. 진행 중인 ACK RPC가 없을 때, 64건이 찼을 때, 또는 `next`가 기다리는 동안 가장 오래된 ACK가 5 ms를 넘었을 때다. 동시에 진행하는 ACK RPC는 최대 4개다.
+- 새 `flush(&Cancellation)`는 대기열을 보내고 모든 ACK RPC를 기다린다. Ok는 지금까지 인계한 기록을 서버가 모두 확인했다는 뜻이다. 이미 보낸 ACK RPC가 실패하면 다음 `handoff`·`next`·`flush`에서 `AcknowledgementUnknown`으로 드러나며 stream을 닫는다. 재전송은 없다. 소비자 수락 뒤 취소도 `AcknowledgementUnknown`이다.
+- wire `AckRequest`에 `repeated AckItem items = 8`을 추가했다. `major=1`은 유지한다. 서버는 묶음 항목을 순서대로 적용하다 첫 실패에서 멈춘다. 구독 창(`subscription_records`)보다 긴 묶음은 적용 전에 거절하고, 단건 형식도 계속 받는다.
+- 서버는 입장한 TCP 소켓에 `TCP_NODELAY`를 설정한다.
+- 서버 확인이 필요한 CLI `tail --limit` 종료, 화면 tail 단계, dot-probe bridge, LAN 측정 예제는 `flush` 뒤에 확인을 보고한다. [ADR-015](adrs/ADR-015_batched_pipelined_remote_ack.md)
+
 ## 24. TASK-031 S2 실시간 viewer — 2026-11-18
 
 | 경계 | 구현 계약 |

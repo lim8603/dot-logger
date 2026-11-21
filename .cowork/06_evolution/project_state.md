@@ -10,9 +10,9 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | TASK-031 In Progress — 8 GiB P3·정식 P5 Pass(EV-103). LAN P4 소형·P4-bulk 미달(EV-102), 원격 ACK 계약 결정 대기 |
+| 활성 Task | TASK-031 In Progress — 8 GiB P3·정식 P5 Pass(EV-103). ADR-015 뒤 LAN P4 소형 Pass(EV-104). P4-bulk는 Wi-Fi 변동으로 판정 방법 결정 대기 |
 | 미처리 리뷰 | 없음 — [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) RV-160·161 Closed(2026-11-21), REV-001~066 Closed |
-| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~103](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 702 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~104](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 704 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-21 / RV-161 종료·LAN P4 실측 / AI |
@@ -20,6 +20,8 @@
 | 최근 완료 세션 | 2026-11-19 #001 — Foxglove·RV-161 조치·P4 루프백 대조([EV-096~100](../05_verification/verification_evidence.md#ev-096)) |
 
 ## 현재 결정과 제약
+
+- **2026-11-21 Human 「묶음·파이프라인 ACK (권장)」 — [ADR-015](../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md):** `handoff`는 ACK를 대기열에 넣고 바로 반환한다. 묶음 Ack RPC와 유한 동시 전송을 쓰고, 실패는 이후 호출에서 `AcknowledgementUnknown`으로 보고하며, `flush`로 확인한다. 구현은 `4ac9bf1`, LAN P4 소형 Pass는 [EV-104](../05_verification/verification_evidence.md#ev-104)다.
 
 - **2026-11-21 Human 「0 행 생략 (권장)」 — ADR-013 D2 저장 표현 개정:** 손실 checkpoint는 `version=2` part에 0이 아니거나 overflow인 행만 등록 행 구간과 함께 싣는다. 예약은 dense 최악값을 유지하고 v1 판독도 유지한다. 구현·P3/P5 Pass는 [EV-103](../05_verification/verification_evidence.md#ev-103), 근거는 [EV-101](../05_verification/verification_evidence.md#ev-101)이다. [ADR-013 개정](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#손실-checkpoint-0-행-생략-개정--2026-11-21)
 
@@ -73,7 +75,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-21 | 원격 ACK 계약 결정 뒤 LAN P4·P4-bulk 재측정 |
+| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-21 | P4-bulk 판정 방법 결정 → TASK-031 수락 정리 → TASK-032 S1 |
 | TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -96,7 +98,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **TASK-031.** LAN P4 소형은 기록마다 Ack RPC 왕복을 기다리는 클라이언트 구조 때문에 초당 약 440건에서 막혔다(RTT 2 ms). P4-bulk는 TCP 대비 74.6%였다. 원격 ACK 계약 변경(ADR-009·014)에 대한 Human 결정을 받은 뒤 구현하고, Windows 세션(`dot-logger-d1`)과 다시 측정한다. [EV-102](../05_verification/verification_evidence.md#ev-102) · [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
+1. **TASK-031.** ADR-015 묶음·파이프라인 ACK 뒤 LAN P4 소형은 Pass다(p99 10.86 ms, EV-104). P4-bulk는 64건 검증이 모두 통과했지만, Wi-Fi TCP 기준이 43–110 MB/s로 흔들려 ≥80% 비율을 판정하지 못했다(쌍별 76–136%, 최고값 비교 81%). 판정 방법을 Human이 정하면 TASK-031 수락을 정리하고 TASK-032 S1로 넘어간다. [EV-104](../05_verification/verification_evidence.md#ev-104) · [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
@@ -129,7 +131,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
-**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7 루프백 포화 회복은 EV-097, 정식 P5는 EV-103에서 마쳤다. LAN P4·P4-bulk는 EV-102에서 미달했고 ACK 계약 결정을 기다린다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
+**T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1~T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. T7 루프백 포화 회복은 EV-097, 정식 P5는 EV-103에서 마쳤다. LAN P4 소형은 ADR-015 뒤 EV-104에서 충족됐고, P4-bulk는 Wi-Fi 변동으로 판정 보류다. native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -147,7 +149,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 최근 작업·이력
 
-- 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, LAN P4 실측과 ACK 왕복 병목 확인. [EV-101~103](../05_verification/verification_evidence.md#ev-101)
+- 2026-11-21 #001 — RV-161 P0 대조·0 행 생략 개정·P3/P5 Pass, LAN ACK 왕복 병목 확인 뒤 ADR-015 구현으로 P4 소형 Pass. [EV-101~104](../05_verification/verification_evidence.md#ev-101)
 - 2026-11-19 #001(11-20 마감) — RV-161 저장 조치·P3/P5 재측정, Windows 직접 연결과 P4 루프백 대조를 기록했다. [EV-098~100](../05_verification/verification_evidence.md#ev-098)
 - 2026-11-18 #005: [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) RV-156~159 조치·위임 마감([EV-095](../05_verification/verification_evidence.md#ev-095), [로그](../members/lim8603/workspace/session_logs/session_2026-11-18_005.md)).
 - 2026-11-18 #004: ae3b6b3..3f8a46f 통합 코드리뷰 [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) Open(RV-156~159)([로그](../members/lim8603/workspace/session_logs/session_2026-11-18_004.md)).

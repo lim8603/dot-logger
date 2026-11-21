@@ -1585,6 +1585,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **P3:** EV-101과 같은 8 GiB 제한·P3 부하에서 예열 포함 70초분을 70.0005초에 수락했다. tail 0.60초, 제어·안전 miss 0, 수락 재시도 거절 0. 기록 7,007,700건과 payload 66.39 GB를 실행 안에서 판독 대조했다. framing은 25.90 GB(EV-097)에서 0.94 GB로 줄었다. 판독을 생략한 회차의 장치 기록은 67.58 GB로, P0 66.67 GB보다 1.4% 많다.
 - **P5:** 같은 쓰기 실행에서 닫힌 파일 한 페이지(630건·262,080 B)를 1 Hz로 45회 조회했다. 45회 모두 쓰기와 겹쳤고 p95 5.03 ms·최대 5.43 ms로 목표 200 ms를 충족했다. [원자료](../06_evolution/imported_context/task_031_t7_2026-11-19/rv161-p0/README.md#0-행-생략-반영-후--2026-11-21)
 
+<a id="ev-104"></a>
+### EV-104 — 묶음·파이프라인 ACK(ADR-015) 구현과 LAN P4 재측정
+
+- **변경:** 제품 `4ac9bf1`. `AckRequest`에 묶음 항목을 추가했다. 서버는 묶음을 순서대로 적용하다 첫 실패에서 멈추고, 구독 창보다 긴 묶음은 적용 전에 거절하며, 단건 형식도 계속 받는다. 클라이언트 `handoff`는 ACK를 대기열에 넣고 바로 반환한다. 대기열은 진행 중인 RPC가 없을 때, 64건이 찼을 때, 또는 `next` 대기 중 5 ms가 지나면 RPC 하나로 보낸다. 동시 RPC는 최대 4개다. `flush`는 모든 확인을 기다리고, 실패는 이후 호출에서 `AcknowledgementUnknown`으로 보고한다. 서버는 입장한 소켓에 `TCP_NODELAY`를 설정한다. CLI `tail --limit`, 화면 tail, dot-probe bridge, LAN 예제는 확인 보고 전에 `flush`한다.
+- **TDD:** 서버 묶음 Ack 시험(창 초과 거절·순서 적용과 첫 실패 중단·단건 호환)과 클라이언트 `flush` 시험(64건 × 4회 확정, 연결 종료 뒤 `AcknowledgementUnknown`)이 각각 컴파일 실패하는 것(Red)을 확인했다. 클라이언트 시험 3건과 CLI 시험 1건은 handoff 직후 확정을 기대하고 있어 `flush` 또는 서버 확인 대기로 바꿨다. Rust 1.85.0·1.96.0 workspace all-features 각각 **704 Pass, 실패 0, 5 ignored**. 양쪽 Clippy `-D warnings`와 fmt를 통과했다. client·CLI·viewer 시험 15회 반복에서 실패는 0이었다.
+- **루프백:** 소형 60,000건이 모두 ACK됐고 p99는 3.00 ms였다. 대용량은 214.62 MB/s였다. `TCP_NODELAY` 없이 측정한 중간 빌드에서는 Dropped 10,832건, ACK p50 115.65 ms였다.
+- **LAN P4 소형:** Ubuntu 유선 → Windows Wi-Fi에서 256 B를 초당 10,000건 보냈다. 60,000건 모두 검증·ACK됐고 Dropped 0, ACK p99 10.86 ms로 목표(≤100 ms)를 충족한다. 수정 전에는 초당 약 440건에서 끊겼다(EV-102).
+- **LAN P4-bulk:** 대용량 4회 모두 64건을 검증·ACK했고 52.14–92.30 MB/s였다. 같은 시간대 TCP 기준이 43.44–110.10 MB/s로 흔들려 쌍별 비율이 76–136%에 걸쳤다. 각 경로의 최고값 비교는 81%다. 이 Wi-Fi 환경에서는 ≥80% 기준을 안정적으로 판정할 수 없다. [원자료](../06_evolution/imported_context/t7_lan_2026-11-21/README.md#묶음파이프라인-ack-뒤--2026-11-21)
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

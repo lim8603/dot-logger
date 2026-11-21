@@ -10,12 +10,12 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1~S4 Done, **Human 수락 대기**: Gate 4 판정안 Pass(로컬 범위)·Gate 5 Not Ready([판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)) |
-| 미처리 리뷰 | 없음 — REV-001~070 Closed. 최근 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치·수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
+| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1~S4 Done, **REV-071 코드 전체 리뷰 처리 뒤 Human 수락**: Gate 4 판정안 Pass(로컬 범위)·Gate 5 Not Ready([판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)) |
+| 미처리 리뷰 | **REV-071 요청(2026-11-21)** — 코드 전체 독립 리뷰(Gate 4 수락 전). 리뷰 전용 세션에서 수행. 중점은 「다음 시작점」 0. REV-001~070 Closed |
 | 상태 | 31/35 Task Done, MS-009 Done. 현재 HEAD 재검증 [EV-110](../05_verification/verification_evidence.md#ev-110): 두 Rust 각 724 Pass·5 ignored, feature 조합·CI 범위 Miri·종단 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089) 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. **Gate 4 판정안 Pass(로컬 범위, Human 수락 대기)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / #004 공개 범위 논의·imported_context 비공개 처리 / AI |
+| 갱신 | 2026-11-21 / #004 REV-071 코드 전체 리뷰 요청 등록 / AI |
 | 세션 상태 | **진행 — 2026-11-21 #004.** 공개 준비 — 이력 정리·라이선스를 마치고 비공개 단일 저장소로 교체. 공개 전환은 남은 MS·Task 뒤 |
 | 최근 완료 세션 | 2026-11-21 #003 — REV-069·070 조치·마감, TASK-032 S1~S3 수락·MS-009 Done, TASK-025 S1·S2(영어 README), 공개 전 사전 점검 |
 
@@ -104,12 +104,23 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
+| REV-071(요청) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성(main `1b0fe85`, 코드 마지막 변경 `8bab94b`) | Requested | 리뷰 전용 세션이 REV-071 문서를 만든다. 결과 처리 뒤 Gate 4 수락 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **공개 전환(T2 잔여):** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
+0. **REV-071 코드 전체 독립 리뷰(요청, 2026-11-21 Human 「Gate4 수락 전에, 코드 전체, 전반에 대한 리뷰를 요청」):** 리뷰 전용 세션이 [세션 프로토콜 1E](../01_cowork_protocol/session_protocol.md)와 `.agents/skills/code-review` 기준으로 수행하고 `05_verification/reviews/REV-071_*.md`를 만든다(지적 번호 RV-171부터). 제품 코드는 고치지 않는다. **결과 처리가 끝난 뒤 Gate 4 판정안을 수락한다.**
+   - **대상:** workspace 전체(`crates/` 4개, `examples/`, `tests/`, `proto/`, `scripts/`, `.github/workflows/ci.yml`, vendor `mcap` 패치)를 main `1b0fe85`(코드 마지막 변경 `8bab94b`) 기준으로 본다. diff가 아니라 현재 코드 전체가 대상이다. 근거 색인은 [EV-110](../05_verification/verification_evidence.md#ev-110), 판정안은 [quality_gate](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21).
+   - **테마 1 — 가장 많이 지적받은 3개 영역.** REV-001~070의 지적 170건 중 116건, P1 15건 중 12건이 이 세 영역에 있다. 예전 수정이 지금도 유지되는지(회귀)와, 같은 유형이 다른 곳에 남았는지를 본다.
+     - **A. 기본 경로·완료/동기화/종료 경계(42건, P1 7)** — `logger/`, `completion/`, `control/`, `routing/`, preset·runtime 설정. 반복 유형: 상태 전이 경합(RV-001·005), 만료된 완료 이력을 내구성 증명으로 오인(RV-128), watermark 앞쪽 공백 건너뛰기(RV-129), 정리 작업 소유권(RV-131), 종료 지연(RV-110). 중점: 모든 경로에서 "성공" 보고가 실제 write·sync를 증명하는지, shutdown·회전·revision 경계의 경합, 쉬는 writer와 `Busy`.
+     - **B. 원격 전송·클라이언트 ACK/구독·CLI·viewer(42건, P1 2)** — `adapters/remote/`, `dot-logger-client`, `dot-logger-cli`, `dot-logger-viewer`. 반복 유형: ACK 실패 상태 보존과 `AcknowledgementUnknown`(RV-163), 거절 사유 분류(RV-046), 입력 검사 순서(RV-047), 연결 포화(RV-049), 자격 증명 노출(RV-050·166). 중점: 묶음·파이프라인 ACK의 순서·상한·취소, 재연결·재전송 금지 원칙, 구독 lease·Gap 의미, CLI 종료 코드와 summary 정확성.
+     - **C. 파일 저장·native MCAP·손실 checkpoint·회전/복구(32건, P1 3)** — `storage/`, `loss.rs`, `query/`, vendor `mcap` 패치. 반복 유형: 손상 입력의 언더플로·용량 오버플로 패닉(RV-136·141), 복구 중 부분 chunk 반출(RV-149), part 경계(RV-164). 중점: 손상·잘린 파일에서 패닉 없이 거절하는지, 예산 선검사, `.active` → `.mcap` 이름 변경과 디렉터리 sync, ring 삭제가 보호 구간을 지키는지.
+   - **테마 2 — 보안.** ① 신뢰할 수 없는 입력 파싱: MCAP 파일, gRPC frame·protobuf, manifest·catalog·config patch JSON, viewer HTTP 요청(Host·Origin) — 길이·개수 상한, 정수 오버플로, 할당 전 검사. ② 인증·전송: loopback 외 HTTPS+토큰 강제, 토큰 비교(상수 시간), 토큰·자격 증명이 로그·오류·Debug·대시보드로 새지 않는지, 권한(Read/Manage) 구분. ③ 자원 고갈(DoS): 연결·구독·명령·메시지 크기 상한, 느린 클라이언트. ④ 파일 시스템: 덮어쓰기 금지(`create_new`), 경로 조합·symlink, 출력 디렉터리 권한. ⑤ `unsafe`(`pool/storage.rs`, `influxdb/numeric.rs`)의 건전성. ⑥ 공급망: vendor `mcap` 패치, `Cargo.lock`, `cargo audit`(`paste` 경고), 저장소의 시험 TLS 키.
+   - **테마 3 — 신뢰성.** ① 프로세스 kill·crash·전원 차단 뒤 복구 가능성과 정확한 보고. ② 디스크 가득·IO 오류·worker panic 격리(실시간 경로로 전파 금지). ③ 모든 대기·종료의 기한과 `Unknown`/`Unresponsive` 보고(성공으로 바뀌지 않는지). ④ 장시간 운전 위험: 카운터·sequence wrap, 단조 증가 자료구조, 누수(24h 시험 전 정적 점검). ⑤ 시험 신뢰성: 타이밍 의존·간헐 실패·`/tmp` 쓰기량. ⑥ CI 정합: EV-110에서 찾은 `.proto`·Miri 설정 낡음과 같은 유형이 더 있는지.
+   - **형식·제약:** 각 지적은 P1~P3, 파일:줄, 실패 시나리오(입력·상태 → 잘못된 결과), 확인 방법(재현·시험·추론 구분), 제안을 적는다. 이미 Closed인 RV는 회귀일 때만 다시 올린다. 긴 성능·부하 실행은 하지 않는다(짧은 재현 시험만, 실행 시간과 쓰기량 기록). 판정은 Pass / Conditional / Fail.
+   - 2026-11-21 #004의 공개 전환 준비 요약은 아래 0-1에 있다.
+0-1. **공개 전환(T2 잔여):** 2026-11-21 #004에서 정리된 이력(`imported_context` 제거, 커밋 346개)을 같은 이름의 **비공개** 저장소로 다시 올렸고, 로컬도 새 main으로 전환했다. 반영이 끝난 로컬 브랜치 `wip/task-034-s2b-runtime-config`는 삭제했다(원본은 번들에 있음). 남은 일은 다음과 같다. ① 남은 MS·Task를 마친 뒤 `gh repo edit --visibility public` ② `gh auth refresh -r delete_repo`로 삭제 권한 회수 ③ 공개 확인 후 T3(native) 발동. 다른 프로젝트용 절차 정리는 로컬 비공개 파일 `imported_context/github_private_to_public_procedure_2026-11-21.md`에 있다. 아래 #003 점검 결과와 권장 방식은 기록용이며, #004 결정이 우선한다.
    - **2026-11-21 읽기 전용 점검 결과:** 추적 파일 2,487개 중 `.cowork` 2,244개(43 MB, 그중 `06_evolution/imported_context` 2,003개). 커밋 342개, Rust 약 9.5만 줄.
      - 코드: TODO·FIXME 0, `.rs` 한국어 0. 개인 키는 시험 전용 TLS 키(`crates/dot-logger/tests/fixtures/remote/test-only-key.pem`) 1개, 토큰 같은 문자열 8곳은 모두 시험 값. 주석의 내부 번호 198줄(공개 rustdoc은 `d4e0624`에서 정리), dot-probe 언급 65곳(대부분 예제).
      - 로컬 경로: `.cowork` 밖 4곳(`scripts/run-perf-rt.sh`·`run-perf-s3.sh`의 `/data/build`, `test-profiles/local-pc.toml`, `vendor/mcap-0.26.0/single-crc.patch` 머리). `.cowork` 안 약 19,200곳 중 19,011곳이 `imported_context`, 나머지 약 190곳이 reviews·perf_runs·tasks·verification_evidence.
@@ -121,7 +132,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
      4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
      5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
    - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.
-1. **TASK-025 수락:** S4에서 MS별 추적 요약, 현재 HEAD 재검증([EV-110](../05_verification/verification_evidence.md#ev-110)), Gate 4 판정안(Pass, 이 PC 로컬 범위)과 Gate 5 Not Ready를 기록했다. 발견 2건(공개 `.proto` 누락, CI Miri 실행 불가)은 조치했다. Human이 수락하면 TASK-025 Done, 구현 칸 5개 체크, Phase를 Verify로 바꾼다. 그다음은 공개 전환(T2 잔여)과 TASK-024·026이다.
+1. **TASK-025 수락(REV-071 처리 뒤):** S4에서 MS별 추적 요약, 현재 HEAD 재검증([EV-110](../05_verification/verification_evidence.md#ev-110)), Gate 4 판정안(Pass, 이 PC 로컬 범위)과 Gate 5 Not Ready를 기록했다. 발견 2건(공개 `.proto` 누락, CI Miri 실행 불가)은 조치했다. Human이 수락하면 TASK-025 Done, 구현 칸 5개 체크, Phase를 Verify로 바꾼다. 그다음은 공개 전환(T2 잔여)과 TASK-024·026이다.
 2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약

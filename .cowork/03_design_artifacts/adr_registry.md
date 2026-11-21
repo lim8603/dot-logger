@@ -40,6 +40,7 @@
 | ADR-013 | native 표준 MCAP·손실 기록·revision별 파일 회전 | Accepted | 2026-11-16 | INT-001 | MS-008·009 | [상세](adrs/ADR-013_native_standard_loss_revision_storage.md) | TASK-030 S2·TASK-035 S1 설계 승인. D1 배포 전 native 단일 형식(legacy 지원 제외)·D2 누적 손실·D3 교차 revision 회전, 2026-11-16 Human 「승인」. 2026-11-18 개정은 `.logger` 토픽 및 `standard/2` |
 | ADR-014 | 원격 viewer의 WebSocket v1과 로컬 스키마 목록 | Accepted | 2026-11-18 | INT-001 | MS-009 | [상세](adrs/ADR-014_viewer_live_websocket.md) | TASK-031 S1 Human 승인. 읽기 전용 loopback WS·채널별 구독 공유·유한 큐와 손실 표시 |
 | ADR-015 | 원격 수신 ACK의 묶음·파이프라인 전송 | Accepted | 2026-11-21 | INT-001 | MS-009 | [상세](adrs/ADR-015_batched_pipelined_remote_ack.md) | EV-102 LAN ACK 왕복 병목. AckRequest 묶음 항목·handoff 비대기·유한 동시 RPC·실패는 이후 호출에서 AcknowledgementUnknown |
+| ADR-016 | viewer 내장 웹 운영 대시보드(읽기 전용) | Accepted | 2026-11-21 | INT-001 | MS-009 | [상세](adrs/ADR-016_viewer_embedded_web_dashboard.md) | TASK-032 S1 Human 승인. loopback HTTP·내장 정적 페이지·새 crate 없음, GetStatus·Compare·PlanCheck 조회만, 값 상태 보존·마지막 값과 실패 사유 구분 |
 
 - `상태`: `Proposed` / `Accepted` / `Deprecated` / `Superseded`
 - `날짜`: `YYYY-MM-DD`

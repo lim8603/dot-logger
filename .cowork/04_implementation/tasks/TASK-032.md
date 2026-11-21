@@ -6,11 +6,11 @@
 | Story | US-004 |
 | 요구사항 | FR-006 FR-014 FR-016 FR-017 NFR-006 NFR-008 |
 | 설계 | [인터페이스 §15](../../03_design_artifacts/interface_contract.md#15-설정운영-계측점검-계약안) · [CLI/화면](../../03_design_artifacts/ui_spec.md) |
-| ADR | ADR-007·009 Accepted. UI 기술 결정(S1) |
+| ADR | ADR-007·009·014 Accepted. [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md) Accepted(S1, 2026-11-21) |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-11-04 |
-| 다음 액션 | S1 — UI 방식(viewer 내장 웹·native·Foxglove 확장 패널) 결정 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-21 |
+| 다음 액션 | S2 — 상태 JSON 계약 실패 시험(Unavailable/Stale·끊김·권한 없음) → viewer 내장 HTTP·상태 화면 |
 | 의존 | TASK-031·TASK-016·TASK-017 |
 | 예상 소요 | 2~4 인일, 리뷰 대기 제외 |
 
@@ -18,7 +18,7 @@
 
 Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을 viewer에서 제공한다: 여유·병목·보존 시간 리포트, 대상별 완료/손실/Unknown, 설정 변경 전후 비교, 간편 점검 결과.
 
-- 기본은 읽기 전용. ApplyConfig 같은 변경 동작은 원격 관리 권한과 명시 확인이 있을 때만(포함 여부는 S1 결정).
+- 읽기 전용(S1 결정, ADR-016). ApplyConfig·RunCheck는 대시보드에 넣지 않고 CLI를 사용한다.
 - Observed/Validated/Estimated/Stale/Unavailable 구분을 화면에서 보존하고 미측정 값을 0이나 추정으로 대체하지 않는다.
 - dot-probe 기존 화면(TASK-026)은 별도 유지한다. 이 대시보드는 dot-probe 외 일반 소비처용이다.
 
@@ -26,13 +26,13 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
-| S1 | UI 방식·화면 범위 결정 | 권고안(viewer 내장 웹: 단일 바이너리·브라우저·3 OS)과 대안 비교, ui_spec 반영안 Human 승인 | Planned |
+| S1 | UI 방식·화면 범위 결정 | 권고안(viewer 내장 웹: 단일 바이너리·브라우저·3 OS)과 대안 비교, ui_spec 반영안 Human 승인 | Done — 2026-11-21 ADR-016·[화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21) |
 | S2 | 상태·리포트·완료 화면 | Status/Report/Completion 표시, 값 구분·갱신 실패 표시 | Planned |
-| S3 | 전후 비교·점검 화면 | Compare·PlanCheck/RunCheck 결과, (승인 시) 권한 있는 설정 적용 흐름 | Planned |
+| S3 | 전후 비교·점검 화면 | Compare 결과·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시(변경 동작 없음) | Planned |
 
 ## 변경 대상과 첫 검증
 
-계획 경로: `crates/dot-logger-viewer/`(대시보드 모듈). 아직 생성된 코드 경로가 아니다.
+계획 경로: `crates/dot-logger-viewer/`(대시보드 모듈). 아직 생성된 코드 경로가 아니다. 새 crate 없이 이미 잠긴 hyper `server`·`http1`을 쓴다(ADR-016).
 
 첫 실패/리뷰 조건: **Unavailable/Stale 지표를 0·정상으로 표시하지 않고, 원격 연결 끊김·권한 없음에서 마지막 값과 시각·사유를 구분 표시**.
 
@@ -48,3 +48,13 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). 제품 코드·테스트 실행 결과: 없음.
+
+## S1 결정 — 2026-11-21
+
+Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)」. 비교 근거와 결정 내용은 [ADR-016](../../03_design_artifacts/adrs/ADR-016_viewer_embedded_web_dashboard.md)에 있다.
+
+- viewer가 loopback HTTP로 내장 정적 페이지와 JSON 경로를 제공한다. 외부 CDN·빌드 도구는 쓰지 않는다.
+- 조회는 GetStatus(1초, 한 번에 하나)·Compare·PlanCheck뿐이다. 브라우저는 credential을 받지 않는다.
+- 값 상태를 보존하고, 실패 시 마지막 성공 값·시각과 실패 사유·시각을 구분한다.
+- 화면 범위는 [화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)을 따른다.
+

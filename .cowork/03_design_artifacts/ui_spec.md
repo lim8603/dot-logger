@@ -61,3 +61,22 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
 운영 PC에서 `dot-logger-viewer --upstream <URL> --catalog <JSON>`을 실행하고 출력된 loopback URL을 Foxglove WebSocket 종류로 연다. Raw Messages나 Plot에서 광고된 토픽을 구독한다. 화면 상태에 Upstream Gap(상류 transfer 순번), Viewer Gap(해당 소켓에서 버린 건), Unknown(범위 미확인), 재연결을 표시한다. 스키마 불일치가 관측되면 토픽 광고를 회수하고 로컬 목록 수정·재시작이 필요하다. [실행 예제](../../crates/dot-logger-viewer/README.md) · [API §24](interface_contract.md#24-task-031-s2-실시간-viewer--2026-11-18)
 
 기록 모드는 `--replay-from-ns`·`--replay-to-ns`로 범위를 지정하고 토픽을 구독해 시작한다. viewer 터미널에 `seek MONO_NS`와 `speed N/D`를 입력한다. 시각화 앱은 같은 WS 주소에서 기록과 재생 시각을 받는다. [API §24.2](interface_contract.md#242-task-031-s3-원격-기록-재생--2026-11-18)
+
+## 7. TASK-032 운영 대시보드 — 2026-11-21
+
+[ADR-016](adrs/ADR-016_viewer_embedded_web_dashboard.md)에 따라 viewer 내장 웹(읽기 전용)으로 제공한다. 운영 PC에서 viewer를 대시보드 옵션과 함께 실행하면 loopback HTTP URL이 출력된다. 이 URL을 브라우저로 연다. Foxglove 연결용 WS URL은 그대로 따로 출력된다. 옵션 이름·JSON 경로·필드는 S2 구현에서 확정해 이 절과 viewer README에 기록한다.
+
+| 단계 | 화면 | 데이터 | 표시 규칙 |
+|---|---|---|---|
+| S2 | 연결 머리줄 | viewer 설정과 마지막 GetStatus 결과 | endpoint, session, revision·`posted_revision`, 마지막 성공 시각. 실패하면 사유(끊김·권한 없음·시간 초과·Unsupported)와 실패 시각을 따로 표시 |
+| S2 | 최근 표본·window | `status.v1`의 `latest`, `windows`(10/60/300초) | 각 값의 상태 배지(Observed·Stale·Unavailable+사유). 실제 from/to 구간. 없는 필드는 "미관측"이며 0으로 그리지 않음 |
+| S2 | 대상별 출력 | `latest`·`windows`의 outputs·required_outputs | 대상별 완료·실패·폐기·Unknown·pending. Unknown은 실패와 다른 색 |
+| S2 | snapshot 목록 | `status.v1`의 `snapshots` | ID·revision·epoch·구간. 등록 순서(ID 오름차순) |
+| S3 | 전후 비교 | 두 snapshot ID로 Compare → `compare.v1` | `comparable`, 차이 8항목, 변화값 8개와 출처. 비교 불가면 수치 없이 사유만 |
+| S3 | 점검 계획 | 계획 ID로 PlanCheck → `check.v1` 미리보기 | 선언 내용만 표시. 실행 버튼 없음(RunCheck는 CLI) |
+
+- **갱신:** 1초 간격으로 GetStatus를 조회하고, 한 번에 하나만 진행한다. 상류가 실패하면 마지막 성공 값을 흐리게 남기고 그 시각을 함께 보인다.
+- **기능 미제공:** facade 호스트처럼 Compare가 Gone이거나 PlanCheck가 Unsupported면 해당 영역을 "이 호스트에서 제공하지 않음"으로 표시한다.
+- **변경 동작 없음:** ApplyConfig·RunCheck는 CLI(`config apply`, `check run`)를 사용한다.
+- **범위 구분:** dot-probe 기존 화면(TASK-026)은 별도로 유지한다.
+

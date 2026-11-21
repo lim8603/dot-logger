@@ -1645,6 +1645,27 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **브라우저:** headless Firefox(geckodriver)로 `live_host`에 연결해 정상, 상류 실패, viewer 무응답을 캡처했다. [근거](../06_evolution/imported_context/task_032_s2_2026-11-21/README.md)
 - **범위:** 브라우저 렌더링은 자동 시험이 아니라 수동 확인이다. Compare·PlanCheck 화면은 S3다.
 
+<a id="ev-108"></a>
+### EV-108 — TASK-032 S3 대시보드 snapshot 비교·계획 미리보기
+
+- **변경:** 제품 `277de2d`.
+  - `GET /api/compare?before=&after=`, `GET /api/plan?id=`가 `dot_logger.viewer.request.v1`을 돌려준다. 호스트 보고서를 그대로 담거나 이름 있는 실패 사유를 담는다.
+  - 상류 작업자 하나가 1초 상태 조회와 대기열(4개)의 조회를 한 번에 하나씩 처리한다. 전송 계열 오류에서만 다시 연결한다.
+  - 화면에 snapshot 비교와 계획 미리보기를 추가했다(읽기 전용).
+  - 실제 `OperationsHost` 데모 `operations_host` 예제를 추가했다.
+- **TDD:** 동작 없는 stub에서 새 시험 3건이 실패(Red)하는 것을 확인했고 구현 뒤 Green이다.
+  - 응답 문서: 보고서 원문 통과, Gone·Unsupported·권한 거절·schema 불일치·계획 대신 결과·비보고 응답은 실패이며 일부 보고서를 담지 않음.
+  - ID 검사: 누락·숫자 아님·음수·중복·빈 값·u64 초과는 400. 상류가 닿지 않으면 이름 있는 실패.
+  - 실제 hub: GetStatus를 300 ms 붙잡는 동안 Compare가 상류에 도착하지 않음(슬롯 1개). 이어서 Compare(1, 2)의 보고서가 그대로 전달됨. PlanCheck Unsupported 뒤 같은 연결에서 다음 PlanCheck 성공.
+  - 구현 중 시험 하나가 stub에서 끝나지 않는 대기를 갖고 있어, 전체 기한을 두도록 고쳤다.
+- **결과:**
+  - Rust 1.85.0·1.96.0 workspace all-features 각 **719 Pass, 실패 0, 5 ignored**.
+  - 두 버전의 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사 통과. viewer 시험 10회 반복 실패 0.
+- **브라우저:**
+  - 실제 호스트: Compare 성공(차이 −0.200 /s), PlanCheck unsupported, 없는 snapshot은 gone.
+  - PlanCheck 성공 화면: 실제 JS에 고정 응답을 넣은 하네스로 확인했다. [근거](../06_evolution/imported_context/task_032_s3_2026-11-21/README.md)
+- **범위:** 실제 원격 `CheckHost` 데모는 없다. 브라우저 렌더링은 수동 확인이다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

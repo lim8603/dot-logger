@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | S3 — snapshot 전후 비교(Compare)·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시 |
+| 다음 액션 | S1~S3 구현 완료. Task 수락 전 리뷰(완료 기준의 Human 리뷰) |
 | 의존 | TASK-031·TASK-016·TASK-017 |
 | 예상 소요 | 2~4 인일, 리뷰 대기 제외 |
 
@@ -28,7 +28,7 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 |---|---|---|---|
 | S1 | UI 방식·화면 범위 결정 | 권고안(viewer 내장 웹: 단일 바이너리·브라우저·3 OS)과 대안 비교, ui_spec 반영안 Human 승인 | Done — 2026-11-21 ADR-016·[화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21) |
 | S2 | 상태·리포트·완료 화면 | Status/Report/Completion 표시, 값 구분·갱신 실패 표시 | Done — 2026-11-21 `704d055`, [EV-107](../../05_verification/verification_evidence.md#ev-107) |
-| S3 | 전후 비교·점검 화면 | Compare 결과·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시(변경 동작 없음) | Planned |
+| S3 | 전후 비교·점검 화면 | Compare 결과·PlanCheck 미리보기, Gone/Unsupported 기능 미제공 표시(변경 동작 없음) | Done — 2026-11-21 `277de2d`, [EV-108](../../05_verification/verification_evidence.md#ev-108) |
 
 ## 변경 대상과 첫 검증
 
@@ -37,17 +37,17 @@ Foxglove 계열 도구가 보여주지 않는 dot-logger 고유 운영 관점을
 첫 실패/리뷰 조건: **Unavailable/Stale 지표를 0·정상으로 표시하지 않고, 원격 연결 끊김·권한 없음에서 마지막 값과 시각·사유를 구분 표시**.
 
 - [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다(S2, EV-107).
-- [ ] 최소 구현 후 관련 `TC-014`의 대시보드 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 최소 구현 후 관련 `TC-014`의 대시보드 하위 시나리오를 통과시킨다(EV-107·108).
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다(두 Rust 각 719 Pass, README·ui_spec §7).
 
 ## 완료 기준
 
-- [ ] 운영 화면 구현과 값 구분·권한 경계 검증.
+- [x] 운영 화면 구현과 값 구분·권한 경계 검증(EV-107·108).
 - [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/연결 끊김·취소/종료를 해당 범위에서 검증한다.
+- [x] 실패/연결 끊김·취소/종료를 해당 범위에서 검증한다(EV-107·108).
 - [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
-테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). S2 결과: [EV-107](../../05_verification/verification_evidence.md#ev-107).
+테스트 정의: [TC-014](../../05_verification/test_case.md#tc-014). 결과: S2 [EV-107](../../05_verification/verification_evidence.md#ev-107), S3 [EV-108](../../05_verification/verification_evidence.md#ev-108). 추적표 MS 칸은 Task 수락 때 갱신한다.
 
 ## S1 결정 — 2026-11-21
 
@@ -63,3 +63,10 @@ Human 「A. viewer 내장 웹 (Recommended)」·「읽기 전용 (Recommended)�
 - `--dashboard ADDR`로 loopback HTTP 대시보드를 연다. `/api/status`는 `dot_logger.viewer.dashboard.v1`이다. 상류 `status.v1`을 그대로 넘기고, 마지막 성공 값과 최근 실패 사유·시각을 분리해 담는다.
 - 화면은 연결 머리줄, 최근 표본(Capture·전체·필수 출력), 10/60/300초 window, snapshot 목록을 보여준다. `status.v1`에 대상별 분해가 없어 출력은 전체·필수 합계로 표시한다([화면 §7](../../03_design_artifacts/ui_spec.md#7-task-032-운영-대시보드--2026-11-21)).
 - 시험 5건(값 상태 보존, 지표 없음, 실패 뒤 마지막 값 유지, HTTP 경계, 실제 hub 응답·권한 거절·호스트 종료)이 stub에서 Red였고 구현 뒤 Green이다. 브라우저 확인 캡처 3종은 [근거](../../06_evolution/imported_context/task_032_s2_2026-11-21/README.md)에 있다.
+
+## S3 결과 — 2026-11-21
+
+- `/api/compare?before=&after=`와 `/api/plan?id=`는 호스트의 `compare.v1`·`check.v1` plan을 그대로 담거나, 이름 있는 실패(gone·unsupported·viewer_busy 등)를 돌려준다.
+- 상태 조회와 조회 요청은 작업자 하나가 한 번에 하나씩 처리한다(상류 명령 슬롯 1개).
+- 화면은 보유 snapshot 두 개의 비교(양쪽 조건, 다른 조건, 변화 8항목)와 계획 미리보기를 보여준다. 실행 버튼은 없다.
+- 시험 3건(문서 계약, ID 검사, 단일 슬롯·Unsupported 뒤 연결 유지)이 stub에서 Red였고 구현 뒤 Green이다. 실제 `OperationsHost` 데모(`operations_host` 예제)와 브라우저로 확인했다. [근거](../../06_evolution/imported_context/task_032_s3_2026-11-21/README.md)

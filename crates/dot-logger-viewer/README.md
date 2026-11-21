@@ -49,12 +49,33 @@ the page keeps the last status, marks it as not current with its time, and
 shows the failure reason and time separately. If the viewer itself stops,
 the page says so.
 
+The page can also ask the host for two read-only lookups. Each lookup waits
+for the same single upstream request slot as the status poll.
+
+- **Compare snapshots:** choose two snapshots the host holds and compare them
+  (`dot_logger.compare.v1`). The page shows each side's window and conditions,
+  which conditions differ, and each change (after minus before) with its
+  Observed, Validated, Estimated, Stale or Unavailable state. Rates are shown
+  per second.
+- **Check plan preview:** enter a registered plan ID to see its declaration
+  (`dot_logger.check.v1` plan). The check is not run.
+
+A host that does not serve a lookup reports `unsupported`. The basic facade
+holds no snapshots and serves no plans. To try comparisons, run the demo host
+with two snapshots:
+
+```sh
+cargo run --locked -p dot-logger-viewer --example operations_host
+# Use the printed URL as --upstream; any catalog with channel_id 7 works.
+```
+
 The dashboard is read-only. Use the CLI to change configuration or run checks.
 It listens on loopback only, answers `GET` requests whose `Host` is a loopback
 name with its port, and admits only a loopback Origin or the `--allow-origin`
 value. The upstream credential is never sent to the browser. The page loads
 no external resources. `GET /api/status` returns the same document as
-`dot_logger.viewer.dashboard.v1` JSON.
+`dot_logger.viewer.dashboard.v1` JSON. `GET /api/compare?before=ID&after=ID`
+and `GET /api/plan?id=ID` return `dot_logger.viewer.request.v1`.
 
 ## Catalog
 

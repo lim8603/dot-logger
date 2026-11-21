@@ -97,3 +97,18 @@ Ctrl-C/기한은 협력 취소이고 실제 진행 IO 종료까지 정리한다.
   - Origin은 loopback 또는 `--allow-origin` 값만 허용하고 나머지는 403이다.
   - 본문(Content-Length≠0·Transfer-Encoding)이 있으면 400, 머리 8 KiB 초과는 431이다.
   - 동시 연결은 8개, 머리 읽기 기한 2초, 연결당 요청 1개다. 응답은 `Cache-Control: no-store`와 제한적인 CSP를 붙인다.
+
+### 7.2 S3 구현 — 2026-11-21
+
+- **경로:** `GET /api/compare?before=ID&after=ID`, `GET /api/plan?id=ID`.
+  - ID는 10진 u64만 받는다. 이름이 정확해야 하고 각 한 번씩이며, 다른 파라미터는 허용하지 않는다. 어기면 상류에 묻기 전에 400이다.
+- **응답(`dot_logger.viewer.request.v1`):** `request`(`compare`·`plan`), `at_unix_ms`, `outcome`(`ok`·`failed`)로 이뤄진다.
+  - 성공하면 `report`에 호스트의 `compare.v1` 또는 `check.v1`(kind `plan`)을 그대로 담는다.
+  - 실패하면 `reason`만 담고 일부 보고서는 담지 않는다. 사유는 `gone`·`unsupported`·`permission_denied`·`corrupt`·`viewer_busy`·`timed_out` 등이다.
+- **상류 사용:** 작업자 하나가 상태 조회와 대기열(4개)의 조회 요청을 한 번에 하나씩 처리한다. 상류 명령 슬롯은 최대 1개다. 전송 계열 오류에서만 연결을 다시 맺고, Gone·Unsupported 같은 호스트 응답은 연결을 유지한다.
+- **비교 화면:**
+  - snapshot이 2개 이상일 때만 선택 상자를 보인다. 목록이 바뀔 때만 다시 그려 선택이 유지된다.
+  - 양쪽 window·조건을 표로 보이고 다른 칸은 강조한다. 차이 나는 조건 이름을 나열한다.
+  - 변화 8항목을 상태 배지·방향·`after − before`·출처로 보인다. 비율은 /s(바이트 비율은 B/s)로 환산하고, 정확한 분수는 툴팁에 둔다. `cpu_rate`는 분수 그대로다. Unavailable은 사유와 "—"로 표시한다.
+- **계획 미리보기:** 계획 필드를 모두 나열하고 "preview only, not run" 배지와 CLI 실행 안내를 붙인다. 실행 버튼은 없다.
+- **기능 미제공:** `unsupported`는 "This host does not provide …", `gone`은 snapshot 해제나 미등록 계획 안내로 표시한다.

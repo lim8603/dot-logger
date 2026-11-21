@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | Human 수락 — REV-071 1차·보충 조치([EV-111](../../05_verification/verification_evidence.md#ev-111)·[EV-112](../../05_verification/verification_evidence.md#ev-112))와 Gate 4 판정안(Pass, 로컬 범위)·Gate 5 Not Ready |
+| 다음 액션 | 없음 — 2026-11-21 Human 「승인, Gate 4 수락 진행하자」로 수락. 후속은 공개 전환(T2 잔여)·TASK-024·026 |
 | 의존 | TASK-033·TASK-032(MS-009). TASK-024 의존은 2026-11-15 해제 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -29,7 +29,7 @@ Human 결정(2026-11-21):
 | S1 | 문서 검토 | README·crate README·예제에 적힌 명령을 실행하고, 실제 기능과 다른 곳의 목록을 만든다 | Done — 2026-11-21 아래 F1~F10 |
 | S2 | 공개용 README | 루트·cli·client·viewer README를 영어로 새로 쓴다. S1 불일치를 고치고, 명령이 그대로 실행되는지 확인한다 | Done — 2026-11-21 `d4e0624`·`dca35d2` |
 | S3 | 사용·운영 작업 문서 | `07_delivery`의 사용자 매뉴얼·운영서·릴리즈 노트(작업 문서, 한국어)에 재현 가능한 사용 예와 운영 한계를 정리한다 | Done — 2026-11-21 아래 S3 결과 |
-| S4 | 추적표·게이트 | MS별 구현/TC/EV 링크를 정리하고 Gate 4·5를 따로 판정해 기록한다 | Done — 2026-11-21 아래 S4 결과, Human 수락 대기 |
+| S4 | 추적표·게이트 | MS별 구현/TC/EV 링크를 정리하고 Gate 4·5를 따로 판정해 기록한다 | Done — 2026-11-21 아래 S4 결과, Human 수락 2026-11-21 |
 
 공식 산출물(`docs/`) 생성은 이 Task 범위 밖이다. 필요해지면 언어·형식을 확인한 뒤 생성한다.
 
@@ -85,6 +85,10 @@ Human 결정(2026-11-21):
 - **Gate 판정([quality_gate](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)):** Gate 4는 AI 판정안 Pass(이 PC 로컬 범위, native는 GAP-004/TASK-024). Gate 5는 Not Ready(24h·native·3 OS·실사용처 Not Run, 공식 산출물 미생성). Human이 Gate 4를 수락하면 Phase를 Verify로 바꾸고 이 Task를 Done으로 닫는다.
 - 정리: MS 목록 상단 요약(MS-009 Done 반영), MS-007 상태 줄, verification_evidence 문서 정보·근거 요약을 현재 상태로 맞췄다.
 
+## 수락 — 2026-11-21
+
+2026-11-21 Human 「승인, Gate 4 수락 진행하자」. REV-071 1차·보충 조치([EV-111](../../05_verification/verification_evidence.md#ev-111)·[EV-112](../../05_verification/verification_evidence.md#ev-112))와 Gate 4 판정안을 수락했다. 추적표의 이 Task 구현 칸 5개(INT-001·FR-001·NFR-004·CON-003·CON-006)를 체크하고, Gate 4 Pass·Phase Verify로 전환했다. 전환 전 F-09·F-12 점검 결과는 [quality_gate](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)에 있다. Gate 5는 Not Ready다.
+
 ## 진입 조건
 
 - TASK-001의 Gate 3 및 해당 ADR·상세 계약 승인, 위 의존 작업 완료.
@@ -96,15 +100,15 @@ Human 결정(2026-11-21):
 
 첫 실패/리뷰 조건: **문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치**.
 
-- [ ] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
-- [ ] 최소 구현 후 관련 `TC-001`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
-- [ ] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
+- [x] 요구·설계와 연결한 실패 테스트(문서 작업은 리뷰)에서 의도한 실패를 확인한다.
+- [x] 최소 구현 후 관련 `TC-001`와 해당 케이스의 필요한 하위 시나리오를 통과시킨다.
+- [x] 리팩토링 후 영향 경로 회귀와 문서/예제의 일치를 확인한다.
 
 ## 완료 기준
 
-- [ ] 재현 가능한 사용 예·운영 한계·MS별 구현/TC/EV 링크·Gate 4/5 별도 판정.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] 재현 가능한 사용 예·운영 한계·MS별 구현/TC/EV 링크·Gate 4/5 별도 판정.
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
+- [x] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
 
 테스트 정의: [TC-001](../../05_verification/test_case.md#tc-001). 제품 코드·테스트 실행 결과: 없음. TC 전체가 다른 Task까지 포함하면 이 Task의 하위 검증만 완료로 표시한다.

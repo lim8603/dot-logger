@@ -186,11 +186,13 @@ Human 결정(2026-11-13): 「실사용처 테스트는 마지막에 진행은 �
 
 TASK-025 S4에서 판정했다. 대상은 main `987fdb9`와 이 판정에서 고친 공개 스키마·CI 설정이다. 근거 색인은 [EV-110](verification_evidence.md#ev-110)과 [MS별 추적 요약](test_case.md#ms별-추적-요약--2026-11-21-task-025-s4)이다. **Gate 4 판정은 AI 판정안이며 Human 수락 전에는 Phase를 바꾸지 않는다.**
 
-### Gate 4 (Implementation → Verification) — AI 판정안: Pass (이 PC 로컬 범위)
+### Gate 4 (Implementation → Verification) — 판정: Pass (이 PC 로컬 범위, Human 수락 2026-11-21)
+
+**Human 수락:** 2026-11-21 Human 「승인, Gate 4 수락 진행하자」. REV-071 1차·보충 조치([EV-111](verification_evidence.md#ev-111)·[EV-112](verification_evidence.md#ev-112))와 이 판정안을 수락했다. 전환 전 점검으로 F-09(Accepted ADR-003~016과 코드·기술 기준 대조: 무근거 반전 0, 낡은 문서 문구 3건 정정)과 F-12(열린 OQ-002~005의 문서 간 분기 없음, requirement_spec §5 상태 문구 동기화)를 수행했다. Phase를 Verify로 전환한다.
 
 | 항목 | 판정 | 근거 |
 |---|---|---|
-| 코드 리뷰 완료 | Pass | REV-001~070 모두 Closed. 각 리뷰는 review_checklist 기준으로 조치·수락했다 |
+| 코드 리뷰 완료 | Pass | REV-001~071 모두 Closed(REV-071은 2026-11-21 수락). 각 리뷰는 review_checklist 기준으로 조치·수락했다 |
 | 검증 대상 Milestone 정렬 | Pass | 구현 MS인 MS-002~006·008·009가 Done이다. MS-007은 검증·인수 MS 자체다 |
 | 핵심 Task 완료 기준 | Pass | 구현 Task 31건 Done. 남은 TASK-024(native·24h)·TASK-026(실사용처)은 2026-11-13·15 Human 결정으로 마지막 단계의 검증·적용 Task다. TASK-018은 범위 미승인 선택 기능이다. TASK-025는 이 S4로 마무리한다 |
 | 단위 테스트 통과 | Pass | Rust 1.96.0·1.85.0 각 724 Pass·실패 0·5 ignored(외부 DB), feature 조합 두 버전, Miri CI 범위([EV-110](verification_evidence.md#ev-110)). 커버리지 라인 93.69%·함수 92.67%·리전 91.08%([EV-089](verification_evidence.md#ev-089)) |

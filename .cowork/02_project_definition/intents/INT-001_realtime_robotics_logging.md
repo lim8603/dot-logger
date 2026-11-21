@@ -2,7 +2,7 @@
 
 ## 상태
 
-`Approved` — 프로젝트 목표·핵심 가치와 2026-10-25 Human 「확정」에 따른 설계용 초기 성능/Story AC·문서 계획·미결 이월 승인. **2026-11-21 현재 초점은 Build/Verify다.** MS-001~006·008·009 Done, MS-007 In Progress. 아래 본문의 "미정" 표현은 2026-10-25 당시 기록이며, 이후 정해진 내용은 맨 아래 [현재 상태](#현재-상태--2026-11-21)를 따른다.
+`Approved` — 프로젝트 목표·핵심 가치와 2026-10-25 Human 「확정」에 따른 설계용 초기 성능/Story AC·문서 계획·미결 이월 승인. **2026-11-21 Gate 4 Pass(Human 수락)로 현재 초점은 Verify다.** MS-001~006·008·009 Done, MS-007 In Progress. 아래 본문의 "미정" 표현은 2026-10-25 당시 기록이며, 이후 정해진 내용은 맨 아래 [현재 상태](#현재-상태--2026-11-21)를 따른다.
 
 ## 배경
 
@@ -95,4 +95,4 @@ Human 선택으로 첫 클라이언트는 Rust API + CLI와 dot-probe 기존 화
 ### 남은 것
 
 - 3개 OS native 검증·24시간·전원 차단(TASK-024, 공개 뒤 T3), dot-probe 첫 적용(TASK-026), 질문 프리셋(TASK-018, 선택·범위 미승인).
-- Gate 4는 판정안 Pass(이 PC 로컬, Human 수락 대기), Gate 5는 Not Ready([판정](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)).
+- Gate 4는 Pass(이 PC 로컬, 2026-11-21 Human 수락, Phase Verify), Gate 5는 Not Ready([판정](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)).

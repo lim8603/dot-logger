@@ -305,7 +305,7 @@ cargo run -p dot-logger-cli -- recover --manifest .logger/session.json --output 
 | 4 | `tail`이 `invalid_input`으로 끝난다 | `--record-bytes`나 `--records`가 호스트 한도보다 크다. 한도 안의 값을 준다 |
 | 5 | 두 번 구독한 사이의 기록은? | 두 구독 사이에 놓친 기록은 Gap으로 보고되지 않는다. 한 연속 스트림으로 취급하지 않는다 |
 | 6 | Windows·macOS에서 쓸 수 있나? | CI 구성은 있지만 실행 결과가 아직 없어 미검증이다. 검증된 환경은 Linux x86_64다 |
-| 7 | 압축 파일을 쓰나? | dot-logger는 무압축 chunk로 쓴다. `compression-zstd`는 읽기 쪽 의존성 기능이다 |
+| 7 | 압축 파일을 쓰나? | dot-logger는 무압축 chunk로만 쓰고, 압축 chunk는 조회·복구에서 거절한다. `compression-zstd`는 MCAP 의존성의 zstd 지원만 켜며 제품 경로는 쓰지 않는다 |
 
 ---
 

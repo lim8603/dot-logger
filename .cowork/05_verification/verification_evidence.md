@@ -1760,7 +1760,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 
 ### EV-112 — REV-071 보충 조치 뒤 전체 회귀와 비-Linux 교차 Clippy
 
-- **대상:** main `9622e94`(REV-071 보충 조치 `RV-189~192`). 이 PC(Ubuntu generic 7.0.0-43, x86_64), 빌드 디렉터리 `/data/build/target`, 교차 검사는 `/data/build/target-cross`. AI 실행.
+- **대상:** main `9622e94`(REV-071 보충 조치 `RV-189~192`). 이 PC(Ubuntu 7.0.0-43-realtime 커널로 부팅된 상태, x86_64. 기능 회귀라 성능 행 분류와 무관), 빌드 디렉터리 `/data/build/target`, 교차 검사는 `/data/build/target-cross`. AI 실행.
 - **CI와 같은 검사 묶음:**
   - Rust 1.96.0·1.85.0 workspace all-features 각 **741 Pass, 실패 0, 5 ignored**(외부 DB). 새 시험 2개(RV-190·RV-191) 포함.
   - 두 버전 Clippy `-D warnings`, fmt, strict rustdoc(workspace·core 전용), client 기능 없는 시험(시험 0개, 컴파일 확인).

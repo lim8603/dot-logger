@@ -1560,6 +1560,31 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - 대용량 gRPC는 모든 회차에서 8 MiB 64건을 검증하고 ACK했다. 기준 3회는 226.95~228.19 MB/s, 임시 빌드 2회는 211.72~213.86 MB/s였다. 같은 호스트의 TCP 기준 1회는 4,808.25 MB/s였다. LAN에서는 TCP 기준과 두 서버 빌드를 같은 두 장비에서 대조해야 한다. [명령과 원자료](../06_evolution/imported_context/t7_lan_2026-11-19/README.md)
 - 기준과 임시 빌드 모두 TC-007의 세 하위 시험을 통과했다. 임시 빌드는 TLS 권한, 수신 확인, 단절 Unknown, 포화 후 새 연결을 포함한 원격 모듈 시험 15건도 통과했다.
 
+<a id="ev-101"></a>
+### EV-101 — RV-161 8 GiB P0 대조와 손실 checkpoint 바이트 분리
+
+- **환경:** 제품 `17a8346`(코드 `0be4bfe` 이후 동일), Rust 1.96.0 release, Ubuntu `7.0.0-43-realtime` SCHED_OTHER, Crucial T500 1 TB ext4. EV-098과 같은 P3 부하와 `MemoryMax=8G` scope를 사용했다. 판독 대조는 생략했다. 기록 정확성의 근거는 EV-098의 7,007,700건 대조다.
+- **P0 대조:** 예열 포함 70초분의 수락은 P0 70.12초, 제품 71.75초였다. 최종 sync tail은 0.03초와 1.35초, 제어·안전 miss는 모두 0이었다. durable 처리량은 946 MB/s와 902 MB/s(95.3%)였다. 장치 기록은 P0 66.67 GB, 제품 89.63 GB로 제품이 34% 많았다.
+- **추가 바이트 원인:** 10초 회차의 닫힌 파일 121개(13.03 GB)에서 `.logger/loss`가 3.16 GB(24.2%)였다. checkpoint 하나는 행 639,616개·7.9 MB이며 0이 아닌 행은 없었다. 출력 범주 589,824행(92%)은 모든 출력이 16개 target의 생산자×채널 카운터를 함께 싣기 때문에 생긴다. 파일당 약 26 MB이고, 60초 회차의 파일 약 760개에서 약 20 GB로 장치 기록 차이의 대부분이다.
+- **판단:** EV-098의 76.93초 미달은 장치 상태 표류와 dense 손실 checkpoint의 34% 추가 기록이 겹친 결과로 본다. 같은 시각의 P0는 offered 속도를 유지했다. 제품 지연은 1.75초다. 0이 아닌 행만 기록하면 정상 부하에서 payload 대비 추가 기록이 약 3%(meta·인덱스·요약)로 줄어들 것으로 추정한다. 저장 형식 변경은 ADR-013 D2 개정 사항이다. [원자료](../06_evolution/imported_context/task_031_t7_2026-11-19/rv161-p0/README.md)
+
+<a id="ev-102"></a>
+### EV-102 — T7 LAN P4·P4-bulk 실측과 ACK 왕복 병목
+
+- **환경:** Ubuntu 유선 1 GbE 송신·서버와 Windows Wi-Fi(AX201, 링크 817 Mbps) 수신을 같은 LAN에 두었다. `17a8346`의 `lan_probe`, Rust 1.96.0 release, 임시 TLS·읽기 토큰을 썼다. Windows→Ubuntu RTT는 평균 2 ms(1–6 ms)였다.
+- **P4-bulk:** 8 MiB 64건을 모두 검증·ACK했다. TCP 기준 114.12 MB/s, gRPC 기준 빌드 85.13 MB/s(74.6%), 서버 `TCP_NODELAY` 대조 빌드 84.45 MB/s(74.0%)다. 목표 ≥80%에 미달한다. `TCP_NODELAY`는 대용량 처리량에 영향이 없었다.
+- **P4 소형:** 256 B를 10,000건/s로 보냈다. 기준 빌드는 두 번 모두 5.2초 안에 수신 측이 `Disconnected`로 끊겼다. 대조 빌드는 ACK 3,797건·Dropped 56,203건, ACK p50 2.15 s·p99 2.58 s였고 8.6초에 끊겼다. 목표(ACK p99 ≤100 ms)에 미달한다.
+- **원인:** ACK는 초당 약 440건이었다. 클라이언트 `handoff`가 기록마다 단항 Ack RPC의 응답을 기다리므로 처리량이 약 1/RTT로 제한된다. EV-100의 루프백 통과는 RTT가 짧았기 때문이다. 이를 고치려면 원격 ACK 계약(ADR-009·ADR-014)을 바꿔야 한다. [원자료](../06_evolution/imported_context/t7_lan_2026-11-21/README.md)
+
+<a id="ev-103"></a>
+### EV-103 — RV-161 손실 checkpoint 0 행 생략과 P3·P5 판정
+
+- **변경:** 제품 `5e97631`. [ADR-013 개정](../03_design_artifacts/adrs/ADR-013_native_standard_loss_revision_storage.md#손실-checkpoint-0-행-생략-개정--2026-11-21)에 따라 새 checkpoint는 `version=2` part만 쓴다. part는 0이 아니거나 overflow인 행만 싣고, 덮는 등록 행 구간(`rows_end`/`rows`)을 함께 기록한다. 완전한 checkpoint에 없는 키는 같은 session·epoch에서 관측된 키에 한해 0 표본으로 비교하며, 이렇게 채운 표본도 호출자의 행 상한에 포함한다. 예약은 dense 최악값을 그대로 쓴다. 판독·복구는 `version=1` dense report와 이전 descriptor를 계속 받는다.
+- **TDD:** 새 `sparse`·`LossRange`·v2 필드가 없는 상태에서 단위 시험 3건이 컴파일에 실패하는 것(Red)을 확인한 뒤 구현했다. 0 행 생략과 구간 연속성, 버전·구간·part 상한 거절, 생략 키 0 비교와 행 상한을 검사한다. 통합 시험에는 채널 70개에서 거절해 checkpoint가 64 + 6행 두 part로 나뉘는 fixture를 추가했다. 완전 복구에서는 70개 키 모두 정확한 delta가 나오고, report 한도로 끊긴 복구에서는 정확한 delta가 없으며, 묶음 청크는 통째로 채택하거나 제외함을 확인했다. dense part 수를 전제로 한 기존 기대값(tc_013 1건, tc_017 4건, CLI 2건)은 개정 의미에 맞게 갱신했다.
+- **품질 검사:** Rust 1.85.0·1.96.0 workspace all-features 각각 **702 Pass, 실패 0, 외부 DB 5 ignored**. 양쪽 all-targets Clippy `-D warnings`와 fmt 검사를 통과했다. 실시간 시계 접근을 허용한 Miri(nightly-2026-10-26)에서 손실 단위 시험 9건이 통과했다.
+- **P3:** EV-101과 같은 8 GiB 제한·P3 부하에서 예열 포함 70초분을 70.0005초에 수락했다. tail 0.60초, 제어·안전 miss 0, 수락 재시도 거절 0. 기록 7,007,700건과 payload 66.39 GB를 실행 안에서 판독 대조했다. framing은 25.90 GB(EV-097)에서 0.94 GB로 줄었다. 판독을 생략한 회차의 장치 기록은 67.58 GB로, P0 66.67 GB보다 1.4% 많다.
+- **P5:** 같은 쓰기 실행에서 닫힌 파일 한 페이지(630건·262,080 B)를 1 Hz로 45회 조회했다. 45회 모두 쓰기와 겹쳤고 p95 5.03 ms·최대 5.43 ms로 목표 200 ms를 충족했다. [원자료](../06_evolution/imported_context/task_031_t7_2026-11-19/rv161-p0/README.md#0-행-생략-반영-후--2026-11-21)
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

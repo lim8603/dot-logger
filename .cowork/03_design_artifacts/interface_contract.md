@@ -1381,6 +1381,13 @@ facade는 L=max(16384, 4K)로 baseline·final과 주기 관측 두 번의 여유
 
 호스트 통합 예제에서 앱이 정한 프로젝트 루트 아래 `.logger/`를 만들어 `file_output`에 넘긴다. CLI 예제는 `.logger/session.json`에 둔 manifest를 인자로 지정한다. [ADR-013 개정](adrs/ADR-013_native_standard_loss_revision_storage.md#예약-토픽과-파일-프로필-개정--2026-11-18) · [EV-090](../05_verification/verification_evidence.md#ev-090)
 
+### 23.6 손실 checkpoint version 2 — 2026-11-21
+
+- `LossReport.range: Option<LossRange>`를 추가했다. `LossRange { end, rows }`는 part가 덮는 등록 행 구간의 끝(exclusive)과 등록 행 수다. `None`이면 모든 행을 싣는 `version=1` part다.
+- 새 파일의 checkpoint는 `version=2` part로 기록된다. part는 0이 아니거나 overflow인 행만 싣는다. part 번호가 0부터 이어지고 마지막 `end`가 `rows`와 같아야 완전한 checkpoint다. 빈 checkpoint는 행 0개인 part 하나다.
+- `loss::summarize`는 완전한 version-2 checkpoint에 없는 키를, 같은 session·epoch에서 관측된 키에 한해 0으로 비교한다. 이렇게 채운 표본도 `max_rows`에 포함되며, 넘으면 `NeedRotation`이다. 어떤 report에도 0이 아닌 값으로 나타나지 않은 키는 결과 행에 나오지 않는다. CLI `loss`는 원래 0인 행을 출력하지 않으므로 출력 형식은 바뀌지 않는다.
+- `LossCount`는 `Copy`를 구현한다. protobuf에는 `optional uint64 rows = 14`와 `rows_end = 15`를 추가했다. 복구는 이전 descriptor로 기록된 파일도 받는다. [ADR-013 개정](adrs/ADR-013_native_standard_loss_revision_storage.md#손실-checkpoint-0-행-생략-개정--2026-11-21) · [EV-103](../05_verification/verification_evidence.md#ev-103)
+
 ## 24. TASK-031 S2 실시간 viewer — 2026-11-18
 
 | 경계 | 구현 계약 |

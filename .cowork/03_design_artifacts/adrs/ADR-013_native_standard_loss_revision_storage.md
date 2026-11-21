@@ -237,3 +237,14 @@ TASK-034 runtime WIP36c1724를 현재 native/loss에 맞춰 통합했다. 설정
 dot-logger는 호스트 프로젝트의 `.logger/` 폴더 아래에서 기록을 모으는 이름이다. Human 「좋아!」로 통합 예제와 native 예약 토픽에 이 이름을 반영하기로 했다. 예제는 호스트가 기존 출력 경로 인자로 `.logger/`를 지정하고 CLI manifest를 `.logger/session.json`에 둔다.
 
 최신 예약 토픽은 `.logger/meta`와 `.logger/loss`다. 새 파일은 `dot-logger/standard/2`와 `dot_logger.file.format_version=2`를 함께 사용한다. 개발용 `standard/1` 파일은 당시 검증 증거로 보존하고 현재 제품의 판독·복구 입력에서 거절한다. [EV-090](../../05_verification/verification_evidence.md#ev-090)에서 기록·조회·복구·GUI를 검증한다.
+
+### 손실 checkpoint 0 행 생략 개정 — 2026-11-21
+
+[EV-101](../../05_verification/verification_evidence.md#ev-101)에서 P3 대표 구성(생산자 32·채널 128·출력 16)의 checkpoint 하나가 행 639,616개·7.9 MB였고, 정상 부하에서는 모든 행이 0이었다. 이 때문에 장치 기록이 P0보다 34% 많았다. Human이 「0 행 생략」을 승인해 D2의 저장 표현을 다음과 같이 개정한다. 수집 키·단위·누적 의미와 예약 상한은 바꾸지 않는다.
+
+- **report 버전 2:** 새 파일은 `version=2` report만 쓴다. `rows`는 등록 키 공간 크기 `N`(파일 `loss_tracking`의 행 수와 같음)이다. `rows_end`는 이 part가 덮는 등록 행 구간의 끝(exclusive)이다. part `i`는 직전 part의 `rows_end`(첫 part는 0)부터 자기 `rows_end`까지를 덮는다.
+- **생략 의미:** 덮은 구간에서 읽은 값이 0이고 overflow가 아닌 행은 싣지 않는다. 0이 아니거나 overflow인 행은 모두 싣는다. 생략한 행은 그 checkpoint의 관측 구간 안에서 0으로 읽은 값이다. 행 사이의 동시 스냅샷이 아니라는 기존 의미는 그대로다.
+- **완전성:** part 번호가 0부터 빈틈없이 이어지고, `rows_end`가 증가하며, 마지막 part의 `rows_end`가 `rows`와 같아야 완전한 checkpoint다. `parts`는 기존처럼 dense part 수 `ceil(N/64)`를 상한으로 유지한다. 실제 part 수는 `max(1, ceil(0이 아닌 행/64))` 이하다. 빈 checkpoint도 행 0개인 part 하나를 남긴다.
+- **조회:** 완전한 checkpoint에 없는 키는 같은 session·epoch에서 관측된 키에 한해 0 표본으로 비교한다. 불완전한 checkpoint는 생략 행을 0으로 추정하지 않는다. 판독은 기존 `version=1` dense report도 받는다.
+- **예약:** 파일·청크·report 수와 바이트 예약은 dense 최악값을 그대로 쓴다. 손실이 많아 모든 행이 0이 아니어도 시작 전 산정한 예산 안에 들어간다.
+- **구현·수락:** [EV-103](../../05_verification/verification_evidence.md#ev-103)에서 구현과 8 GiB P3·P5 판정을 마쳤고, [REV-067 RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161)을 닫았다.

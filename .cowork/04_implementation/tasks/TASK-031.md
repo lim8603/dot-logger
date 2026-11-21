@@ -113,7 +113,7 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 
 - [x] Foxglove Desktop 3.5.0 실시간 구독·원격 기록 재생, 되감기와 ¼배속 표시를 확인했다. [EV-096](../../05_verification/verification_evidence.md#ev-096)
 - [x] 루프백 upstream 구독 큐와 원격 연결 한도의 정량 포화 회복을 반복했다. [EV-097](../../05_verification/verification_evidence.md#ev-097)
-- [ ] T7 LAN P4·P4-bulk를 두 번째 장비에서 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다. Ubuntu 유선과 Windows Wi-Fi 간 직접 TCP 연결 및 시험 예제를 확인했다. 소형 부하의 ACK 지연·누락은 루프백에서 재현했고 서버 `TCP_NODELAY`의 영향을 확인했다. Windows 브리지 수신 재개 뒤 기준·대조 빌드를 LAN에서 시험한다. [EV-099](../../05_verification/verification_evidence.md#ev-099) · [EV-100](../../05_verification/verification_evidence.md#ev-100)
+- [ ] T7 LAN P4·P4-bulk를 두 번째 장비에서 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증한다. 2026-11-21 Ubuntu 유선 ↔ Windows Wi-Fi(RTT 평균 2 ms)에서 실행했다. 대용량은 TCP 대비 74.6%(목표 ≥80%)였다. 소형은 클라이언트가 기록마다 Ack RPC 응답을 기다려 초당 약 440건에서 막혔고, 서버 `TCP_NODELAY`로도 해소되지 않았다. 원격 ACK 계약 변경은 Human 결정 대기다. [EV-099](../../05_verification/verification_evidence.md#ev-099) · [EV-100](../../05_verification/verification_evidence.md#ev-100) · [EV-102](../../05_verification/verification_evidence.md#ev-102)
 - [x] [RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) 조치를 반입해 작은 loss part를 묶어 저장하고 주기 checkpoint 예산을 확보했다. [EV-098](../../05_verification/verification_evidence.md#ev-098)
-- [ ] 8 GiB 제한의 전체 P3 부하와 함께 P5를 재판정한다. 제한을 적용한 재측정에서 예열 포함 70초분 수락에 76.93초가 걸렸고, 쓰기와 겹친 Query의 p95는 4.72ms였다. [EV-098](../../05_verification/verification_evidence.md#ev-098)
+- [x] 8 GiB 제한의 전체 P3 부하와 함께 P5를 재판정했다. 손실 checkpoint 0 행 생략(ADR-013 개정) 뒤 예열 포함 70초분을 70.0005초에 수락했고, 쓰기와 겹친 조회 p95는 5.03 ms였다. RV-161 Closed. [EV-101](../../05_verification/verification_evidence.md#ev-101) · [EV-103](../../05_verification/verification_evidence.md#ev-103)
 - [ ] TASK-031 수락을 정리한 뒤 [TASK-032](TASK-032.md) 운영 대시보드 S1로 진행한다.

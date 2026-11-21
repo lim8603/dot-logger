@@ -181,3 +181,41 @@ Human 결정(2026-11-13): 「실사용처 테스트는 마지막에 진행은 �
 **2026-11-18 일정 판정:** TASK-033 S4 [EV-089](verification_evidence.md#ev-089) Pass. 최종 라인 93.69%·함수 92.67%·리전 91.08%, 파일별 실제 동작 공백 미처리 0, 범위 내 UC 대응 28/28. Gate 4·5는 Not Ready.
 
 이 결정으로 2026-10-31 기록의 "이번 정책 변경만으로 Task를 Done 처리하지 않는다"는 문구를 대체한다. 미실행 시험(native·장기·실사용처)을 Pass로 바꾸지 않으며, 미실행 상태는 GAP과 소유 Task에 그대로 남는다.
+
+## dot-logger Gate 4·5 판정 — 2026-11-21
+
+TASK-025 S4에서 판정했다. 대상은 main `987fdb9`와 이 판정에서 고친 공개 스키마·CI 설정이다. 근거 색인은 [EV-110](verification_evidence.md#ev-110)과 [MS별 추적 요약](test_case.md#ms별-추적-요약--2026-11-21-task-025-s4)이다. **Gate 4 판정은 AI 판정안이며 Human 수락 전에는 Phase를 바꾸지 않는다.**
+
+### Gate 4 (Implementation → Verification) — AI 판정안: Pass (이 PC 로컬 범위)
+
+| 항목 | 판정 | 근거 |
+|---|---|---|
+| 코드 리뷰 완료 | Pass | REV-001~070 모두 Closed. 각 리뷰는 review_checklist 기준으로 조치·수락했다 |
+| 검증 대상 Milestone 정렬 | Pass | 구현 MS인 MS-002~006·008·009가 Done이다. MS-007은 검증·인수 MS 자체다 |
+| 핵심 Task 완료 기준 | Pass | 구현 Task 31건 Done. 남은 TASK-024(native·24h)·TASK-026(실사용처)은 2026-11-13·15 Human 결정으로 마지막 단계의 검증·적용 Task다. TASK-018은 범위 미승인 선택 기능이다. TASK-025는 이 S4로 마무리한다 |
+| 단위 테스트 통과 | Pass | Rust 1.96.0·1.85.0 각 724 Pass·실패 0·5 ignored(외부 DB), feature 조합 두 버전, Miri CI 범위([EV-110](verification_evidence.md#ev-110)). 커버리지 라인 93.69%·함수 92.67%·리전 91.08%([EV-089](verification_evidence.md#ev-089)) |
+| 코딩 컨벤션 | Pass | 두 버전 Clippy `-D warnings`, fmt, strict rustdoc(workspace·core 전용), 통합 표면 검사 |
+| F-11 종단 재검증 | Pass — 결함 2건 발견·조치 | 아래 소비자 목록을 현재 HEAD에서 확인했다. 공개 스키마 누락(GAP-011)과 CI Miri 설정 낡음(GAP-012)을 찾아 고쳤다 |
+
+F-11 소비자 목록(최근 계약 강화와 영향 경로):
+
+| 변경 | 소비자 | 확인 |
+|---|---|---|
+| ADR-015 묶음·파이프라인 ACK | 서버 Ack, client `handoff`/`flush`, CLI `tail`, viewer, `dot_probe_*`·`lan_probe` 예제, 공개 `.proto` | 종단 `tail` 10건 ACK, LAN [EV-104](verification_evidence.md#ev-104)·[EV-105](verification_evidence.md#ev-105). `.proto` 누락 발견 → 보완 |
+| REV-069 구독 창 묶음 상한 | client 묶음 크기, 서버 거절 | 회귀 시험([EV-106](verification_evidence.md#ev-106)), 종단 `tail` |
+| REV-070 endpoint·upstream 검사 | CLI, client `connect`, viewer, README 명령 | 종단 viewer·대시보드·CLI, S2 README 명령 실행 |
+| ADR-013 `standard/2`·manifest v2 전용 | 오프라인 CLI, `recover`, viewer 파일 열기, Foxglove | [EV-088](verification_evidence.md#ev-088)·[EV-090](verification_evidence.md#ev-090)·[EV-096](verification_evidence.md#ev-096), 회귀 시험 |
+| 손실 checkpoint 실제 시각 | Miri CI 작업 | CI 설정 낡음 발견 → 조치 |
+
+범위 한계: 위 근거는 이 PC(Linux x86_64)의 로컬 실행이다. native·다른 OS CI는 GAP-004로 Not Run이며 공개 뒤 TASK-024(T3)가 소유한다. Gate 4 Pass는 이 범위를 넘어서 해석하지 않는다.
+
+### Gate 5 (Verification → Release) — 판정: Not Ready
+
+| 항목 | 판정 | 근거·남은 일 |
+|---|---|---|
+| 통합 테스트 전체 통과 | Not Ready | 로컬 통합·종단은 통과. TC-012의 P6 24시간·native·3 OS·실사용처, TC-011의 MS-007 부분이 Not Run |
+| NFR 검증 | Not Ready | NFR-001·002·005·006은 이 PC 측정 근거가 있다([EV-064](verification_evidence.md#ev-064)~[EV-070](verification_evidence.md#ev-070), [EV-097](verification_evidence.md#ev-097)~[EV-105](verification_evidence.md#ev-105)). NFR-003 24h·NFR-007 3 OS는 Not Run |
+| 문서 최종 업데이트 | Partial | 공개 README와 `07_delivery` 작업 문서(TASK-025 S2·S3) 완료. 릴리즈 노트는 미배포 초안이고 TASK-024·026 결과 반영 전 |
+| 산출물 범위 충족 | Not Ready | deliverable_plan의 필수 산출물 다수가 수집중이고 공식 `docs/`는 만들지 않았다 |
+
+Gate 5 재판정 경로: 저장소 공개 전환 → TASK-024(T3 native·3 OS, 24h·전원 차단) → TASK-026(첫 실사용처 적용) → 릴리즈 노트·운영서 갱신과 공식 산출물 생성 → Gate 5 재판정. 미실행 시험은 Pass로 바꾸지 않는다.

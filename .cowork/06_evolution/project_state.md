@@ -10,9 +10,9 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 일정 판정 완료, 인수(TASK-025)·장기/native(TASK-024)·실사용처(TASK-026) 잔여. MS-009 Done(2026-11-21) |
-| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1 문서 검토·S2 공개용 영어 README·S3 `07_delivery` 작업 문서 Done. 다음 S4 MS별 추적표·Gate 4·5 판정 |
+| 활성 Task | [TASK-025](../04_implementation/tasks/TASK-025.md) In Progress — S1~S4 Done, **Human 수락 대기**: Gate 4 판정안 Pass(로컬 범위)·Gate 5 Not Ready([판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)) |
 | 미처리 리뷰 | 없음 — REV-001~070 Closed. 최근 [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) RV-166~170 조치·수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
-| 상태 | 31/35 Task Done, MS-009 Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), REV-069 [EV-106](../05_verification/verification_evidence.md#ev-106), 대시보드 [EV-107](../05_verification/verification_evidence.md#ev-107)·[EV-108](../05_verification/verification_evidence.md#ev-108)·REV-070 [EV-109](../05_verification/verification_evidence.md#ev-109) 두 Rust 각 724 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 상태 | 31/35 Task Done, MS-009 Done. 현재 HEAD 재검증 [EV-110](../05_verification/verification_evidence.md#ev-110): 두 Rust 각 724 Pass·5 ignored, feature 조합·CI 범위 Miri·종단 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089) 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. **Gate 4 판정안 Pass(로컬 범위, Human 수락 대기)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-21 / #004 공개 범위 논의·imported_context 비공개 처리 / AI |
@@ -83,7 +83,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
-| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | In Progress | 2026-11-21 | S1~S3 Done(영어 README, `07_delivery` 작업 문서). 다음 S4 추적표·Gate 4/5 |
+| TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | In Progress | 2026-11-21 | S1~S4 Done. Human 수락 → Done·Phase Verify 전환 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -121,7 +121,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
      4. dot-probe(별도 프로젝트) 내부 정보를 어디까지 드러낼지 Human이 정한다.
      5. 공개 전 자동 검사: gitleaks 등 비밀 검사, `cargo-deny` 라이선스 검사. 라이선스 선택과 vendor `mcap` MIT 고지 보완(T2)을 함께 한다.
    - `.cowork`를 공개하면 코드 주석의 내부 번호(198줄)는 가리킬 곳이 있으므로 남겨도 된다.
-1. **TASK-025 S4:** S1 문서 검토, S2 공개용 영어 README, S3 `07_delivery` 사용자 매뉴얼·운영서·릴리즈 노트(작업 문서, 릴리즈 노트는 미배포 초안)를 마쳤다. 다음은 S4 MS별 구현/TC/EV 추적표와 Gate 4·5 판정이다. [TASK-025](../04_implementation/tasks/TASK-025.md#s3-결과--2026-11-21)
+1. **TASK-025 수락:** S4에서 MS별 추적 요약, 현재 HEAD 재검증([EV-110](../05_verification/verification_evidence.md#ev-110)), Gate 4 판정안(Pass, 이 PC 로컬 범위)과 Gate 5 Not Ready를 기록했다. 발견 2건(공개 `.proto` 누락, CI Miri 실행 불가)은 조치했다. Human이 수락하면 TASK-025 Done, 구현 칸 5개 체크, Phase를 Verify로 바꾼다. 그다음은 공개 전환(T2 잔여)과 TASK-024·026이다.
 2. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약

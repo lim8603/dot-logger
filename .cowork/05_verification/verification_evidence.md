@@ -20,10 +20,10 @@
 | 항목 | 내용 |
 |------|------|
 | 관련 Intent | INT-001 |
-| 관련 Milestone | MS-002·003 |
+| 관련 Milestone | MS-001~009 |
 | 관련 Test Strategy | `test_strategy.md` |
 | 관련 Test Case | `test_case.md` |
-| 버전 | 2026-11-18 / EV-001~087 |
+| 버전 | 2026-11-21 / EV-001~110 |
 
 ---
 
@@ -46,10 +46,11 @@
 
 ## 근거 영역 요약
 
-INT-001 / 2026-11-01 #005 / Build, MS-005 In Progress. TASK-017 S2 로컬 합성 파일 실행·예산/취소·footer/sync/close·소유 경로 정리·결과 분류를 EV-032/REV-030 Closed로 수락했다. S3 운영 free probe·Report/CLI/host/backend·실앱/실측/UPS·native(T3)가 남고 Task/MS/TC 전체 및 Gate4/5 Not Ready를 유지한다. EV-031 이전 로컬 수락과 각 형상의 미검증 이력은 보존한다.
+INT-001 / 2026-11-21 / Build·Verify. MS-001~006·008·009 Done, MS-007 In Progress(TASK-025 S4, TASK-024·026 남음). 현재 HEAD 회귀·종단 확인은 [EV-110](#ev-110), 일정 판정은 [EV-089](#ev-089), 성능 근거는 [EV-064](#ev-064)~[EV-070](#ev-070)·[EV-097](#ev-097)~[EV-105](#ev-105), UPS 시뮬레이션은 [EV-043](#ev-043)이다. native·3 OS·24h·실사용처는 Not Run(GAP-004, TASK-024·026). Gate 판정은 [quality_gate](quality_gate.md#dot-logger-gate-45-판정--2026-11-21).
 
 ## Evidence Index
 
+<a id="ev-001"></a>
 ### EV-001 — TASK-002 구성·공개 API·도구체인·의존성
 
 - 대상: 코드 커밋 `5f8cee9`. `ace6d1a` 위 작업 트리에서 검증한 소스와 commit blob의 SHA-256이 일치함을 세션 마감 시 확인했다. 기계 판독 결과·소스 SHA-256(비공개 원시 근거: `imported_context/task_002_2026-10-26/results.json`)에 각 소스/manifest·lock/CI/script의 검증 대상 hash를 기록했다.
@@ -94,6 +95,7 @@ MCAP 0.25.0 선택 zstd 경로의 취약점 3·zstd-safe unsound 10건은 Human 
 
 사용자가 TASK-002 요약보고 후 「승인하고」로 구현 리뷰를 승인했다. 대상 구현은 `5f8cee9`, 로컬 검증은 위 EV-001이다. GitHub MCP 연결·본인 계정 저장소 생성·업로드도 요청했다. native CI는 같은 날 위 7개 작업 Pass로 완료했고 GAP-004를 hosted native CI 범위에서 Closed로 갱신했다.
 
+<a id="ev-002"></a>
 ### EV-002 — TASK-003 소형 수집·예약·일반 대기
 
 - 대상: base `3cab15f5298fefa1bd985267f1a32c8238a53053` 위 dirty 작업 트리. capture 모듈/통합 시험·고정 오류 resource·공개 consumer·test-only allocator guard·workspace/lock/script 변경. 결과·20개 소스/manifest SHA-256(비공개 원시 근거: `imported_context/task_003_2026-10-27/results.json`)으로 검증 내용을 고정했다. 외부 의존성 pin은 변경하지 않았다.
@@ -134,6 +136,7 @@ allocator guard는 TLS의 실제 할당/해제 감지 보정 후 소형 수락·
 
 6개 구성 작업과 audit 총 7개 작업 Pass. TASK-003 Done·GAP-004 Closed(hosted native CI 범위). Windows Server 2025는 Windows 11, Ubuntu hosted는 PREEMPT_RT/실장비 수락을 대신하지 않는다. 원본 풀·회수/메모리 순서 모델·분배/완료·파일·p99·전원 차단 검증은 잔여다. GAP-001·002·005와 Gate 4/5 Not Ready를 유지한다.
 
+<a id="ev-003"></a>
 ### EV-003 — TASK-004 원본 풀·수명·반환
 
 - 대상: base `d5759c24990bf3a328b3aec2a311b6cfec26aa49` 위 dirty 작업 트리. pool·capture 연동·원본 시험/allocator guard·scope 예제·package lint·CI/feature script 변경. 기계 판독 결과·24개 소스/manifest SHA-256(비공개 원시 근거: `imported_context/task_004_2026-10-27/results.json`)으로 검증 대상을 고정했다. Cargo.lock·외부 dependency는 변경하지 않았다.
@@ -168,6 +171,7 @@ Miri는 [공식 사용법](https://github.com/rust-lang/miri#using-miri)과 [다
 - CI 대상과 EV-003 source/manifest 24개 hash 일치. 시험 실행 전 인프라 차단이므로 제품/native 시험·fresh audit·CI Miri는 **Not Run / Not Verified**다. 첫 job 로그 API는 404(blob 없음)였고 실행 로그를 생성하지 않는다. 기존 로컬/Miri Pass·Human 승인은 유지한다.
 - TASK-004는 In Progress·GAP-004 Open으로 남긴다. Human이 GitHub Billing & plans의 결제/한도 조건을 확인한 뒤 동일 workflow를 재실행해 8개 job을 확인한다. 계정/과금 설정을 변경하지 않았고 원인이 그대로인 재시도는 하지 않았다. TASK-003의 마지막 native Pass는 기존 revision의 이력이다.
 
+<a id="ev-004"></a>
 ### EV-004 — TASK-005 분배·출력 격리·예산
 
 - 대상: base `0f2ad6e` 위 dirty 작업 트리. routing/·capture peek/등록 metadata·Output resource·독립 consumer·allocator 계측·raw-memory CI recipe. 기계 판독 결과·27개 source/manifest SHA-256(비공개 원시 근거: `imported_context/task_005_2026-10-28/results.json`)으로 소스 범위를 고정했다. 외부 dependency/Cargo.lock·private pool/storage unsafe 경계·RT producer/loan API는 변경하지 않았다.
@@ -191,6 +195,7 @@ Miri는 [공식 사용법](https://github.com/rust-lang/miri#using-miri)과 [다
 
 Human 구현 리뷰는 2026-10-28 「승인」으로 완료됐다. native CI/fresh audit Not Run. 사용량 소진이 확인돼 계정 조회/차단 재시도 없이 로컬 검증만 수행했다. raw-memory recipe에 `--test tc_003_routing`을 추가했으나 hosted 실행 증거는 아니다. 공개 전환/계정 변경/commit/push도 수행하지 않았다. TASK-004 native 검증 이월 상태와 승인은 유지한다.
 
+<a id="ev-005"></a>
 ### EV-005 — TASK-006 완료 추적·명시 sync·종료
 
 - 대상: base `0f2ad6e` 위 dirty worktree(승인된 TASK-005 + TASK-006). 결과·36개 source/manifest SHA-256 및 EV-004 이후 변경 목록(비공개 원시 근거: `imported_context/task_006_2026-10-28/results.json`)으로 고정했다. 신규 completion/control·tracked capture/routing feedback·독립 consumer/allocator·CI recipe가 대상이다. 기존 EV-004 source(비공개 원시 근거: `imported_context/task_005_2026-10-28/results.json`)는 당시 승인 revision의 이력으로 보존한다. private pool/storage unsafe·dependency/Cargo.lock은 변경하지 않았다.
@@ -406,6 +411,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 로컬 커밋·세션 마감(2026-10-30): Human 「커밋하고 세션 마무리하자」에 따라 소스 `e6669ac0b4ab1e6ee824e4b571afbd25e49295e7`를 로컬 커밋했다. source49개/commit blob49개·검사10개 exit0·원본/압축/뷰 로그16세트와 artifact hash 일치를 재확인했다. 커밋 기록(비공개 원시 근거: `imported_context/task_008_2026-10-30/commit.json`)을 보존하며 소스와 마감 문서는 분리 커밋한다. 소스가 같아 시험을 반복하지 않았다. 푸시는 요청되지 않아 수행하지 않았고 TASK-008 Human 최종 구현 리뷰/native·장비는 잔여다.
 
+<a id="ev-013"></a>
 ### EV-013 — TASK-008 REV-010 지적 처리
 
 - 승인/대상: 2026-10-30 Human 「프로젝트 브리핑해주고, 리뷰 지적사항 처리하고, TASK-008 요약 보고해줘.」. 로컬 TASK-008 소스 `e6669ac` 위 REV-010 조치 작업 트리. source49개·환경·명령·결과/로그 hash(비공개 원시 근거: `imported_context/task_008_review_fixes_2026-10-30/results.json`), 재현 script(비공개 원시 근거: `imported_context/task_008_review_fixes_2026-10-30/verify.py`). 변경은 catalog/retention/보존 통합3파일이며 dependency/lock·RT 입력·unsafe 경계·feature 구성은 동일하다. commit/push·최종 구현 승인은 이 요청에 포함하지 않는다.
@@ -424,6 +430,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-010](reviews/REV-010_TASK-008_CODE_REVIEW.md)은 RV-012 현 계약 유지/위험 명시·TASK-010 연결, RV-013/014 수정·검증으로 **Resolved / Conditional**이다. [REV-009](reviews/REV-009_TASK-008.md)도 Resolved를 유지하며 Human 최종 구현 리뷰 전 Closed로 올리지 않는다. native GAP-004·실장비/전원/OS 교환·host probe 실측·fresh audit는 미실행이다. 유실 pin의 실제 리더 반환/회수 조건은 TASK-010 미착수 후속이다. TASK-008/MS-003 In Progress·TC-005 부분 실행·Gate4/5 Not Ready를 유지한다. 기존 EV-012/Miri776은 수정 전 검증 이력이며 이번 Miri 범위는 보존128회다.
 
+<a id="ev-014"></a>
 ### EV-014 — TASK-009 중단 복구·IO 장애
 
 - 승인/대상: 2026-10-30 Human 「커밋 푸쉬 후, 다음 테스크 진행」으로 TASK-008 조치 소스7102d93/문서bf3acf0를 origin/main에 게시한 뒤 TASK-009를 구현했다. TASK-008 최종 Human 리뷰·REV-009/010 Resolved·native GAP-004는 유지한다. TASK-009 대상은 `bf3acf0` 위 작업 트리다. source51개·환경/명령/결과·원본 로그 hash(비공개 원시 근거: `imported_context/task_009_2026-10-30/results.json`), 재현 script(비공개 원시 근거: `imported_context/task_009_2026-10-30/verify.py`). 소스 변경은 recovery/fault_storage 신규2개와 storage mod/writer·allocator/CI recipe/README다. dependency/lock·RT 입력·unsafe 경계는 동일하다.
@@ -444,6 +451,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-011](reviews/REV-011_TASK-009.md)은 RV-015 로컬 해결·회귀 Pass로 **Resolved / Conditional**이다. TASK-009 검증 당시 작업 트리는 후속 세션 마감/게시 요청으로 소스 5bbb45c을 커밋했고 source51개와 일치한다. Human 최종 구현 리뷰·native GAP-004·실제 장비/전원/OS 교환·host free-space adapter 실측은 잔여다. host가 원래 session/revision·동일 순서의 등록과 source 불변성을 보장해야 한다. 자동 startup directory 발견/기존 namespace 재개·active reader TASK-010·worker/StorageDegraded 계측 TASK-014는 별도 후속이다. TASK-009/MS-003 In Progress·TC-005 부분 실행·Gate4/5 Not Ready를 유지한다. 새 native CI recipe에는 retention/fault_storage Miri 범위를 추가했으나 CI/계정/과금 조회·차단 재시도·fresh audit는 하지 않았다.
 
+<a id="ev-015"></a>
 ### EV-015 — TASK-009 REV-012 P3 권고 조치
 
 - 승인/대상: 2026-10-30 Human 「프로젝트 진행현황 확인하고, 새 리뷰 지적사항 처리하고, TASK-009 짧게 요약보고해줘」. `5b49ea7` 위 dirty 작업 트리, EV-014 source51개 중 `storage/recovery.rs`만 변경했다. 소스51개·환경/명령/결과·로그 SHA-256(비공개 원시 근거: `imported_context/task_009_review_fixes_2026-10-30/results.json`)·재현 script(비공개 원시 근거: `imported_context/task_009_review_fixes_2026-10-30/verify.py`).
@@ -459,6 +467,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-012](reviews/REV-012_TASK-009_DEEP_REVIEW.md) RV-016/017 수용·Resolved. Human 최종 구현 리뷰·native GAP-004·장비/전원/OS 교환은 잔여이며 TASK-009/MS-003 In Progress·Gate4/5 Not Ready를 유지한다. 현재 변경은 feature 분기/unsafe를 건드리지 않아 이 영향 회귀를 적용했다. EV-014의16-feature matrix/rustdoc/Miri936은 이전 소스의 이력으로 보존하며 이번 변경에서 다시 실행했다고 표시하지 않는다. native CI/계정 조회·차단 재시도·fresh audit·commit/push는 수행하지 않았다.
 
+<a id="ev-016"></a>
 ### EV-016 — TASK-010 시간·채널 조회와 active snapshot
 
 - 승인/대상: 2026-10-30 Human 「승인, 커밋 푸쉬하고 다음 작업 진행하자.」로 TASK-009 최신 구현·REV-011/012 Closed 및 소스5c60399/문서74fc9ba origin/main 게시 후 착수. TASK-008 최종 Human 리뷰·선행 native GAP-004는 별도 유지한다. 대상은 `74fc9ba` 위 dirty 작업 트리의 source53개·환경/명령/로그 hash(비공개 원시 근거: `imported_context/task_010_2026-10-30/results.json`), 실행 script(비공개 원시 근거: `imported_context/task_010_2026-10-30/verify.py`)·결과 대조 script(비공개 원시 근거: `imported_context/task_010_2026-10-30/consolidate.py`)다. query/통합2개 신규, storage pin/검증 helper·lib/consumer/allocator/CI recipe 변경. dependency/lock·RT 수집/거절/Drop·unsafe는 동일하다.
@@ -478,6 +487,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 현재 closed 파일도 bounded data-section scan으로 query index를 재구성하며, 표준 summary를 이용한 scan 생략 최적화는 미구현이다. 파일 prefix 불변성/정확한 독립 descriptor·원래 등록은 host 계약이고 clock 변환·OS IO 강제 취소를 제공하지 않는다. 실제 p95/IO 간섭·native/다른 OS/전원/장비·replay/remote/CLI는 잔여다. source/sink host buffer·allocator 내부·OS cache는 logger 예약 밖이다. [REV-013](reviews/REV-013_TASK-010.md)는 RV-018~020 조치·최종 회귀 Pass로 Resolved/Conditional이다. Human 최종 구현 리뷰 전 Closed로 올리지 않으며 TASK-010/MS-004 In Progress·TC-006 부분 실행·Gate4/5 Not Ready를 유지한다. native CI/계정 조회·차단 재시도·fresh audit·TASK-010 commit/push는 수행하지 않았다.
 
+<a id="ev-017"></a>
 ### EV-017 — TASK-010 REV-014 정렬 재사용·API 안내 보강
 
 - 대상: 기준 HEAD `89e33eb` 위 미커밋 작업 트리, 제품 변경은 `query/mod.rs`와 `tc_006_query.rs`다. 명령·exit code·소스/로그 SHA-256(비공개 원시 근거: `imported_context/task_010_review_fixes_2026-10-30/results.json`)에 검증 대상 파일52개의 hash를 고정했다. 이전 EV-016은 당시 source53개에 대한 이력이다.
@@ -497,6 +507,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 [REV-014](reviews/REV-014_TASK-010_CODE_REVIEW.md) RV-021~023은 로컬 조치/검증 Pass로 Resolved다. 원본 로그는 `.log.gz`, `.log`는 줄 끝/EOF 공백만 정규화한 뷰이며 각각의 hash를 results.json에 기록했다. 실제 CPU 처리량·p95/IO 간섭은 측정하지 않았으며 native GAP-004·장비·fresh audit·commit/push는 미실행이다. 변경 없는 pool/control/routing unsafe 영역의 Miri 전체 반복은 하지 않았다. TASK-010/MS-004 In Progress, Human 구현 리뷰 대기·Gate4/5 Not Ready를 유지한다.
 
+<a id="ev-018"></a>
 ### EV-018 — TASK-011 mono 재생·유한 prefetch·시간/취소 제어
 
 - 대상: TASK-010 소스1972649·문서f92dd17 게시 후 작업 트리. 신규 `replay/mod.rs`, `tc_006_replay.rs`; query의 crate-private 1건 page/검증된 buffer 접근, lib export·retention/실제 파일 consumer/allocator·native recipe 변경. 검사 명령·소스54개/로그 SHA-256(비공개 원시 근거: `imported_context/task_011_2026-10-30/results.json`)에 고정한다.
@@ -516,6 +527,7 @@ source49개와 matrix/Miri source hash 일치·검사10개 exit0을 확인했다
 
 native GAP-004·다른 OS·실제 timer 지터/처리량/p95·수집 IO 간섭/장비·remote/live/CLI·fresh audit·TASK-011 commit/push는 미실행이다. TASK-011/MS-004 In Progress·TC-006 하위 검증만 완료하며 Human 리뷰와 Gate4/5 Not Ready를 유지한다. 기존 unsafe pool/control/routing을 변경하지 않아 해당 Miri 전체는 반복하지 않았다.
 
+<a id="ev-019"></a>
 ### EV-019 — TASK-011 REV-016 반입·방어적 정리/진단 API
 
 - 승인/대상: 2026-10-31 Human의 프로젝트 브리핑·리뷰 반입 및 처리·TASK-011 요약 요청. HEAD `50190f1`(재생 소스 `ccecf4a`) 위 미커밋 작업 트리의 `replay/mod.rs`·`tc_006_replay.rs` 2파일 변경이다. 명령/환경·source54개/로그 SHA-256(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/results.json`)·재현 script(비공개 원시 근거: `imported_context/task_011_review_fixes_2026-10-31/verify.py`) 참조.
@@ -534,6 +546,7 @@ native GAP-004·다른 OS·실제 timer 지터/처리량/p95·수집 IO 간섭/�
 
 native GAP-004·다른 OS·장비/실제 timer·remote/live/CLI·fresh audit·커밋/푸시는 미실행이다. TASK-011은 Human 최종 구현 승인·REV-015/016 Closed이며 TASK-011/MS-004 In Progress·Gate4/5 Not Ready·TASK-008/010 Human 최종 리뷰 대기를 유지한다.
 
+<a id="ev-020"></a>
 ### EV-020 — TASK-011 REV-017 반입·배속 비교/오류 진단·MSRV 유지
 
 - 요청/대상: 2026-10-31 Human 「프로젝트 브리핑하고, 리뷰 반입하고, 승인 해야 하는 업무 보고해줘」. HEAD `97463bc`(기존 재생 소스c6cc5a5) 위 미커밋 작업 트리. query/mod.rs·replay/mod.rs·tc_006_replay.rs 3파일 변경. 명령/환경·source54개/로그 SHA-256(비공개 원시 근거: `imported_context/task_011_final_review_fixes_2026-10-31/results.json`)·재현 script(비공개 원시 근거: `imported_context/task_011_final_review_fixes_2026-10-31/verify.py`).
@@ -552,6 +565,7 @@ native GAP-004·다른 OS·장비/실제 timer·remote/live/CLI·fresh audit·�
 
 native GAP-004(공개 후 T3), PC 성능/실제 timer·UPS 시뮬레이션·다른 OS·fresh audit·commit/push는 미실행. RT/unsafe·의존성/lock/feature 구성 변경 없음. 16 feature 조합·기존 unsafe 영역 전체 Miri는 영향이 없어 반복하지 않았다. TASK-008/010 최종 구현 리뷰·TASK-022 수치 프로필 잔여, TASK-011/MS-004 In Progress·Yellow·Gate4/5 Not Ready 유지. 기존 EV-018/019 Human 승인은 이번 추가 조치의 승인으로 확대하지 않는다.
 
+<a id="ev-021"></a>
 ### EV-021 — TASK-022 local-pc-v1 프로필 준비·읽기 전용 사전 점검
 
 - 요청: 2026-10-31 Human 「승인, 다음작업 진행하자」. TASK-008 EV-012/013·TASK-010 EV-016/017·TASK-011 EV-020 최종 구현 승인, REV-009/010/013/014/017 Closed. 기존 source54개 hash가 EV-020과 일치해 성공 시험을 반복하지 않았다.
@@ -567,6 +581,7 @@ EV-021 후속 — 2026-10-31 Human의10ms 요청으로 합성 control 주기/기
 
 EV-021 수치 승인 — 2026-10-31 10ms 주기 조정 보고 후 Human 「승인」으로 local-pc-v1 Approved를 반영했다. 승인 스냅샷/hash·사전 점검(비공개 원시 근거: `imported_context/task_022_profile_2026-10-31/approval-checks.json`)에서 선언 Valid exit0·require-ready exit2, pending에서 승인 대기 제거를 확인했다. 이전 Draft/20ms·10ms 검증 근거는 각각 당시 스냅샷과 대응하며 현재 프로필 hash는 승인 근거를 따른다. 제품 실행 NotRun·TASK-022 In Progress·선행 harness/실앱 통합/UPS adapter·RT 부팅·GAP-004 공개 후 이월은 유지한다. 앞선 Draft/수치 검토 대기는 승인 전 이력이다.
 
+<a id="ev-022"></a>
 ### EV-022 — TASK-012 bounded gRPC·수신 ACK·host 관리·TLS
 
 - 요청/대상: 2026-10-31 Human 「권장대로 진행」, HEAD `97463bc` 위 기존 승인 변경을 보존한 미커밋 작업 트리. remote 모듈/서버·native DTO/receiver·proto·external ledger 공유·TLS feature/lock edge·독립 consumer/allocator 및 feature/proto 검사. 소스70개/검사11개/로그 SHA-256(비공개 원시 근거: `imported_context/task_012_2026-10-31/results.json`)·재현 script(비공개 원시 근거: `imported_context/task_012_2026-10-31/verify.py`).
@@ -587,6 +602,7 @@ EV-021 수치 승인 — 2026-10-31 10ms 주기 조정 보고 후 Human 「승�
 
 native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC 성능/UPS·dot-probe/운영 보안 정책·TASK-013 CLI/SDK·TASK-016/017 등 관리 backend·fresh online audit·commit/push는 미실행이다. 서버의 테스트 실행은 종료했고 상시 데몬/실제 배포를 수행하지 않았다. 기존 unsafe pool/control/routing 전체 Miri는 변경 영향이 없어 반복하지 않았다.
 
+<a id="ev-023"></a>
 ### EV-023 — TASK-012 REV-019 연결 포화·credential 비교·receiver 수명 보강
 
 - 대상: 소스 `ca1694a6f93a8fe5f6f93bc86b346bcdbc1583f6`. source70개/검사9개/hash(비공개 원시 근거: `imported_context/task_012_review_fixes_2026-10-31/results.json`)·재현 script(비공개 원시 근거: `imported_context/task_012_review_fixes_2026-10-31/verify.py`)·commit blob70개 일치(비공개 원시 근거: `imported_context/task_012_review_fixes_2026-10-31/commit.json`). EV-022는 이전 형상의 이력이다.
@@ -598,6 +614,7 @@ native GAP-004 공개 후(T3), 다른 OS·실제 LAN/정량 timer/전체 RSS·PC
 - 수락: Human 기존 로컬 구현 승인·마감 위임을 근거로 검증 뒤 AI 수락. REV-018/019 Closed, TASK-012는 로컬 Human 리뷰 완료/native·실측 잔여로 In Progress다. TASK-013 착수 승인 유지.
 - 미검증: native 공개 후(T3)·다른 OS·PC 성능/RT/UPS/LAN/RSS·실제 dot-probe/운영 backend·전체 인증 시간 특성. Gate4/5 Not Ready 유지.
 
+<a id="ev-024"></a>
 ### EV-024 — TASK-013 착수·클라이언트 연결별 수신 수명 API
 
 - 대상: 소스 `86b50ef41f6bb35193b4b9605af360dc27964159`, 새 dot-logger-client crate와 workspace/lock 등록. source74개/검사12개/log hash(비공개 원시 근거: `imported_context/task_013_start_2026-10-31/results.json`)·검증 script(비공개 원시 근거: `imported_context/task_013_start_2026-10-31/verify.py`)·commit blob74개 일치(비공개 원시 근거: `imported_context/task_013_start_2026-10-31/commit.json`). 외부 package/version은 그대로이며 로컬 workspace package1개만 추가했다. TASK-012 코드 조치 근거는 EV-023을 유지하고 현재 통합 workspace snapshot은 EV-024다.
@@ -725,6 +742,8 @@ TASK-022 환경/프로필 준비를 시작했다. 아직 수행하지 않은 실
 
 ## Gate 판정 메모
 
+2026-11-21 현재: [quality_gate의 Gate 4·5 판정](quality_gate.md#dot-logger-gate-45-판정--2026-11-21)을 따른다. 아래는 2026-10-31 당시 기록이다.
+
 Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.md의 설계 판정을 따른다.
 
 <a id="ev-034"></a>
@@ -841,6 +860,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **사전 존재 불안정:** `transport::next_timeout_during_partial_tcp_frame_retains_decoder_and_record`가 변경 전 HEAD에서도 5/40 실패(서버 종료 직후 예약 40,976,384B 잔존). 최종 실행에서는 통과했다. GAP-008로 추적한다.
 - **미실행:** 실제 dot-probe 화면/지속 앱(TASK-026), 자동 1초 sampling worker(host 책임), CPU/메모리/지연 실측, PC/RT·native(T3).
 
+<a id="ev-045"></a>
 ## EV-045 — GAP-008 서버 종료 뒤 hub 예약 지연 반환 수정
 
 - **판정:** 로컬 Pass. GAP-008 Closed. 원격 서버 수명 계약을 보강한 것이며, LAN·RSS·native(T3) 수락을 뜻하지 않는다.
@@ -851,6 +871,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy(-D warnings)·rustdoc(-D warnings)·Rust 1.96/MSRV 1.85 workspace 각 440 Pass(5 ignore, 기존 DB 회귀)·두 toolchain feature matrix exit0.
 - **미실행:** Miri(네트워크/Tokio 경로 대상 아님), LAN·실앱·native(T3).
 
+<a id="ev-046"></a>
 ## EV-046 — TASK-023 S1 P0 기준선 harness·결과 판정 로컬 구현
 
 - **판정:** 로컬 구현 Pass. 정식 P0~P5 측정·off/on 3회·RT는 NotRun이며 성능 합격 근거가 아니다.
@@ -920,6 +941,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·`git diff --check`·clippy 1.96/1.85 exit0·rustdoc·Rust 1.96/MSRV 1.85 workspace 각 483 Pass(5 ignore, 기존 DB 회귀)·`scripts/check-feature-matrix.py` 두 toolchain exit0.
 - **미실행:** S2 auto preset, preset 예산의 실제 IO 정지 흡수 측정(TASK-023 S2/S3), RT 행, native(T3).
 
+<a id="ev-053"></a>
 ## EV-053 — REV-051 조치(RV-120~127)
 
 - **판정:** 로컬 조치 Pass. REV-051 Closed(2026-11-07 Human 「승인」). RT 커널 행·native(T3)·TASK-023 실측은 NotRun.
@@ -929,6 +951,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96 `-D warnings` exit0·rustdoc `-D warnings` exit0(병렬 실행 첫 회에 기존 CLI bin/lib 문서 파일명 충돌 경고와 함께 1회 실패, 단독 재실행 Pass)·Rust 1.96 workspace 493 Pass(5 ignore, 기존 DB 회귀; 신규 10)·MSRV 1.85 workspace 493 Pass·clippy 1.85 exit0·`check-feature-matrix.py` 1.96/1.85 exit0·api-consumer Pass(`9437184 bytes reserved`)·경쟁 민감 묶음(rt-allocation·logger 단위·tc_013_facade·facade_remote) 20회 반복 20/20.
 - **미실행:** TASK-023 S2/S3 실측(RV-121·RV-124 효과 포함), RT 커널 행, native(T3).
 
+<a id="ev-054"></a>
 ## EV-054 — TASK-023 S2a·S2b facade 경로 측정 도구와 제품 발견 조치
 
 - **판정:** 로컬 구현 Pass(측정 도구·조치 4건). 정식 측정은 NotRun(S3). 발견 ⑥(기록 수 회전 시 보존 segment 개수 상한)은 Open — Human 결정 대기.
@@ -946,6 +969,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검증:** fmt·clippy 1.96/1.85 exit0·rustdoc exit0·workspace 1.96/1.85 각 507 Pass(5 ignore 기존 DB)·feature matrix 1.96 exit0·Miri lib 26(2 ignore)·tc_003 completion 15·control 18·routing 19 Pass.
 - **미실행:** 발견 ⑥ 조치, S2c(P2 raw·P3 혼합), S3 정식 측정, RT, native(T3).
 
+<a id="ev-055"></a>
 ## EV-055 — TASK-023 S2b 발견 ⑥~⑧ 조치
 
 - **판정:** 로컬 조치 Pass. S2b 완료(발견 ①~⑧ 조치). 정식 측정은 NotRun(S3).
@@ -1010,6 +1034,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **기록:** 중단된 실행 결과 `perf_runs/s3-2026-11-08-aborted/`(⑩), `perf_runs/s3-2026-11-08/`(⑪ 발견 전 1회차 일부).
 - **미실행:** S3 정식 측정, ⑪ 원인 분석, RT, native(T3).
 
+<a id="ev-060"></a>
 ## EV-060 — TASK-023 S3 발견 ⑪ 분석 1차: 회전 sync 가설 기각
 
 - **판정:** 진단 실험(제품 무수정). 가설 「256 MiB 회전마다의 파일·디렉터리 fsync가 원인」 기각. ⑪ Open 유지 — 재현 조건 미확정.
@@ -1021,6 +1046,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **남은 후보:** EV-059와 다른 조건은 ① 페이지 캐시 무제한(RAM 55 GiB, dirty 한도 약 11 GB) ② 수 TB 기록 뒤의 더 깊은 소진(약 650 MB/s) ③ 순서 표류 — EV-059의 비교는 모두 P0를 먼저 실행한 단일 쌍이었다.
 - **쓰기량:** 이 분석 전체 약 370 GB(T500, Human 승인 범위 400~450 GB 안). 원자료 `perf_runs/f11-2026-11-09/`.
 
+<a id="ev-061"></a>
 ## EV-061 — TASK-023 S3 발견 ⑪ 분석 2차: P3 격차는 생산자 바쁜 대기와 host 스레드 상한
 
 - **판정:** ⑪ 원인 규명. P2(raw만)는 격차 없음(EV-060). P3 무제한 격차는 ① 측정 도구 결함(조치) ② 제품 host 스레드 처리 상한(Open, Human 판단 필요)으로 나뉜다.
@@ -1031,6 +1057,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **EV-059 재해석:** P3 441 MB/s는 ①이 주원인으로 보인다. P2 격차는 메모리 상한 조건에서 재현되지 않았고, P0를 먼저 실행한 단일 쌍의 장치 상태 표류 가능성이 크다(EV-060).
 - **쓰기량:** 2차 분석(dry-run 약 25 GB 포함) 약 125 GB(T500). 11-09 누적 약 495 GB로, 1차 분석 때 알린 400~450 GB를 넘었다.
 
+<a id="ev-062"></a>
 ## EV-062 — TASK-023 S3 발견 ⑪ 3차: host 장부 훑기 제거, 남은 한계는 파이프라인 대기
 
 - **정정(EV-063):** 아래 ① 게이트는 실제 흐름에서 효과가 없었다 — 보고를 마친 IO guard도 marker를 해제하지 않고 drop해 세대가 기록마다 올랐다. 「host R 99% → 52~66%」는 SSD 잡음 범위의 관측이다.
@@ -1043,6 +1070,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **남은 한계(Open):** 생산자 거부 약 27.5만 회(소형 20.3만·raw 획득 7.2만)인데 host·IO 스레드는 약 45% sleep. IO 배치 대기 기본값(256건·10 ms)과 유휴 대기 1 ms 때문에 기록이 slot을 오래 점유하는 것으로 보인다. 진단 1회: `idle_wait` 100 µs에서 1,834 MB/s(기본 1,376), `batching` 1 ms만으로는 변화 없음. 4 GiB 실행은 잡음이 커 판정에 반복·장시간 실행이 필요하다.
 - **쓰기량:** 3차 약 90 GB(T500). 11-09 누적 약 585 GB.
 
+<a id="ev-063"></a>
 ## EV-063 — TASK-023 S3 발견 ⑪ 4차: 게이트 정정, tmpfs 측정, 남은 상한
 
 - **판정:** reconcile 게이트 정정 로컬 Pass. ⑪ 정리 — 남은 logger 상한은 장치 지속 속도와 요구 처리량보다 높다. 정식 판정은 축소 S3.
@@ -1056,6 +1084,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **쓰기량:** 4차 SSD 0(tmpfs). 11-09 누적 약 585 GB.
 - **Human 결정(2026-11-10 「1」):** ⑪을 「알려진 상한·비차단」으로 둔다. S3 앞에 조치하지 않고 축소 S3를 실행한다. 근거: 정식 판정은 캐시 소진 상태에서 하고 이때 장치(S ≈ 1.67 GB/s)가 먼저 한계이며, 상한 2.6 GB/s가 효율 0.8을 깨는 조건은 지속 P0 > 약 3.25 GB/s(R1 1.5 GB/s 장비 아님)다. 원인 미규명 사실은 유지한다. 재개 조건은 이월 T5. S3 해석 시 효율 행 P0가 S보다 뚜렷이 높으면(캐시 회복) ⑪ 상한과 분리해 보고한다.
 
+<a id="ev-064"></a>
 ## EV-064 — TASK-023 S3 축소 정식 실행 1회차
 
 - **판정:** 실행 완료(실패 기록 0). P1·제어 Pass, P2/P3 정상 부하는 처리량·무손실·miss 0·sync 기한 Pass(단 raw 획득 Capacity 다수 — 판정 보류), P2 효율 Pass, **P3 효율 미달(0.8)**, 계측 비용 판정 불가. 발견 ⑪의 비차단 전제(「소진 상태에서는 장치가 먼저 한계」)는 P3에서 성립하지 않았다 — **T5 트리거 ① 도래.**
@@ -1078,6 +1107,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **쓰기량:** 장치 카운터 기준 584 GB(T500). 예고 범위 0.5~0.7 TB 안.
 - **미실행/잔여:** P3 효율 원인(T5), 정상 부하 raw 획득 거절의 판정, 계측 비용 재측정, P4·P5(이월), RT, native(T3).
 
+<a id="ev-065"></a>
 ## EV-065 — TASK-023 S3 1회차 후속 진단: P3 효율 재현 안 됨, raw 획득 거절은 풀 사이징, 계측 비용 2.5%
 
 - **판정:** ① EV-064의 P3 효율 미달은 같은 조건 ABBA에서 재현되지 않았다(logger/P0 103%) — 장치 상태 표류가 비율을 지배한다. logger 원인 미달이 확인되지 않아 **T5 트리거 ①은 미확정**(AI 판단, Human 확인 대기). ② 정상 부하 raw 획득 거절은 harness raw 풀(스트림당 8칸)의 사이징 문제 — `sensor` preset 크기(35칸)에서 0. ③ 계측 비용 2.5% **Pass**(≤5%).
@@ -1088,6 +1118,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **쓰기량:** SSD 149 GB(T500). 11-10 누적 약 733 GB.
 - **Human 결정(2026-11-10 「a」) — S3 마감:** 추가 SSD 쓰기 없이 판정한다. P3 효율은 EV-064·065 P3 10회 합산 89% Pass(장치 표류 큼 주석), 정상 부하 raw 획득 거절은 harness 사이징 문제(P3에도 같은 원인으로 판단). `run-perf-s3.sh` raw 풀을 `Preset::sensor` 크기(⌈hz × 1.25⌉, 메모리 예산 증액)로 수정, tmpfs dry-run 13조건 Pass(raw 38칸, 거절 0). T5는 Human 결정으로 조사(다음 세션, tmpfs·SSD 쓰기 0).
 
+<a id="ev-066"></a>
 ## EV-066 — T5 조사: ⑪ 상한은 IO 경로의 바이트당 비용과 공유 자원 경합, 새 발견 ⑫ 종료 drain 장부 훑기
 
 - **판정:** ⑪ 원인 규명(조사 범위). 단일 결함이 아니다. ① logger IO 스레드가 payload 바이트당 P0 writer의 약 2.5~3배 CPU를 쓴다(encode 복사·CRC 2회·커널 쓰기 비용 증가·같은 스레드의 소형 기록). ② hot IO 스레드를 늘려도 바이트당 비용이 함께 올라 합계가 약 3 GB/s에서 멈춘다 — 메모리 대역폭·SMT 같은 공유 자원 경합(하드웨어 카운터 없이 자원은 미확정). host·CPU 배치·raw 깊이는 원인이 아니다. **새 발견 ⑫(제품 결함, Open):** 종료 중 host turn마다 `poll_shutdown`이 완료 장부 전체를 두 번 집계해 drain을 굶긴다.
@@ -1100,6 +1131,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **조치 후보(미착수, Human 판단):** ⑫ 종료 집계를 drain이 끝났을 때·기한 경과 때만 수행(TDD, 판정 의미 유지, 효과 4 스트림 +3%·raw 스트림이 많을 때 큰 폭). 중복 CRC 제거(+9~10%, 압축 없음일 때 chunk CRC 한 번 — mcap 옵션/형식 영향 검토 필요). Envelope 복사 제거(형식·mcap 쓰기 API 변경 필요, 효과 미측정). 상한 수치(이 PC 약 3 GB/s)는 요구 P3(1 GB/s + 10만/s)와 10GbE 1줄(1.25 GB/s)보다 높다.
 - **쓰기량:** SSD 0(tmpfs). 진단 빌드 산출물만 `/data/build`(HP EX950).
 
+<a id="ev-067"></a>
 ## EV-067 — ⑫ 종료 drain 장부 훑기 조치, 중복 CRC·Envelope 복사 효과 측정
 
 - **판정:** ⑫ 조치 로컬 **Pass**(`236ef59`). 중복 CRC 1회화 효과 +4~9%, Envelope 복사 1회 비용 −21~24%(제거 효과 추정 상한 +37~45%) — 둘 다 미적용, Human 판단.
@@ -1111,6 +1143,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Envelope 복사:** `encode_record`에 payload 복사 1회를 더한 진단: 4 스트림 2.13·2.13(−21%), 8 스트림 2.29·2.29(−24%). 복사 1회 ≈ 0.1 s/GB 합산. 같은 비용을 빼는 선형 외삽은 4 스트림 3.7·8 스트림 4.3 GB/s(+37~45%)로 상한 추정이며, 메모리 경합이 비선형이라 실제 효과는 더 작을 수 있다. 제거에는 Envelope 헤더와 payload를 나눠 쓰는 mcap 쓰기 경로(형식 또는 API 변경)가 필요하다.
 - **원자료:** `perf_runs/t5-2026-11-11/`(`runs-ev067.jsonl`). 쓰기량 SSD 0.
 
+<a id="ev-068"></a>
 ## EV-068 — 무압축 MCAP chunk CRC 1회 계산(vendor mcap 0.26.0)
 
 - **판정:** 로컬 **Pass**(`6187768`). 파일 바이트와 CRC 값은 그대로이고 처리량은 +4~6%다. Envelope 복사는 이월 T6로 등록했다.
@@ -1122,6 +1155,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **별건 — 보안 검사:** `cargo audit --deny unsound`가 **RUSTSEC-2026-0486**(rustix 1.1.4, xattr 함수 unsound, 2026-10-27 공지)로 실패한다. HEAD(`7b9f046`, 변경 전)에서도 같으므로 이번 변경과 무관하다. dot-logger는 xattr 함수를 쓰지 않는다(statvfs·affinity만). workspace 고정이 `=1.1.4`이고 1.1.6이 있다 — 고정 갱신은 Human 판단. `paste` 유지보수 경고(GAP-005)는 그대로다.
 - **원자료:** `perf_runs/t5-2026-11-11/runs-ev068.jsonl`. SSD 쓰기 0.
 
+<a id="ev-069"></a>
 ## EV-069 — rustix 1.1.4 → 1.1.6(RUSTSEC-2026-0486)
 
 - **판정:** 로컬 **Pass**. `cargo audit --deny unsound` 실패 해소.
@@ -1129,6 +1163,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **변경:** `Cargo.toml` `rustix = "=1.1.6"`, `Cargo.lock`은 rustix 버전·checksum만 바뀌었다(다른 패키지 변동 없음). dot-logger는 문제의 xattr 함수를 쓰지 않는다(statvfs·affinity만).
 - **검증:** fmt·clippy 1.96.0/1.85.0 `--all-targets --all-features -D warnings` 0, rustdoc `-D warnings` 0, workspace 1.96.0/1.85.0 각 544 Pass, `scripts/check-feature-matrix.py` 1.96.0/1.85.0 각 17조합 Pass, `cargo audit --deny unsound`(cargo-audit 0.22.2) 취약점·unsound 0 — `paste` 유지보수 경고 1(GAP-005)만 남음.
 
+<a id="ev-070"></a>
 ## EV-070 — TASK-023 RT 행: generic FIFO / PREEMPT_RT FIFO 제어 대조
 
 - **판정:** 로컬 **Pass** — 두 커널 모두 control(FIFO 70, 10 ms 주기·500 µs 작업)·safety(FIFO 80, 200 µs 작업) deadline miss 0·skipped 0·다른 CPU 실행 0, off 3회와 P1·P3 logger on 모두. 요구 「추가 miss 0(off 대비)」 충족. 이 PC 합성 control의 결과이며 실제 앱 WCET·장기 결과가 아니다.
@@ -1150,6 +1185,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **원자료:** `perf_runs/rt-generic-2026-11-11/`·`perf_runs/rt-rt-2026-11-11/`(`runs.jsonl`·`cyclictest.txt`·`calibration.json`·`progress.txt`·`device-writes.txt`). SSD 쓰기 T500 generic 70.4 GB + RT 약 70.5 GB(RT는 부팅 뒤 장치 누적, 상한).
 
 
+<a id="ev-071"></a>
 ## EV-071 — TASK-028 S2 auto preset: calibrate·프로필·preset 반영·CLI, T500 정확도
 
 - **판정:** 로컬 **Pass**. 정확도 수락(추정 지속 ≤ 1.2 × S3 S = 1.853 GB/s) 3회 모두 충족 — 최대 1.467 GB/s(S의 95%), 과대평가 없음.
@@ -1172,6 +1208,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미시험:** 취소는 시작 전 취소만 시험했다. 측정 도중 취소(블록마다 확인, 정리 경로는 같은 `Probe` Drop)는 자동 시험이 없다.
 - **Human 승인(2026-11-11 「승인」):** S2 구현·리뷰 포인트 4건(×0.5 근거 1대, 흡수가 sync 최대로 1.4~1.5배, 부하 경고는 preset writer만, CLI 기본 제한 시간)을 수락.
 
+<a id="ev-072"></a>
 ## EV-072 — REV-053 조치: 완료 장부 훑기 단일 소유·비 Linux calibrate·core-only rustdoc
 
 - **판정:** 로컬 **Pass**. RV-131~133 모두 수용·조치([REV-053](reviews/REV-053_COMPLETION_CALIBRATION_REVIEW.md)), Human 리뷰 대기. 커밋 `71e5a72`.
@@ -1184,6 +1221,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행:** 성능 측정(정리 경로 비용 변화는 겹치지 않을 때 CAS 1회·store 1회), native, `check-feature-matrix.py`(feature 경계 변경 없음).
 - **Human 승인(2026-11-12 「승인」):** RV-131~133 조치와 리뷰 포인트 3건(겹친 호출 0 반환, 비 Linux CLI 교차 검사 T3 이월, 비 Linux calibrate CLI exit 4 유지)을 수락. REV-053 Closed.
 
+<a id="ev-073"></a>
 ## EV-073 — TASK-029 S1·S2: 접점 표면 가드·레시피 L1~L3
 
 - **판정:** 로컬 **Pass**. 커밋 `681acd7`. 2026-11-12 Human 「승인」.
@@ -1193,6 +1231,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0(레시피 포함), workspace 테스트 1.96.0·1.85.0 각 560 passed·5 ignored, rustdoc core-only·all-features `-D warnings` 0. CI에 `integration-surface` job 추가(native 실행은 T3).
 - **한계:** 줄 계수는 줄 단위 휴리스틱(최상위 `struct`/`enum`/`#[derive]`·`impl ... Record for` 블록 제외)이다. snapshot의 타입 표기는 rustdoc JSON을 그대로 옮긴 것이라 `crate::` 경로·`&Self` 표기가 섞인다. nightly rustdoc JSON에서만 나는 `redundant_explicit_links` 경고 1건(위치 미표시, `logger/mod.rs` 모듈 문서로 추정)은 stable rustdoc `-D warnings`에서 나지 않아 남겨 두었다. 레시피는 이 PC(Linux)에서만 실행했다.
 
+<a id="ev-074"></a>
 ## EV-074 — TASK-029 S3: quickstart·README 축소·계약 상세 rustdoc 이동
 
 - **판정:** 로컬 **Pass**. 커밋 `a2f0dce`. 2026-11-12 Human 「승인」.
@@ -1201,6 +1240,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀:** fmt Pass, clippy 1.96.0 `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 561 passed(560 + quickstart doctest)·5 ignored, rustdoc core-only·all-features `-D warnings` 0(기존 `output filename collision` 경고만), 가드 Pass.
 - **한계:** 옮긴 문서는 기존 한국어 README 서술을 번역·정리한 것이며 계약 의미를 새로 정하지 않았다. 계약 원문 기준은 계속 `interface_contract.md`다.
 
+<a id="ev-075"></a>
 ## EV-075 — TASK-029 S4: dot-probe 형태 facade 예제·support 감소 기록
 
 - **판정:** 로컬 **Pass**. 커밋 `975858a`. TASK-029 S1~S4 로컬 완료, 2026-11-12 Human 「승인」.
@@ -1211,6 +1251,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀:** fmt Pass, clippy 1.96.0·1.85.0 workspace `--all-targets --all-features` `-D warnings` 0, workspace 테스트 1.96.0·1.85.0 각 561 passed·5 ignored, 가드 Pass.
 - **한계:** 구독 쪽 수신 확인은 예제에 넣지 않았다(클라이언트 구독은 async runtime·구독 예산이 필요하고 viewer는 MS-009 TASK-031 범위). 원격 copy 경로 자체는 TC-013 F13(EV-050)이 검증한다.
 
+<a id="ev-076"></a>
 ## EV-076 — REV-054 조치: 표면 snapshot 계약 조건·레시피 개념 import 해석
 
 - **판정:** 로컬 **Pass**. RV-134·135 모두 수용·조치([REV-054](reviews/REV-054_INTEGRATION_GUARD_REVIEW.md)). 2026-11-12 Human 「승인」 → REV-054 Closed. 커밋 `a536486`. 제품 Rust 코드 변경 없음(가드 스크립트·snapshot·CI만).
@@ -1221,6 +1262,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **한계:** 개념 계수는 정규식 기반 경로 해석이다. 지역 `mod`·매크로 생성 경로·문자 리터럴 `'"'`은 해석하지 않으며(레시피 금지 항목·관례상 없음), 지역 변수가 binding 이름과 같아도 `::` 경로만 보므로 영향이 없다. snapshot은 rustdoc JSON format 61에 묶여 있고, 새 항목 종류는 실패로 드러난다. 상수 기본값·discriminant·`#[must_use]` 등 동작 의미 속성은 여전히 snapshot에 넣지 않았다.
 - **Human 승인(2026-11-12 「승인」):** 조치와 리뷰 포인트 4건(snapshot 301→314줄 표기 확장, 범위 밖 추가 표기, 레시피 glob import 금지, 정규식 경로 해석 한계)을 수락.
 
+<a id="ev-077"></a>
 ## EV-077 — TASK-030 S1: 표준 MCAP export·facade schema descriptor
 
 - **판정:** 로컬 **Pass**(GUI 도구 판독 제외). 커밋 `3cbd1b2`. Human 리뷰 대기.
@@ -1233,6 +1275,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행:** Foxglove/Lichtblick GUI 판독(이 세션에 GUI 없음), 공식 `mcap` Python 라이브러리 대조(이 PC에 pip 없음, 시스템 패키지 설치는 하지 않음), `check-feature-matrix.py`(feature 경계 변경 없음 — `standard`는 core), 큰 파일 export 시간·메모리 측정, native(T3). Miri — unsafe·동시성 변경 없음.
 - **한계:** 출력은 무압축이다. 여러 segment는 파일마다 따로 export한다(병합 없음). real 시각이 뒤로 가면 표준 도구의 `log_time` 정렬이 기록 순서와 달라진다(메타 `mono`로 복원). ~~descriptor 없는 채널과 protobuf 외 encoding은 표준 도구에서 raw bytes로 보인다.~~ **2026-11-13 정정:** 확인 없이 쓴 예측이었고 틀렸다. Foxglove는 모르는 message encoding(`vendor-blob`)을 raw bytes로 보여 주지 않고 해당 토픽만 `Unsupported encoding` 오류로 표시한다(Human 판독). 나머지 토픽 판독과 처리 방식 결정은 TASK-030 S1 리뷰에서 기록한다. **2026-11-15:** 처리 방식 Human 「권고대로」 — 원문·encoding 유지, 한계를 API §21.2·[TASK-030](../04_implementation/tasks/TASK-030.md)에 기록. CLI summary `records:0`은 결함 아님 — 공통 summary `records`가 출력한 `record` 줄 수라 export는 항상 0(`Output::finish`), CLI README에 의미 추가. 판독 파일은 같은 절차로 재생성(pose 300·blob 10, export `messages: 310`). **Foxglove 판독(Human, 2026-11-15):** `robot/pose` `test.Pose` 300건·`.x`/`.y` float32, `_dot_logger/meta` `dot_logger.RecordMeta` 310건·전 필드(source 하위 포함) 인식, `robot/blob`만 `Unsupported encoding`(수락한 한계). S1 Done. Lichtblick·공식 Python `mcap` 대조는 미실행.
 
+<a id="ev-078"></a>
 ## EV-078 — 2026-11-13 완료 기준 변경: 커버리지 기준선·공백 시험 2건·Task 전수 판정
 
 - **판정:** 로컬 **Pass**. Human 결정(2026-11-13): 「실사용처 테스트는 마지막에 진행은 하겠지만, 일정 판단에 두지 말고, 일정 판단은 유닛테스트 케이스 커버리지, 실제 로깅 사용 사례 조사 등을 통해서 마무리」·「바뀐 기준으로 TASK도 완료처리 할 껀 완료처리하고 전수 갱신」·「커버리지 도구는 필요한건 알아서 설치」. 기준은 [quality_gate](quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정).
@@ -1243,6 +1286,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Task 전수 판정:** Done 22건(TASK-004~017·019~023·027~029). 잔여 소유처는 native·다른 OS → TASK-024(T3, GAP-004), 실사용처 → TASK-026(MS-007로 이동, 마지막 단계), P4·P5·원격 포화 회복(RV-049) → 이월 T7, S3d → T4. 신규 TASK-033(사용 사례 조사·커버리지 판정). MS-002~006·008 Done.
 - **미실행/한계:** 커버리지에는 doctest·`#[ignore]` 성능 시험·examples 실행이 들어가지 않는다. 분기(branch) 커버리지는 nightly 전용이라 재지 않았다. 미분류 파일 6개는 TASK-033 S3에서 분류한다. native·장기·실사용처 시험은 계속 Not Run이다.
 
+<a id="ev-079"></a>
 ## EV-079 — TASK-033 S2·S3: 사용 사례 조사, UC↔TC 대응, 공백 시험, 작은 ring 결함 수정
 
 - **판정:** 로컬 **Pass**. S3 기능 공백 4건은 Human 결정 대기([TASK-033](../04_implementation/tasks/TASK-033.md#human-결정-요청--s3-기능-공백-2026-11-15)).
@@ -1260,6 +1304,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행:** `check-feature-matrix.py`(feature 경계 변경 없음), Miri(unsafe·동시성 변경 없음), native(T3).
 - **쓰기량:** 시험 데이터는 /tmp(tmpfs) MiB 단위다. ring 재현 probe는 크기 5개로 각 약 4 MiB였고 실행 뒤 삭제했다.
 
+<a id="ev-080"></a>
 ## EV-080 — TASK-033 S4: 경미 분기 시험과 목표치 1~3 충족
 
 - **판정:** 로컬 **Pass**. Human 승인 목표치(2026-11-15, [quality_gate](quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)) 기준 1~3 충족. 기준 4(TASK-034·035 뒤 재측정)는 남았다.
@@ -1268,6 +1313,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **커버리지:** 라인 **93.56%**(미실행 1,178)·함수 92.93%·리전 90.88%. 라인 85% 미만 파일 6개는 모두 비동작·도달 불가(TASK-034)·OS 결함 주입 필요로 분류했다.
 - **미실행:** Miri(unsafe 변경 없음), native(T3).
 
+<a id="ev-081"></a>
 ## EV-081 — TASK-034 S2·S3: facade 중요도·시작 시 level·이벤트 보존
 
 - **판정:** 로컬 **Pass**. Human 결과 확인 대기. ① 실행 중 변경은 TASK-030 S2 저장 ADR 뒤로 미뤘다(API §22.8, 로컬 WIP 브랜치 `36c1724`).
@@ -1685,6 +1731,21 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   - 두 버전의 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사 통과. viewer·client 시험 10회 반복 실패 0.
   - viewer는 잘못된 `--upstream` 세 가지를 리스너를 열기 전에 원문 없이 거절했다. `live_host` 연결은 정상이다.
 
+<a id="ev-110"></a>
+### EV-110 — TASK-025 S4 최종 회귀·종단 확인과 CI 정합 조치
+
+- **대상:** main `987fdb9`(2026-11-21 공개 준비 이력 정리 뒤 HEAD)와, 이 EV에서 고친 `proto/logger.proto`·`.github/workflows/ci.yml`. 제품 Rust 소스는 바꾸지 않았다. 환경은 이 PC(Ubuntu, generic 7.0.0-43, x86_64), 빌드 디렉터리 `/data/build/target`. AI 실행.
+- **GitHub CI와 같은 검사 묶음:**
+  - Rust 1.96.0·1.85.0 workspace all-features 각 **724 Pass, 실패 0, 5 ignored**(외부 DB). 두 버전 Clippy `-D warnings`, fmt, strict rustdoc(workspace·core 전용) 통과.
+  - feature 조합 검사(16조합, calibrate 단독·전체, 독립 core consumer, RT 할당 guard): 1.85.0 492초·1.96.0 407초 통과. `dot-logger-api-consumer` 실행 통과.
+  - 통합 표면 검사와 그 자체 시험 통과. `cargo audit --deny unsound` 통과(`paste` 유지보수 경고 1건, GAP-005).
+  - Miri(CI 범위: lib + 통합 시험 8개, strict provenance, seed 0..8): 조치 후 종료 코드 0, 753초. 시험 바이너리 9개 × seed 8개에서 실패 seed 0(출력이 섞여 결과 줄은 72개 중 57개만 파싱됐고 그 안에서 1,248 Pass·실패 0). lib은 실제 파일 IO를 쓰는 `logger::` 17개를 제외한 45개다.
+- **종단 경로:** `live_host` → `dot-logger-viewer --dashboard` → CLI. WebSocket과 대시보드가 떴고, `/api/status`가 관측된 수집 지표를 담은 `dot_logger.viewer.dashboard.v1`을 돌려줬다. CLI `status`는 Observed, `tail --limit 10`은 10건 수신·10건 ACK·Gap 0이었다. README 레시피 L1~L3는 통합 표면 검사 안에서 실행됐다.
+- **발견 1 — 공개 protobuf 스키마 누락(F-11):** feature 조합 검사의 첫 단계 `check-remote-protocol.py`가 실패했다. ADR-015 묶음 ACK(`c0f23bb`)가 서버·클라이언트 `wire.rs`에 `AckItem`과 `AckRequest.items = 8`을 추가했지만 `proto/logger.proto`에는 넣지 않았다. 그 뒤 회귀에서는 이 스크립트를 돌리지 않아 드러나지 않았다. 스키마로 클라이언트를 만드는 외부 사용자는 묶음 ACK를 쓸 수 없는 상태였다(단건 형식은 호환). 두 정의를 스키마에 추가했고, 검사는 메시지 10개·필드 89개 일치와 protoc 컴파일 통과로 Green이 됐다. `.proto`는 빌드 입력이 아니라 코드 동작은 바뀌지 않는다.
+- **발견 2 — CI Miri 설정 낡음:** CI와 같은 플래그의 Miri가 lib 시험에서 두 단계로 실패했다. ① 격리 모드에서 `clock_gettime(REALTIME)` 미지원: 손실 checkpoint(`5be17b5`, 2026-11-17)가 게시 시각을 실제 시계로 기록한다. ② 시계를 허용하면 기본 경로 `logger::` 단위 시험(TASK-027 이후)이 실제 파일과 디렉터리 `fsync`를 써서 Miri 미지원으로 멈춘다. 로컬 EV는 그동안 시계를 허용한 Miri로 일부 시험만 돌렸고 CI 설정은 그대로였으므로, 공개 뒤 첫 CI 실행에서 실패했을 것이다. CI에 `-Zmiri-disable-isolation`을 넣고 lib에서 `logger::`를 제외했다(`-- --skip logger::`). 이 17개는 일반 테스트 작업에서 두 Rust 버전으로 돈다. 제품 동작은 그대로다.
+- **환경 주의:** 저장소 안의 `target/`에 13:35에 만든 다른 빌드가 남아 있었다. 그 `live_host`는 지표가 `no_runtime_metrics_backend`로 나왔다. 설정된 빌드 디렉터리(`/data/build/target`)의 현재 빌드로 다시 실행해 위 결과를 얻었다. 판정에는 현재 빌드 결과만 쓴다.
+- **판정에 쓰는 범위:** Gate 4 단위·lint·F-11 근거(이 PC 로컬). native·3 OS(GAP-004/TASK-024)·24h·실사용처는 Not Run 그대로다. 원자료: `/tmp/.../s4_reg`(세션 임시, 보관하지 않음).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -1698,6 +1759,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `d001931`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |
 | GAP-009 | TC-013 F5의 worker panic 절반: host/IO panic 처리는 `1e651b4`에 구현했지만 주입점이 없어 자동 시험이 없었다(RV-094). `691f937`에서 crate 내부 `#[cfg(test)]` 주입 flag로 host·IO panic 시험을 추가했고, host 사망 시 shutdown이 기한까지 기다리던 문제(RV-100)도 고쳤다(EV-048) | AI, 공개·feature hook 없음 유지 | Closed — 로컬 시험 범위 |
 | GAP-010 | Rust 1.85 clippy `-D warnings`가 기존 `adapters/tracing.rs:121` needless_lifetimes 1건으로 실패했다. `691f937`에서 lifetime 생략으로 정리해 1.85/1.96 clippy 모두 exit0(EV-048) | AI | Closed |
+| GAP-011 | ADR-015 묶음 ACK 뒤 공개 `proto/logger.proto`에 `AckItem`·`AckRequest.items`가 없었다(`c0f23bb` 이후). 회귀에서 `check-remote-protocol.py`를 돌리지 않아 놓쳤다 | AI, 원격 wire 변경 시 feature 조합 검사(protocol 검사 포함)를 회귀에 넣는다 | Closed — [EV-110](#ev-110) 스키마 보완 |
+| GAP-012 | CI Miri 작업이 실행 불가였다: 손실 checkpoint의 실제 시계(`5be17b5` 이후)와 기본 경로 `logger::` 시험의 실제 파일·디렉터리 fsync. 로컬 EV는 시계 허용 Miri로 일부만 돌렸다 | AI, CI 설정·Miri 대상 변경 시 로컬에서 같은 명령으로 확인 | Closed — [EV-110](#ev-110) 시계 허용·`logger::` 제외, CI 범위 seed 8개 통과 |
 | GAP-007 | EV-008 RV-005 P1은 EV-009에서 일반 sync 진입/게시와 shutdown 순서화 수정·정식 회귀3개·두 Rust 각16 features/consumer/예제·Miri81×8·RT0/0 Pass | AI, 최종 수정분 Human 리뷰/native(GAP-004) 후속. 수정 전 반례와 source38개 근거 보존 | Closed — 로컬 수정/회귀 범위 |
 
 

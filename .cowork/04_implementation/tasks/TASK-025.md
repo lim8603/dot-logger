@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | S4 — MS별 구현/TC/EV 추적표와 Gate 4·5 판정 |
+| 다음 액션 | Human 수락 — S4 추적표와 Gate 4 판정안(Pass, 로컬 범위)·Gate 5 Not Ready 검토 |
 | 의존 | TASK-033·TASK-032(MS-009). TASK-024 의존은 2026-11-15 해제 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 
@@ -29,7 +29,7 @@ Human 결정(2026-11-21):
 | S1 | 문서 검토 | README·crate README·예제에 적힌 명령을 실행하고, 실제 기능과 다른 곳의 목록을 만든다 | Done — 2026-11-21 아래 F1~F10 |
 | S2 | 공개용 README | 루트·cli·client·viewer README를 영어로 새로 쓴다. S1 불일치를 고치고, 명령이 그대로 실행되는지 확인한다 | Done — 2026-11-21 `d4e0624`·`dca35d2` |
 | S3 | 사용·운영 작업 문서 | `07_delivery`의 사용자 매뉴얼·운영서·릴리즈 노트(작업 문서, 한국어)에 재현 가능한 사용 예와 운영 한계를 정리한다 | Done — 2026-11-21 아래 S3 결과 |
-| S4 | 추적표·게이트 | MS별 구현/TC/EV 링크를 정리하고 Gate 4·5를 따로 판정해 기록한다 | Planned — 다음 |
+| S4 | 추적표·게이트 | MS별 구현/TC/EV 링크를 정리하고 Gate 4·5를 따로 판정해 기록한다 | Done — 2026-11-21 아래 S4 결과, Human 수락 대기 |
 
 공식 산출물(`docs/`) 생성은 이 Task 범위 밖이다. 필요해지면 언어·형식을 확인한 뒤 생성한다.
 
@@ -76,6 +76,14 @@ Human 결정(2026-11-21):
 - [운영서](../../07_delivery/operation_guide.md): dot-logger는 호스트 프로세스 안의 라이브러리라는 전제를 적었다. 요구사항·의존성 고정 버전, 설치·설정 기본값, 배포 체크리스트, 파일 위치·회전·삭제 규칙(`<sequence>.active` → `.mcap`, ring 최소 16 MiB), 모니터링 수단, 장애 시나리오 8종, 복구 원칙, 가정 4개, 미확정 운영 항목 5개, 근거 EV 링크를 담았다. 임계값과 대응 시간은 첫 사용처(TASK-026)에서 정하도록 `미확정`으로 남겼다.
 - [릴리즈 노트](../../07_delivery/release_note.md): v0.1.0 **미배포 초안**이다. 기능 11, 개선 4, Breaking 없음(개발 형식 미지원 명시), 알려진 이슈 8로 구성했다. FR·US 번호는 요구사항 표와 대조했고, 외부 공개본에서는 뺀다. 릴리즈 날짜·태그·공개는 Human 결정으로 남긴다.
 - **검증:** 세 문서의 상대 링크와 앵커를 검사했다(실패 0). 파일 이름·ring 하한·`worker_failed`·`directories` 같은 동작은 코드 주석과 대조했다. `cargo build --locked -p dot-logger-cli -p dot-logger-viewer --release` 성공.
+
+## S4 결과 — 2026-11-21
+
+- **추적표:** [MS별 추적 요약](../../05_verification/test_case.md#ms별-추적-요약--2026-11-21-task-025-s4)을 추가했다. 미체크 칸은 모두 MS-007 소유이거나 선택 기능이다. TC-001의 MS-007 칸 7개를 EV-110으로 체크했고, NFR-007(3 OS)은 TASK-024로 남겼다. 이 Task의 구현 칸 5개(INT-001·FR-001·NFR-004·CON-003·CON-006)는 Human 수락 뒤 체크한다.
+- **현재 HEAD 재검증([EV-110](../../05_verification/verification_evidence.md#ev-110)):** 두 Rust 각 724 Pass, Clippy·fmt·rustdoc, feature 조합 두 버전, api-consumer, 통합 표면, audit, CI 범위 Miri, 종단 경로(`live_host` → viewer·대시보드 → CLI `status`·`tail`) 통과.
+- **발견·조치 2건(F-11):** ① 공개 `proto/logger.proto`에 ADR-015 묶음 ACK 필드가 빠져 있었다(GAP-011) → 보완. ② GitHub CI의 Miri 작업이 실제 시계와 파일 fsync 때문에 실행 불가였다(GAP-012) → 시계 허용·`logger::` 제외. 둘 다 제품 Rust 코드는 바꾸지 않았다.
+- **Gate 판정([quality_gate](../../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)):** Gate 4는 AI 판정안 Pass(이 PC 로컬 범위, native는 GAP-004/TASK-024). Gate 5는 Not Ready(24h·native·3 OS·실사용처 Not Run, 공식 산출물 미생성). Human이 Gate 4를 수락하면 Phase를 Verify로 바꾸고 이 Task를 Done으로 닫는다.
+- 정리: MS 목록 상단 요약(MS-009 Done 반영), MS-007 상태 줄, verification_evidence 문서 정보·근거 요약을 현재 상태로 맞췄다.
 
 ## 진입 조건
 

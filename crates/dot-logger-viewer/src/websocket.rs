@@ -154,7 +154,7 @@ fn negotiate(
     Ok(response)
 }
 
-fn local_origin(origin: &str) -> bool {
+pub(crate) fn local_origin(origin: &str) -> bool {
     let Ok(uri) = origin.parse::<Uri>() else {
         return false;
     };

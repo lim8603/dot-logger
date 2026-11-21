@@ -36,6 +36,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_output(&directory, Retention::ring(64 << 20))
         .channel::<Pose>(TOPIC)
         .writer("demo")
+        // Runtime metrics for the dashboard's GetStatus (`--dashboard`).
+        .telemetry()
         .remote_with(
             ServerConfig {
                 enabled: true,

@@ -2,6 +2,9 @@
 
 mod bridge;
 mod catalog;
+mod dashboard;
+#[cfg(test)]
+mod dashboard_tests;
 mod output;
 mod replay;
 #[cfg(test)]
@@ -33,6 +36,10 @@ struct Command {
     /// Local WebSocket address. Port 0 requests an available port.
     #[arg(long, default_value = "127.0.0.1:8765", value_parser = loopback)]
     listen: SocketAddr,
+    /// Also serve the read-only operations dashboard on this loopback address.
+    /// Port 0 requests an available port.
+    #[arg(long, value_parser = loopback)]
+    dashboard: Option<SocketAddr>,
     /// CA PEM for an HTTPS upstream.
     #[arg(long)]
     ca: Option<PathBuf>,
@@ -237,12 +244,29 @@ async fn run(command: Command) -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(command.listen).await?;
     let stop = termination()?;
     println!("ws://{}", listener.local_addr()?);
+    // The dashboard polls with its own connection and stops with the viewer.
+    let dashboard = match command.dashboard {
+        Some(address) => {
+            let listener = TcpListener::bind(address).await?;
+            println!("http://{}/", listener.local_addr()?);
+            Some(tokio::spawn(dashboard::serve(
+                listener,
+                upstream.clone(),
+                command.options.allow_origin.clone(),
+                std::future::pending(),
+            )))
+        }
+        None => None,
+    };
     if let Some(playback) = playback {
         playback.start_terminal()?;
         eprintln!("Replay controls: seek MONO_NS or speed N/D");
         serve_replay(listener, upstream, catalog, command.options, playback, stop).await?;
     } else {
         serve(listener, upstream, catalog, command.options, stop).await?;
+    }
+    if let Some(dashboard) = dashboard {
+        dashboard.abort();
     }
     Ok(())
 }

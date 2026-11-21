@@ -38,7 +38,7 @@ const CATALOG: &str = r#"{"version":1,"channels":[{"id":17,"channel_id":7,
 
 type ClientSocket = tokio_tungstenite::WebSocketStream<TcpStream>;
 
-fn budget() -> QueryBudget {
+pub(crate) fn budget() -> QueryBudget {
     let plan = SessionBuilder::new(SessionConfig {
         memory: MemoryBudget {
             total_bytes: 132 * 1024 * 1024,

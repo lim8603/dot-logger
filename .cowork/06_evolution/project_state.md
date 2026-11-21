@@ -10,7 +10,7 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | TASK-031 In Progress — 8 GiB P3·정식 P5 Pass(EV-103). ADR-015 뒤 LAN P4 소형 Pass(EV-104). P4-bulk는 Wi-Fi 변동으로 판정 방법 결정 대기 |
+| 활성 Task | TASK-031 In Progress — 8 GiB P3·정식 P5 Pass(EV-103). ADR-015 뒤 LAN P4 소형 Pass(EV-104). P4-bulk는 Human 결정에 따라 유선 LAN 재측정 대기 |
 | 미처리 리뷰 | 없음 — [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) RV-160·161 Closed(2026-11-21), REV-001~066 Closed |
 | 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~104](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 704 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
@@ -75,7 +75,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-21 | P4-bulk 판정 방법 결정 → TASK-031 수락 정리 → TASK-032 S1 |
+| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-21 | 유선 LAN P4-bulk 재측정 → TASK-031 수락 정리 → TASK-032 S1 |
 | TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -98,7 +98,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 
 ## 다음 시작점
 
-1. **TASK-031.** ADR-015 묶음·파이프라인 ACK 뒤 LAN P4 소형은 Pass다(p99 10.86 ms, EV-104). P4-bulk는 64건 검증이 모두 통과했지만, Wi-Fi TCP 기준이 43–110 MB/s로 흔들려 ≥80% 비율을 판정하지 못했다(쌍별 76–136%, 최고값 비교 81%). 판정 방법을 Human이 정하면 TASK-031 수락을 정리하고 TASK-032 S1로 넘어간다. [EV-104](../05_verification/verification_evidence.md#ev-104) · [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
+1. **TASK-031.** ADR-015 묶음·파이프라인 ACK 뒤 LAN P4 소형은 Pass다(p99 10.86 ms, EV-104). P4-bulk는 64건 검증이 모두 통과했지만, Wi-Fi TCP 기준이 43–110 MB/s로 흔들려 ≥80% 비율을 판정하지 못했다(쌍별 76–136%, 최고값 비교 81%). 2026-11-21 Human 「유선으로 재측정」: Human이 Windows 장비를 유선 LAN에 연결하거나 다른 유선 장비를 준비하고 수신 세션을 띄우면, AI가 새 임시 TLS를 만들어 TCP↔gRPC 교대 3쌍을 측정한다. 그 결과로 판정한 뒤 TASK-031 수락을 정리하고 TASK-032 S1로 넘어간다. [EV-104](../05_verification/verification_evidence.md#ev-104) · [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 

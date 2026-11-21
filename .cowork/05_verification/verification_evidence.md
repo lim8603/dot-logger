@@ -1594,6 +1594,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **LAN P4 소형:** Ubuntu 유선 → Windows Wi-Fi에서 256 B를 초당 10,000건 보냈다. 60,000건 모두 검증·ACK됐고 Dropped 0, ACK p99 10.86 ms로 목표(≤100 ms)를 충족한다. 수정 전에는 초당 약 440건에서 끊겼다(EV-102).
 - **LAN P4-bulk:** 대용량 4회 모두 64건을 검증·ACK했고 52.14–92.30 MB/s였다. 같은 시간대 TCP 기준이 43.44–110.10 MB/s로 흔들려 쌍별 비율이 76–136%에 걸쳤다. 각 경로의 최고값 비교는 81%다. 이 Wi-Fi 환경에서는 ≥80% 기준을 안정적으로 판정할 수 없다. [원자료](../06_evolution/imported_context/t7_lan_2026-11-21/README.md#묶음파이프라인-ack-뒤--2026-11-21)
 
+<a id="ev-105"></a>
+### EV-105 — 유선 LAN P4-bulk와 하드웨어 CRC-32
+
+- **환경:** Ubuntu 유선 1 GbE 송신과 Windows 유선 USB GbE(192.168.0.20) 수신을 같은 LAN에 두었다. Windows Wi-Fi는 연결이 끊긴 상태였고, 192.168.0.136으로 가는 경로는 이더넷 하나였다. Ubuntu는 모든 회차에서 `ss`로 상대 주소 192.168.0.20을 기록했다. RTT는 1 ms 미만이었다. Rust 1.96.0 release `lan_probe`와 새 임시 TLS를 썼다.
+- **ADR-015 빌드(`4ac9bf1`):** TCP 115.55–116.88 MB/s로 안정적이었다. gRPC 대용량은 77.15–82.51 MB/s, 쌍별 66.8–70.6%로 ≥80%에 미달했다.
+- **원인:** 원격 chunk checksum과 파일 CRC가 바이트 단위 테이블 CRC(이 PC 607 MB/s)를 썼다. 8 MiB 기록마다 송·수신 CRC에 약 28 ms가 들어 직렬 처리 시간 대부분을 차지했다. 루프백 기록당 ACK p50은 154 ms, 4건 창에서 처리량은 약 215 MB/s였다.
+- **조치(`0637601`):** `crc_update`를 crc32fast 1.5.3으로 바꿨다. 이 버전은 MCAP가 이미 잠근 것이며, 바꾼 뒤 lockfile에는 `dot-logger`의 의존 관계 한 줄만 추가됐다. 같은 PC에서 38,121 MB/s였다. 교체 전에 비트 단위 기준 구현과 비교하는 시험(표준 검사값, 길이·분할·임의 상태)을 넣어 기존 구현에서 Green을 확인했다. Rust 1.85.0·1.96.0 각 **705 Pass, 실패 0, 5 ignored**, Clippy `-D warnings`·fmt·Miri(CRC 시험) 통과. 루프백 대용량은 215 → 784 MB/s, 수신 user CPU는 1.35 → 0.43 s였다.
+- **P4-bulk Pass:** 같은 유선 환경에서 TCP 115.81–117.81 MB/s, gRPC 115.89–116.42 MB/s, 쌍별 98.8–100.5%로 ≥80%를 충족했다. **P4 소형**은 60,000건 ACK, p99 4.12 ms다. 모든 회차에서 Dropped·Unknown은 0이었다. [원자료](../06_evolution/imported_context/t7_lan_2026-11-21/README.md#유선-lan--2026-11-21)
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

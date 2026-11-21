@@ -237,7 +237,7 @@ TASK-021 [EV-043](verification_evidence.md#ev-043): TC-011 신규11개·정상 �
 ### TC-012 — 플랫폼·실사용 성능·장시간 종합
 
 - 관련: MS-007 / NFR-001~007 / 주요 FR 종단
-- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097)에 있다. 8 GiB P3·정식 P5 Pass는 [EV-103](verification_evidence.md#ev-103)이다. LAN P4 소형은 ADR-015 뒤 [EV-104](verification_evidence.md#ev-104)에서 충족됐다(p99 10.86 ms). P4-bulk는 Wi-Fi 변동으로 판정 보류다(쌍별 76–136%, 최고값 비교 81%).
+- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097)에 있다. 8 GiB P3·정식 P5 Pass는 [EV-103](verification_evidence.md#ev-103)이다. LAN P4 소형은 ADR-015 뒤 [EV-104](verification_evidence.md#ev-104)에서 충족됐다(Wi-Fi p99 10.86 ms). 유선 P4-bulk는 하드웨어 CRC 뒤 [EV-105](verification_evidence.md#ev-105)에서 쌍별 98.8–100.5%로 충족됐다. 장기 P6·native·3 OS는 TASK-024에 남는다.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

@@ -12,6 +12,7 @@
 | 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | hosted native CI는 EV-001 Pass; Windows 11·Linux RT 커널/장비·추가 CPU는 TASK-022에서 별도 검증 |
 | 큐 | rtrb | 0.4.0 SPSC | ADR-009 | 전체 API/Drop의 RT 안전성은 TASK-003·004 |
 | 파일 | MCAP | mcap 0.26.0(vendor, 무압축 chunk CRC 1회 패치 — ADR-010 개정 1); CRC/index on, 초기 압축 off | ADR-009·010 | 인덱스 상한·active reader·복구/성능 검증 |
+| CRC | IEEE CRC-32 | crc32fast 1.5.3(MCAP가 이미 잠근 같은 버전을 직접 의존으로 사용, 실행 시 하드웨어 경로 선택) | [EV-105](../05_verification/verification_evidence.md#ev-105) | 파일 복구·조회·원격 chunk checksum. 비트 단위 기준 구현 대조 시험 |
 | 저장 매체 | SSD | 현재 PC의 CT1000T500SSD8(루트), HP EX950 512GB 2개(/data/build·/data/db)·ext4 | ADR-004·011 | 시험별 대상 경로 고정·실측으로 판정, 제품 사양으로 처리량 추정 금지 |
 | 봉투·통신 | Protobuf·gRPC | tonic 0.13.1 / prost 0.13.5 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |

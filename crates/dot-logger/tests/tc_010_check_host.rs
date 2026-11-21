@@ -1,5 +1,5 @@
 //! Host capability lifecycle and actual Linux filesystem observations.
-#![cfg(unix)]
+#![cfg(target_os = "linux")]
 #![allow(clippy::unwrap_used)]
 mod support;
 use dot_logger::{

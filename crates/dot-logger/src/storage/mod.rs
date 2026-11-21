@@ -175,16 +175,45 @@ pub(crate) struct FileLedger {
 }
 /// Per producer `(first, last)`, `(0, 0)` when none.
 type Ranges = Box<[(u64, u64)]>;
+/// Closed files whose owed ranges are kept exactly; more share one hull.
+const PENDING_FILES: usize = 4;
 #[derive(Default)]
 struct Owed {
     /// Files released unsynced that nothing will sync later (dropped writers).
     stuck: usize,
     /// Per producer: hull of those files' unsynced ranges, `(0, 0)` when none.
     stuck_ranges: Ranges,
-    /// Closed files still awaiting their own sync, each with its unsynced
-    /// ranges, so settling one shrinks what is owed (REV-071 RV-175).
-    pending: Vec<(u64, Ranges)>,
+    /// Closed files awaiting their own sync, one slot each (id 0 = free), so
+    /// settling one removes only its ranges (REV-071 RV-175). Preallocated:
+    /// owing and settling never allocate.
+    slot_ids: Box<[u64]>,
+    /// `PENDING_FILES` rows of `producers` ranges, one row per slot.
+    slot_ranges: Ranges,
+    /// Closed files beyond the slots, sharing one hull until all settle.
+    overflow: usize,
+    overflow_ranges: Ranges,
     next: u64,
+}
+impl Owed {
+    fn producers(&self) -> usize {
+        self.stuck_ranges.len()
+    }
+    fn slot(&mut self, at: usize) -> &mut [(u64, u64)] {
+        let n = self.producers();
+        &mut self.slot_ranges[at * n..(at + 1) * n]
+    }
+    fn fold_into_stuck(&mut self, ranges: impl IntoIterator<Item = (u64, u64)>) {
+        self.stuck += 1;
+        for (range, (first, last)) in self.stuck_ranges.iter_mut().zip(ranges) {
+            widen(range, first, last);
+        }
+    }
+    fn release_overflow(&mut self) {
+        self.overflow = self.overflow.saturating_sub(1);
+        if self.overflow == 0 {
+            self.overflow_ranges.fill((0, 0));
+        }
+    }
 }
 fn widen(range: &mut (u64, u64), first: u64, last: u64) {
     if first == 0 {
@@ -203,14 +232,19 @@ impl FileLedger {
             owed: std::sync::Mutex::new(Owed {
                 stuck: 0,
                 stuck_ranges: vec![(0, 0); producers].into_boxed_slice(),
-                pending: Vec::new(),
+                slot_ids: vec![0; PENDING_FILES].into_boxed_slice(),
+                slot_ranges: vec![(0, 0); PENDING_FILES * producers].into_boxed_slice(),
+                overflow: 0,
+                overflow_ranges: vec![(0, 0); producers].into_boxed_slice(),
                 next: 0,
             }),
         }
     }
-    /// Bytes `new` allocates per producer beyond the struct itself.
-    pub(crate) const PRODUCER_BYTES: usize =
-        size_of::<std::sync::atomic::AtomicU64>() + size_of::<(u64, u64)>();
+    /// Bytes `new` allocates per producer beyond the struct itself (the slot
+    /// ids are charged per producer too, which over-reserves).
+    pub(crate) const PRODUCER_BYTES: usize = size_of::<std::sync::atomic::AtomicU64>()
+        + (2 + PENDING_FILES) * size_of::<(u64, u64)>()
+        + PENDING_FILES * size_of::<u64>();
     fn owed(&self) -> std::sync::MutexGuard<'_, Owed> {
         // Owed is updated in place without panicking paths; a poisoned
         // guard still holds consistent counts.
@@ -234,11 +268,8 @@ impl FileLedger {
     /// later sync can reach. `first` is each producer's first unsynced
     /// sequence (0 when none), `last` its last appended one.
     pub(crate) fn owe(&self, first: &[u64], last: &[u64]) {
-        let mut owed = self.owed();
-        owed.stuck += 1;
-        for (range, (&first, &last)) in owed.stuck_ranges.iter_mut().zip(first.iter().zip(last)) {
-            widen(range, first, last);
-        }
+        self.owed()
+            .fold_into_stuck(first.iter().copied().zip(last.iter().copied()));
     }
     /// A closed file holding unsynced records that its own later sync may
     /// settle; returns the handle for [`Self::settle`].
@@ -246,43 +277,80 @@ impl FileLedger {
         let mut owed = self.owed();
         owed.next += 1;
         let id = owed.next;
-        let ranges = first
-            .iter()
-            .zip(last)
-            .map(|(&first, &last)| if first == 0 { (0, 0) } else { (first, last) })
-            .collect();
-        owed.pending.push((id, ranges));
+        let free = owed.slot_ids.iter().position(|&slot| slot == 0);
+        let pairs = first.iter().copied().zip(last.iter().copied());
+        match free {
+            Some(at) => {
+                owed.slot_ids[at] = id;
+                for (range, (first, last)) in owed.slot(at).iter_mut().zip(pairs) {
+                    *range = if first == 0 { (0, 0) } else { (first, last) };
+                }
+            }
+            None => {
+                owed.overflow += 1;
+                for (range, (first, last)) in owed.overflow_ranges.iter_mut().zip(pairs) {
+                    widen(range, first, last);
+                }
+            }
+        }
         id
     }
-    /// The closed file `id` was synced: only its own ranges stop being owed.
+    /// The closed file `id` was synced: only its own ranges stop being owed
+    /// (an overflowed file's share clears once every overflowed file settled).
     pub(crate) fn settle(&self, id: u64) {
-        self.owed().pending.retain(|(owed, _)| *owed != id);
+        let mut owed = self.owed();
+        match owed.slot_ids.iter().position(|&slot| slot == id) {
+            Some(at) => {
+                owed.slot_ids[at] = 0;
+                owed.slot(at).fill((0, 0));
+            }
+            None => owed.release_overflow(),
+        }
     }
     /// The closed file `id` was dropped unsynced: its ranges stay owed for
-    /// good, folded into the stuck hull so no per-file entry outlives it.
+    /// good, folded into the stuck hull.
     pub(crate) fn abandon(&self, id: u64) {
         let mut owed = self.owed();
-        let Some(at) = owed.pending.iter().position(|(owed, _)| *owed == id) else {
-            return;
-        };
-        let (_, ranges) = owed.pending.swap_remove(at);
-        owed.stuck += 1;
-        for (range, &(first, last)) in owed.stuck_ranges.iter_mut().zip(ranges.iter()) {
-            widen(range, first, last);
+        match owed.slot_ids.iter().position(|&slot| slot == id) {
+            Some(at) => {
+                owed.slot_ids[at] = 0;
+                let n = owed.producers();
+                for p in 0..n {
+                    let (first, last) = std::mem::take(&mut owed.slot(at)[p]);
+                    widen(&mut owed.stuck_ranges[p], first, last);
+                }
+                owed.stuck += 1;
+            }
+            None if owed.overflow > 0 => {
+                // Its share is not separable: keep the whole overflow hull.
+                let hull = std::mem::take(&mut owed.overflow_ranges);
+                owed.fold_into_stuck(hull.iter().copied());
+                owed.overflow_ranges = hull;
+                owed.release_overflow();
+            }
+            None => {}
         }
     }
     /// The records of `producer` another file may hold unsynced, as seen by a
     /// file created when this ledger's appended marks were `base`.
     pub(crate) fn foreign(&self, producer: usize, base: u64) -> crate::control::Foreign {
         let owed = self.owed();
-        let mut hull = if owed.stuck == 0 {
-            (0, 0)
-        } else {
-            owed.stuck_ranges.get(producer).copied().unwrap_or((0, 0))
-        };
-        for (_, ranges) in &owed.pending {
-            if let Some(&(first, last)) = ranges.get(producer) {
+        let mut hull = (0, 0);
+        let mut add = |range: Option<&(u64, u64)>| {
+            if let Some(&(first, last)) = range {
                 widen(&mut hull, first, last);
+            }
+        };
+        if owed.stuck > 0 {
+            add(owed.stuck_ranges.get(producer));
+        }
+        if owed.overflow > 0 {
+            add(owed.overflow_ranges.get(producer));
+        }
+        let n = owed.producers();
+        for (at, &id) in owed.slot_ids.iter().enumerate() {
+            if id != 0 {
+                add(owed.slot_ranges.get(at * n + producer));
             }
         }
         crate::control::Foreign {
@@ -510,6 +578,19 @@ mod reserve_tests {
         let c = ledger.owe_until_settled(&[30], &[31]);
         ledger.settle(c);
         assert_eq!(ledger.foreign(0, 0).owed, (20, 21));
+        // Beyond the preallocated slots, files share one hull that clears
+        // once all of them settled; owing and settling never allocate.
+        let fresh = FileLedger::new(1);
+        let ids: Vec<_> = (0..PENDING_FILES as u64 + 1)
+            .map(|i| fresh.owe_until_settled(&[10 * i + 1], &[10 * i + 5]))
+            .collect();
+        assert_eq!(fresh.foreign(0, 0).owed, (1, 45));
+        fresh.settle(ids[0]);
+        assert_eq!(fresh.foreign(0, 0).owed, (11, 45));
+        for &id in &ids[1..] {
+            fresh.settle(id);
+        }
+        assert_eq!(fresh.foreign(0, 0).owed, (0, 0));
     }
 
     /// TASK-023 S3 finding ⑩: outputs of one router rotate at the same moment

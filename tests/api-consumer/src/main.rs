@@ -316,6 +316,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
     })?;
     report_contract();
+    // The facade's file output needs the Linux free-space probe (RV-172).
+    #[cfg(target_os = "linux")]
     facade_contract()?;
     #[cfg(feature = "remote")]
     remote_contract(&plan)?;
@@ -388,6 +390,7 @@ fn remote_contract(
 /// TASK-027 facade (API §18): the default path an application uses, without
 /// support modules, scopes or lifetimes. With `remote`, one more line serves
 /// subscribers and status (§18.11).
+#[cfg(target_os = "linux")]
 fn facade_contract() -> Result<(), Box<dyn std::error::Error>> {
     use dot_logger::logger::{
         Budget, EncodeError, HealthState, Logger, Record, Retention, Schema, Shutdown, WriterQuota,

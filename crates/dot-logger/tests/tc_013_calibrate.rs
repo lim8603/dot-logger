@@ -371,6 +371,8 @@ fn f20_profile_stall_lengthens_the_absorb_but_a_user_absorb_wins() {
 }
 
 #[test]
+// Starts the facade, whose file output needs the Linux free-space probe (RV-172).
+#[cfg(target_os = "linux")]
 fn f20_plan_warns_on_memory_and_load_but_start_is_not_blocked() {
     let temp = Temp::new();
     // Sustained estimate = 2 bytes/s burst / 2 = 1 byte/s.

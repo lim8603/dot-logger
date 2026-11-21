@@ -1,6 +1,7 @@
 //! TC-013 F12 (TASK-027 S3b): tracing/log connection through the facade.
 #![cfg(feature = "tracing-adapter")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+#![cfg(target_os = "linux")]
 
 use dot_logger::capture::Level;
 use dot_logger::logger::{Budget, Logger, LookupError, Retention, Shutdown, WriterQuota};

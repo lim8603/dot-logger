@@ -396,6 +396,9 @@ mod closing_tests {
     use super::*;
     use crate::logger::{Budget, Logger, Retention, WriterQuota};
     #[test]
+    #[cfg(target_os = "linux")]
+    // Real files and a directory fsync, which Miri does not support (RV-188).
+    #[cfg_attr(miri, ignore)]
     fn closing_during_encoding_outranks_encode_and_foreign_channel_errors() {
         struct Closing<'a>(&'a CaptureCore);
         impl Record for Closing<'_> {

@@ -1186,7 +1186,7 @@ fn drain_failed(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;

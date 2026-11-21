@@ -1,6 +1,7 @@
 //! TC-014 TASK-030 S2 A: native standard MCAP — user schema channels
 //! without the product envelope, plus one metadata channel.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+#![cfg(target_os = "linux")]
 
 use dot_logger::logger::{
     Budget, EncodeError, Logged, Logger, Record, Retention, Schema, WriterQuota,

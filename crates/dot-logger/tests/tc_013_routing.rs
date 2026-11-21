@@ -1,6 +1,7 @@
 //! TC-013 F16 (TASK-023 S2a): a channel can be routed to a subset of the file
 //! outputs (Human 2026-11-07: outputs by declaration order).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+#![cfg(target_os = "linux")]
 
 use dot_logger::logger::{
     Budget, ChannelOptions, Logger, LoggerBuilder, Retention, Shutdown, StartError, WriterQuota,

@@ -1550,6 +1550,8 @@ fn power_notification_and_closed_capture_rejection_allocate_and_free_nothing() {
     });
 }
 
+// The facade's file output needs the Linux free-space probe (RV-172).
+#[cfg(target_os = "linux")]
 mod facade {
     //! TC-013 F2/F3: facade RT logging and every Writer drop order (ADR-012 §3).
     use super::allocator;

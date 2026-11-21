@@ -1,5 +1,5 @@
 //! TC-013 F13 (TASK-027 S3c): remote connection owned by the facade.
-#![cfg(feature = "remote")]
+#![cfg(all(feature = "remote", target_os = "linux"))]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use dot_logger::adapters::remote::{

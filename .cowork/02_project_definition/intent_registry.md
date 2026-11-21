@@ -26,6 +26,7 @@
 | Intent ID | 제목 | 상태 | 우선순위 | 현재 초점 Phase | 관련 Milestone | 문서 경로 | 비고 |
 |-----------|------|------|----------|-----------------|----------------|----------|------|
 | INT-001 | 재사용 가능한 실시간 로보틱스 로깅·텔레메트리 | Approved | Must | Build/Verify | MS-001~009 | [상세](intents/INT-001_realtime_robotics_logging.md) | Human이 프로젝트 목표·핵심 가치를 지정. MS-001~006·008·009 Done, MS-007 In Progress(2026-11-21). 범용 라이브러리·첫 사용처 dot-probe, 완료 기준은 2026-11-13 결정 |
+| INT-002 | AI가 로그와 소스코드로 애플리케이션 자기개선을 돕는 분석 도구 | Draft | 미정 | Define | 없음 | [상세](intents/INT-002_ai_assisted_log_analysis.md) | 2026-11-21 Human 아이디어. 목표·범위 미정, INT-001 마무리 뒤 구체화 |
 
 - `상태`: `Draft` / `Approved` / `Superseded` / `Split` / `Closed`
 - `우선순위`: `Must` / `Should` / `Could`

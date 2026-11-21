@@ -212,6 +212,8 @@ pub struct SegmentLog<S: SegmentStore> {
     config: WriterConfig,
     channels: Vec<StorageChannel>,
     first: Box<[u64]>,
+    /// Per producer: first appended sequence not yet synced, 0 when none.
+    unsynced: Box<[u64]>,
     last: Box<[u64]>,
     /// The target's appended marks when this log started.
     base: Box<[u64]>,
@@ -233,7 +235,10 @@ impl<S: SegmentStore> Drop for SegmentLog<S> {
         // Unsynced records stay owed: no later file of this target stands in
         // for them (REV-052 RV-128).
         if self.dirty {
-            self.budget.target_state.files.owe(&self.first, &self.last);
+            self.budget
+                .target_state
+                .files
+                .owe(&self.unsynced, &self.last);
         }
     }
 }
@@ -406,6 +411,7 @@ impl<S: SegmentStore> SegmentLog<S> {
             config,
             channels,
             first: vec![0; producers].into_boxed_slice(),
+            unsynced: vec![0; producers].into_boxed_slice(),
             last: vec![0; producers].into_boxed_slice(),
             base: budget.target_state.files.base(),
             dirty: false,
@@ -662,6 +668,9 @@ impl<S: SegmentStore> SegmentLog<S> {
         if self.first[p] == 0 {
             self.first[p] = record.receipt.accepted_seq;
         }
+        if self.unsynced[p] == 0 {
+            self.unsynced[p] = record.receipt.accepted_seq;
+        }
         self.last[p] = record.receipt.accepted_seq;
         self.dirty = true;
         self.appended_records = next_count;
@@ -764,6 +773,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         self.active = None;
         // Earlier files were synced at their own publication.
         self.dirty = false;
+        self.unsynced.fill(0);
         self.poisoned = false;
         Ok(())
     }
@@ -938,6 +948,7 @@ impl<S: SegmentStore> SegmentLog<S> {
         }
         if result.is_ok() {
             self.dirty = false;
+            self.unsynced.fill(0);
             if let Some(a) = self.active.as_mut() {
                 a.visible = a.range;
             }

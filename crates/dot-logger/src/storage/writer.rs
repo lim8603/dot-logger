@@ -278,6 +278,8 @@ pub struct SegmentWriter<W: SyncSink> {
     index: Vec<ChunkIndexEntry>,
     last: Box<[u64]>,
     first: Box<[u64]>,
+    /// Per producer: first appended sequence not yet synced, 0 when none.
+    unsynced: Box<[u64]>,
     /// The target's appended marks when this file started.
     base: Box<[u64]>,
     /// Appended records not covered by a successful sync of this file.
@@ -314,8 +316,8 @@ pub struct FinishedSegment<W: SyncSink> {
     first: Box<[u64]>,
     last: Box<[u64]>,
     base: Box<[u64]>,
-    /// Counted in the target's owed files until synced.
-    owes: bool,
+    /// The target's owed entry for this file's unsynced records, if any.
+    owes: Option<super::OwedFile>,
     _lease: Lease,
 }
 impl<W: SyncSink> FinishedSegment<W> {
@@ -328,8 +330,8 @@ impl<W: SyncSink> FinishedSegment<W> {
         Ok(())
     }
     fn settle(&mut self) {
-        if std::mem::take(&mut self.owes) {
-            self._lease.budget.target_state.files.settle();
+        if let Some(owed) = self.owes.take() {
+            owed.settle();
         }
     }
     /// Retained auxiliary index.
@@ -548,6 +550,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             index: Vec::with_capacity(config.index_entries(count)),
             last: vec![0; budget.producers].into_boxed_slice(),
             first: vec![0; budget.producers].into_boxed_slice(),
+            unsynced: vec![0; budget.producers].into_boxed_slice(),
             base: budget.target_state.files.base(),
             dirty: false,
             standalone,
@@ -655,6 +658,9 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.last[p] = record.receipt.accepted_seq;
         if self.first[p] == 0 {
             self.first[p] = record.receipt.accepted_seq;
+        }
+        if self.unsynced[p] == 0 {
+            self.unsynced[p] = record.receipt.accepted_seq;
         }
         self.dirty = true;
         if let Some(lease) = &self.lease {
@@ -1053,6 +1059,7 @@ impl<W: SyncSink> SegmentWriter<W> {
         self.signals.sync.store(false, Ordering::Release);
         if result.is_ok() {
             self.dirty = false;
+            self.unsynced.fill(0);
         }
         work.complete(if result.is_ok() {
             SyncResult::Synced
@@ -1088,10 +1095,8 @@ impl<W: SyncSink> SegmentWriter<W> {
         let lease = self.lease.take().ok_or(StorageError::Poisoned)?;
         // Releasing the target claim: a later file of this target must not
         // stand in for these records until this file is synced.
-        let owes = self.standalone && std::mem::take(&mut self.dirty);
-        if owes {
-            lease.budget.target_state.files.owe(&self.first, &self.last);
-        }
+        let owes = (self.standalone && std::mem::take(&mut self.dirty))
+            .then(|| super::OwedFile::new(&lease.budget.target_state, &self.unsynced, &self.last));
         Ok(FinishedSegment {
             sink: sink.inner,
             index: std::mem::take(&mut self.index),
@@ -1114,7 +1119,11 @@ impl<W: SyncSink> Drop for SegmentWriter<W> {
         // Unsynced records stay owed: no later file stands in for them.
         if self.standalone && self.dirty {
             if let Some(lease) = &self.lease {
-                lease.budget.target_state.files.owe(&self.first, &self.last);
+                lease
+                    .budget
+                    .target_state
+                    .files
+                    .owe(&self.unsynced, &self.last);
             }
         }
     }

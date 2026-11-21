@@ -1039,14 +1039,21 @@ impl SyncWork<'_, '_> {
                 producer_id: p as u32,
                 accepted_seq: seq,
             };
-            match completion
-                .poll(receipt, self.target, Boundary::Synced)?
-                .outcome
-            {
+            let status = completion.poll(receipt, self.target, Boundary::Synced)?;
+            match status.outcome {
                 QueryOutcome::Busy => return Err(ControlError::Busy),
                 QueryOutcome::Pending => return Ok(false),
                 QueryOutcome::Expired if strict => return Ok(false),
                 _ => {}
+            }
+            // Another file may hold it unsynced: a record that reached
+            // Written there but ended Failed or Unknown before Synced is not
+            // proven synced anywhere (REV-071 RV-175).
+            if strict
+                && status.confirmed.contains(Boundary::Written)
+                && !status.confirmed.contains(Boundary::Synced)
+            {
+                return Ok(false);
             }
         }
         Ok(true)

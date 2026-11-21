@@ -174,18 +174,34 @@ pub(crate) struct FileLedger {
 }
 #[derive(Default)]
 struct Owed {
-    /// Released files whose appended records were never proven synced.
-    files: usize,
-    /// Per producer: hull of those files' ranges, `(0, 0)` when none.
-    ranges: Box<[(u64, u64)]>,
+    /// Files released unsynced that nothing will sync later (dropped writers).
+    stuck: usize,
+    /// Per producer: hull of those files' unsynced ranges, `(0, 0)` when none.
+    stuck_ranges: Box<[(u64, u64)]>,
+    /// Closed files still awaiting their own sync, each with its unsynced
+    /// ranges, so settling one shrinks what is owed (REV-071 RV-175).
+    pending: Vec<(u64, Box<[(u64, u64)]>)>,
+    next: u64,
+}
+fn widen(range: &mut (u64, u64), first: u64, last: u64) {
+    if first == 0 {
+        return;
+    }
+    *range = if range.0 == 0 {
+        (first, last)
+    } else {
+        (range.0.min(first), range.1.max(last))
+    };
 }
 impl FileLedger {
     pub(crate) fn new(producers: usize) -> Self {
         Self {
             appended: (0..producers).map(|_| Default::default()).collect(),
             owed: std::sync::Mutex::new(Owed {
-                files: 0,
-                ranges: vec![(0, 0); producers].into_boxed_slice(),
+                stuck: 0,
+                stuck_ranges: vec![(0, 0); producers].into_boxed_slice(),
+                pending: Vec::new(),
+                next: 0,
             }),
         }
     }
@@ -211,44 +227,99 @@ impl FileLedger {
             .map(|mark| mark.load(Ordering::Acquire))
             .collect()
     }
-    /// A file released its writer while holding unsynced records.
+    /// A file released its writer while holding unsynced records that no
+    /// later sync can reach. `first` is each producer's first unsynced
+    /// sequence (0 when none), `last` its last appended one.
     pub(crate) fn owe(&self, first: &[u64], last: &[u64]) {
         let mut owed = self.owed();
-        owed.files += 1;
-        for (range, (&first, &last)) in owed.ranges.iter_mut().zip(first.iter().zip(last)) {
-            if first == 0 {
-                continue;
-            }
-            *range = if range.0 == 0 {
-                (first, last)
-            } else {
-                (range.0.min(first), range.1.max(last))
-            };
+        owed.stuck += 1;
+        for (range, (&first, &last)) in owed.stuck_ranges.iter_mut().zip(first.iter().zip(last)) {
+            widen(range, first, last);
         }
     }
-    /// A released file that owed its records was synced.
-    pub(crate) fn settle(&self) {
+    /// A closed file holding unsynced records that its own later sync may
+    /// settle; returns the handle for [`Self::settle`].
+    pub(crate) fn owe_until_settled(&self, first: &[u64], last: &[u64]) -> u64 {
         let mut owed = self.owed();
-        owed.files = owed.files.saturating_sub(1);
-        if owed.files == 0 {
-            owed.ranges.fill((0, 0));
+        owed.next += 1;
+        let id = owed.next;
+        let ranges = first
+            .iter()
+            .zip(last)
+            .map(|(&first, &last)| if first == 0 { (0, 0) } else { (first, last) })
+            .collect();
+        owed.pending.push((id, ranges));
+        id
+    }
+    /// The closed file `id` was synced: only its own ranges stop being owed.
+    pub(crate) fn settle(&self, id: u64) {
+        self.owed().pending.retain(|(owed, _)| *owed != id);
+    }
+    /// The closed file `id` was dropped unsynced: its ranges stay owed for
+    /// good, folded into the stuck hull so no per-file entry outlives it.
+    pub(crate) fn abandon(&self, id: u64) {
+        let mut owed = self.owed();
+        let Some(at) = owed.pending.iter().position(|(owed, _)| *owed == id) else {
+            return;
+        };
+        let (_, ranges) = owed.pending.swap_remove(at);
+        owed.stuck += 1;
+        for (range, &(first, last)) in owed.stuck_ranges.iter_mut().zip(ranges.iter()) {
+            widen(range, first, last);
         }
     }
     /// The records of `producer` another file may hold unsynced, as seen by a
     /// file created when this ledger's appended marks were `base`.
     pub(crate) fn foreign(&self, producer: usize, base: u64) -> crate::control::Foreign {
         let owed = self.owed();
+        let mut hull = if owed.stuck == 0 {
+            (0, 0)
+        } else {
+            owed.stuck_ranges.get(producer).copied().unwrap_or((0, 0))
+        };
+        for (_, ranges) in &owed.pending {
+            if let Some(&(first, last)) = ranges.get(producer) {
+                widen(&mut hull, first, last);
+            }
+        }
         crate::control::Foreign {
-            owed: if owed.files == 0 {
-                (0, 0)
-            } else {
-                owed.ranges.get(producer).copied().unwrap_or((0, 0))
-            },
+            owed: hull,
             base,
             appended: self
                 .appended
                 .get(producer)
                 .map_or(0, |mark| mark.load(Ordering::Acquire)),
+        }
+    }
+}
+/// A closed file's entry in its target's owed ledger: settled by its own
+/// sync, otherwise kept owed for good when the file is dropped (RV-175).
+pub(crate) struct OwedFile {
+    state: Arc<crate::routing::TargetLedger>,
+    id: u64,
+    settled: bool,
+}
+impl OwedFile {
+    pub(crate) fn new(
+        state: &Arc<crate::routing::TargetLedger>,
+        first: &[u64],
+        last: &[u64],
+    ) -> Self {
+        Self {
+            state: Arc::clone(state),
+            id: state.files.owe_until_settled(first, last),
+            settled: false,
+        }
+    }
+    pub(crate) fn settle(mut self) {
+        self.state.files.settle(self.id);
+        self.settled = true;
+    }
+}
+impl Drop for OwedFile {
+    fn drop(&mut self) {
+        if !self.settled {
+            self.state.files.abandon(self.id);
         }
     }
 }
@@ -418,6 +489,25 @@ impl From<mcap::McapError> for StorageError {
 mod reserve_tests {
     use super::*;
     use crate::routing::{SharedLedger, TargetLedger};
+
+    /// REV-071 RV-175 (C): settling one closed file removes only its own
+    /// range; the others it overlapped stay owed until they settle too.
+    #[test]
+    fn settling_one_owed_file_shrinks_the_owed_range() {
+        let ledger = FileLedger::new(1);
+        let a = ledger.owe_until_settled(&[1], &[5]);
+        let b = ledger.owe_until_settled(&[6], &[15]);
+        assert_eq!(ledger.foreign(0, 0).owed, (1, 15));
+        ledger.settle(a);
+        assert_eq!(ledger.foreign(0, 0).owed, (6, 15));
+        ledger.settle(b);
+        assert_eq!(ledger.foreign(0, 0).owed, (0, 0));
+        // A file dropped unsynced stays owed for good.
+        ledger.owe(&[20], &[21]);
+        let c = ledger.owe_until_settled(&[30], &[31]);
+        ledger.settle(c);
+        assert_eq!(ledger.foreign(0, 0).owed, (20, 21));
+    }
 
     /// TASK-023 S3 finding ⑩: outputs of one router rotate at the same moment
     /// and reserve their next writer from one shared ledger. A lost CAS race

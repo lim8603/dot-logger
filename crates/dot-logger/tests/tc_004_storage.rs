@@ -954,6 +954,45 @@ fn an_expired_written_record_cannot_let_a_new_segment_skip_its_unsynced_file() {
         },
     );
 }
+/// REV-071 RV-175 (A): a record written to an older file whose barrier was
+/// discarded ended Unknown, not Synced. A newer file cannot take a barrier
+/// that covers it.
+#[test]
+fn an_unknown_written_record_cannot_let_a_new_segment_claim_its_sync() {
+    use dot_logger::completion::{Boundary, QueryOutcome};
+    use dot_logger::storage::StorageError;
+    use std::time::Duration;
+    file_session(
+        4,
+        Duration::from_secs(60),
+        |c, mut producer, mut router, control, now| {
+            let budget = router.writer_budget(10).unwrap();
+            let (_old, old) = Temp::new();
+            let (_new, new) = Temp::new();
+            let mut first = SegmentWriter::new(budget.clone(), small(), channels(), old).unwrap();
+            router.scope(|mut dispatch, mut outputs| {
+                let receipt =
+                    write_one(&mut producer, &mut dispatch, &mut outputs, &mut first, now);
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                drop(work);
+                assert!(!succeeded(&control, token, now));
+                assert_eq!(
+                    c.poll(receipt, 10, Boundary::Synced).unwrap().outcome,
+                    QueryOutcome::Unknown
+                );
+                let older = first.finish().unwrap();
+                let mut second = SegmentWriter::new(budget, small(), channels(), new).unwrap();
+                write_one(&mut producer, &mut dispatch, &mut outputs, &mut second, now);
+                let (token, work) = file_barrier(c, &control, &mut dispatch, &[], now);
+                let rejected = second.sync_work(work).unwrap_err();
+                assert!(matches!(rejected.error, StorageError::InvalidRecord));
+                drop(rejected);
+                drop(older);
+                assert!(!succeeded(&control, token, now));
+            });
+        },
+    );
+}
 /// RV-128, window reuse: the older record's completion slot was reused by a
 /// later record instead of its detail aging out.
 #[test]

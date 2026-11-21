@@ -736,7 +736,10 @@ impl<'c, 'o> Host<'c, 'o> {
         if let Some((token, mut pending)) = self.ordinary.take() {
             self.hand(token, &mut pending, dispatcher, now, send);
             let snapshot = self.control.sync_snapshot(token, now)?;
-            if snapshot.finished && pending.is_empty() {
+            // Finished means nothing is queued, in flight or applying, so any
+            // target still pending ended (Expired) and will never be handed
+            // out: release the slot anyway (REV-071 RV-171).
+            if snapshot.finished {
                 let _ = self.control.release_sync(token);
             } else {
                 self.ordinary = Some((token, pending));
@@ -833,7 +836,9 @@ fn io_loop(
     flags: &Shared,
     origin: Instant,
 ) {
-    let mut syncs: Vec<SyncWork<'_, '_>> = Vec::new();
+    // Each barrier carries whether its pre-sync checkpoint was written, so a
+    // Busy retry does not write it again (REV-071 RV-174).
+    let mut syncs: Vec<(SyncWork<'_, '_>, bool)> = Vec::new();
     let mut expired = Instant::now();
     loop {
         let now = Instant::now();
@@ -852,7 +857,7 @@ fn io_loop(
             }
         }
         while let Ok(next) = work.try_recv() {
-            syncs.push(next);
+            syncs.push((next, false));
             busy = true;
         }
         for target in targets.iter_mut() {
@@ -874,38 +879,45 @@ fn io_loop(
                     || target
                         .held_since
                         .is_some_and(|t| now.saturating_duration_since(t) >= tuning.batch_wait)
-                    || syncs.iter().any(|w| w.target_id() == target_id)
+                    || syncs.iter().any(|(w, _)| w.target_id() == target_id)
                     || flags.stop.load(Ordering::Acquire));
             if due {
                 write_batch(target, ns(origin, now), flags);
                 busy = true;
             }
         }
+        // Try each barrier at most once per turn. A Busy one waits for the next
+        // turn without counting as progress, so it cannot spin (REV-071 RV-174).
+        let mut retry = Vec::new();
         let mut index = 0;
         while index < syncs.len() {
-            let target_id = syncs[index].target_id();
+            let target_id = syncs[index].0.target_id();
             let Some(target) = targets.iter_mut().find(|t| t.log_target() == target_id) else {
-                syncs.swap_remove(index).complete(SyncResult::Failed);
+                syncs.swap_remove(index).0.complete(SyncResult::Failed);
                 continue;
             };
             if !target.batch.is_empty() {
                 index += 1;
                 continue;
             }
+            let (work, checkpointed) = syncs.swap_remove(index);
             // Observe after the drained batch and before its sync barrier.
             // Capacity leaves cumulative counters for the next observation.
-            if let Err(error) = target.log.checkpoint(ns(origin, Instant::now())) {
-                if !matches!(error, RetentionError::Capacity | RetentionError::EventQuota) {
-                    flags.io_failed.store(true, Ordering::Release);
-                    target.status.fail();
+            if !checkpointed {
+                if let Err(error) = target.log.checkpoint(ns(origin, Instant::now())) {
+                    if !matches!(error, RetentionError::Capacity | RetentionError::EventQuota) {
+                        flags.io_failed.store(true, Ordering::Release);
+                        target.status.fail();
+                    }
                 }
             }
-            match target.log.sync_work(syncs.swap_remove(index)) {
+            match target.log.sync_work(work) {
                 Ok(()) => target.status.synced(ns(origin, Instant::now())),
                 Err(error) => {
                     if let Some(work) = error.work {
                         if matches!(error.error, StorageError::Busy) {
-                            syncs.push(work);
+                            retry.push((work, true));
+                            continue;
                         } else {
                             work.complete(SyncResult::Failed);
                             // A barrier over records this output never wrote
@@ -925,6 +937,7 @@ fn io_loop(
             }
             busy = true;
         }
+        syncs.append(&mut retry);
         for target in targets.iter_mut() {
             busy |= serve_events(target, origin, flags);
         }
@@ -944,7 +957,7 @@ fn io_loop(
                     target.status.fail();
                 }
             }
-            for work in syncs.drain(..) {
+            for (work, _) in syncs.drain(..) {
                 work.complete(SyncResult::Failed);
             }
             return;
@@ -1268,6 +1281,94 @@ mod tests {
                     .mark(target.log, 1, 0, 0)
                     .unwrap();
                 test(&mut target, d.tuning, &flags);
+            });
+        });
+    }
+
+    /// REV-071 RV-171: an ordinary sync whose target expired (the record was
+    /// never ready) must still release the single ordinary slot, so the next
+    /// period can request a new barrier.
+    #[test]
+    fn expired_ordinary_sync_releases_its_slot() {
+        let channel = ChannelConfig::new(1, 7, 1);
+        let channels = vec![StorageChannel {
+            channel,
+            topic: "blob".into(),
+            payload_encoding: "opaque".into(),
+            schema: None,
+        }];
+        let budget = Budget::new()
+            .memory_bytes(64 << 20)
+            .sync_every(Duration::from_millis(20))
+            .drop_deadline(Duration::from_secs(3))
+            .writer_quota(WriterQuota::small(64, 64));
+        let d = budget::derive(
+            &budget,
+            &[None],
+            &channels,
+            &[vec![1]],
+            &[Retention::ring(32 << 20)],
+            budget::Extra::default(),
+        )
+        .unwrap();
+        let plan = SessionBuilder::new(d.session)
+            .validate(&d.platform)
+            .unwrap();
+        let mut owner =
+            CaptureOwner::new_tracked(&plan, 42, 1, &[channel], &d.routing, d.completion).unwrap();
+        owner.scope(|mut scope| {
+            let completion = scope.completion().unwrap();
+            let start = Instant::now();
+            let control = ControlOwner::new(&plan, scope.control(), d.control, start).unwrap();
+            let (mut producer, input) = scope.next().unwrap();
+            let mut router = Router::new(&plan, vec![input], d.routing).unwrap();
+            router.scope(|mut dispatch, _outputs| {
+                let metadata = RecordMetadata {
+                    channel_id: 1,
+                    schema_id: 7,
+                    schema_version: 1,
+                    mono_ns: 0,
+                    real_ns: 0,
+                    source_time: None,
+                    level: Level::Info,
+                    importance: Some(Importance::Normal),
+                };
+                // Routed but never written: the barrier can never become ready.
+                producer.try_record_small(metadata, &[1]).unwrap();
+                dispatch.turn(start, &mut [None; 16]).unwrap();
+                let mut host = Host {
+                    control: &control,
+                    targets: vec![1],
+                    ranges: vec![ProducerRange::default(); 1],
+                    cutoffs: vec![ProducerRange::default(); 1],
+                    ordinary: None,
+                    last_sync: start,
+                    tuning: d.tuning,
+                };
+                let send = |_: u32, _: SyncWork<'_, '_>| panic!("no barrier is ready");
+                let requested = start + d.tuning.sync_every;
+                host.ordinary_sync(&mut dispatch, completion, true, requested, &send)
+                    .unwrap();
+                assert!(host.ordinary.is_some());
+                let expired = requested
+                    + budget::sync_overdue(d.tuning.sync_every)
+                    + Duration::from_millis(1);
+                control.poll(expired).unwrap();
+                host.ordinary_sync(&mut dispatch, completion, true, expired, &send)
+                    .unwrap();
+                assert!(
+                    host.ordinary.is_none(),
+                    "the expired ordinary sync kept the only ordinary slot"
+                );
+                host.ordinary_sync(
+                    &mut dispatch,
+                    completion,
+                    true,
+                    expired + d.tuning.sync_every,
+                    &send,
+                )
+                .unwrap();
+                assert!(host.ordinary.is_some(), "the next period could not request");
             });
         });
     }

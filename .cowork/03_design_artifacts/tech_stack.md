@@ -11,15 +11,15 @@
 | 아키텍처 | 내장형 Ports and Adapters·제한된 파이프라인 | 생산자별 큐, 비-RT background | ADR-007·008 | 프로세스 장애 완전 격리 아님 |
 | 플랫폼 | Linux·macOS·Windows | 첫 기능 매트릭스: Ubuntu 24.04 x86_64, Windows 11 x86_64, macOS 14+ arm64 | ADR-006·009 | hosted native CI는 EV-001 Pass; Windows 11·Linux RT 커널/장비·추가 CPU는 TASK-022에서 별도 검증 |
 | 큐 | rtrb | 0.4.0 SPSC | ADR-009 | 전체 API/Drop의 RT 안전성은 TASK-003·004 |
-| 파일 | MCAP | mcap 0.26.0(vendor, 무압축 chunk CRC 1회 패치 — ADR-010 개정 1); CRC/index on, 초기 압축 off | ADR-009·010 | 인덱스 상한·active reader·복구/성능 검증 |
+| 파일 | MCAP | mcap 0.26.0(vendor, 무압축 chunk CRC 1회 패치 — ADR-010 개정 1. 2026-11-21부터 패키지 이름 `dot-logger-mcap`·lib 이름 `mcap`, `[patch]` 없이 별칭 의존 — 개정 2·TASK-036); CRC/index on, 초기 압축 off | ADR-009·010 | 인덱스 상한·active reader·복구/성능 검증 |
 | CRC | IEEE CRC-32 | crc32fast 1.5.3(MCAP가 이미 잠근 같은 버전을 직접 의존으로 사용, 실행 시 하드웨어 경로 선택) | [EV-105](../05_verification/verification_evidence.md#ev-105) | 파일 복구·조회·원격 chunk checksum. 비트 단위 기준 구현 대조 시험 |
 | 저장 매체 | SSD | 현재 PC의 CT1000T500SSD8(루트), HP EX950 512GB 2개(/data/build·/data/db)·ext4 | ADR-004·011 | 시험별 대상 경로 고정·실측으로 판정, 제품 사양으로 처리량 추정 금지 |
 | 봉투·통신 | Protobuf·gRPC | tonic 0.13.1 / prost 0.13.5 | ADR-009 | bounded 조각·ACK·실제 TCP 대비 성능 검증 |
 | 외부 I/O runtime | Tokio | 1.51.6 | ADR-009 | DB/remote background만, RT 경로 제외 |
 | 시계열 DB | InfluxDB v2 어댑터 | v2 HTTP write·제한 수치 query; 로컬 기능 pin OSS2.9.1/Linux amd64 | ADR-009·EV-038 | digest/health version 고정 실제 DB write/query·중복/partial 및 Delivery/완료·로컬 파일 격리 EV-039. 다른 버전/OS·실앱·정량 성능/native 잔여, v3 호환 미선언 |
 | 클라이언트 | Rust API + CLI, dot-probe 기존 화면 연동 | clap 4.6.6·serde 1.0.229/serde_json 1.0.154 | Human 선택·ADR-009·EV-025 | 로컬 CLI10/transport7·두 Rust Pass, 실제 dot-probe/다른 OS 후속 |
-| 원격 viewer | 공개 Foxglove WebSocket v1, 운영 PC의 로컬 스키마 목록 | `tokio-tungstenite =0.30.0` (MIT, handshake), 대시보드 HTTP용 `httparse =1.10.1`·`base64 =0.22.1`·`futures-util =0.3.34`(lock에 이미 있던 패키지), 개발 Rust 1.96.0 / 하한 1.85 | [ADR-014](adrs/ADR-014_viewer_live_websocket.md)·[ADR-016](adrs/ADR-016_viewer_embedded_web_dashboard.md) | Foxglove Desktop 3.5.0·Lichtblick Web 1.31.0 대상, 파일과 실시간 검증은 각 증거 참조 |
-| Linux 공간 관측 구현 | rustix | =1.1.6(RUSTSEC-2026-0486, EV-069), std/fs + 제품 `thread`(facade worker CPU 배치, API §22)·Linux target 한정; linux-raw-sys0.12.1 lock | TASK-017 S3·API §15.5·EV-033, 승인된 OS probe의 내부 구현 | 일반 경로 statvfs·원 OS 오류, 다른 OS는 Unsupported; 실제 성능 인증 아님 |
+| 원격 viewer | 공개 Foxglove WebSocket v1, 운영 PC의 로컬 스키마 목록 | `tokio-tungstenite 0.30.0` (MIT, handshake), 대시보드 HTTP용 `httparse 1.10.1`·`base64 0.22.1`·`futures-util 0.3.34`(lock에 이미 있던 패키지), 개발 Rust 1.96.0 / 하한 1.85 | [ADR-014](adrs/ADR-014_viewer_live_websocket.md)·[ADR-016](adrs/ADR-016_viewer_embedded_web_dashboard.md) | Foxglove Desktop 3.5.0·Lichtblick Web 1.31.0 대상, 파일과 실시간 검증은 각 증거 참조 |
+| Linux 공간 관측 구현 | rustix | 1.1.6(RUSTSEC-2026-0486, EV-069), std/fs + 제품 `thread`(facade worker CPU 배치, API §22)·Linux target 한정; linux-raw-sys0.12.1 lock | TASK-017 S3·API §15.5·EV-033, 승인된 OS probe의 내부 구현 | 일반 경로 statvfs·원 OS 오류, 다른 OS는 Unsupported; 실제 성능 인증 아님 |
 | 일반 로그 어댑터 | tracing/log | 0.1.44 / 0.4.29 | ADR-009 | 전용 RT 계약과 분리 |
 | 검증 도구 | cargo test/fmt/clippy·allocation guard·선택 Loom/Miri·native OS CI | Miri nightly-2026-10-26(검증 전용), 나머지 patch/CI 환경은 Task에서 고정 | ADR-009 | 모의/빌드 성공을 장비 성능/내구성으로 승격하지 않음 |
 
@@ -30,6 +30,8 @@ TASK-002에서 `rust-toolchain.toml`로 개발 Rust 1.96.0, workspace `rust-vers
 MCAP 0.25의 선택 zstd 경로에서 발견한 취약점은 Human 승인 [ADR-010](adrs/ADR-010_mcap_security_update.md)에 따라 0.26.0(zstd 0.14.3 / zstd-safe 8.2.0)으로 수정했다. Tokio는 같은 계열 수정판 1.51.6이다. rustix는 RUSTSEC-2026-0486(xattr unsound, dot-logger 미사용 함수) 때문에 같은 계열 1.1.6으로 고정했다(2026-11-11 Human 「올려올려」, [EV-069](../05_verification/verification_evidence.md#ev-069)). 최종 보안 검사 취약점/unsound 0건, `paste` 유지보수 중단 경고 1건은 GAP-005로 추적한다. 외부 177개 의존성의 라이선스 metadata 누락은 0건이며 목록(비공개 원시 근거: `imported_context/task_002_2026-10-26/dependencies.json`)에 원문 표현을 보존했다. 제품 배포 라이선스 결정·고지 완성의 의미는 아니다.
 
 CI는 Ubuntu 24.04·Windows Server 2025·macOS 14 × Rust 1.85.0/1.96.0의 6개 구성 검사와 audit 모두 [Pass](https://github.com/lim8603/dot-logger/actions/runs/40504484501)했다(2026-10-27, EV-001, GAP-004 Closed). Windows 11 및 실제 PREEMPT_RT/장비 수락은 별도다. CLI/clap과 이후 추가 의존성은 해당 Task에서 같은 절차로 고정한다.
+
+**2026-11-21 의존성 표기 기준(ADR-009 개정, TASK-036):** 위 표와 아래 기록의 버전은 `Cargo.lock`에 고정되어 CI가 `--locked`로 검사하는 버전이다. manifest는 이 버전을 하한으로 하는 `^` 범위이며(과거 기록의 `=` 고정 표기는 당시 기준), 최신 호환 버전 쪽은 워크스페이스 밖 소비자 검사(`scripts/check-external-consumer.py`)가 확인한다. CI의 macOS 행은 2026-11-21 `macos-14` 러너 지원 종료로 `macos-15`로 바꿨다.
 
 2026-10-31 ADR-011로 현재 Ubuntu PC를 실제 장치 시험 대체 환경으로 확정했다. TASK-022에서 실행 커널/시험 경로·NIC·제어 부하/기한을 고정하며 UPS는 시뮬레이션으로 판정한다. GitHub native는 공개 완료 후 실행한다. R1은 참조 조건이며 다른 장비·Tier 2에 자동 적용하지 않는다. FR-015 추천 기능은 별도 제안이며 자동 채택하지 않았다.
 

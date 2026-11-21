@@ -1778,6 +1778,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **미실행 — macOS 2개:** `macos-14` 러너 이미지가 더 이상 지원되지 않아 2초 만에 취소됐다("The configuration 'macos-14-arm64-us-default' is not supported"). CI 행렬을 `macos-15`로 바꿨다.
 - **판정에 쓰는 범위:** Linux native CI 통과 근거. Windows·macOS는 위 수정 뒤 재실행 결과로 판정한다(GAP-004 유지).
 
+### EV-114 — TASK-036 배포 가능화 회귀와 T3 두 번째 실행
+
+- **대상:** TASK-036 작업 트리(`d9d8b1f` 위: MCAP 별칭 crate `dot-logger-mcap`, `[patch]` 제거, 의존성 `^` 범위, 외부 소비자 검사, macOS RT 할당 시험 3개 ignore). 이 PC(Ubuntu 7.0.0-43-realtime, x86_64), `/data/build/target`. AI 실행.
+- **재현과 해소:** 워크스페이스 밖 소비자(`scripts/check-external-consumer.py`: `tests/api-consumer` 프로그램을 lockfile 없이 path 의존으로 빌드·실행)가 수정 전 `E0599`(`WriteOptions::chunk_registrations` 없음)로 실패했고, 수정 뒤 1.96.0·1.85.0 모두 `run`·`run --features remote`·`check --features full` 통과. lockfile 없이 183개 패키지를 Rust 1.85 호환 최신 버전으로 해석했다.
+- **lockfile:** 바뀐 항목은 `mcap 0.26.0`(registry) → `dot-logger-mcap 0.1.0`(path) 하나. 다른 의존성 버전 변경 없음. MCAP 소스는 바꾸지 않아 출력 바이트도 같다.
+- **CI와 같은 검사 묶음:** 두 Rust 각 **741 Pass, 실패 0, 5 ignored**. 두 버전 Clippy `-D warnings`(Linux와 macOS·Windows 교차), fmt, strict rustdoc, client 기능 없는 시험, 통합 표면, audit(`paste` 경고 1), feature 조합(1.96.0 496초·1.85.0 552초), CI 범위 Miri(796초, 실패 0, 파싱된 결과 줄 43개에서 1,082 Pass·88 ignored).
+- **디스크 주의:** 첫 회귀는 `/data/build` 100%(오래된 `target/debug` 419 GB)로 `No space left on device`·링커 Bus error가 나 무효였다. `target/debug`를 비우고 처음부터 다시 실행한 결과가 위 값이다.
+- **T3 두 번째 실행(run `44910448346`, `d9d8b1f`):** contracts `windows-2025` 두 개 **Pass**(EV-113 하네스 수정 효과), Linux 두 개·audit·integration-surface·raw-memory Pass. `macos-15` 두 개는 RT 할당 시험 3개(`storage_encoder_…`, `enabled_telemetry_…`, `telemetry_preallocation_…`)가 실패했다. 관찰 구간에서 64바이트 1회 할당이 남는다. macOS의 std `Mutex`는 처음 잠글 때 pthread mutex(64바이트)를 힙에 만들고(Linux futex·Windows SRWLock은 할당 없음), 해당 경로가 `telemetry::counters` history와 `storage::FileLedger`의 `Mutex`를 잠근다. 모두 관리 경로이며, 무할당 회계는 Tier 1(Linux) 계약이다(NFR-007 Tier 2는 RT SLA 제외). 세 시험을 macOS에서만 이유를 적어 `ignore`했다. 제품 코드는 바꾸지 않았다.
+- **판정에 쓰는 범위:** TASK-036 로컬 회귀, Windows native CI 통과. macOS 판정은 이 변경을 푸시한 뒤의 CI 실행으로 한다(GAP-004).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |
@@ -1785,7 +1795,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 | GAP-001 | ADR-011 현재 PC/UPS 방법 및 local-pc-v1 수치 프로필 Human 승인(EV-021). generic 관측·RT 설치 구분, 제품 실측은 NotRun | AI, 선행 harness·실앱 통합/UPS adapter 준비 및 RT 부팅/capability 확인 뒤 해당 행 실행 | Open — 실행 준비/실측 잔여 |
 | GAP-002 | TASK-002/003 로컬/native Pass·TASK-004~011 로컬 Pass/Human 승인. TASK-012/013 EV-026·TASK-014/015 EV-029·TASK-016 EV-030까지 로컬 수락·REV-001~027 Closed. REV-028 조치·TASK-017 S1/S2 EV-031/032·REV-029/030 Closed, EV-033~035 file/고정 routed host·생산/실앱 snapshot 수락, 지속 실앱/통합 실측/native TC 수락 잔여. TASK-019 S1/S2/S3 EV-037~039 write/query·원 Delivery/완료·로컬 파일 격리 수락, 실앱/정량 성능/환경·native 잔여. TASK-020 S1~S3 EV-040~042 로컬 수락, TASK-021 EV-043 로컬 구현/UPS 시뮬레이션 수락. 지속 실앱/환경/장기·native 후속 | AI. 2026-11-13 완료 기준 변경으로 기능 Task는 Done(EV-078). 남은 실사용처는 TASK-026, 장기는 TASK-024, native는 GAP-004 | Open — 실사용처·장기 잔여 |
 | GAP-003 | 프로젝트 toolchain/lock/MSRV·로컬 feature 검증은 EV-001로 확인. 전역 default는 불필요 | AI, dependency 변경 시 동일 검사 재실행 | Closed — 로컬 toolchain 범위; native는 GAP-004 |
-| GAP-004 | TASK-004 0cafb5c run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 2b90b3e. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, 소유 Task: TASK-024(2026-11-13 통합). T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — 2026-11-21 공개 뒤 T3 첫 실행 [EV-113](#ev-113): Linux·audit·raw-memory Pass, Windows 시험 하네스 수정·macOS 러너 변경 뒤 재실행 대기 |
+| GAP-004 | TASK-004 0cafb5c run40520558735의8job 실행 전 차단, 마지막 native Pass TASK-003 2b90b3e. TASK-004~017·019~021의 최신 변경 native는 Not Run. 2026-10-31 ADR-011로 저장소 공개 완료 후 실행하는 승인된 이월 | AI, 소유 Task: TASK-024(2026-11-13 통합). T3: GitHub 공개 완료 확인 시 당시 source hash 고정·6 contracts+audit+raw-memory 실행/확인. 공개 전 CI/계정/과금 조회·차단 재시도 없음. 공개 전 준비/로컬 검증 진행 허용 | Open — T3 [EV-113](#ev-113)·[EV-114](#ev-114): Linux·Windows·audit·raw-memory Pass, macOS는 RT 할당 시험 3개 Tier 1 한정(ignore) 뒤 재실행 대기 |
 | GAP-005 | MCAP 간접 build 의존 `paste` 1.0.15 유지보수 중단 RUSTSEC-2024-0436; 로컬 및 2026-10-27 native CI 감사에서 동일 경고 1개 확인 | AI, TASK-007 의존성 재검토 또는 수정 upstream 출현 시 재검사. 취약점·unsound 검사는 계속 실패 조건 유지 | Open |
 | GAP-006 | EV-006 자가 리뷰 RV-001~004는 EV-007 수정·신규9개/두 Rust16 features·Miri78×8·RT0/0 회귀 Pass. 수정 전 Red·과거 승인/시험 이력은 보존 | AI, 수정분 Human 리뷰/native(GAP-004) 후속. 현 소스 hash는 EV-007 | Closed — 로컬 수정/회귀 범위 |
 | GAP-008 | `next_timeout_during_partial_tcp_frame_retains_decoder_and_record` 간헐 실패(서버 종료 직후 hub 예약 40,976,384B 잔존)는 hyper stream task가 serve 반환 뒤 handle을 보유한 순서 문제였다. EV-045 `d001931`에서 serve가 서버 측 handle 해제까지 대기하도록 수정했고, 4개 동시 실행 기준 19/200 → 0/200 | AI, 재발 시 같은 부하 방법으로 재측정 | Closed — 로컬 수정/회귀 범위 |

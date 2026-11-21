@@ -10,19 +10,19 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 장기/native(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 Planned(2026-11-21). MS-009 Done |
-| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) Planned — 배포 가능화(외부 소비자 빌드 실패 해소). T3 native CI 재실행(Windows·macOS) 병행 |
+| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) In Progress — S1~S4 Done([EV-114](../05_verification/verification_evidence.md#ev-114)), 푸시 뒤 CI(외부 소비자·macOS) 확인과 Human 리뷰 대기 |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
 | 상태 | 32/36 Task Done, MS-009 Done. 최신 회귀 [EV-112](../05_verification/verification_evidence.md#ev-112): 두 Rust 각 741 Pass·5 ignored, Clippy(Linux와 macOS·Windows 교차)·feature 조합·CI 범위 Miri 통과. 커버리지 [EV-089](../05_verification/verification_evidence.md#ev-089). **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / #006 T3 첫 실행·릴리즈 계획 / AI |
-| 세션 상태 | **2026-11-21 #006(개발) — Gate 4·Phase Verify, public 전환, T3 첫 실행(EV-113), 릴리즈 계획 MS-010.** Human: `delete_repo` 권한 회수 |
+| 갱신 | 2026-11-21 / #006 TASK-036·T3 두 번째 실행 / AI |
+| 세션 상태 | **2026-11-21 #006(개발) — Gate 4·Phase Verify, public 전환, T3(EV-113·114), MS-010 계획, TASK-036 S1~S4.** 다음은 CI 결과 확인 |
 | 최근 완료 세션 | 2026-11-21 #006 — REV-071 보충 조치(`9622e94`, EV-112), REV-071 Closed·TASK-025 Done·Gate 4 Pass·Phase Verify |
 
 ## 현재 결정과 제약
 
 - **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
-- **2026-11-21 T3 첫 실행([EV-113](../05_verification/verification_evidence.md#ev-113)):** Linux·audit·integration-surface·raw-memory Pass. Windows는 시험 하네스의 소켓 non-blocking 상속 차이로 실패 → 5곳 수정. macOS는 `macos-14` 러너 지원 종료로 미실행 → `macos-15`. 재실행으로 판정한다.
+- **2026-11-21 T3 첫 실행([EV-113](../05_verification/verification_evidence.md#ev-113)):** Linux·audit·integration-surface·raw-memory Pass. Windows는 시험 하네스의 소켓 non-blocking 상속 차이로 실패 → 5곳 수정. macOS는 `macos-14` 러너 지원 종료로 미실행 → `macos-15`. 두 번째 실행([EV-114](../05_verification/verification_evidence.md#ev-114))에서 Windows Pass, macOS는 std `Mutex`의 첫 잠금 할당(64 B)으로 RT 할당 시험 3개 실패 → Tier 1(Linux) 계약이라 macOS에서만 ignore.
 
 - **2026-11-21 Human 「지금 공개」·「그대로 공개」 — 공개 전환(T2 해소):** 공개 전 재점검: gitleaks(커밋 369개) 1건은 기존 시험 전용 TLS 키, 커밋 주소 전부 noreply, gmail 0, `imported_context` 추적은 `.gitkeep`만, 의존성 197개 라이선스 모두 허용형(`cargo metadata` 집계). 문서·perf 결과의 로컬 경로(`/home/lim8603`·`/data/build`)와 사설 IP 1곳(총 205곳, #004 시점 196곳)은 비밀이 아니므로 그대로 둔다(Human 선택, 이력 재정리 안 함). `ae22f9d`에서 저장소를 public으로 전환했다(gh 구버전이라 REST API로 변경). T3 트리거 도래.
 
@@ -91,7 +91,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-036 | 배포 가능화(MS-010 0단계) | AI | Planned | 2026-11-21 | S1 외부 소비자 빌드 재현부터 |
+| TASK-036 | 배포 가능화(MS-010 0단계) | AI | In Progress | 2026-11-21 | S1~S4 Done(EV-114), CI·Human 리뷰 대기 |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
@@ -119,8 +119,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **T3 native CI 재실행:** 첫 실행([EV-113](../05_verification/verification_evidence.md#ev-113))의 Windows 시험 하네스 수정과 macOS 러너 변경(`macos-15`)을 푸시해 다시 실행한다. 결과로 GAP-004를 판정하고, 실패는 원인별로 조치한다.
-0-1. **TASK-036 배포 가능화(MS-010 0단계):** 워크스페이스 밖 소비자 빌드 재현 시험 → MCAP 별칭 crate → 의존성 `^` 범위 → README·회귀. 끝나면 T3 통과와 함께 v0.1.0 미리보기(MS-010 1단계).
+0. **T3·TASK-036 CI 확인:** 두 번째 실행([EV-114](../05_verification/verification_evidence.md#ev-114))에서 Linux·Windows는 Pass. macOS RT 할당 시험 3개를 Tier 1 한정으로 바꾼 TASK-036 변경을 푸시한 CI로 GAP-004와 TASK-036 외부 소비자 단계를 판정한다.
+0-1. **TASK-036 Human 리뷰 → v0.1.0 미리보기(MS-010 1단계):** 리뷰 포인트는 별칭 crate 이름·버전, `^` 범위, macOS RT 할당 시험 ignore 판단.
    - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
 1. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.

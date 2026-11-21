@@ -52,7 +52,7 @@ Human 「권고대로 조치 시작하자」에 따라 vendor reader의 무압�
 ## 개정 2 — 배포 가능한 vendor 구조(2026-11-21)
 
 - **문제:** 패치한 MCAP를 워크스페이스 `[patch.crates-io]`로 적용해 왔다. Cargo는 `[patch]`를 최상위 워크스페이스에서만 적용하므로, git 의존성이나 crates.io로 dot-logger를 쓰는 외부 프로젝트는 원본 mcap 0.26.0을 받는다. 워크스페이스 밖 소비자 프로젝트에서 `WriteOptions::chunk_registrations`가 없어 `error[E0599]`로 컴파일이 실패하는 것을 확인했다(2026-11-21). 내부 `tests/api-consumer`는 워크스페이스 안이라 잡지 못했다.
-- **결정(2026-11-21 Human 결정(1 A·2 권장대로·3 미리보기·4 TASK-026 뒤·5 권장대로)의 1 A):** vendor 복사본을 이름을 바꾼 워크스페이스 crate(`dot-logger-mcap` 후보)로 두고, dot-logger는 `mcap = { package = "dot-logger-mcap", path = …, version = … }` 별칭으로 의존한다. `[patch.crates-io]`는 없앤다. crates.io 게시 때 이 crate를 먼저 게시한다. MIT 고지와 원본 출처·`local-changes.patch`는 유지한다. 상류(foxglove/mcap)에 변경을 제안하는 일은 선택이며, 반영되면 이 crate를 걷어낸다.
+- **결정(2026-11-21 Human 결정(1 A·2 권장대로·3 미리보기·4 TASK-026 뒤·5 권장대로)의 1 A):** vendor 복사본을 이름을 바꾼 crate `dot-logger-mcap`(vendor 위치 유지, lib 이름은 `mcap`)으로 두고, dot-logger는 `mcap = { package = "dot-logger-mcap", path = …, version = … }` 별칭으로 의존한다. `[patch.crates-io]`는 없앤다. crates.io 게시 때 이 crate를 먼저 게시한다. MIT 고지와 원본 출처·`local-changes.patch`는 유지한다. 상류(foxglove/mcap)에 변경을 제안하는 일은 선택이며, 반영되면 이 crate를 걷어낸다.
 - **유지되는 것:** MCAP 0.26.0 기준, 무압축 고정, 세 가지 로컬 변경(CRC 1회, reader 경계 강화, 선행 등록 옵션), 신뢰할 수 없는 입력 경계(RV-180).
 - **구현·검증:** [TASK-036](../../04_implementation/tasks/TASK-036.md). 워크스페이스 밖 소비자 빌드를 CI에 넣어 재발을 막는다.
 

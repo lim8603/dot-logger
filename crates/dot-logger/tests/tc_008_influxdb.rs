@@ -81,7 +81,11 @@ fn server(replies: Vec<&'static str>) -> (String, std::thread::JoinHandle<Vec<St
             for reply in replies {
                 let mut stream = loop {
                     match listener.accept() {
-                        Ok((stream, _)) => break stream,
+                        Ok((stream, _)) => {
+                            // Windows accepted sockets inherit the listener's non-blocking mode.
+                            stream.set_nonblocking(false).unwrap();
+                            break stream;
+                        }
                         Err(e)
                             if e.kind() == std::io::ErrorKind::WouldBlock
                                 && std::time::Instant::now() < end =>
@@ -371,6 +375,8 @@ fn in_flight_cancel_or_timeout_never_claims_remote_rollback() {
             let deadline = std::time::Instant::now() + Duration::from_secs(3);
             let mut stream = loop {
                 if let Ok((stream, _)) = listener.accept() {
+                    // Windows accepted sockets inherit the listener's non-blocking mode.
+                    stream.set_nonblocking(false).unwrap();
                     break stream;
                 }
                 assert!(std::time::Instant::now() < deadline);

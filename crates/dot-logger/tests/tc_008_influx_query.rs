@@ -86,6 +86,8 @@ fn server_action(
             let deadline = std::time::Instant::now() + Duration::from_secs(4);
             let mut stream = loop {
                 if let Ok((s, _)) = listener.accept() {
+                    // Windows accepted sockets inherit the listener's non-blocking mode.
+                    s.set_nonblocking(false).unwrap();
                     break s;
                 }
                 assert!(std::time::Instant::now() < deadline);

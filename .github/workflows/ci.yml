@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-14]
+        os: [ubuntu-24.04, windows-2025, macos-15]
         toolchain: [1.85.0, 1.96.0]
     runs-on: ${{ matrix.os }}
     steps:

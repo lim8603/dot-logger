@@ -24,6 +24,8 @@ fn peer(response: &'static str) -> (String, std::thread::JoinHandle<String>) {
             let end = Instant::now() + std::time::Duration::from_secs(4);
             let mut s = loop {
                 if let Ok((s, _)) = l.accept() {
+                    // Windows accepted sockets inherit the listener's non-blocking mode.
+                    s.set_nonblocking(false).unwrap();
                     break s;
                 }
                 assert!(Instant::now() < end);
@@ -389,6 +391,8 @@ fn stalled_saturated_db_retains_one_raw_slot_while_all_six_mcap_records_finish()
                 let deadline = Instant::now() + std::time::Duration::from_secs(4);
                 let mut s = loop {
                     if let Ok((s, _)) = listener.accept() {
+                        // Windows accepted sockets inherit the listener's non-blocking mode.
+                        s.set_nonblocking(false).unwrap();
                         break s;
                     }
                     assert!(Instant::now() < deadline);

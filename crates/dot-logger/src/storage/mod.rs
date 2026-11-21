@@ -172,15 +172,17 @@ pub(crate) struct FileLedger {
     appended: Box<[std::sync::atomic::AtomicU64]>,
     owed: std::sync::Mutex<Owed>,
 }
+/// Per producer `(first, last)`, `(0, 0)` when none.
+type Ranges = Box<[(u64, u64)]>;
 #[derive(Default)]
 struct Owed {
     /// Files released unsynced that nothing will sync later (dropped writers).
     stuck: usize,
     /// Per producer: hull of those files' unsynced ranges, `(0, 0)` when none.
-    stuck_ranges: Box<[(u64, u64)]>,
+    stuck_ranges: Ranges,
     /// Closed files still awaiting their own sync, each with its unsynced
     /// ranges, so settling one shrinks what is owed (REV-071 RV-175).
-    pending: Vec<(u64, Box<[(u64, u64)]>)>,
+    pending: Vec<(u64, Ranges)>,
     next: u64,
 }
 fn widen(range: &mut (u64, u64), first: u64, last: u64) {

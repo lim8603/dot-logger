@@ -1,4 +1,5 @@
-//! dot-probe style integration on the facade only (TASK-029 S4): `tracing`
+//! A robot-application integration on the facade only, modeled on the first
+//! application that uses dot-logger (dot-probe): `tracing`
 //! logs, typed joint telemetry at 1 kHz and 30 Hz camera frames into files,
 //! plus a loopback gRPC server that `dot-logger tail` can subscribe to.
 //! No support module, `unsafe` or memory partition.

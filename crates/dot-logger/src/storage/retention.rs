@@ -46,7 +46,8 @@ fn sync_dir(path: &Path) -> io::Result<()> {
 }
 impl<F: FnMut() -> io::Result<u64>> FileStore<F> {
     /// Create a fresh target namespace below an existing trusted base directory.
-    /// Existing target directories are rejected; startup/recovery is TASK-009.
+    /// Existing target directories are rejected; recover existing files with
+    /// the recovery API instead.
     /// An existing session path must be a real directory, not a symbolic link:
     /// the metadata check rejects symlink traversal into a different namespace.
     /// The host must keep the trusted base and session namespace exclusively

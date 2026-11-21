@@ -33,8 +33,8 @@
 //! # Ok(()) }
 //! ```
 //!
-//! The detailed modules remain the advanced path. Ownership follows ADR-012:
-//! the shared capture core lives behind one management-held `Arc`; each
+//! The detailed modules remain the advanced path. Ownership: the shared
+//! capture core lives behind one management-held `Arc`; each
 //! [`crate::logger::Writer`] owns its endpoint and only builds borrowed views of the core.
 
 mod affinity;
@@ -451,7 +451,7 @@ impl ChannelOptions {
         Self::default()
     }
     /// Classify records sent at `level` or more severe as Important and the
-    /// rest as Normal (FR-009, API §22.4). A record marked with
+    /// rest as Normal. A record marked with
     /// [`Channel::important`] stays Important at any level, and an explicit
     /// importance in advanced-path metadata always wins over this mapping.
     ///

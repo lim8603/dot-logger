@@ -120,6 +120,7 @@ pub fn command() -> Command {
     }
     c.subcommand(
         Command::new("config")
+            .about("Validate or compare session declarations, or post a live change")
             .subcommand_required(true)
             .subcommand(
                 Command::new("validate")
@@ -133,6 +134,7 @@ pub fn command() -> Command {
     )
     .subcommand(
         Command::new("check")
+            .about("Preview or run a check plan the host registered")
             .subcommand_required(true)
             .subcommand(Command::new("run").about("Run a pre-registered host plan"))
             .subcommand(

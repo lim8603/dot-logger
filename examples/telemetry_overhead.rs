@@ -1,5 +1,5 @@
 //! Repeatable enabled/disabled fixture, not a calibrated RT/performance verdict.
-//! Run in release with controlled CPU/IO and repeat/order reversal for TC-012.
+//! Run in release with controlled CPU/IO, repeating runs in reversed order.
 use dot_logger::{capture::*, config::*, platform::*};
 use std::{
     error::Error,

@@ -1,4 +1,4 @@
-//! Read-only operations dashboard over loopback HTTP (ADR-016).
+//! Read-only operations dashboard over loopback HTTP.
 //!
 //! One upstream worker owns the connection and sends one request at a time:
 //! `GetStatus` at most once per second, and the page's read-only `Compare` and
@@ -49,7 +49,7 @@ const POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; \
     frame-ancestors 'none'";
 
 /// A read-only lookup the page may ask for. Running a check or changing the
-/// configuration is not offered (ADR-016).
+/// configuration is not offered; use the CLI for those.
 #[derive(Clone, Copy)]
 pub enum Query {
     /// `Compare` of two held snapshots (`dot_logger.compare.v1`).

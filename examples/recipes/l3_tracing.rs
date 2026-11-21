@@ -1,4 +1,4 @@
-//! L3 recipe (NFR-008): L1 plus the `tracing`/`log` connection.
+//! L3 recipe: L1 plus the `tracing`/`log` connection.
 use dot_logger::logger::{EncodeError, Logger, Preset, Record, Retention, Schema, WriterQuota};
 use std::time::Duration;
 use tracing::Level;

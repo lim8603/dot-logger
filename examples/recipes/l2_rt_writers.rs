@@ -1,4 +1,4 @@
-//! L2 recipe (NFR-008): two real-time writers - small typed records and
+//! L2 recipe: two real-time writers - small typed records and
 //! zero-copy camera frames from a loaned slot - and the shutdown report.
 use dot_logger::capture::Importance;
 use dot_logger::logger::{EncodeError, Logger, Preset, Record, Retention, Schema};

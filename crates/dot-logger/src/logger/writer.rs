@@ -32,7 +32,7 @@ impl Schema {
         }
     }
     /// Attach the payload's schema descriptor so standard MCAP tools can
-    /// decode it directly from native MCAP files (ADR-013): `name` is the
+    /// decode it directly from native MCAP files: `name` is the
     /// type the tools resolve (for protobuf the fully-qualified message name,
     /// `data` a serialized `FileDescriptorSet` with imports), `encoding` the
     /// MCAP schema encoding (`"protobuf"`, `"jsonschema"`, ...). Stored once
@@ -254,7 +254,7 @@ pub(crate) struct Owned {
 ///
 /// Use one writer per thread. Dropping it moves its state into a preallocated
 /// mailbox; the logger's management side frees it, so Drop never allocates or
-/// releases memory on the calling thread (ADR-012 §3).
+/// releases memory on the calling thread.
 ///
 /// ```compile_fail
 /// fn require_sync<T: Sync>() {}

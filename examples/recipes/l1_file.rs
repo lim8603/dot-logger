@@ -1,4 +1,4 @@
-//! L1 recipe (NFR-008): record typed messages from a real-time thread into
+//! L1 recipe: record typed messages from a real-time thread into
 //! files and judge the shutdown. No support module, `unsafe` or lifetimes.
 use dot_logger::logger::{EncodeError, Logger, Preset, Record, Retention, Schema};
 use std::time::Duration;

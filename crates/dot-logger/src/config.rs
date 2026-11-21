@@ -104,7 +104,8 @@ pub struct WorkerThreadingConfig {
     pub affinity: Requirement,
 }
 
-/// Explicit startup plan for the configuration subset implemented by TASK-002.
+/// Explicit startup plan: memory partitions, producer quotas, importance
+/// policy and worker threads.
 ///
 /// Device-independent numeric defaults are deliberately absent. Storage targets,
 /// schemas, durability, and completion plans are added with their implementing

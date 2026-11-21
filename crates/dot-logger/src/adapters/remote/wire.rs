@@ -199,7 +199,7 @@ pub(crate) struct AckRequest {
     pub producer: u32,
     #[prost(uint64, tag = "7")]
     pub sequence: u64,
-    /// ADR-015 batch; when nonempty the single-item fields above are unused.
+    /// Batched items; when nonempty the single-item fields above are unused.
     #[prost(message, repeated, tag = "8")]
     pub items: Vec<AckItem>,
 }
@@ -568,7 +568,7 @@ impl Frame {
     }
 }
 impl AckRequest {
-    /// The single-item form, or every batch item in order (ADR-015). A batch
+    /// The single-item form, or every batch item in order. A batch
     /// longer than `max_items` is rejected before any item is decoded.
     pub fn native(self, max_items: usize) -> Result<Vec<Ack>, RemoteError> {
         version(self.major)?;

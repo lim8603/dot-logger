@@ -21,7 +21,7 @@
 #![doc = include_str!("../../../examples/recipes/l1_file.rs")]
 //! ```
 //!
-//! # Recipes (NFR-008)
+//! # Recipes
 //!
 //! | Recipe in `examples/recipes/` | Shows | Limit |
 //! |---|---|---|
@@ -78,10 +78,10 @@ pub mod telemetry;
 /// Load-free diagnostic plans and caller-driven physical write admission.
 pub mod diagnostics;
 
-/// Default execution layer: builder, default worker and owned writers (ADR-012).
+/// Default execution layer: builder, default worker and owned writers.
 pub mod logger;
 
-/// Explicit machine calibration and JSON profiles for presets (TASK-028 S2).
+/// Explicit machine calibration and JSON profiles for presets.
 #[cfg(feature = "calibrate")]
 pub mod calibrate;
 

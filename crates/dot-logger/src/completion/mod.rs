@@ -521,13 +521,13 @@ impl<'owner> Completion<'owner> {
     ///
     /// Updates terminalize their own slot; only an abandoned delivery needs a
     /// sweep. So each abandonment starts one sweep over the whole window, and
-    /// without one this does no work (TASK-023 S3 finding ⑪: sweeping on
-    /// every turn took ~37 % of the host thread). A sweep that skipped an
+    /// without one this does no work (sweeping on every turn took about 37 %
+    /// of the host thread in a measured load). A sweep that skipped an
     /// abandoned slot under update runs once more.
     ///
     /// A call that overlaps another reconciliation returns 0 without waiting;
     /// the sweep state has one owner, and a newer abandonment stays visible to
-    /// the next call (REV-053 RV-131).
+    /// the next call.
     pub fn reconcile(self, limit: usize) -> usize {
         let registry = self.registry;
         if registry

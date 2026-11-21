@@ -1,4 +1,4 @@
-//! Explicit machine calibration for presets (TASK-028 S2, API §19.8).
+//! Explicit machine calibration for presets.
 //!
 //! [`Calibration::run`] is meant for installation or commissioning: it writes
 //! a bounded amount of data to a dedicated directory on the filesystem the

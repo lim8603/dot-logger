@@ -668,7 +668,7 @@ impl RemoteSubscription {
     }
     /// Send queued ACKs and wait for every ACK RPC of this subscription. Ok means
     /// the server confirmed every record handed off so far. A failure closes the
-    /// stream with AcknowledgementUnknown; no ACK is retried (ADR-015). Once an
+    /// stream with AcknowledgementUnknown; no ACK is retried. Once an
     /// ACK failed or a queued ACK was dropped by the stream closing, every
     /// later flush reports AcknowledgementUnknown too.
     pub async fn flush(&mut self, cancel: &Cancellation) -> Result<(), ClientError> {
@@ -793,8 +793,8 @@ impl RemoteSubscription {
         }
     }
     /// Synchronously hand off data, then queue its ACK for the same
-    /// non-reconnecting socket and return without waiting for the server
-    /// (ADR-015). Consumer rejection produces no ACK. Cancellation after
+    /// non-reconnecting socket and return without waiting for the server.
+    /// Consumer rejection produces no ACK. Cancellation after
     /// acceptance, or a failure of an earlier ACK RPC, reports
     /// AcknowledgementUnknown, never successful receiving-application completion.
     /// Use [`Self::flush`] to learn that the server confirmed the handoffs.

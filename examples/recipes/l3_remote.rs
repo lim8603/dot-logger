@@ -1,4 +1,4 @@
-//! L3 recipe (NFR-008): L1 plus a loopback gRPC server that streams copies of
+//! L3 recipe: L1 plus a loopback gRPC server that streams copies of
 //! the written records to subscribers (`dot-logger tail`).
 use dot_logger::adapters::remote::ServerConfig;
 use dot_logger::logger::{EncodeError, Logger, Preset, Record, Retention, Schema};
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..ServerConfig::default()
         }) // loopback, anonymous read
         .start()?;
-    println!("serving on {:?}", logger.remote_addr());
+    println!("http://{}", logger.remote_addr().ok_or("no listener")?);
     let pose = logger.channel::<Pose>("robot/pose")?;
     let mut writer = logger.take_writer("control")?;
     let rt = std::thread::spawn(move || {

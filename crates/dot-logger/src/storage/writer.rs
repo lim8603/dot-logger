@@ -119,7 +119,7 @@ pub(super) fn report_written(delivery: &Delivery<'_>) -> Result<(), StorageError
 }
 // Shared by the native reader and writer so self-described registrations cannot
 // bypass reserved names, product identity uniqueness or descriptor consistency.
-pub(super) fn registration_bytes(channels: &[StorageChannel]) -> Result<usize, StorageError> {
+pub(crate) fn registration_bytes(channels: &[StorageChannel]) -> Result<usize, StorageError> {
     let mut metadata = 0usize;
     for (i, c) in channels.iter().enumerate() {
         if c.topic.len() > 256

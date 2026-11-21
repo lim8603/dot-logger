@@ -356,6 +356,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
         true,
         output_sequence,
     )?;
+    let mut chunk_seen = false;
     'scan: loop {
         cancelled(cancel, report)?;
         if position == report.source_bytes {
@@ -386,6 +387,7 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
             }),
             3 | 4 => state.registration(op, body),
             6 => {
+                chunk_seen = true;
                 if report.chunks == options.limits.max_chunks {
                     report.stop = RecoveryStop::Limit;
                     break;
@@ -469,7 +471,9 @@ fn recover_inner<R: Read + Seek, W: SyncSink>(
                 }
             }
             // Source indexes are replaceable, never evidence of recovered messages.
-            7 => Ok(()),
+            // One before any chunk is corrupt (REV-071 RV-181).
+            7 if chunk_seen => Ok(()),
+            7 => Err(RecoveryStop::InvalidRecord),
             15 => {
                 report.stop =
                     if body.len() == 4 && (body == [0; 4] || body == (!data_crc).to_le_bytes()) {

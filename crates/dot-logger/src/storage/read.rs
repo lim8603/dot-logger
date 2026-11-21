@@ -152,6 +152,8 @@ pub struct NativeReader<'a> {
     info: FileInfo,
     crc: u32,
     ended: bool,
+    /// A MessageIndex is valid only after a chunk (REV-071 RV-181).
+    chunk_seen: bool,
 }
 impl<'a> NativeReader<'a> {
     /// Read a native file, rejecting obsolete profiles, oversized payloads and
@@ -180,6 +182,7 @@ impl<'a> NativeReader<'a> {
             info,
             crc: crc_update(!0, &bytes[..consumed]),
             ended: false,
+            chunk_seen: false,
         })
     }
     /// Self-described file identity, including cumulative collection availability.
@@ -223,8 +226,9 @@ impl<'a> NativeReader<'a> {
                     self.validation.chunk(body).map_err(corrupt)?;
                     // chunk() already verified the fixed uncompressed header and CRC.
                     self.chunk = Fields(&body[40..]);
+                    self.chunk_seen = true;
                 }
-                7 => {}
+                7 if self.chunk_seen => {}
                 15 => {
                     self.validation.registrations_complete().map_err(corrupt)?;
                     if body.len() != 4 || (body != [0; 4] && body != (!self.crc).to_le_bytes()) {
@@ -317,6 +321,7 @@ fn registrations(
     let mut schemas = HashMap::new();
     let mut channels = BTreeMap::new();
     let mut channel_ids = std::collections::BTreeSet::new();
+    let mut chunk_seen = false;
     while let Some(&opcode) = outer.0.first() {
         if opcode == 15 || (opcode == 6 && !registrations.is_empty()) {
             break;
@@ -335,8 +340,14 @@ fn registrations(
         }
         let (mut registration, mut nested) = match op {
             3 | 4 => (Some((op, body)), Fields(&[])),
-            6 => (None, Fields(chunk_data(body).map_err(corrupt)?)),
-            _ => continue,
+            6 => {
+                chunk_seen = true;
+                (None, Fields(chunk_data(body).map_err(corrupt)?))
+            }
+            // Only a chunk's own MessageIndex may sit between registrations
+            // and data; an unknown record is corrupt, not skipped (RV-181).
+            7 if chunk_seen => continue,
+            _ => return Err(StorageError::CorruptData),
         };
         let (file, _) = info.ok_or(StorageError::CorruptData)?;
         loop {
@@ -374,6 +385,9 @@ fn registrations(
                 return Err(StorageError::CorruptData);
             }
             registrations.push((op, body));
+            // The only call into the vendored MCAP readers on untrusted bytes:
+            // Schema/Channel only, after every length above was checked. Its
+            // other readers can panic on corrupt input (VENDORED.md, RV-180).
             match mcap::parse_record(op, body).map_err(corrupt)? {
                 Record::Schema { header, data } => {
                     if schemas.len() >= file.channels + 2 || schemas.contains_key(&header.id) {

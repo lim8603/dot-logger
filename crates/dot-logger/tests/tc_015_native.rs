@@ -658,9 +658,7 @@ fn registrations_reject_duplicate_ids_names_and_control_schema_aliases_at_constr
 
 #[test]
 fn native_reader_still_accepts_standard_v2_with_registrations_in_a_chunk() {
-    let bytes = include_bytes!(
-        "../../../.cowork/06_evolution/imported_context/dot_logger_namespace_2026-11-18/dot-namespace.mcap"
-    );
+    let bytes = include_bytes!("fixtures/standard-v2-registrations-in-chunk.mcap");
     let records = NativeReader::new(bytes, 64, 1)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
@@ -672,6 +670,36 @@ fn native_reader_still_accepts_standard_v2_with_registrations_in_a_chunk() {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     assert_eq!(reports.len(), 12);
+}
+
+/// REV-071 RV-181: a MessageIndex before any chunk is corrupt, not skipped.
+/// The DataEnd CRC is zeroed (no checksum) so only the record order differs.
+#[test]
+fn a_message_index_before_any_chunk_is_rejected() {
+    let read = |bytes: &[u8]| {
+        NativeReader::new(bytes, 100, 2)
+            .and_then(|reader| reader.collect::<Result<Vec<_>, _>>())
+            .map(|records| records.len())
+    };
+    let mut base = file(4096);
+    let end = frames(&base, 8, base.len() - 8)
+        .into_iter()
+        .find(|r| r.0 == 15)
+        .unwrap();
+    base[end.1 + 9..end.2].fill(0);
+    assert!(read(&base).is_ok(), "zeroed CRC alone must still read");
+    let root = frames(&base, 8, base.len() - 8)
+        .into_iter()
+        .find(|r| r.0 == 12)
+        .unwrap();
+    let mut damaged = base.clone();
+    // MessageIndex: opcode 7, length 6, channel 0 and an empty record array.
+    let index = [7u8, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    damaged.splice(root.2..root.2, index);
+    assert!(
+        read(&damaged).is_err(),
+        "accepted a MessageIndex before any chunk"
+    );
 }
 
 #[test]

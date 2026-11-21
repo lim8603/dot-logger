@@ -91,6 +91,7 @@ pub use retention::{
 };
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+pub(crate) use writer::registration_bytes;
 pub use writer::{FinishedSegment, SegmentWriter, SyncSink};
 
 /// Opaque reservation authority for one configured target and a shared output partition.

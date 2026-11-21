@@ -629,3 +629,25 @@ fn equal_timestamps_from_two_producers_tie_break_by_producer_then_sequence() {
         );
     });
 }
+
+/// REV-071 RV-187: a schema name counts toward the query's metadata limit,
+/// as it does for the writer.
+#[test]
+fn schema_names_count_toward_the_query_metadata_limit() {
+    let named = |length: usize| {
+        vec![StorageChannel {
+            channel: ChannelConfig::new(7, 99, 1),
+            topic: "robot/a".into(),
+            payload_encoding: "opaque".into(),
+            schema: Some(dot_logger::storage::PayloadSchema {
+                name: Some("n".repeat(length)),
+                encoding: "opaque".into(),
+                descriptor: Vec::new(),
+            }),
+        }]
+    };
+    let mut c = cfg();
+    c.max_metadata_bytes = 128;
+    assert!(c.reservation(&named(1)).is_ok());
+    assert!(matches!(c.reservation(&named(200)), Err(QueryError::Limit)));
+}

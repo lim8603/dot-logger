@@ -144,11 +144,18 @@ impl LossRange {
     // Per-part invariants of a part listing `listed` rows out of `parts`: a
     // nonempty span within the registered rows, at most one listed row per
     // covered row, and ROWS_PER_REPORT rows in every part but the last.
-    fn holds(self, listed: usize, parts: u32) -> bool {
+    // Part `part` follows `part` full parts, so it ends past their rows; a
+    // span that stops short of the registered rows is a full, non-final part
+    // (REV-071 RV-182). An empty trailing part at `end == rows` stays valid
+    // (REV-069 RV-164).
+    fn holds(self, listed: usize, part: u32, parts: u32) -> bool {
         self.end > 0
             && self.end <= self.rows
-            && listed as u64 <= self.end
-            && (self.end == self.rows || listed == ROWS_PER_REPORT)
+            && u64::from(part)
+                .checked_mul(ROWS_PER_REPORT as u64)
+                .and_then(|before| before.checked_add(listed as u64))
+                .is_some_and(|rows| rows <= self.end)
+            && (self.end == self.rows || (listed == ROWS_PER_REPORT && part + 1 < parts))
             && u64::from(parts) == self.rows.div_ceil(ROWS_PER_REPORT as u64)
     }
 }
@@ -591,9 +598,11 @@ impl LossReport {
         }
         let r = WireReport::decode(bytes).map_err(|_| bad())?;
         let range = match (r.version, r.rows, r.rows_end) {
-            (1, None, None) => None,
+            // A dense report lists every registered row: never none.
+            (1, None, None) if !r.counts.is_empty() => None,
             (2, Some(rows), Some(end))
-                if LossRange { end, rows }.holds(r.counts.len(), r.parts) =>
+                if r.part < r.parts
+                    && LossRange { end, rows }.holds(r.counts.len(), r.part, r.parts) =>
             {
                 Some(LossRange { end, rows })
             }
@@ -801,7 +810,8 @@ pub fn summarize(
             || r.counts.len() > ROWS_PER_REPORT
             || r.parts == 0
             || r.part >= r.parts
-            || r.range.is_some_and(|g| !g.holds(r.counts.len(), r.parts))
+            || r.range
+                .is_some_and(|g| !g.holds(r.counts.len(), r.part, r.parts))
     }) {
         return Err(StorageError::CorruptData);
     }
@@ -849,28 +859,38 @@ pub fn summarize(
                 && r.coverage == first.coverage
                 && r.observed_from_ns == first.observed_from_ns
         };
-        let complete = match first.range {
-            None => {
-                end - at == first.parts as usize
-                    && groups[at..end]
-                        .iter()
-                        .enumerate()
-                        .all(|(i, r)| same(i, r) && r.range.is_none())
-            }
-            Some(LossRange { rows, .. }) => {
-                let mut covered = 0;
-                groups[at..end].iter().enumerate().all(|(i, r)| {
-                    // A part lists distinct rows of the span it covers.
-                    let next = r.range.filter(|g| {
-                        g.rows == rows
-                            && g.end > covered
-                            && r.counts.len() as u64 <= g.end - covered
-                    });
-                    covered = next.map_or(covered, |g| g.end);
-                    same(i, r) && next.is_some()
-                }) && covered == rows
-            }
+        // Parts of one checkpoint list distinct counters; a repeat means a
+        // damaged checkpoint that also misses one (REV-071 RV-182).
+        let distinct = {
+            let mut seen = std::collections::BTreeSet::new();
+            groups[at..end]
+                .iter()
+                .flat_map(|r| r.counts.iter().map(counter_key))
+                .all(|key| seen.insert(key))
         };
+        let complete = distinct
+            && match first.range {
+                None => {
+                    end - at == first.parts as usize
+                        && groups[at..end]
+                            .iter()
+                            .enumerate()
+                            .all(|(i, r)| same(i, r) && r.range.is_none())
+                }
+                Some(LossRange { rows, .. }) => {
+                    let mut covered = 0;
+                    groups[at..end].iter().enumerate().all(|(i, r)| {
+                        // A part lists distinct rows of the span it covers.
+                        let next = r.range.filter(|g| {
+                            g.rows == rows
+                                && g.end > covered
+                                && r.counts.len() as u64 <= g.end - covered
+                        });
+                        covered = next.map_or(covered, |g| g.end);
+                        same(i, r) && next.is_some()
+                    }) && covered == rows
+                }
+            };
         let observed_to = groups[at..end]
             .iter()
             .map(|r| r.observed_to_ns)
@@ -1301,6 +1321,73 @@ mod tests {
                 .unwrap()
                 .range
                 .is_none()
+        );
+    }
+    /// REV-071 RV-182: a checkpoint whose parts repeat a key (and so miss
+    /// another) is not complete; it yields no delta and no synthesized zeros.
+    #[test]
+    fn a_key_repeated_across_parts_makes_the_checkpoint_incomplete() {
+        let rows = ROWS_PER_REPORT as u64 + 1;
+        let part =
+            |checkpoint: u64, part: u32, end: u64, targets: Vec<u32>, count: u64| LossReport {
+                session: 42,
+                epoch: 1,
+                observer: 10,
+                checkpoint,
+                part,
+                parts: 2,
+                observed_from_ns: 0,
+                observed_to_ns: checkpoint * 10,
+                publish_time_unix_ns: 0,
+                coalesced: false,
+                coverage: if checkpoint == 1 {
+                    Coverage::Baseline
+                } else {
+                    Coverage::Observed
+                },
+                counts: targets
+                    .into_iter()
+                    .map(|target| LossCount {
+                        scope: Scope::OutputUnknown,
+                        cause: Cause::Unconfirmed,
+                        producer: Some(0),
+                        channel: Some(7),
+                        target: Some(target),
+                        count,
+                        overflowed: false,
+                    })
+                    .collect(),
+                range: Some(LossRange { end, rows }),
+            };
+        let checkpoint = |id: u64, last: u32, count: u64| {
+            vec![
+                part(
+                    id,
+                    0,
+                    ROWS_PER_REPORT as u64,
+                    (0..ROWS_PER_REPORT as u32).collect(),
+                    count,
+                ),
+                part(id, 1, rows, vec![last], count),
+            ]
+        };
+        let baseline = checkpoint(1, ROWS_PER_REPORT as u32, 1);
+        let good: Vec<_> = baseline
+            .iter()
+            .cloned()
+            .chain(checkpoint(2, ROWS_PER_REPORT as u32, 3))
+            .collect();
+        let deltas = summarize(&good, 1024).unwrap();
+        assert!(deltas.iter().any(|d| d.delta == Some(2)));
+        let bad: Vec<_> = baseline
+            .iter()
+            .cloned()
+            .chain(checkpoint(2, 0, 3))
+            .collect();
+        let deltas = summarize(&bad, 1024).unwrap();
+        assert!(
+            deltas.iter().all(|d| d.delta.is_none()),
+            "a repeated key still produced a delta"
         );
     }
     #[test]

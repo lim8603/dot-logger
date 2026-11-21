@@ -338,22 +338,15 @@ impl QueryConfig {
             || self.blob_read_bytes == 0
             || self.read_bytes == 0
             || channels.is_empty()
-            || channels.len() > u16::MAX as usize
+            // Two ids stay reserved for the control channels, as the writer
+            // requires (REV-071 RV-187).
+            || channels.len() > u16::MAX as usize - 2
         {
             return Err(QueryError::InvalidInput);
         }
-        let metadata = channels
-            .iter()
-            .try_fold(0usize, |n, c| {
-                n.checked_add(c.topic.len())?
-                    .checked_add(c.payload_encoding.len())?
-                    .checked_add(
-                        c.schema
-                            .as_ref()
-                            .map_or(0, |s| s.encoding.len().saturating_add(s.descriptor.len())),
-                    )
-            })
-            .ok_or(QueryError::InvalidInput)?;
+        // The writer's own registration sizing, schema names included.
+        let metadata =
+            crate::storage::registration_bytes(channels).map_err(|_| QueryError::InvalidInput)?;
         if metadata > self.max_metadata_bytes {
             return Err(QueryError::Limit);
         }
@@ -527,6 +520,9 @@ impl<R: Read + Seek> Snapshot<R> {
         let end = self.sources[index].safe_offset;
         let expected_target = self.sources[index].expected_target;
         let sequence = self.sources[index].sequence;
+        // An empty prefix is an active file with nothing verified yet: it has
+        // no records to duplicate and counts as giving no loss evidence
+        // (REV-071 RV-181 reviewed; kept).
         if end == 0 {
             return Ok(());
         }
@@ -566,6 +562,7 @@ impl<R: Read + Seek> Snapshot<R> {
             self.config.producers,
             self.config.max_payload_bytes,
         );
+        let mut chunk_seen = false;
         while position < end {
             check(now, self.deadline, cancel)?;
             let start = position;
@@ -585,6 +582,7 @@ impl<R: Read + Seek> Snapshot<R> {
                 }
                 3 | 4 => validation.registration(op, body).map_err(invalid)?,
                 6 => {
+                    chunk_seen = true;
                     validation.chunk(body).map_err(|e| match e {
                         crate::storage::RecoveryStop::UnsupportedCompression => {
                             QueryError::Unsupported
@@ -632,7 +630,7 @@ impl<R: Read + Seek> Snapshot<R> {
                         });
                     }
                 }
-                7 => {}
+                7 if chunk_seen => {}
                 15 => {
                     if body.len() != 4 || (body != [0; 4] && body != (!crc).to_le_bytes()) {
                         return Err(QueryError::CorruptData);

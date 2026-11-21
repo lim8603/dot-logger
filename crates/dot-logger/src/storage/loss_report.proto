@@ -25,6 +25,10 @@ message LossCount {
 }
 // Observation clocks are management monotonic nanoseconds of counter_epoch.
 // Every part is required for a complete checkpoint; counts are session cumulative.
+// Version 2 parts list only nonzero or overflowed rows of the registered row
+// range ending at rows_end; omitted rows in that range were read as zero.
+// Part i starts at the previous part's rows_end (zero for part 0), and the
+// checkpoint is complete when the last part's rows_end equals rows.
 message LossReport {
   uint32 schema_version = 1;
   // Exactly 16 bytes: the original session u128 in little-endian order.
@@ -40,4 +44,6 @@ message LossReport {
   repeated LossCount counts = 11;
   uint64 publish_time_unix_ns = 12;
   bool coalesced = 13;
+  optional uint64 rows = 14;
+  optional uint64 rows_end = 15;
 }

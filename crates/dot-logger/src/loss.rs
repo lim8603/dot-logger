@@ -14,10 +14,13 @@ pub const ROWS_PER_REPORT: usize = 64;
 pub const MAX_REPORT_BYTES: usize = 8192;
 // A canonical count uses at most 35 bytes (including present zero-valued
 // identifiers), plus two bytes to frame the nested message. The fixed report
-// fields, including the 16-byte session, fit within 128 bytes.
+// fields, including the 16-byte session and the version-2 range, fit within
+// 128 bytes.
 pub(crate) const ENCODED_REPORT_BOUND: usize = ROWS_PER_REPORT * 37 + 128;
 pub(crate) const CONTROL_CHARGE: u64 = ENCODED_REPORT_BOUND as u64 + 1024;
 pub(crate) const DESCRIPTOR: &[u8] = include_bytes!("storage/loss_report.bin");
+/// Descriptor of files written before version-2 parts; recovery still admits them.
+pub(crate) const DESCRIPTOR_V1: &[u8] = include_bytes!("storage/loss_report.v1.bin");
 pub(crate) const SCHEMA: &str = "dot_logger.LossReport";
 const INGRESS: usize = 12;
 const ACQUIRE: usize = 8;
@@ -78,7 +81,7 @@ codes!(Coverage,"Checkpoint coverage; closure alone never proves quiescence.",
     FinalPartial=3=>"Final file sample with an explicitly unconfirmed future tail.",
     Quiescent=4=>"Producer return, drain and final sample were explicitly proven.");
 /// One cumulative row; absent identifiers remain absent even when ID zero exists.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LossCount {
     /// Attempts, omissions, or one target's assignments.
     pub scope: Scope,
@@ -123,6 +126,19 @@ pub struct LossReport {
     pub coalesced: bool,
     /// At most ROWS_PER_REPORT cumulative rows.
     pub counts: Vec<LossCount>,
+    /// Registered rows this version-2 part covers; omitted rows there were read
+    /// as zero. Absent for a version-1 part, which lists every row of its range.
+    pub range: Option<LossRange>,
+}
+/// Registered row range of a version-2 part. The part starts at the previous
+/// part's `end` (zero for part 0); the checkpoint is complete when the last
+/// part's `end` equals `rows`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LossRange {
+    /// Exclusive end of the covered registered rows.
+    pub end: u64,
+    /// Registered counter rows of this session epoch.
+    pub rows: u64,
 }
 #[derive(Default)]
 struct Cell {
@@ -349,6 +365,7 @@ impl Bank {
             overflowed,
         })
     }
+    #[cfg(test)]
     pub(crate) fn sample(
         &self,
         target: u32,
@@ -376,6 +393,56 @@ impl Bank {
             coalesced: coverage == Coverage::Coalesced,
             coverage,
             counts,
+            range: None,
+        }
+    }
+    fn written(&self, index: usize) -> bool {
+        self.cells.get(index).is_some_and(|cell| {
+            cell.count.load(Ordering::Relaxed) != 0 || cell.overflow.load(Ordering::Relaxed)
+        })
+    }
+    /// One version-2 part from registered row `start`: the next nonzero or
+    /// overflowed rows, at most ROWS_PER_REPORT. Its range ends after the last
+    /// listed row when the part is full, otherwise at the registered rows.
+    pub(crate) fn sparse(
+        &self,
+        target: u32,
+        checkpoint: u64,
+        part: usize,
+        start: usize,
+        from: u64,
+        coverage: Coverage,
+    ) -> LossReport {
+        let mut counts = Vec::with_capacity(ROWS_PER_REPORT);
+        let mut end = self.len();
+        for index in start..self.len() {
+            if self.written(index) {
+                counts.extend(self.get(index));
+                if counts.len() == ROWS_PER_REPORT {
+                    end = index + 1;
+                    break;
+                }
+            }
+        }
+        LossReport {
+            session: self.session,
+            epoch: 1,
+            observer: target,
+            checkpoint,
+            part: part as u32,
+            parts: self.parts() as u32,
+            observed_from_ns: from,
+            observed_to_ns: self.now(),
+            publish_time_unix_ns: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos().min(u128::from(u64::MAX)) as u64),
+            coalesced: coverage == Coverage::Coalesced,
+            coverage,
+            counts,
+            range: Some(LossRange {
+                end: end as u64,
+                rows: self.len() as u64,
+            }),
         }
     }
 }
@@ -456,6 +523,10 @@ struct WireReport {
     publish_time_unix_ns: u64,
     #[prost(bool, tag = "13")]
     coalesced: bool,
+    #[prost(uint64, optional, tag = "14")]
+    rows: Option<u64>,
+    #[prost(uint64, optional, tag = "15")]
+    rows_end: Option<u64>,
 }
 impl LossReport {
     pub(crate) fn encode(&self, out: &mut Vec<u8>) -> Result<(), crate::storage::StorageError> {
@@ -463,7 +534,9 @@ impl LossReport {
             return Err(crate::storage::StorageError::InvalidRecord);
         }
         let report = WireReport {
-            version: 1,
+            version: if self.range.is_some() { 2 } else { 1 },
+            rows: self.range.map(|r| r.rows),
+            rows_end: self.range.map(|r| r.end),
             session: self.session.to_le_bytes().to_vec(),
             epoch: self.epoch,
             observer: self.observer,
@@ -504,8 +577,19 @@ impl LossReport {
             return Err(bad());
         }
         let r = WireReport::decode(bytes).map_err(|_| bad())?;
-        if r.version != 1
-            || r.session.len() != 16
+        let range = match (r.version, r.rows, r.rows_end) {
+            (1, None, None) => None,
+            (2, Some(rows), Some(end))
+                if end > 0
+                    && end <= rows
+                    && r.counts.len() as u64 <= end
+                    && u64::from(r.parts) == rows.div_ceil(ROWS_PER_REPORT as u64) =>
+            {
+                Some(LossRange { end, rows })
+            }
+            _ => return Err(bad()),
+        };
+        if r.session.len() != 16
             || r.epoch == 0
             || r.checkpoint == 0
             || r.parts == 0
@@ -590,6 +674,7 @@ impl LossReport {
             publish_time_unix_ns: r.publish_time_unix_ns,
             coalesced: r.coalesced,
             counts,
+            range,
         })
     }
 }
@@ -617,7 +702,7 @@ fn bounded_wire(mut bytes: &[u8], row: bool) -> bool {
         };
         let field = tag >> 3;
         let wire = tag & 7;
-        if field == 0 || field > if row { 7 } else { 13 } {
+        if field == 0 || field > if row { 7 } else { 15 } {
             return false;
         }
         let repeated = !row && field == 11;
@@ -702,13 +787,33 @@ pub fn summarize(
         return Err(StorageError::NeedRotation);
     }
     if reports.iter().any(|r| {
-        r.counts.is_empty() || r.counts.len() > ROWS_PER_REPORT || r.parts == 0 || r.part >= r.parts
+        r.counts.is_empty() && r.range.is_none()
+            || r.counts.len() > ROWS_PER_REPORT
+            || r.parts == 0
+            || r.part >= r.parts
     }) {
         return Err(StorageError::CorruptData);
+    }
+    // Every key listed anywhere in a session epoch is registered there, so a
+    // complete version-2 checkpoint that omits it read it as zero.
+    let mut keys = std::collections::BTreeMap::<_, std::collections::BTreeMap<_, _>>::new();
+    for r in reports {
+        for row in &r.counts {
+            keys.entry((r.session, r.epoch))
+                .or_default()
+                .entry(counter_key(row))
+                .or_insert(LossCount {
+                    count: 0,
+                    overflowed: false,
+                    ..*row
+                });
+        }
     }
     let mut groups: Vec<_> = reports.iter().collect();
     groups.sort_unstable_by_key(|r| (r.session, r.epoch, r.observer, r.checkpoint, r.part));
     let mut samples = Vec::with_capacity(count);
+    // Listed rows already fit `max_rows`; synthesized zeros share the rest.
+    let mut spare = max_rows - count;
     // Include groups missing this row when deciding whether a later incomplete
     // checkpoint invalidates an earlier quiescent tail.
     let mut latest = std::collections::BTreeMap::new();
@@ -727,13 +832,29 @@ pub fn summarize(
         {
             end += 1;
         }
-        let complete = end - at == first.parts as usize
-            && groups[at..end].iter().enumerate().all(|(i, r)| {
-                r.parts == first.parts
-                    && r.part as usize == i
-                    && r.coverage == first.coverage
-                    && r.observed_from_ns == first.observed_from_ns
-            });
+        let same = |i: usize, r: &LossReport| {
+            r.parts == first.parts
+                && r.part as usize == i
+                && r.coverage == first.coverage
+                && r.observed_from_ns == first.observed_from_ns
+        };
+        let complete = match first.range {
+            None => {
+                end - at == first.parts as usize
+                    && groups[at..end]
+                        .iter()
+                        .enumerate()
+                        .all(|(i, r)| same(i, r) && r.range.is_none())
+            }
+            Some(LossRange { rows, .. }) => {
+                let mut covered = 0;
+                groups[at..end].iter().enumerate().all(|(i, r)| {
+                    let next = r.range.filter(|g| g.rows == rows && g.end > covered);
+                    covered = next.map_or(covered, |g| g.end);
+                    same(i, r) && next.is_some()
+                }) && covered == rows
+            }
+        };
         let observed_to = groups[at..end]
             .iter()
             .map(|r| r.observed_to_ns)
@@ -750,7 +871,23 @@ pub fn summarize(
         }
         for report in &groups[at..end] {
             for row in &report.counts {
-                samples.push((*report, row, complete, observed_to));
+                samples.push((*report, *row, complete, observed_to));
+            }
+        }
+        if complete && first.range.is_some() {
+            let listed: std::collections::BTreeSet<_> = groups[at..end]
+                .iter()
+                .flat_map(|r| r.counts.iter().map(counter_key))
+                .collect();
+            for (key, zero) in keys
+                .get(&(first.session, first.epoch))
+                .into_iter()
+                .flatten()
+            {
+                if !listed.contains(key) {
+                    spare = spare.checked_sub(1).ok_or(StorageError::NeedRotation)?;
+                    samples.push((first, *zero, true, observed_to));
+                }
             }
         }
         at = end;
@@ -768,13 +905,13 @@ pub fn summarize(
     let mut at = 0;
     while at < samples.len() {
         let (report, row, _, _) = samples[at];
-        let key = (report.session, report.epoch, counter_key(row));
+        let key = (report.session, report.epoch, counter_key(&row));
         let mut end = at + 1;
         while end < samples.len()
             && (
                 samples[end].0.session,
                 samples[end].0.epoch,
-                counter_key(samples[end].1),
+                counter_key(&samples[end].1),
             ) == key
         {
             end += 1;
@@ -827,7 +964,7 @@ pub fn summarize(
                 .unwrap_or(0);
             min = max;
         }
-        let mut counter = row.clone();
+        let mut counter = row;
         counter.count = max;
         counter.overflowed = samples[at..end].iter().any(|(_, r, _, _)| r.overflowed);
         let last = latest[&(report.session, report.epoch)];
@@ -945,10 +1082,20 @@ mod tests {
                     overflowed: true,
                 })
                 .collect(),
+            range: Some(LossRange {
+                end: u64::from(u32::MAX) * ROWS_PER_REPORT as u64,
+                rows: u64::from(u32::MAX) * ROWS_PER_REPORT as u64,
+            }),
         };
         let bytes = report_to_bytes(&report);
         assert!(bytes.len() <= ENCODED_REPORT_BOUND);
         assert_eq!(LossReport::decode(&bytes).unwrap(), report);
+        let mut widest = report.clone();
+        widest.range = Some(LossRange {
+            end: u64::MAX,
+            rows: u64::MAX,
+        });
+        assert!(report_to_bytes(&widest).len() <= ENCODED_REPORT_BOUND);
     }
     #[test]
     fn incomplete_overflow_and_decreasing_checkpoints_never_extend_an_exact_delta() {
@@ -1043,6 +1190,139 @@ mod tests {
                 .find(|d| counter_key(&d.counter) == key)
                 .unwrap()
                 .tail_confirmed
+        );
+    }
+    fn sparse_checkpoint(
+        bank: &Bank,
+        target: u32,
+        checkpoint: u64,
+        coverage: Coverage,
+    ) -> Vec<LossReport> {
+        let mut parts = Vec::new();
+        let mut start = 0;
+        loop {
+            let report = bank.sparse(target, checkpoint, parts.len(), start, 0, coverage);
+            start = report.range.unwrap().end as usize;
+            parts.push(report);
+            if start == bank.len() {
+                return parts;
+            }
+        }
+    }
+    #[test]
+    fn sparse_parts_omit_zero_rows_and_tile_every_registered_row() {
+        let bank = Bank::new(42, 2, vec![7, 8], vec![10, 20]);
+        let n = bank.len();
+        let empty = sparse_checkpoint(&bank, 10, 1, Coverage::Baseline);
+        assert_eq!(empty.len(), 1);
+        assert!(empty[0].counts.is_empty());
+        assert_eq!(
+            empty[0].range,
+            Some(LossRange {
+                end: n as u64,
+                rows: n as u64
+            })
+        );
+        assert_eq!(empty[0].parts as usize, bank.parts());
+        let mut nonzero = 0;
+        for i in (0..n).step_by(2) {
+            bank.cells[i].count.store(1, Ordering::Relaxed);
+            nonzero += 1;
+        }
+        bank.cells[1].overflow.store(true, Ordering::Relaxed);
+        nonzero += 1;
+        let parts = sparse_checkpoint(&bank, 10, 2, Coverage::Observed);
+        assert!(parts.len() > 1 && parts.len() <= bank.parts());
+        assert_eq!(parts.iter().map(|r| r.counts.len()).sum::<usize>(), nonzero);
+        let mut previous = 0;
+        for (i, report) in parts.iter().enumerate() {
+            let range = report.range.unwrap();
+            assert_eq!(report.part as usize, i);
+            assert!(range.end > previous && range.rows == n as u64);
+            assert!(report.counts.len() <= ROWS_PER_REPORT);
+            assert!(report.counts.iter().all(|r| r.count > 0 || r.overflowed));
+            previous = range.end;
+            assert_eq!(
+                LossReport::decode(&report_to_bytes(report)).unwrap(),
+                *report
+            );
+        }
+        assert_eq!(previous, n as u64);
+    }
+    #[test]
+    fn sparse_ranges_must_be_versioned_nonempty_and_within_the_registered_rows() {
+        let bank = Bank::new(42, 1, vec![7], vec![10]);
+        bank.ingress(0, Some(0), Cause::Capacity);
+        let report = bank.sparse(10, 1, 0, 0, 0, Coverage::Observed);
+        let wire = WireReport::decode(report_to_bytes(&report).as_slice()).unwrap();
+        assert_eq!(wire.version, 2);
+        let reject = |change: &dyn Fn(&mut WireReport)| {
+            let mut raw = wire.clone();
+            change(&mut raw);
+            LossReport::decode(&raw.encode_to_vec()).is_err()
+        };
+        assert!(
+            reject(&|r| r.rows_end = Some(r.rows.unwrap() + 1)),
+            "past the rows"
+        );
+        assert!(reject(&|r| r.rows_end = Some(0)), "empty range");
+        assert!(reject(&|r| r.rows = None), "missing key space");
+        assert!(reject(&|r| r.version = 1), "dense part with a range");
+        assert!(
+            reject(&|r| r.parts = (r.rows.unwrap() as u32).div_ceil(64) + 1),
+            "part bound"
+        );
+        assert!(
+            reject(&|r| r.rows_end = Some(r.counts.len() as u64 - 1)),
+            "more rows than covered"
+        );
+        let mut dense = wire.clone();
+        dense.version = 1;
+        dense.rows = None;
+        dense.rows_end = None;
+        assert!(
+            LossReport::decode(&dense.encode_to_vec())
+                .unwrap()
+                .range
+                .is_none()
+        );
+    }
+    #[test]
+    fn complete_sparse_checkpoints_compare_omitted_keys_as_zero() {
+        let bank = Bank::new(42, 1, vec![7], vec![10]);
+        let mut baseline = sparse_checkpoint(&bank, 10, 1, Coverage::Baseline);
+        assert!(summarize(&baseline, 256).unwrap().is_empty());
+        bank.ingress(0, Some(0), Cause::Capacity);
+        bank.ingress(0, Some(0), Cause::Capacity);
+        let observed = sparse_checkpoint(&bank, 10, 2, Coverage::Observed);
+        let reports: Vec<_> = baseline.iter().chain(&observed).cloned().collect();
+        let deltas = summarize(&reports, 256).unwrap();
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].counter.count, 2);
+        assert_eq!(deltas[0].delta, Some(2));
+        // A part that stops before the registered rows proves nothing about omitted keys.
+        baseline[0].range = Some(LossRange {
+            end: bank.len() as u64 - 1,
+            rows: bank.len() as u64,
+        });
+        let reports: Vec<_> = baseline.iter().chain(&observed).cloned().collect();
+        assert_eq!(summarize(&reports, 256).unwrap()[0].delta, None);
+        // Synthesized zero samples count against the caller's row bound.
+        bank.ingress(0, None, Cause::InvalidInput);
+        let fresh = Bank::new(42, 1, vec![7], vec![10]);
+        let reports: Vec<_> = sparse_checkpoint(&fresh, 10, 1, Coverage::Baseline)
+            .into_iter()
+            .chain(sparse_checkpoint(&bank, 10, 3, Coverage::Observed))
+            .collect();
+        assert_eq!(reports.iter().map(|r| r.counts.len()).sum::<usize>(), 2);
+        assert!(matches!(
+            summarize(&reports, 3),
+            Err(crate::storage::StorageError::NeedRotation)
+        ));
+        let deltas = summarize(&reports, 4).unwrap();
+        assert_eq!(
+            deltas.iter().map(|d| d.delta).collect::<Vec<_>>(),
+            [Some(2), Some(1)]
         );
     }
     #[test]

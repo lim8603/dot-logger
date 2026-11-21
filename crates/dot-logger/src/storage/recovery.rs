@@ -686,7 +686,7 @@ impl<'a> Validation<'a> {
         }
         if name == crate::loss::SCHEMA.as_bytes()
             && encoding == b"protobuf"
-            && data == crate::loss::DESCRIPTOR
+            && (data == crate::loss::DESCRIPTOR || data == crate::loss::DESCRIPTOR_V1)
         {
             if self.file.is_none_or(|file| file.loss_rows == 0)
                 || self.loss_schema.is_some()
@@ -902,12 +902,17 @@ impl<'a> Validation<'a> {
             || report.checkpoint as u32 != sequence
             || report.publish_time_unix_ns != log
             || log != publish
-            || report.counts.len()
-                != if report.part as usize + 1 == expected_parts {
-                    file.loss_rows - (expected_parts - 1) * crate::loss::ROWS_PER_REPORT
-                } else {
-                    crate::loss::ROWS_PER_REPORT
+            || match report.range {
+                Some(range) => range.rows != file.loss_rows as u64,
+                None => {
+                    report.counts.len()
+                        != if report.part as usize + 1 == expected_parts {
+                            file.loss_rows - (expected_parts - 1) * crate::loss::ROWS_PER_REPORT
+                        } else {
+                            crate::loss::ROWS_PER_REPORT
+                        }
                 }
+            }
             || report.counts.iter().any(|r| {
                 r.producer.is_some_and(|p| p as usize >= self.last.len())
                     || r.channel

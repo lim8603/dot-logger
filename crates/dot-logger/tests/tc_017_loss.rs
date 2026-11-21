@@ -106,6 +106,16 @@ fn storage() -> Vec<dot_logger::storage::StorageChannel> {
         schema: None,
     }]
 }
+fn wide_storage() -> Vec<dot_logger::storage::StorageChannel> {
+    (7..77)
+        .map(|id| dot_logger::storage::StorageChannel {
+            channel: ChannelConfig::new(id, 99, 1),
+            topic: format!("loss/test/{id}"),
+            payload_encoding: "opaque".into(),
+            schema: None,
+        })
+        .collect()
+}
 fn writer_config() -> dot_logger::storage::WriterConfig {
     dot_logger::storage::WriterConfig {
         max_loss_reports: 8,
@@ -177,18 +187,19 @@ fn native_baseline_periodic_and_final_parts_preserve_attempt_counts_without_user
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
+        // Each checkpoint is one version-2 part over every registered row, so
+        // an omitted row was read as zero (ADR-013 2026-11-21).
         let counts: Vec<_> = reports
             .iter()
-            .filter_map(|r| {
-                r.counts
-                    .iter()
-                    .find(|c| {
-                        c.scope == Scope::SubmissionRejected
-                            && c.cause == Cause::Capacity
-                            && c.channel == Some(7)
-                            && c.producer == Some(0)
-                    })
-                    .map(|c| (r.coverage, c.count))
+            .map(|r| {
+                assert_eq!(r.range.map(|g| g.end == g.rows), Some(true));
+                let count = r.counts.iter().find(|c| {
+                    c.scope == Scope::SubmissionRejected
+                        && c.cause == Cause::Capacity
+                        && c.channel == Some(7)
+                        && c.producer == Some(0)
+                });
+                (r.coverage, count.map_or(0, |c| c.count))
             })
             .collect();
         assert_eq!(
@@ -283,6 +294,77 @@ fn recorded_files_with_writer(
         files
     })
 }
+/// One observer-10 file whose final checkpoint needs two version-2 parts:
+/// producer 0 is rejected on 70 channels, more than ROWS_PER_REPORT rows.
+fn wide_routing() -> dot_logger::routing::RoutingConfig {
+    let mut routes = support::routing();
+    let route = routes.routes[0].clone();
+    routes.routes = (7..77)
+        .map(|channel_id| dot_logger::routing::Route {
+            channel_id,
+            ..route.clone()
+        })
+        .collect();
+    routes
+}
+fn wide_recorded_file(config: dot_logger::storage::WriterConfig) -> Vec<u8> {
+    use dot_logger::storage::SegmentWriter;
+    let plan = loss_plan();
+    let routes = wide_routing();
+    let channels: Vec<_> = (7..77).map(|id| ChannelConfig::new(id, 99, 1)).collect();
+    let mut owner =
+        CaptureOwner::new_tracked(&plan, 42, 1, &channels, &routes, support::tracking(16)).unwrap();
+    owner.enable_loss_tracking().unwrap();
+    owner.scope(|mut scope| {
+        let (mut p, a) = scope.next().unwrap();
+        let (_, b) = scope.next().unwrap();
+        let router = Router::new(&plan, vec![a, b], routes).unwrap();
+        let mut writer = SegmentWriter::new(
+            router.writer_budget(10).unwrap(),
+            config,
+            wide_storage(),
+            Memory::default(),
+        )
+        .unwrap();
+        let mut first = None;
+        for _ in 0..8 {
+            let receipt = support::accepted(p.try_record_small(support::meta(), &[1]).unwrap());
+            first.get_or_insert(receipt);
+        }
+        for channel in 7..77 {
+            let mut metadata = support::meta();
+            metadata.channel_id = channel;
+            for _ in 0..if channel == 7 { 3 } else { 1 } {
+                assert_eq!(
+                    p.try_record_small(metadata, &[1]),
+                    Err(CaptureError::Capacity)
+                );
+            }
+        }
+        let mut metadata = support::meta();
+        metadata.importance = Some(Importance::Normal);
+        writer
+            .append(
+                CapturedRecord {
+                    receipt: first.unwrap(),
+                    metadata,
+                    revision: 1,
+                    payload_len: 1,
+                },
+                &[1],
+            )
+            .unwrap();
+        writer.finish().unwrap().into_inner().0.into_inner()
+    })
+}
+fn wide_writer() -> dot_logger::storage::WriterConfig {
+    dot_logger::storage::WriterConfig {
+        max_loss_reports: 160,
+        max_chunks: 160,
+        max_metadata_bytes: 16384,
+        ..writer_config()
+    }
+}
 fn query_config() -> dot_logger::query::QueryConfig {
     dot_logger::query::QueryConfig {
         max_loss_reports: 32,
@@ -367,19 +449,26 @@ fn loss_only_snapshot_compares_replicas_and_validates_target_identity_without_re
 fn recovery_preserves_original_reports_and_incomplete_parts_never_make_an_exact_delta() {
     use dot_logger::storage::*;
     use std::{io::Cursor, sync::atomic::AtomicBool};
-    let source = recorded_files(&[10], false, true).remove(0);
+    let source = wide_recorded_file(wide_writer());
     let original = LossReader::new(&source, 16, 2)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    assert_eq!(original.len(), 4);
+    // An empty baseline part, then a final checkpoint of 64 + 6 rows.
+    assert_eq!(
+        original.iter().map(|r| r.counts.len()).collect::<Vec<_>>(),
+        [0, 64, 6]
+    );
     let plan = loss_plan();
-    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    let channels: Vec<_> = (7..77).map(|id| ChannelConfig::new(id, 99, 1)).collect();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &channels).unwrap();
     owner.scope(|scope| {
-        let router =
-            Router::new(&plan, scope.map(|(_, r)| r).collect(), support::routing()).unwrap();
-        for limit in [8, 3] {
-            let mut writer = writer_config();
+        let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), wide_routing()).unwrap();
+        for limit in [8, 2] {
+            let mut writer = WriterConfig {
+                max_metadata_bytes: 16384,
+                ..writer_config()
+            };
             writer.max_loss_reports = limit;
             let options = RecoveryOptions {
                 source_target: Some(10),
@@ -394,7 +483,7 @@ fn recovery_preserves_original_reports_and_incomplete_parts_never_make_an_exact_
             let recovered = recover_segment(
                 &mut Cursor::new(&source),
                 router.writer_budget(10).unwrap(),
-                storage(),
+                wide_storage(),
                 options,
                 Memory::default(),
                 &AtomicBool::new(false),
@@ -410,11 +499,14 @@ fn recovery_preserves_original_reports_and_incomplete_parts_never_make_an_exact_
             if limit == 8 {
                 assert_eq!(stop, RecoveryStop::DataEnd);
                 assert_eq!(reports, original);
-                assert_eq!(count, 4);
+                assert_eq!(count, 3);
                 assert_eq!(NativeReader::new(&bytes, 16, 2).unwrap().count(), 1);
+                let deltas = dot_logger::loss::summarize(&reports, 512).unwrap();
+                assert_eq!(deltas.len(), 70);
+                assert!(deltas.iter().all(|d| d.delta == Some(d.counter.count)));
             } else {
                 assert_eq!(stop, RecoveryStop::Limit);
-                assert_eq!(count, 3);
+                assert_eq!(count, 2);
                 let summary = dot_logger::loss::summarize(&reports, 512).unwrap();
                 assert!(summary.iter().all(|row| row.delta.is_none()));
             }
@@ -428,46 +520,53 @@ fn recovery_keeps_grouped_loss_chunks_whole_at_report_and_chunk_limits() {
     use std::{io::Cursor, sync::atomic::AtomicBool};
     let grouped = WriterConfig {
         chunk_target_bytes: 8192,
+        max_metadata_bytes: 16384,
         ..writer_config()
     };
-    let source = recorded_files_with_writer(&[10], false, true, grouped).remove(0);
+    let source = wide_recorded_file(WriterConfig {
+        max_loss_reports: 160,
+        max_chunks: 60,
+        ..grouped
+    });
     let original = LossReader::new(&source, 16, 2)
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    assert_eq!(original.len(), 4);
+    // The final checkpoint's two parts share one grouped chunk.
+    assert_eq!(original.len(), 3);
     let plan = loss_plan();
-    let mut owner = CaptureOwner::new(&plan, 42, 1, &[ChannelConfig::new(7, 99, 1)]).unwrap();
+    let channels: Vec<_> = (7..77).map(|id| ChannelConfig::new(id, 99, 1)).collect();
+    let mut owner = CaptureOwner::new(&plan, 42, 1, &channels).unwrap();
     owner.scope(|scope| {
-        let router =
-            Router::new(&plan, scope.map(|(_, r)| r).collect(), support::routing()).unwrap();
+        let router = Router::new(&plan, scope.map(|(_, r)| r).collect(), wide_routing()).unwrap();
         for (writer, expected) in [
             (
                 WriterConfig {
                     max_chunks: 3,
                     ..grouped
                 },
-                4,
+                3,
             ),
             (
                 WriterConfig {
-                    max_loss_reports: 3,
+                    max_loss_reports: 2,
                     ..grouped
                 },
-                2,
+                1,
             ),
             (
                 WriterConfig {
-                    max_chunks: 4,
+                    max_chunks: 3,
+                    max_metadata_bytes: 16384,
                     ..writer_config()
                 },
-                2,
+                1,
             ),
         ] {
             let recovered = recover_segment(
                 &mut Cursor::new(&source),
                 router.writer_budget(10).unwrap(),
-                storage(),
+                wide_storage(),
                 RecoveryOptions {
                     source_target: Some(10),
                     source_sequence: 0,
@@ -775,7 +874,7 @@ fn a_bad_loss_control_later_in_the_same_chunk_exposes_no_user_pair() {
         .find(|r| r.0 == 5)
         .unwrap();
     let payload = message.1 + 9 + 22;
-    assert_eq!(&bad[payload..payload + 2], &[8, 1]);
+    assert_eq!(&bad[payload..payload + 2], &[8, 2], "version-2 report");
     bad[payload + 1] = 99;
     data.extend_from_slice(&bad);
     let mut header = bytes[user.1 + 9..user.1 + 49].to_vec();
@@ -922,7 +1021,10 @@ impl dot_logger::storage::SegmentStore for Store {
 #[test]
 fn saturated_control_budget_keeps_the_active_file_and_coalesces_its_final_sample() {
     use dot_logger::storage::*;
-    for (report_limit, index_limit, periodic) in [(4, 16384, 0), (16, 4096, 1)] {
+    // Reservations stay dense (two parts per checkpoint here) while each
+    // written version-2 checkpoint uses one part, so five reports admit the
+    // baseline and one periodic sample but not a second (ADR-013 2026-11-21).
+    for (report_limit, index_limit, periodic) in [(4, 16384, 0), (5, 4096, 1)] {
         let plan = loss_plan();
         let routes = support::routing();
         let mut owner = CaptureOwner::new_tracked(
@@ -1022,8 +1124,9 @@ fn saturated_control_budget_keeps_the_active_file_and_coalesces_its_final_sample
                     .filter(|r| r.coverage == dot_logger::loss::Coverage::Baseline)
                     .all(|r| r.observed_from_ns > 0)
             );
-            assert_eq!(reports.len(), 4 + 2 * periodic as usize);
-            assert!(reports[reports.len() - 2..].iter().all(|r| r.coalesced));
+            // One version-2 part per checkpoint: only one nonzero row exists.
+            assert_eq!(reports.len(), 2 + periodic as usize);
+            assert!(reports[reports.len() - 1].coalesced);
             let counts = dot_logger::loss::summarize(&reports, 512).unwrap();
             assert!(
                 counts

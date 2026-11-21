@@ -2682,7 +2682,9 @@ fn loss_cli_untracked_source_reports_unavailability_instead_of_zero_loss_proof()
 }
 #[test]
 fn recovery_cli_preserves_cross_target_report_origins_and_bounds_the_whole_job() {
-    for limit in [16, 8] {
+    // Each file holds three single-part checkpoints, so four reports cannot
+    // cover the second file (ADR-013 2026-11-21).
+    for limit in [16, 4] {
         let f = loss_fixture();
         let mut m: Value = serde_json::from_slice(&std::fs::read(&f.manifest).unwrap()).unwrap();
         m["limits"]["max_records"] = json!(4);
@@ -2750,11 +2752,13 @@ fn recovery_user_record_quota_does_not_consume_control_only_later_sources() {
         assert_eq!(recovered[1]["data"]["target"], "20");
         assert_eq!(recovered[1]["data"]["file_synced"], true);
         if fanout {
-            assert_eq!(recovered[1]["data"]["loss_reports"], 2);
+            // Only the single-part baseline precedes the over-quota user record.
+            assert_eq!(recovered[1]["data"]["loss_reports"], 1);
             assert_eq!(recovered[1]["data"]["stop"], "Limit");
         }
         if !fanout {
-            assert_eq!(recovered[1]["data"]["loss_reports"], 6);
+            // Baseline, periodic and final checkpoints, one version-2 part each.
+            assert_eq!(recovered[1]["data"]["loss_reports"], 3);
         }
         let data = std::fs::read(destination.join("20-0.mcap")).unwrap();
         assert_eq!(
@@ -2765,7 +2769,7 @@ fn recovery_user_record_quota_does_not_consume_control_only_later_sources() {
             0
         );
         if !fanout {
-            assert_eq!(LossReader::new(&data, 8192, 2).unwrap().count(), 6);
+            assert_eq!(LossReader::new(&data, 8192, 2).unwrap().count(), 3);
         }
     }
 }

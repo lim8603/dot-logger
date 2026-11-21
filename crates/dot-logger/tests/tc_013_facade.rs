@@ -2142,18 +2142,28 @@ fn large_native_loss_checkpoints_fit_facade_storage_limits() {
     for file in files {
         let bytes = std::fs::read(file).unwrap();
         let summary = mcap::Summary::read(&bytes).unwrap().unwrap();
-        let loss = summary
-            .channels
-            .values()
-            .find(|channel| channel.topic == ".logger/loss")
-            .unwrap();
         assert!(
-            summary.chunk_indexes.iter().any(|chunk| summary
-                .read_message_indexes(&bytes, chunk)
+            summary
+                .channels
+                .values()
+                .any(|channel| channel.topic == ".logger/loss")
+        );
+        // Without losses each checkpoint of 346,624 registered rows is one
+        // empty version-2 part covering them all (ADR-013 2026-11-21, EV-101).
+        let reports = dot_logger::storage::LossReader::new(&bytes, 8, 128)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(reports.len() >= 2);
+        for report in &reports {
+            let range = report.range.unwrap();
+            assert_eq!((report.part, range.end, range.rows), (0, 346_624, 346_624));
+            assert!(report.counts.is_empty() && report.parts == 5_416);
+        }
+        assert!(
+            dot_logger::loss::summarize(&reports, 64)
                 .unwrap()
-                .get(loss)
-                .is_some_and(|entries| entries.len() > 1)),
-            "multiple parts of a large checkpoint should share a chunk"
+                .is_empty()
         );
         for item in NativeReader::new(&bytes, 8, 128).unwrap() {
             payloads.push(item.unwrap().payload.to_vec());

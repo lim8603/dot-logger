@@ -1119,6 +1119,7 @@ mod loss_tests {
             coverage: Coverage::Observed,
             coalesced: false,
             counts: vec![],
+            range: None,
         };
         let mut second = first.clone();
         second.part = 1;

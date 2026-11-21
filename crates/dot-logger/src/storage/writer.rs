@@ -722,15 +722,22 @@ impl<W: SyncSink> SegmentWriter<W> {
         let checkpoint = bank
             .next_checkpoint(target)
             .ok_or(StorageError::InvalidRecord)?;
+        // Version-2 parts list only nonzero rows; the reserved dense part
+        // count above remains the upper bound.
+        let from = if coverage == crate::loss::Coverage::Baseline {
+            started
+        } else {
+            self.sample_start
+        };
+        let mut start = 0;
         for part in 0..parts {
-            let from = if coverage == crate::loss::Coverage::Baseline {
-                started
-            } else {
-                self.sample_start
-            };
-            let mut report = bank.sample(target, checkpoint, part, from, coverage);
+            let mut report = bank.sparse(target, checkpoint, part, start, from, coverage);
             report.coalesced = self.deferred;
             self.append_loss_report(&report)?;
+            start = report.range.map_or(bank.len(), |r| r.end as usize);
+            if start == bank.len() {
+                break;
+            }
         }
         self.flush_chunk()?;
         self.sample_start = started;

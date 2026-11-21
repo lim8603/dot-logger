@@ -1603,6 +1603,28 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **조치(`0637601`):** `crc_update`를 crc32fast 1.5.3으로 바꿨다. 이 버전은 MCAP가 이미 잠근 것이며, 바꾼 뒤 lockfile에는 `dot-logger`의 의존 관계 한 줄만 추가됐다. 같은 PC에서 38,121 MB/s였다. 교체 전에 비트 단위 기준 구현과 비교하는 시험(표준 검사값, 길이·분할·임의 상태)을 넣어 기존 구현에서 Green을 확인했다. Rust 1.85.0·1.96.0 각 **705 Pass, 실패 0, 5 ignored**, Clippy `-D warnings`·fmt·Miri(CRC 시험) 통과. 루프백 대용량은 215 → 784 MB/s, 수신 user CPU는 1.35 → 0.43 s였다.
 - **P4-bulk Pass:** 같은 유선 환경에서 TCP 115.81–117.81 MB/s, gRPC 115.89–116.42 MB/s, 쌍별 98.8–100.5%로 ≥80%를 충족했다. **P4 소형**은 60,000건 ACK, p99 4.12 ms다. 모든 회차에서 Dropped·Unknown은 0이었다. [원자료](../06_evolution/imported_context/t7_lan_2026-11-21/README.md#유선-lan--2026-11-21)
 
+<a id="ev-106"></a>
+### EV-106 — REV-069 조치: ACK 실패 유지·구독 창 묶음 상한·손실 part 경계·tail 확인 수
+
+- **변경:** 제품 `5daf22b`. [REV-069](reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) RV-163~165 조치.
+  - 클라이언트는 ACK 실패나 보내지 못한 ACK 폐기를 플래그로 유지해 이후 모든 `flush`를 `AcknowledgementUnknown`으로 보고한다.
+  - `settle_one`은 RPC가 완료된 뒤에만 대기열에서 꺼낸다.
+  - 서버는 묶음 ACK를 해당 구독의 협상 창으로 적용 전에 제한한다.
+  - 손실 checkpoint v2의 가득 찬 part는 뒤따르는 0 행을 흡수해 part 수가 `max(1, ceil(M/64))`가 된다.
+  - 판독과 `summarize`는 비최종 part 64행과 구간 폭을 검사한다.
+  - `RemoteSubscription::acknowledged()`(추가형 공개 API)와 CLI `tail`의 모든 종료 경로가 서버 확인 수를 보고한다.
+  - writer의 분할 예측을 `append`와 맞췄다.
+  - `lan_probe`는 `commands: 4`를 쓰고, 수신 Gap이 있으면 오류로 끝난다.
+- **TDD:** 새 시험 6건과 수정 시험 3건.
+  - 수정 전 코드에서 Red를 확인했다: transport 단위 3건(`Ok(())` 반환), 서버 묶음 시험(전역 창 8, 앞 항목 선확인), 손실 part 수(64행에서 2 part), 짧은 비최종 part decode, CLI `deadline` 경로(`acknowledged` 0).
+  - 구간 폭 검사는 변이로 Red를 확인했다.
+  - 기존 손실 시험 1건은 writer가 만들 수 없는 단일 part 모양을 쓰고 있어, 기대값을 `CorruptData`로 바꾸고 의도는 마지막 part 누락 시험으로 옮겼다.
+- **결과:**
+  - Rust 1.85.0·1.96.0 workspace all-features 각 **711 Pass, 실패 0, 5 ignored**.
+  - 양쪽 Clippy `-D warnings`, fmt, strict rustdoc, 통합 표면 검사(NFR-008) 통과.
+  - client lib·transport, CLI `remote_tail`, core remote 시험을 10회 반복해 실패 0.
+- **범위:** 파일 형식은 그대로다. 판독은 `af68578`이 쓴 빈 후행 part(`end == rows`)를 계속 받는다. EV-104·105의 LAN 수치는 `commands: 1`(ACK RPC가 사실상 하나씩 진행) 조건에서 이미 목표를 충족했으므로 다시 측정하지 않았다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

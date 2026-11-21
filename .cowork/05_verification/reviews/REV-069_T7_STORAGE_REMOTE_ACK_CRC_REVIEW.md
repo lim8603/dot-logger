@@ -9,8 +9,8 @@
 | 대상 | REV-066 조치(`bd02d49`) 이후 누적 커밋 `bd02d49..078ca6c` (7개 코드 커밋: `8dbbe01`, `0be4bfe`, `7edae2a`, `af68578`, `4ac9bf1`, `0637601`, `078ca6c`) |
 | 범위 | 손실 checkpoint 인덱스 예약 정합(`8dbbe01`), 손실 checkpoint part 청크 묶음 및 주기 관측 2회 예산(`0be4bfe`), LAN 수신 ACK 측정 예제(`7edae2a`), ADR-013 D2 손실 checkpoint 0 행 생략(`af68578`), ADR-015 원격 수신 묶음·파이프라인 ACK(`4ac9bf1`), `crc32fast` 기반 하드웨어 CRC-32 교체(`0637601`), 파이프라인 ACK 기한 starvation 방지(`078ca6c`) |
 | 최초 판정 | **Conditional** — P1 0 · P2 2 · P3 1 (`RV-163~165`) |
-| 조치 후 판정 | 미조치 (`Open`) |
-| 상태 | **Open** — 후속 개발 세션에서 `RV-163~165` 조치 후 TASK-032 S1 진행 |
+| 조치 후 판정 | **Pass** — RV-163~165 수용·수정·검증 (`5daf22b`, [EV-106](../verification_evidence.md#ev-106)) |
+| 상태 | **Closed** — 2026-11-21 #003, 위임 수락 |
 
 정적 분석(`cargo +1.96.0 fmt --all --check`, `cargo +1.96.0 clippy --workspace --all-targets --all-features --locked -- -D warnings`), 워크스페이스 전체 테스트(`cargo +1.96.0 test --workspace --all-features --locked`: 705 passed, 0 failed, 5 ignored — RT 할당 20 passed, viewer 8 passed, doctests 24 passed 포함), strict `rustdoc`(`1.96.0`, `1.85.0` 모두 Pass), `python3 scripts/check-integration-surface.py`(facade 이름 있는 항목 35/60, L1~L3 레시피·실행·README 일치)는 모두 통과했다.
 
@@ -55,9 +55,9 @@
 
 | ID | 중요도 | 위치·계약 | 문제 요약 | 처리 제안 | 판정 결과 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-163 | P2 | `dot-logger-client/src/transport.rs:514-624, 635-693, 727-769`, `dot-logger/src/adapters/remote/server.rs:374-387`, `hub.rs:243-268`, ADR-015 §1·§2·§4·§5 | ACK 실패 또는 미전송 `acks`가 남은 채 스트림 종료(`close`) 후 `flush` 호출 시 `Ok(())` 반환; `settle_one`이 `.await` 전에 `pop_front()`하여 `next` 로컬 타임아웃 시 진행 중 ACK RPC 결과 유실; 서버 묶음 상한이 구독별 `sub.records` 대신 전역 `limits.subscription_records`만 검사 | `RemoteSubscription`에 미확인/실패 상태 보존 및 스트림 종료 시 미전송 `acks` 감지, `settle_one`에서 `front_mut().await` 완료 후 `pop_front()`, 서버에서 첫 항목 적용 전 `acks.len() <= sub.records` 검증 | 미판정 | Open |
-| RV-164 | P2 | `dot-logger/src/loss.rs:393-433, 580-591, 777-858`, `storage/writer.rs:732-741`, ADR-013 D2 개정(2026-11-21) | 비영 행 수가 64의 양의 배수이고 뒤에 0 행이 남을 때 빈 후행 part가 추가 생성되어 `max(1, ceil(M/64))` 상한과 불일치; `decode`·`summarize`에서 비최종 v2 part의 64행 불변식 및 다중 part 구간 폭(`counts.len() <= end - covered`) 미검증 | `Bank::sparse`가 65번째 비영 행에서 끊어 후행 0 행을 같은 part에 흡수하도록 수정, `decode`와 `summarize`에 비최종 part 행 수(`ROWS_PER_REPORT`) 및 `counts.len() <= g.end - covered` 검증 추가 | 미판정 | Open |
-| RV-165 | P3 | `dot-logger-cli/src/commands.rs:841-883`, `dot-logger/src/storage/writer.rs:615-617, 917-918`, `dot-logger-client/examples/lan_probe.rs:144-154, 333-344` | CLI `tail` 조기 종료/실패 시 이미 서버가 확인한 `acknowledged` 건수가 `0`으로 출력; `projected_index_bytes`의 `split`에 `pending_loss_parts > 0` 누락; `lan_probe`의 `commands: 1`이 동시 ACK 스트림을 1개로 직렬화하고 `grpc_receiver`가 Gap 발생 시에도 `Ok(())` 반환 | `RemoteSubscription`에 확인 완료 ACK 누적 건수 노출 및 CLI 반영, `projected_index_bytes` `split` 조건 정렬, `lan_probe` `commands: 4` 및 수신 Gap 비정상 종료 반영 | 미판정 | Open |
+| RV-163 | P2 | `dot-logger-client/src/transport.rs:514-624, 635-693, 727-769`, `dot-logger/src/adapters/remote/server.rs:374-387`, `hub.rs:243-268`, ADR-015 §1·§2·§4·§5 | ACK 실패 또는 미전송 `acks`가 남은 채 스트림 종료(`close`) 후 `flush` 호출 시 `Ok(())` 반환; `settle_one`이 `.await` 전에 `pop_front()`하여 `next` 로컬 타임아웃 시 진행 중 ACK RPC 결과 유실; 서버 묶음 상한이 구독별 `sub.records` 대신 전역 `limits.subscription_records`만 검사 | `RemoteSubscription`에 미확인/실패 상태 보존 및 스트림 종료 시 미전송 `acks` 감지, `settle_one`에서 `front_mut().await` 완료 후 `pop_front()`, 서버에서 첫 항목 적용 전 `acks.len() <= sub.records` 검증 | 수용 | Closed |
+| RV-164 | P2 | `dot-logger/src/loss.rs:393-433, 580-591, 777-858`, `storage/writer.rs:732-741`, ADR-013 D2 개정(2026-11-21) | 비영 행 수가 64의 양의 배수이고 뒤에 0 행이 남을 때 빈 후행 part가 추가 생성되어 `max(1, ceil(M/64))` 상한과 불일치; `decode`·`summarize`에서 비최종 v2 part의 64행 불변식 및 다중 part 구간 폭(`counts.len() <= end - covered`) 미검증 | `Bank::sparse`가 65번째 비영 행에서 끊어 후행 0 행을 같은 part에 흡수하도록 수정, `decode`와 `summarize`에 비최종 part 행 수(`ROWS_PER_REPORT`) 및 `counts.len() <= g.end - covered` 검증 추가 | 수용(일부 조정) | Closed |
+| RV-165 | P3 | `dot-logger-cli/src/commands.rs:841-883`, `dot-logger/src/storage/writer.rs:615-617, 917-918`, `dot-logger-client/examples/lan_probe.rs:144-154, 333-344` | CLI `tail` 조기 종료/실패 시 이미 서버가 확인한 `acknowledged` 건수가 `0`으로 출력; `projected_index_bytes`의 `split`에 `pending_loss_parts > 0` 누락; `lan_probe`의 `commands: 1`이 동시 ACK 스트림을 1개로 직렬화하고 `grpc_receiver`가 Gap 발생 시에도 `Ok(())` 반환 | `RemoteSubscription`에 확인 완료 ACK 누적 건수 노출 및 CLI 반영, `projected_index_bytes` `split` 조건 정렬, `lan_probe` `commands: 4` 및 수신 Gap 비정상 종료 반영 | 수용 | Closed |
 
 ---
 
@@ -87,9 +87,12 @@
 
 #### [처리담당]
 
-- **판정 결과:** (개발 세션에서 기록)
-- **처리 내용:** (개발 세션에서 기록)
-- **검증 근거:** (개발 세션에서 기록)
+- **판정 결과:** 수용. 세 지적 모두 코드에서 재현했다.
+- **처리 내용:**
+  1. `RemoteSubscription`에 유지되는 `lost` 플래그를 두었다. `unknown()`이 플래그를 세우고, `close()`는 보내지 못한 ACK를 버릴 때 플래그를 세운다. `flush`는 플래그가 서 있으면 진행 중인 RPC 결과와 관계없이 `AcknowledgementUnknown`을 반환한다. 그래서 EOF·스트림 오류·이전 실패 뒤에 다시 `flush`해도 성공으로 보고하지 않는다.
+  2. `settle_one`은 `front_mut()`로 핸들을 대기열에 둔 채 기다리고, 완료된 뒤에만 꺼낸다. `next`의 로컬 시간 초과로 대기가 끊겨도 RPC와 그 실패 결과가 남는다.
+  3. 서버 `AckRpc`는 디코딩 상한으로 전역 `subscription_records`를 계속 쓴다. 적용은 새 `RemoteHub::ack_batch`가 맡는다. 이 함수는 구독을 한 번 찾고 peer를 확인한 뒤, 묶음 길이가 그 구독의 협상 창(`records`)을 넘거나 다른 구독 항목이 섞이면 첫 항목을 적용하기 전에 `InvalidInput`으로 거절한다. 단건용 `RemoteHub::ack`는 시험 전용(`#[cfg(test)]`)으로 남겼다.
+- **검증 근거:** `5daf22b`, [EV-106](../verification_evidence.md#ev-106). transport 단위 시험 3건(큐에 ACK가 남은 채 닫힘, 이전 실패 뒤 반복 `flush`, 대기가 끊긴 `settle_one`)이 수정 전 `Ok(())`로 Red였고 수정 뒤 Green이다. 서버 묶음 시험은 전역 창을 8로 넓힌 뒤 수정 전에는 Red(앞 항목이 먼저 확인됨), 수정 뒤 Green이다. socket 시험에서도 연결 종료 뒤 `flush`를 반복해 `AcknowledgementUnknown`이 유지되는 것을 확인했다.
 
 ---
 
@@ -118,9 +121,13 @@
 
 #### [처리담당]
 
-- **판정 결과:** (개발 세션에서 기록)
-- **처리 내용:** (개발 세션에서 기록)
-- **검증 근거:** (개발 세션에서 기록)
+- **판정 결과:** 수용, 일부 조정.
+- **처리 내용:**
+  1. `Bank::sparse`는 65번째로 0이 아닌 행을 만날 때 그 행 앞에서 끊는다. 가득 찬 part가 뒤따르는 0 행 구간을 흡수하므로 part 수는 `max(1, ceil(M/64))`와 같다.
+  2. part 하나의 불변식을 `LossRange::holds`로 모아 `decode`와 `summarize` 사전 검사에 같이 쓴다. 불변식은 `end>0`, `end<=rows`, `counts<=end`, 비최종 part는 64행, `parts=ceil(rows/64)`이다. `summarize`의 연속 구간 판정은 `counts.len() <= end - covered`까지 요구한다. 이를 어기는 checkpoint는 완전하지 않은 것으로 보고 생략 키를 0으로 합성하지 않는다.
+  3. **조정:** 리뷰가 덧붙인 `part == 0 || !counts.is_empty()`는 넣지 않았다. `af68578`로 기록된 파일에는 `end == rows`인 빈 후행 part가 있을 수 있고, 이 조건은 그런 파일을 판독에서 거절한다. 위 불변식만으로 빈 비최종 part는 거절된다.
+  4. 기존 시험 하나는 행 64개 이하인데 끝이 등록 행보다 앞인 단일 part를 손으로 만들어 넣었다. writer가 만들 수 없는 모양이라 이제 `CorruptData`로 판정한다. 원래 의도(끝까지 덮지 못한 checkpoint는 0 합성 없음)는 "마지막 part 누락" 시험으로 옮겼다.
+- **검증 근거:** `5daf22b`, [EV-106](../verification_evidence.md#ev-106). 0이 아닌 행 63·64·65·128개의 part 수 시험은 수정 전 64개에서 2 part로 Red였다. 짧은 비최종 part의 decode 거절도 수정 전에 통과해 Red였다. 구간 폭 검사는 조건을 `true`로 바꾼 변이에서 Red, 원복 뒤 Green을 확인했다.
 
 ---
 
@@ -143,9 +150,12 @@
 
 #### [처리담당]
 
-- **판정 결과:** (개발 세션에서 기록)
-- **처리 내용:** (개발 세션에서 기록)
-- **검증 근거:** (개발 세션에서 기록)
+- **판정 결과:** 수용.
+- **처리 내용:**
+  1. `RemoteSubscription::acknowledged()`를 추가했다. 각 ACK RPC 작업이 서버 확인을 받으면 그 묶음의 기록 수를 공유 카운터에 더한다. 그래서 아직 회수하지 않은 RPC도 확인되는 즉시 집계되고, 결과를 모르는 기록은 세지 않는다. 기존 동작을 바꾸지 않는 추가형 공개 API다. CLI `tail`은 루프를 async 블록으로 감싸고, 성공·실패·시간 초과 모든 경로에서 `out.acknowledged`에 이 값을 반영한다.
+  2. `projected_index_bytes`의 `split` 조건에 `pending_loss_parts > 0`을 넣어 `append`와 맞췄다. 현재 호출 경로에서는 그 상태가 나오지 않아 별도 Red 시험은 없다.
+  3. `lan_probe` 서버는 `commands: 4`를 쓴다(HTTP/2 동시 스트림 = commands + subscriptions). `grpc_receiver`는 결과 출력 뒤 Gap이 있으면 오류로 끝난다.
+- **검증 근거:** `5daf22b`, [EV-106](../verification_evidence.md#ev-106). 새 CLI 시험(첫 기록 확인 뒤 다음 기록을 기다리다 `deadline`으로 종료)은 수정 전 CLI에서 `acknowledged` 0으로 Red, 수정 뒤 1이다. socket 시험은 64건 × 4회 `flush` 뒤 `acknowledged()`가 인계 수와 같고, 마지막 실패 뒤에도 늘지 않는 것을 확인했다. EV-104·105의 LAN 측정은 `commands: 1`, 즉 ACK RPC가 사실상 하나씩 진행되는 조건에서 이미 목표를 충족했으므로 재측정하지 않았다.
 
 ---
 
@@ -185,3 +195,7 @@
 ### 개발 인계 — 2026-11-21 #002
 
 - 다음 개발 세션은 **TASK-032 S1 착수 전에** 본 문서(`REV-069`)의 `RV-163~164`(P2) 및 `RV-165`(P3)에 대해 실패 재현 테스트(Red) 작성 → 최소 코드 수정(Green) → 회귀 검증을 수행하고 `[처리담당]` 영역을 갱신한 뒤 마감한다.
+
+### 처리 마감 — 2026-11-21 #003
+
+RV-163~165를 모두 수용해 `5daf22b`에서 수정했다(RV-164는 일부 조정). Rust 1.85.0·1.96.0 workspace all-features 각 **711 Pass, 실패 0, 5 ignored**, Clippy `-D warnings`·fmt·strict rustdoc(두 버전)·통합 표면 검사 Pass. client·CLI·remote 시험 10회 반복 실패 0. 기존 위임 범위에서 수락하고 Closed로 마감한다. [EV-106](../verification_evidence.md#ev-106)

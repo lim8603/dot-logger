@@ -9,7 +9,7 @@
 | 대상 | Workspace 전체(`crates/dot-logger`, `crates/dot-logger-client`, `crates/dot-logger-cli`, `crates/dot-logger-viewer`, `examples/`, `tests/`, `proto/`, `scripts/`, `.github/workflows/ci.yml`, `vendor/mcap-0.26.0/`, `test-profiles/`) — `HEAD` `a46c2d7` (요청 등록 `a354f3c`, 근거 기준 `1b0fe85`, 마지막 코드 변경 `8bab94b`) |
 | 관련 Task / Gate | [TASK-025](../../04_implementation/tasks/TASK-025.md) — Gate 4 최종 수락 및 리포지토리 공개(`gh repo edit --visibility public` + T3 native CI) 직전 전체 코드 독립 점검 |
 | 종합 판정 | **Conditional (보충 리뷰 보완 필요)** — 1차 `RV-171~188` 중 15건+범위 밖 2건 적절/타당한 조정, 보충 리뷰에서 잔여 **P1 1건(4항목) · P2 2건 · P3 1건**(`RV-189~192`) 식별 |
-| 상태 | **Open (보충 리뷰 보완 대기)** — 2026-11-21 1차 조치(§6) 검증 완료, `RV-189~192` 추가 조치 및 재검증 뒤 Closed |
+| 상태 | **Resolved (Human 수락 뒤 Closed)** — 1차 조치(§6), 보충 리뷰(§7) `RV-189~192` 조치·재검증(§8, [EV-112](../verification_evidence.md#ev-112)) 완료 |
 
 Gate 4 수락과 저장소 공개 및 T3(GitHub Actions multi-OS native CI) 발동을 앞둔 시점에서 diff가 아닌 현재 workspace 코드 전체를 대상으로 **테마 1(역대 최다 지적 3대 영역 A·B·C)**, **테마 2(보안 ①~⑥)**, **테마 3(신뢰성 ①~⑥)** 관점에서 독립 심층 리뷰를 수행했다.
 
@@ -512,3 +512,18 @@ TDD 순서(재현 시험 Red → 최소 수정 → 회귀)로 처리했다. 재�
   2. [fault_storage.rs:993](../../../crates/dot-logger/tests/fault_storage.rs#L993): 유일한 사용처가 `#[cfg(all(unix, not(miri)))]`이므로 `#[cfg_attr(not(all(unix, not(miri))), allow(dead_code))]`로 맞춰 Linux Miri 실행 시 `dead_code` 경고를 막는다.
   3. **참고 Note (`RV-178`, 수정 선택):** [server.rs:465](../../../crates/dot-logger/src/adapters/remote/server.rs#L465)에서 `SubscriptionStream`이 후행 레코드를 보낼 때 `self.timer`가 `now + age`로 리셋되므로, 이후 추가 `offer`/`ack`/`discard_generations` 호출이 전혀 없는 완전 유휴 상태에서는 선행 레코드 만료 시점보다 최대 1 lease(`age`) 뒤 타이머 만료로 종료되며 `RemoteError::TimedOut`을 반환한다(호스트는 이미 `expire`로 구독을 닫은 상태).
 
+## 8. 보충 조치 결과 — 2026-11-21 개발 세션
+
+TDD 순서로 처리했다. 코드 커밋은 `9622e94`, 재검증은 [EV-112](../verification_evidence.md#ev-112)다. 조치 전에 각 지적을 현재 코드와 대조했고, `RV-190`은 임시 시험으로 먼저 재현했다.
+
+| RV | 판정 | 조치 | 확인 |
+|---|---|---|---|
+| RV-189 | 수용 | ① `host::tests`를 Linux 전용으로 맞춤(쓰는 `logger::tests`가 Linux 전용) ② `#[cfg(target_os = "linux")]`를 `closing_tests` 모듈로 옮김 ③ `PlanWarning`·`Shutdown` import를 Linux 전용으로 분리 ④ facade 손실 시험을 `unix` → Linux 전용 | macOS(aarch64-apple-darwin)·Windows(x86_64-pc-windows-msvc) 교차 Clippy `-D warnings`를 이 PC에서 실행. 조치 전 코드는 ①②의 오류 3개로 실패(③은 앞 단계 실패로 미도달), 조치 후 두 Rust 모두 통과. ④는 실행 시 패닉이라 교차 검사로 볼 수 없고 조건만 바꿈 |
+| RV-190 | 수용 | `covers_file`의 `!ended_is_synced` 가드 제거. Synced 계약에서도 다른 파일이 미동기화로 가질 수 있는 구간(`foreign.spans`: 빚 hull과 이후 파일 기록분)은 strict로 증명. 같은 구간의 만료 기록을 미증명으로 보는 보수적 판정은 Written 계약과 같다 | `under_a_synced_contract_an_unknown_written_record_still_blocks_a_new_segment` Red(`sync_work` 승인)→Green. 기존 Synced 계약 시험 회귀 통과 |
+| RV-191 | 수용 | `unsettled()`(실패한 ACK RPC·대기열 ACK·진행 중 RPC)를 `next`의 연결 닫힘 분기, `handoff`의 닫힘 분기, `next`의 오류 분기에서 함께 사용. 미정산이면 `Disconnected`보다 `AcknowledgementUnknown` 우선 | `a_closed_connection_with_queued_acks_reports_unknown_not_disconnected`(next·handoff) Red(`Disconnected`)→Green. 진행 중 RPC만 남은 경우는 결정적으로 만들 수 없어 같은 조건식으로 보장 |
+| RV-192 | 수용(①②), Note 유지(③) | ① 중복 `#[cfg(unix)]` 제거 ② `Cleanup`의 `dead_code` 허용 조건을 유일한 사용처와 같은 `all(unix, not(miri))`로 맞춤 ③ 완전 유휴 시 1 lease 늦은 `TimedOut` 종료는 바꾸지 않음: 클라이언트는 깨끗한 종료가 아니라 오류를 받고, 호스트는 이미 구독을 닫았다. 고치려면 서버 스트림 타이머가 가장 오래된 미확인 기록의 만료를 따라야 해 이번 범위를 넘는다 | 두 Rust Clippy·CI 범위 Miri 통과 |
+
+### 검토 의견 반영
+
+- 보충 리뷰 확인 때 AI 의견으로 `RV-191`의 실제 영향이 P2보다 작다고 봤다. 대기열 ACK는 `close()`가 `lost`를 세우고, 진행 중 RPC는 남아 `flush`가 결과를 기다리므로 조용한 유실은 없고 즉시 반환되는 오류 종류만 달랐다. 중요도는 리뷰어 판정(P2)을 유지하고 그대로 조치했다.
+- 교차 Clippy는 C 의존(`zstd-sys`·`ring`)을 링크 없이 통과시키려고 빈 object를 만드는 대체 컴파일러를 썼다. 타입 검사와 lint만 확인하며 macOS·Windows 실행 근거가 아니다. 실제 실행은 공개 뒤 T3 native CI(GAP-004)가 맡는다.

@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-21 |
-| 다음 액션 | Human 수락 — REV-071 조치([EV-111](../../05_verification/verification_evidence.md#ev-111))와 Gate 4 판정안(Pass, 로컬 범위)·Gate 5 Not Ready |
+| 다음 액션 | Human 수락 — REV-071 1차·보충 조치([EV-111](../../05_verification/verification_evidence.md#ev-111)·[EV-112](../../05_verification/verification_evidence.md#ev-112))와 Gate 4 판정안(Pass, 로컬 범위)·Gate 5 Not Ready |
 | 의존 | TASK-033·TASK-032(MS-009). TASK-024 의존은 2026-11-15 해제 |
 | 예상 소요 | 1~2 인일, 장비/리뷰 대기 제외 |
 

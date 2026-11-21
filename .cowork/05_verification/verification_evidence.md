@@ -1758,6 +1758,18 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **종단:** `live_host` → viewer·대시보드 → CLI. 대시보드는 관측 지표를 담은 `dot_logger.viewer.dashboard.v1`, `tail --limit 10`은 10건 수신·10건 ACK·Gap 0. WebSocket 핸드셰이크는 Host `127.0.0.1`·`localhost`이면 101, `evil.example`이면 403(RV-179). 처음 확인에서는 viewer 바이너리가 수정 전 빌드여서 101이 나왔고, 다시 빌드해 확인했다.
 - **판정에 쓰는 범위:** REV-071 조치의 로컬 회귀·종단 근거. macOS·Windows 실행(RV-172·184의 실제 효과)은 공개 뒤 T3 native CI에서 확인한다(GAP-004).
 
+### EV-112 — REV-071 보충 조치 뒤 전체 회귀와 비-Linux 교차 Clippy
+
+- **대상:** main `9622e94`(REV-071 보충 조치 `RV-189~192`). 이 PC(Ubuntu generic 7.0.0-43, x86_64), 빌드 디렉터리 `/data/build/target`, 교차 검사는 `/data/build/target-cross`. AI 실행.
+- **CI와 같은 검사 묶음:**
+  - Rust 1.96.0·1.85.0 workspace all-features 각 **741 Pass, 실패 0, 5 ignored**(외부 DB). 새 시험 2개(RV-190·RV-191) 포함.
+  - 두 버전 Clippy `-D warnings`, fmt, strict rustdoc(workspace·core 전용), client 기능 없는 시험(시험 0개, 컴파일 확인).
+  - feature 조합 1.96.0 359초·1.85.0 442초: 16개 조합·calibrate·독립 core consumer 통과.
+  - Miri(CI 범위, strict provenance·시계 허용·seed 0..8): 종료 코드 0, 779초, 실패 줄 0. 출력이 섞여 파싱한 결과 줄 54개 안에서 1,283 Pass·실패 0·88 ignored.
+  - 원격 wire·공개 API·의존성 변경이 없어 프로토콜·통합 표면·audit 검사는 다시 돌리지 않았다.
+- **비-Linux 교차 Clippy(새 방법):** `aarch64-apple-darwin`·`x86_64-pc-windows-msvc` 대상으로 두 Rust 모두 `clippy --workspace --all-targets --all-features -- -D warnings` 통과. C 의존(`zstd-sys`·`ring`)은 링크하지 않으므로 빈 object를 만드는 대체 컴파일러·archiver로 build script만 통과시켰다. 조치 전 코드(`d0fa039`)는 같은 검사에서 RV-189 ①②의 오류 3개로 실패해 검사가 실제 결함을 잡는 것을 확인했다.
+- **판정에 쓰는 범위:** REV-071 보충 조치의 로컬 회귀. 교차 Clippy는 macOS·Windows의 타입 검사·lint 근거일 뿐 실행 근거가 아니다. 실행 시 결함(RV-189 ④ 같은 패닉)과 실제 동작은 공개 뒤 T3 native CI(GAP-004)가 맡는다. 종단 확인은 바뀐 경로(동기화 증명·클라이언트 ACK 오류 종류)가 시험으로 직접 다뤄져 다시 하지 않았다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

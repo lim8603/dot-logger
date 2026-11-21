@@ -486,6 +486,7 @@ fn real_readonly_file_recovery_keeps_original_and_refuses_existing_output() {
                 .unwrap()
                 .as_nanos()
         ));
+        let _cleanup = Cleanup(root.clone());
         std::fs::create_dir(&root).unwrap();
         let bytes = fixture(budget.clone(), false);
         let src = root.join("original.active");
@@ -986,4 +987,13 @@ fn incomplete_duplicate_and_late_registrations_are_invalid_records() {
             assert_eq!(recovered.report.records, valid_records);
         }
     });
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

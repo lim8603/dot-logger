@@ -64,6 +64,7 @@ fn f11_required_worker_cpus_pin_every_worker_thread() {
     // The first CPU this process may use, e.g. "0-15" or "3,5".
     let cpu: usize = allowed.split([',', '-']).next().unwrap().parse().unwrap();
     let temp = std::env::temp_dir().join(format!("dot-logger-tc013-f11-{}", std::process::id()));
+    let _cleanup = Cleanup(temp.clone());
     std::fs::create_dir_all(&temp).unwrap();
     let logger = Logger::builder()
         .budget(budget().worker_cpus(&[cpu], Requirement::Required))
@@ -87,4 +88,13 @@ fn f11_required_worker_cpus_pin_every_worker_thread() {
     };
     assert!(report.is_success(), "{report:?}");
     std::fs::remove_dir_all(&temp).unwrap();
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

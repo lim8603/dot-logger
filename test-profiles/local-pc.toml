@@ -1,7 +1,8 @@
 # TASK-022 Human-approved profile. Declarations do not start a workload.
 id = "local-pc-v1"
 approval = "Approved"
-execution = "NotRun"
+# P0-P5 ran on this PC (EV-064..070, EV-097..105); P6/24 h and native remain (TASK-024).
+execution = "Partial"
 scope = "current Ubuntu PC; synthetic control; simulated UPS"
 
 [storage]
@@ -55,8 +56,8 @@ safety_priority = 80
 additional_deadline_misses = 0
 
 [p0]
-storage_tool = "paired simple-file Rust writer (TASK-023; not implemented)"
-control_tool = "paired fixed-work control loop (TASK-023; not implemented)"
+storage_tool = "paired simple-file Rust writer (TASK-023, perf_baseline)"
+control_tool = "paired fixed-work control loop (TASK-023, perf_baseline)"
 scheduler_diagnostic = "cyclictest (diagnostic only)"
 same_cpu_workload_sync_rotation_and_completion = true
 tcp = "deferred until remote implementation and declared two-host path"
@@ -97,11 +98,13 @@ protection_bytes = [8388608, 67108864]
 rank1_max_bytes = 50331648
 rank2_max_bytes = 16777216
 earlier_deadline_ms = 1500
-implementation = "TASK-021/024; not implemented"
+implementation = "TASK-021 simulation (ups_simulation); physical UPS out of scope (ADR-011)"
 
 [readiness]
-performance_harness = "NotImplemented"
+performance_harness = "Implemented"
+# The first application is integrated last (TASK-026).
 actual_dot_probe_control = "NotIntegrated"
-ups_adapter = "NotImplemented"
+# Simulated signals with real file IO (ADR-011); no physical UPS adapter.
+ups_adapter = "Implemented"
 rt_boot = "RequiredForRTRows"
 native = "DeferredUntilPublic"

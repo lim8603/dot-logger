@@ -23,7 +23,10 @@ out=${2:?out}
 seconds=${3:-60}
 warmup=${4:-10}
 reps=${5:-3}
-bin=${PERF_BASELINE:-/data/build/target/release/examples/perf_baseline}
+# Default: the built example under this repository's target directory
+# (CARGO_TARGET_DIR when set). Override with PERF_BASELINE (REV-071 RV-183).
+repo=$(cd "$(dirname "$0")/.." && pwd)
+bin=${PERF_BASELINE:-${CARGO_TARGET_DIR:-$repo/target}/release/examples/perf_baseline}
 s=${S_BYTES:-1543573777}
 mem=${RT_MEM:-8G}
 export DOT_LOGGER_PERF_RT=fifo

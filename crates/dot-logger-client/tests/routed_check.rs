@@ -120,6 +120,7 @@ fn source_is_bounded_and_invalid_or_empty_app_exports_are_rejected() {
 #[test]
 fn regular_file_import_preserves_the_actual_export_and_rejects_oversized_input() {
     let root = std::env::temp_dir().join(format!("dot-bridge-import-{}", std::process::id()));
+    let _cleanup = Cleanup(root.clone());
     std::fs::create_dir(&root).unwrap();
     let file = root.join("ticks.json");
     std::fs::write(&file, SNAPSHOT).unwrap();
@@ -190,4 +191,13 @@ fn queue_acceptance_followed_by_connection_loss_preserves_data_without_claiming_
         ),
         (0, 1, 0)
     );
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

@@ -32,6 +32,12 @@ jobs:
         run: cargo +${{ matrix.toolchain }} fmt --all --check
       - name: Check all feature combinations and public consumer
         run: python scripts/check-feature-matrix.py --toolchain ${{ matrix.toolchain }}
+      # The feature matrix covers dot-logger; the client, CLI and viewer
+      # crates are outside the default members (REV-071 RV-173).
+      - name: Client, CLI and viewer tests
+        run: |
+          cargo +${{ matrix.toolchain }} test --locked -p dot-logger-client --no-default-features
+          cargo +${{ matrix.toolchain }} test --locked -p dot-logger-client -p dot-logger-cli -p dot-logger-viewer --all-features
       - name: Clippy
         run: cargo +${{ matrix.toolchain }} clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Public API documentation
@@ -82,8 +88,8 @@ jobs:
       - name: Check raw ownership, completion, control, and reclamation
         # Loss checkpoints stamp a wall-clock publish time, which Miri's isolation
         # mode cannot provide; allow host clock access as the local runs do.
-        # The default-path `logger::` unit tests use real files and directory
-        # fsync, which Miri does not support; they run in the regular test jobs.
+        # Tests that use real files and directory fsync, which Miri does not
+        # support, are marked `cfg_attr(miri, ignore)` (REV-071 RV-188).
         env:
           MIRIFLAGS: -Zmiri-strict-provenance -Zmiri-disable-isolation -Zmiri-many-seeds=0..8
-        run: "cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --test tc_003_routing --test tc_003_completion --test tc_003_control --test tc_005_retention --test fault_storage --test tc_006_query --test tc_006_replay --locked -- --skip logger::"
+        run: "cargo +nightly-2026-10-26 miri test -p dot-logger --lib --test tc_002_pool --test tc_003_routing --test tc_003_completion --test tc_003_control --test tc_005_retention --test fault_storage --test tc_006_query --test tc_006_replay --locked"

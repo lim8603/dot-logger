@@ -1199,6 +1199,7 @@ fn calibrate_saves_a_new_profile_and_never_overwrites() {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
+    let _cleanup = Cleanup(dir.clone());
     std::fs::create_dir(&dir).unwrap();
     let profile = dir.join("machine.json");
     let run = || {
@@ -1266,6 +1267,7 @@ fn calibrate_on_other_platforms_fails_without_writing() {
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
+    let _cleanup = Cleanup(dir.clone());
     std::fs::create_dir(&dir).unwrap();
     let profile = dir.join("machine.json");
     let run = || {
@@ -2861,5 +2863,14 @@ fn recovery_user_record_quota_does_not_consume_control_only_later_sources() {
         if !fanout {
             assert_eq!(LossReader::new(&data, 8192, 2).unwrap().count(), 3);
         }
+    }
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
     }
 }

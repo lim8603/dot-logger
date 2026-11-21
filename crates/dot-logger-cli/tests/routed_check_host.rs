@@ -81,7 +81,8 @@ impl Host {
                         revision: 1,
                         environment_id: 11,
                         workload_id: 22,
-                        directory: "/nonexistent/routed-cli-never-created".into(),
+                        // An absolute path on every OS that is never created (RV-184).
+                        directory: std::env::temp_dir().join("dot-logger-routed-cli-never-created"),
                         budgets: CheckBudgets {
                             duration_ns: 2_000_000_000,
                             write_bytes: 1,

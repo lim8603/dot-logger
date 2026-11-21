@@ -39,6 +39,7 @@ fn progress() -> Progress {
 #[test]
 fn dry_run_preserves_provenance_and_operating_files_without_creating_a_directory() {
     let root = std::env::temp_dir().join(format!("dot-check-plan-{}", std::process::id()));
+    let _cleanup = Cleanup(root.clone());
     std::fs::create_dir(&root).unwrap();
     let operating = root.join("operating.mcap");
     std::fs::write(&operating, b"operating-records").unwrap();
@@ -144,4 +145,13 @@ fn extreme_counts_do_not_wrap_and_network_declarations_never_certify_capacity() 
         plan.spec().network,
         NetworkPlan::RemoteUnmeasured { peer_id: 123 }
     );
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

@@ -5,7 +5,7 @@ use dot_logger::{completion::Boundary, diagnostics::*};
 #[path = "../examples/support/dot_probe.rs"]
 mod dot_probe;
 use dot_probe::SnapshotCheck;
-use std::{path::PathBuf, sync::atomic::AtomicBool, time::Instant};
+use std::{sync::atomic::AtomicBool, time::Instant};
 
 const SNAPSHOT: &[u8] = br#"{"threads":[{"name":"ControlThread","interval_us":10000,"ticks":2}]}"#;
 fn plan(memory: usize) -> CheckPlan {
@@ -14,7 +14,8 @@ fn plan(memory: usize) -> CheckPlan {
         revision: 1,
         environment_id: 11,
         workload_id: 22,
-        directory: PathBuf::from("/nonexistent/routed-check-must-not-create"),
+        // An absolute path on every OS that is never created (RV-184).
+        directory: std::env::temp_dir().join("dot-logger-routed-check-must-not-create"),
         budgets: CheckBudgets {
             duration_ns: 2_000_000_000,
             write_bytes: 1,
@@ -42,7 +43,11 @@ fn fixed_routed_capability_previews_without_io_then_runs_once_with_original_rece
     let preview: serde_json::Value = serde_json::from_slice(&host.preview(id).unwrap()).unwrap();
     assert_eq!(preview["scope"], "production_capture_loopback_snapshot");
     assert_eq!(preview["capability"], "Unprobed");
-    assert!(!std::path::Path::new("/nonexistent/routed-check-must-not-create").exists());
+    assert!(
+        !std::env::temp_dir()
+            .join("dot-logger-routed-check-must-not-create")
+            .exists()
+    );
     let cancel = AtomicBool::new(false);
     let mut runtime = FileCheckRuntime::new(Instant::now(), &cancel, |_| panic!("no disk IO"));
     let evidence = host.run_routed(id, &mut runtime).unwrap();

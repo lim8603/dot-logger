@@ -25,6 +25,7 @@ fn plan_is_load_free_run_is_single_use_and_actual_probe_preserves_operating_file
         std::process::id(),
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
+    let _cleanup = Cleanup(path.clone());
     fs::create_dir(&path).unwrap();
     fs::write(path.join("operating"), b"keep").unwrap();
     let plan = support::plan();
@@ -253,4 +254,13 @@ fn source_is_preserved_expired_profiles_are_not_refreshed_and_slots_do_not_alias
         assert!(matches!(host.preview(id), Err(HostError::Gone)));
         assert!(host.preview(next).is_ok());
     });
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

@@ -406,6 +406,7 @@ fn facade_contract() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let dir = std::env::temp_dir().join(format!("dot-logger-api-consumer-{}", std::process::id()));
+    let _cleanup = Cleanup(dir.clone());
     std::fs::create_dir_all(&dir)?;
     let builder = Logger::builder()
         .budget(
@@ -492,4 +493,13 @@ fn report_contract() {
         r.disk_exhaustion,
         Value::Unavailable(Reason::MissingMeasurement)
     );
+}
+
+/// Removes a temporary path even when the test panics (REV-071 RV-188).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+struct Cleanup(std::path::PathBuf);
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0).or_else(|_| std::fs::remove_file(&self.0));
+    }
 }

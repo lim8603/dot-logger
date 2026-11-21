@@ -9,15 +9,15 @@
 | 현재 Phase | Build/Verify — MS-001~006·008 Done, MS-007·009 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실 완료, 원격 viewer·대시보드 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
-| 활성 Task | TASK-031 In Progress — T7 검증 완료: P3·P5 Pass(EV-103), LAN P4 소형(EV-104)·유선 P4-bulk 98.8–100.5%(EV-105). 수락 정리 남음 |
-| 미처리 리뷰 | 없음 — [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) RV-160·161 Closed(2026-11-21), REV-001~066 Closed |
-| 상태 | 29/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 705 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
+| 활성 Milestone | MS-009 In Progress — 표준 호환·파일 손실·원격 viewer 완료, 운영 대시보드(TASK-032) 잔여. MS-007 In Progress — 일정 판정 완료, 인수·장기/native·실사용처 잔여 |
+| 활성 Task | 없음 — TASK-031 Done(2026-11-21 위임 수락). 다음 [TASK-032](../04_implementation/tasks/TASK-032.md) S1 UI 방식 결정 |
+| 미처리 리뷰 | 없음 — REV-001~068 Closed. 최근 [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) RV-162 조치·수락 |
+| 상태 | 30/35 Task Done. Foxglove·T7 [EV-096~105](../05_verification/verification_evidence.md#ev-096), 두 Rust 각 705 Pass·5 ignored. [EV-089](../05_verification/verification_evidence.md#ev-089) 일정 판정 라인 93.69%·함수 92.67%·리전 91.08%, UC 28/28. Gate 4·5 Not Ready |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-21 / RV-161 종료·LAN P4 실측 / AI |
-| 세션 상태 | **진행 — 2026-11-21 #001.** |
-| 최근 완료 세션 | 2026-11-19 #001 — Foxglove·RV-161 조치·P4 루프백 대조([EV-096~100](../05_verification/verification_evidence.md#ev-096)) |
+| 갱신 | 2026-11-21 / TASK-031 수락·세션 마감 / AI |
+| 세션 상태 | **종료 — 2026-11-21 #001 마감.** |
+| 최근 완료 세션 | 2026-11-21 #001 — RV-161 종료, ADR-015 묶음·파이프라인 ACK, 하드웨어 CRC-32, T7 해소, TASK-031 Done([EV-101~105](../05_verification/verification_evidence.md#ev-101)) |
 
 ## 현재 결정과 제약
 
@@ -68,14 +68,13 @@
 
 ## 활성 Task 요약
 
-Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(29건: TASK-001~017·019~023·027~030·033~035).
+Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(30건: TASK-001~017·019~023·027~031·033~035).
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | AI | Planned | 2026-11-15 | TASK-033·MS-009 뒤, TASK-024·026 앞(TASK-024 의존 해제) |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-031 | 원격 viewer | AI | In Progress | 2026-11-21 | T7 완료 → TASK-031 수락 정리 → TASK-032 S1 |
 | TASK-032 | viewer 대시보드 | AI | Planned | 2026-11-04 | TASK-031 뒤 S1 UI 방식 결정 |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -93,12 +92,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(2
 | [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) | TASK-031 S3 원격 기록 재생 | **Closed** | EV-094·위임 로컬 수락 |
 | [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
 | [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **Closed** | RV-160·161 Closed. 손실 checkpoint 0 행 생략 뒤 8 GiB P3·P5 Pass(EV-101·103) |
+| [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-1. **TASK-031.** ADR-015 묶음·파이프라인 ACK 뒤 LAN P4 소형은 Pass다(p99 10.86 ms, EV-104). P4-bulk는 64건 검증이 모두 통과했지만, Wi-Fi TCP 기준이 43–110 MB/s로 흔들려 ≥80% 비율을 판정하지 못했다(쌍별 76–136%, 최고값 비교 81%). 2026-11-21 Human 「유선으로 재측정」에 따라 유선 LAN에서 측정했다. 대용량이 처음에 TCP의 약 70%였고, 원인인 바이트 단위 CRC를 crc32fast로 바꿔 98.8–100.5%가 됐다(EV-105). 다음은 TASK-031 수락 정리와 TASK-032 S1이다. [EV-104](../05_verification/verification_evidence.md#ev-104) · [잔여 검증](../04_implementation/tasks/TASK-031.md#잔여-검증과-재개-순서)
+1. **TASK-032 S1.** viewer 운영 대시보드의 UI 방식(viewer 내장 웹·native·Foxglove 확장 패널)을 조사해 Human에게 결정을 받는다. TASK-031은 2026-11-21에 Done이 됐다. [TASK-032](../04_implementation/tasks/TASK-032.md) · [TASK-031 수락](../04_implementation/tasks/TASK-031.md#수락--2026-11-21)
 2. **TASK-025 인수 정리:** 상세 작업의 TASK-032 선행 조건에 따라 MS-009 뒤에 진행한다. 11월 16일 주 목표에도 포함됐던 일정 차이는 기존 선행 조건과 계획 날짜를 보존해 추적한다.
 3. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 

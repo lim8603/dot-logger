@@ -8,9 +8,9 @@
 | 설계 | [인터페이스](../../03_design_artifacts/interface_contract.md) · [CLI/화면](../../03_design_artifacts/ui_spec.md) |
 | ADR | ADR-007·009·[014](../../03_design_artifacts/adrs/ADR-014_viewer_live_websocket.md) Accepted |
 | 담당 | AI |
-| 상태 | In Progress |
-| 마지막 갱신일 | 2026-11-19 |
-| 다음 액션 | S2 — Windows 브리지 수신 확인 뒤 LAN TCP 기준과 P4·P4-bulk 대조. RV-161은 8 GiB P0 대조부터 재개. [잔여 검증](#잔여-검증과-재개-순서) |
+| 상태 | Done — 2026-11-21 위임 수락 |
+| 마지막 갱신일 | 2026-11-21 |
+| 다음 액션 | 없음 — [TASK-032](TASK-032.md) S1으로 이어진다. [수락 기록](#수락--2026-11-21) |
 | 의존 | TASK-012·TASK-013·TASK-030(S1) |
 | 예상 소요 | 2~3 인일, 리뷰 대기 제외 |
 
@@ -31,7 +31,7 @@
 | 단계 | 목표 | 종료 상태 (검증 가능) | 상태 |
 |---|---|---|---|
 | S1 | 기술 조사·결정 | 프로토콜/SDK 버전·라이선스·Lichtblick 호환 근거, tech_stack 반영안 Human 승인 | Done — 2026-11-18 Human 승인, ADR-014 |
-| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | 로컬 구현·검증 Pass(EV-092). REV-066 조치 검증(EV-095). Foxglove Desktop·루프백 포화 실측 Pass(EV-096·097). T7 LAN 잔여 |
+| S2 | 실시간 bridge | Subscribe→WS 채널, Gap/Unknown·종료/재연결 표시, 유한 큐·느린 소비자 처리 | Done — EV-092·095·096·097. T7 P3·P5(EV-103), LAN P4(EV-104·105) Pass |
 | S3 | 기록 소스 | Query/ReadBlob 기반 시간 이동·배속, 파일 열기 | 로컬 Pass — MCAP EV-093, 원격 재생 EV-094·096, 등록·재연결 회귀 EV-095 |
 
 ## S1 기술 결정안 — 2026-11-18
@@ -57,7 +57,7 @@ Lichtblick Web v1.31.0은 공개 v1과 SDK v1을 모두 제안하며, SDK v1.1�
 
 ### S2 실시간 구현과 로컬 검증 — 2026-11-18
 
-제품 `f1444d4`의 [사용법과 예제](../../../crates/dot-logger-viewer/README.md), [EV-092](../../05_verification/verification_evidence.md#ev-092), [REV-063](../../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md)을 따른다. 하나의 native 채널에 한 gRPC 구독을 공유하며 WebSocket의 건수/바이트와 2초 쓰기 기한을 각각 제한한다. 채널당 ACK는 순차 처리된다. 새 카탈로그는 viewer 재시작 시 적용한다. 스키마 불일치가 관측되면 이전 광고를 회수하고 상태를 표시한다.
+제품 `f1444d4`의 [사용법과 예제](../../../crates/dot-logger-viewer/README.md), [EV-092](../../05_verification/verification_evidence.md#ev-092), [REV-063](../../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md)을 따른다. 하나의 native 채널에 한 gRPC 구독을 공유하며 WebSocket의 건수/바이트와 2초 쓰기 기한을 각각 제한한다. 채널당 ACK는 순차 처리된다(2026-11-21 [ADR-015](../../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md)부터 묶음·파이프라인 전송). 새 카탈로그는 viewer 재시작 시 적용한다. 스키마 불일치가 관측되면 이전 광고를 회수하고 상태를 표시한다.
 
 Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `robot/pose` x=51·y=-7과 Rust 통합 시험에서 포화 회복·세션 종료/재연결·구독 반환을 확인했다. Foxglove Desktop 3.5.0의 격리 프로필은 로그인 화면에서 실시간 검증을 멈췄다. P4/P4-bulk·P5의 LAN·기준 TCP 부하 실측은 T7에 유지한다.
 
@@ -98,10 +98,10 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 
 ## 완료 기준
 
-- [ ] 실시간·기록 소스 bridge와 Foxglove 계열 도구 판독.
-- [ ] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다.
-- [ ] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다.
-- [ ] Human 리뷰 완료. 새 H/J 결정이 필요하면 근거와 대안을 기록한다.
+- [x] 실시간·기록 소스 bridge와 Foxglove 계열 도구 판독. EV-092~094·096
+- [x] 대상 revision·환경·명령·결과/미실행을 기록하고 요구사항 추적표의 해당 MS 칸만 갱신한다. MS-009 칸은 TASK-032와 공유하므로 체크하지 않고 상태만 갱신했다.
+- [x] 실패/포화·취소/종료·예산 경계를 해당 범위에서 검증한다. EV-092·095·097·103~105
+- [x] 리뷰 완료. REV-063~068 Closed, 2026-10-31 위임 기준으로 수락했다. 새 H/J 결정은 ADR-014·015와 ADR-013 개정으로 승인받았다.
 
 테스트 정의는 [TC-014](../../05_verification/test_case.md#tc-014), 검증 근거는 [EV-092](../../05_verification/verification_evidence.md#ev-092)~[EV-094](../../05_verification/verification_evidence.md#ev-094)를 따른다.
 
@@ -116,4 +116,8 @@ Lichtblick Web 1.31.0 Raw Messages에서 실제 facade→gRPC→viewer→WS의 `
 - [x] T7 LAN P4·P4-bulk를 두 번째 장비에서 [TC-012](../../05_verification/test_case.md#tc-012)에 따라 검증했다. 수정 전에는 ACK 왕복 때문에 소형이 초당 약 440건에서 막혔다(EV-102). [ADR-015](../../03_design_artifacts/adrs/ADR-015_batched_pipelined_remote_ack.md) 묶음·파이프라인 ACK로 소형을 해소했다(EV-104). 유선에서 대용량이 TCP의 약 70%에 그친 원인은 바이트 단위 CRC였고, 하드웨어 CRC-32로 바꿔 쌍별 98.8–100.5%가 됐다. 유선 소형 p99는 4.12 ms다. [EV-102](../../05_verification/verification_evidence.md#ev-102) · [EV-104](../../05_verification/verification_evidence.md#ev-104) · [EV-105](../../05_verification/verification_evidence.md#ev-105)
 - [x] [RV-161](../../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md#rv-161) 조치를 반입해 작은 loss part를 묶어 저장하고 주기 checkpoint 예산을 확보했다. [EV-098](../../05_verification/verification_evidence.md#ev-098)
 - [x] 8 GiB 제한의 전체 P3 부하와 함께 P5를 재판정했다. 손실 checkpoint 0 행 생략(ADR-013 개정) 뒤 예열 포함 70초분을 70.0005초에 수락했고, 쓰기와 겹친 조회 p95는 5.03 ms였다. RV-161 Closed. [EV-101](../../05_verification/verification_evidence.md#ev-101) · [EV-103](../../05_verification/verification_evidence.md#ev-103)
-- [ ] TASK-031 수락을 정리한 뒤 [TASK-032](TASK-032.md) 운영 대시보드 S1로 진행한다.
+- [x] TASK-031 수락을 정리했다. 다음은 [TASK-032](TASK-032.md) 운영 대시보드 S1이다.
+
+## 수락 — 2026-11-21
+
+S1~S3와 T7 성능 검증을 마쳤다. 실시간 bridge(EV-092·095·096), 파일·원격 기록 재생(EV-093·094·096), 포화 회복(EV-097)을 확인했다. 8 GiB P3·P5(EV-103), LAN P4 소형·유선 P4-bulk(EV-104·105)도 통과했다. 리뷰 REV-063~068은 모두 Closed다. T7 과정에서 RV-161 손실 checkpoint 0 행 생략, ADR-015 묶음·파이프라인 ACK, 하드웨어 CRC-32를 반입했다. 2026-10-31 위임 기준에 따라 AI가 수락한다. 원격 viewer의 장기·native·다른 OS 검증은 TASK-024, 실사용처 연동은 TASK-026에 남는다.

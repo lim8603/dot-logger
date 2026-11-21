@@ -13,6 +13,13 @@
   const BAD = new Set(["rejected", "rejected_capacity", "acquire_rejected",
     "acquire_rejected_capacity", "failed", "dropped"]);
   let viewerLostAt = null;
+  let snapshotKey = null;
+  const CHANGES = ["accepted_rate", "accepted_bytes_rate", "completed_rate",
+    "intentional_skip_rate", "capacity_rejection_rate", "cpu_rate", "latency_ns", "memory_bytes"];
+  const SIDES = [["id", "ID"], ["session", "session"], ["revision", "revision"],
+    ["epoch", "epoch"], ["window", "window"], ["application_input_id", "application input"],
+    ["environment_id", "environment"], ["workload_id", "workload"], ["target_id", "target"],
+    ["boundary", "boundary"]];
 
   function el(tag, cls, text) {
     const node = document.createElement(tag);
@@ -116,6 +123,7 @@
       fill("latest", el("p", "note", "No status received yet."));
       fill("windows");
       fill("snapshots");
+      compareForm(null);
       return;
     }
     const m = last.metrics;
@@ -123,8 +131,10 @@
       fill("latest", badge(m.state, m.reason));
       fill("windows", el("p", "note", "No runtime metrics from this host."));
       fill("snapshots");
+      compareForm(null);
       return;
     }
+    compareForm(m.snapshots || []);
     const latest = m.latest || {};
     const head = el("p");
     head.append(badge(latest.state, latest.reason));
@@ -169,6 +179,176 @@
       fill("snapshots", table);
     }
   }
+
+  // ---- Read-only lookups: Compare and PlanCheck preview ----
+  function snapshotLabel(s) {
+    return "#" + s.id + " · revision " + s.revision + " · " + ns(s.from_ns) + " → " + ns(s.to_ns);
+  }
+  function choose(snapshots, selected) {
+    const select = el("select");
+    for (const s of snapshots) {
+      const option = el("option", null, snapshotLabel(s));
+      option.value = s.id;
+      select.append(option);
+    }
+    select.value = snapshots[selected].id;
+    return select;
+  }
+  function labelled(text, control) {
+    const label = el("label", null, text + " ");
+    label.append(control);
+    return label;
+  }
+  // Rebuilt only when the held snapshots change, so a choice survives refreshes.
+  function compareForm(snapshots) {
+    const key = snapshots === null ? "none" : snapshots.map(function (s) { return s.id; }).join(",");
+    if (key === snapshotKey) return;
+    snapshotKey = key;
+    if (snapshots === null) {
+      fill("compare-form", el("p", "note", "No snapshot list from this host."));
+      return;
+    }
+    if (snapshots.length < 2) {
+      fill("compare-form", el("p", "note", snapshots.length === 0
+        ? "This host holds no snapshots. A comparison needs two."
+        : "This host holds one snapshot. A comparison needs two."));
+      return;
+    }
+    const before = choose(snapshots, snapshots.length - 2);
+    const after = choose(snapshots, snapshots.length - 1);
+    const go = el("button", null, "Compare");
+    go.type = "button";
+    go.addEventListener("click", function () {
+      lookup("compare", "api/compare?before=" + encodeURIComponent(before.value) +
+        "&after=" + encodeURIComponent(after.value), renderComparison);
+    });
+    fill("compare-form", labelled("Before", before), labelled("After", after), go);
+  }
+  const FAILURES = {
+    compare: { gone: "A selected snapshot is no longer held by the host.",
+      unsupported: "This host does not provide comparisons." },
+    plan: { gone: "No plan with this ID is registered on the host.",
+      unsupported: "This host does not provide check plans." },
+  };
+  function failure(kind, doc) {
+    const text = (FAILURES[kind] || {})[doc.reason] ||
+      (doc.reason === "viewer_busy" ? "The viewer is busy with other lookups. Try again." : null);
+    const box = el("p");
+    box.append(badge("Failed", doc.reason), el("span", "error", text ? " " + text : ""),
+      el("span", "note", " at " + time(doc.at_unix_ms)));
+    return box;
+  }
+  async function lookup(kind, url, render) {
+    fill(kind, el("p", "note", "Asking the host…"));
+    try {
+      const reply = await fetch(url, { cache: "no-store" });
+      const doc = await reply.json();
+      if (!reply.ok || doc.schema !== "dot_logger.viewer.request.v1" || doc.request !== kind) {
+        throw new Error("bad reply");
+      }
+      if (doc.outcome !== "ok") fill(kind, failure(kind, doc));
+      else fill(kind, ...render(doc.report, doc.at_unix_ms));
+    } catch (error) {
+      fill(kind, badge("Failed", "viewer unreachable"));
+    }
+  }
+  function change(name, c) {
+    const row = el("tr");
+    row.append(el("th", null, name));
+    const state = el("td");
+    state.append(badge(c && c.state, c && c.state === "Unavailable" ? c.reason : null));
+    row.append(state);
+    if (!c || c.state === "Unavailable") {
+      row.append(el("td", "absent", "—"), el("td", "absent", "—"), el("td"));
+      return row;
+    }
+    const origin = c.profile_id ? "profile " + c.profile_id
+      : c.assumptions ? "assumptions " + c.assumptions : c.basis ? "basis " + c.basis : "";
+    const value = el("td", "num", difference(name, c));
+    value.title = "exact: " + c.numerator + " / " + c.denominator;
+    row.append(el("td", null, c.direction), value, el("td", "note", origin));
+    return row;
+  }
+  // The exact magnitude of after minus before is numerator/denominator, with
+  // time in nanoseconds. Rates are shown per second; others in their unit.
+  function difference(name, c) {
+    if (!/^[0-9]+$/.test(c.numerator) || !/^[1-9][0-9]*$/.test(c.denominator)) return "—";
+    const sign = c.direction === "Increase" ? "+" : c.direction === "Decrease" ? "−" : "";
+    const perSecond = name.endsWith("_rate") && name !== "cpu_rate";
+    if (name === "cpu_rate") return sign + c.numerator + " / " + c.denominator;
+    const scale = perSecond ? 1000000000n : 1n;
+    const thousandths = BigInt(c.numerator) * scale * 1000n / BigInt(c.denominator);
+    const text = (thousandths / 1000n).toString() + "." +
+      (thousandths % 1000n).toString().padStart(3, "0");
+    const unit = name === "accepted_bytes_rate" ? " B/s" : perSecond ? " /s"
+      : name === "latency_ns" ? " ns" : name === "memory_bytes" ? " B" : "";
+    return sign + text + unit;
+  }
+  function side(s, key) {
+    if (!s) return undefined;
+    if (key === "window") return ns(s.from_ns) + " → " + ns(s.to_ns);
+    const value = key in s ? s[key] : (s.conditions || {})[key];
+    return value === undefined || value === null ? undefined : String(value);
+  }
+  function renderComparison(report, at) {
+    const head = el("p");
+    head.append(report.comparable === true ? badge("Observed", "comparable")
+      : badge("Unavailable", "not comparable"), el("span", "note", " at " + time(at)));
+    const differs = Object.keys(report.differences || {})
+      .filter(function (k) { return report.differences[k] === true; });
+    const conditions = el("p", differs.length ? "error" : "note", differs.length
+      ? "Conditions differ: " + differs.join(", ") + "."
+      : "No condition differences.");
+    const sides = el("table");
+    const top = el("tr");
+    top.append(el("th"), el("th", null, "before"), el("th", null, "after"));
+    sides.append(top);
+    for (const [key, name] of SIDES) {
+      const a = side(report.before, key);
+      const b = side(report.after, key);
+      const row = el("tr");
+      const cls = a !== b ? "differs" : null;
+      row.append(el("th", null, name), el("td", cls, a === undefined ? "—" : a),
+        el("td", cls, b === undefined ? "—" : b));
+      sides.append(row);
+    }
+    const changes = el("table");
+    const header = el("tr");
+    for (const name of ["change", "state", "direction", "after − before", "source"]) {
+      header.append(el("th", null, name));
+    }
+    changes.append(header);
+    for (const name of CHANGES) changes.append(change(name, (report.changes || {})[name]));
+    const grid = el("div", "stack");
+    const left = el("div", "card");
+    left.append(el("h3", null, "Snapshots"), sides);
+    const right = el("div", "card");
+    right.append(el("h3", null, "Changes"), changes);
+    grid.append(left, right);
+    return [head, conditions, grid];
+  }
+  function renderPlan(report, at) {
+    const head = el("p");
+    head.append(badge("Pending", "preview only, not run"), el("span", "note", " at " + time(at)));
+    const list = el("dl");
+    for (const key of Object.keys(report)) {
+      if (key === "schema" || key === "kind") continue;
+      const value = report[key];
+      pairs(list, [[key, value === null ? "none"
+        : typeof value === "object" ? JSON.stringify(value) : String(value)]]);
+    }
+    return [head, list, el("p", "note",
+      "Running a check uses the CLI: dot-logger check run --plan " + report.plan +
+      " (Manage permission).")];
+  }
+  document.getElementById("plan-go").addEventListener("click", function () {
+    const id = document.getElementById("plan-id").value.trim();
+    if (!/^[0-9]+$/.test(id)) {
+      fill("plan", el("p", "error", "Enter a plan ID (digits only)."));
+      return;
+    }
+    lookup("plan", "api/plan?id=" + id, renderPlan);
+  });
 
   let latest = null;
   async function refresh() {

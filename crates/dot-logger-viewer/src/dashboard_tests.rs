@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used)]
 //! TASK-032 S2: the dashboard status contract and its loopback HTTP boundary.
 
-use crate::dashboard::{self, Status};
+use crate::dashboard::{self, Query, Status};
 use dot_logger::adapters::remote::{
     ManagementReply, ManagementRequest, RemoteError, RemoteHub, RemoteLimits, RemoteServer,
     ServerConfig,
@@ -316,5 +316,230 @@ async fn http_status_follows_the_actual_host_reply_and_keeps_it_after_a_failure(
     .await;
     assert_eq!(gone["last"]["metrics"], unobserved());
     stop.send(()).unwrap();
+    drop((inbox, hub));
+}
+
+// ---- S3: read-only Compare and PlanCheck lookups ----
+
+fn compared() -> Value {
+    json!({"schema":"dot_logger.compare.v1","comparable":false,
+        "before":{"id":"1"},"after":{"id":"2"},
+        "differences":{"environment":true},
+        "changes":{"accepted_rate":{"state":"Unavailable","reason":"NotComparable"}}})
+}
+
+fn planned() -> Value {
+    json!({"schema":"dot_logger.check.v1","kind":"plan","plan":"7","capability":"Unprobed"})
+}
+
+fn report(value: &Value) -> ManagementReply {
+    ManagementReply::Report(value.to_string().into_bytes())
+}
+
+#[test]
+fn lookups_pass_reports_through_and_name_every_failure() {
+    let ok = Query::Compare.json(5, Ok(report(&compared())));
+    assert_eq!(ok["schema"], "dot_logger.viewer.request.v1");
+    assert_eq!(ok["request"], "compare");
+    assert_eq!(ok["at_unix_ms"], 5);
+    assert_eq!(ok["outcome"], "ok");
+    assert_eq!(ok["report"], compared());
+    assert!(ok.get("reason").is_none());
+    let plan = Query::Plan.json(6, Ok(report(&planned())));
+    assert_eq!(
+        (plan["request"].clone(), plan["report"].clone()),
+        (json!("plan"), planned())
+    );
+    for (query, outcome, reason) in [
+        (
+            Query::Compare,
+            Err(ClientError::Remote(RemoteError::Gone)),
+            "gone",
+        ),
+        (
+            Query::Plan,
+            Err(ClientError::Remote(RemoteError::Unsupported)),
+            "unsupported",
+        ),
+        (
+            Query::Plan,
+            Err(ClientError::Remote(RemoteError::PermissionDenied)),
+            "permission_denied",
+        ),
+        // A report with another schema, or a check result instead of a plan.
+        (Query::Compare, Ok(report(&planned())), "corrupt"),
+        (
+            Query::Plan,
+            Ok(report(
+                &json!({"schema":"dot_logger.check.v1","kind":"result"}),
+            )),
+            "corrupt",
+        ),
+        (Query::Plan, Ok(ManagementReply::Applied(1)), "corrupt"),
+    ] {
+        let failed = query.json(9, outcome);
+        assert_eq!(failed["outcome"], "failed", "{reason}");
+        assert_eq!(failed["reason"], reason);
+        assert!(
+            failed.get("report").is_none(),
+            "{reason}: no partial report"
+        );
+    }
+}
+
+#[tokio::test]
+async fn lookup_paths_reject_malformed_ids_before_asking_the_upstream() {
+    let closed = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let unreachable = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let (address, stop) = start(RemoteConfig::new(unreachable)).await;
+    let host = address.to_string();
+    for path in [
+        "/api/compare",
+        "/api/compare?before=1",
+        "/api/compare?before=1&after=x",
+        "/api/compare?before=-1&after=2",
+        "/api/compare?before=1&after=2&before=3",
+        "/api/plan",
+        "/api/plan?id=",
+        "/api/plan?id=18446744073709551616",
+    ] {
+        let (head, _) = exchange(address, &get(path, &host, "")).await;
+        assert!(head.starts_with("http/1.1 400"), "{path}: {head}");
+    }
+    // A well-formed lookup to an unreachable upstream is a named failure.
+    let (head, body) = exchange(address, &get("/api/plan?id=7", &host, "")).await;
+    assert!(head.starts_with("http/1.1 200"), "{head}");
+    assert!(head.contains("cache-control: no-store"), "{head}");
+    let value: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(value["outcome"], "failed");
+    assert!(value["reason"].is_string());
+    stop.send(()).unwrap();
+}
+
+#[tokio::test]
+async fn lookups_share_the_single_upstream_request_slot_with_status_polling() {
+    let budget = crate::tests::budget();
+    let (hub, mut inbox) = RemoteHub::new(
+        &budget,
+        RemoteLimits {
+            connections: 2,
+            subscriptions: 1,
+            commands: 4,
+            message_bytes: 32 * 1024,
+            record_bytes: 1024,
+            subscription_records: 1,
+            subscription_bytes: 1024,
+            max_age: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(3),
+        },
+    )
+    .unwrap();
+    let server = RemoteServer::bind(
+        ServerConfig {
+            enabled: true,
+            address: "127.0.0.1:0".parse().unwrap(),
+            ..ServerConfig::default()
+        },
+        hub.clone(),
+    )
+    .await
+    .unwrap();
+    let upstream = format!("http://{}", server.local_addr().unwrap());
+    let (server_stop, server_stopped) = oneshot::channel::<()>();
+    let served = tokio::spawn(server.serve(async {
+        let _ = server_stopped.await;
+    }));
+    let (address, stop) = start(RemoteConfig::new(upstream)).await;
+    let host = address.to_string();
+
+    async fn next(
+        inbox: &mut dot_logger::adapters::remote::CommandInbox,
+    ) -> dot_logger::adapters::remote::Command {
+        timeout(WAIT, async {
+            loop {
+                if let Some(command) = inbox.try_next() {
+                    return command;
+                }
+                sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .unwrap()
+    }
+    // Hold the first GetStatus while the browser asks for a comparison: no
+    // second upstream request may start until it is answered.
+    let first = next(&mut inbox).await;
+    assert!(matches!(first.request(), ManagementRequest::GetStatus));
+    let lookup = tokio::spawn(exchange(
+        address,
+        get("/api/compare?before=1&after=2", &host, "").leak(),
+    ));
+    sleep(Duration::from_millis(300)).await;
+    assert!(
+        inbox.try_next().is_none(),
+        "a second upstream request started"
+    );
+    first.respond(Ok(reply(&unobserved())));
+    // Status polls may come first; the comparison must follow within WAIT.
+    let compare = timeout(WAIT, async {
+        loop {
+            let command = next(&mut inbox).await;
+            if !matches!(command.request(), ManagementRequest::GetStatus) {
+                return command;
+            }
+            command.respond(Ok(reply(&unobserved())));
+        }
+    })
+    .await
+    .unwrap();
+    assert!(matches!(
+        compare.request(),
+        ManagementRequest::Compare {
+            before: 1,
+            after: 2
+        }
+    ));
+    compare.respond(Ok(report(&compared())));
+    let (head, body) = timeout(WAIT, lookup).await.unwrap().unwrap();
+    assert!(head.starts_with("http/1.1 200"), "{head}");
+    let value: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(value["outcome"], "ok");
+    assert_eq!(value["report"], compared());
+
+    // A host without plans: Unsupported is a named failure, and the
+    // connection stays usable for the next lookup.
+    let host_task = tokio::spawn(async move {
+        let mut plans = 0;
+        while plans < 2 {
+            let command = next(&mut inbox).await;
+            match command.request() {
+                ManagementRequest::GetStatus => command.respond(Ok(reply(&unobserved()))),
+                ManagementRequest::PlanCheck { plan: 7 } => {
+                    plans += 1;
+                    command.respond(if plans == 1 {
+                        Err(RemoteError::Unsupported)
+                    } else {
+                        Ok(report(&planned()))
+                    });
+                }
+                _ => panic!("only status and plan lookups are expected"),
+            }
+        }
+        inbox
+    });
+    let (_, body) = exchange(address, &get("/api/plan?id=7", &host, "")).await;
+    let value: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        (value["outcome"].clone(), value["reason"].clone()),
+        (json!("failed"), json!("unsupported"))
+    );
+    let (_, body) = exchange(address, &get("/api/plan?id=7", &host, "")).await;
+    let value: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(value["report"], planned());
+    let inbox = timeout(WAIT, host_task).await.unwrap().unwrap();
+    stop.send(()).unwrap();
+    server_stop.send(()).unwrap();
+    served.await.unwrap().unwrap();
     drop((inbox, hub));
 }

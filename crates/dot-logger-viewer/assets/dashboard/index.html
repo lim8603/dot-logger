@@ -17,6 +17,19 @@
   <section><h2>Latest sample</h2><div id="latest"></div></section>
   <section><h2>Windows</h2><div id="windows" class="cards"></div></section>
   <section><h2>Snapshots</h2><div id="snapshots"></div></section>
+  <section>
+    <h2>Compare snapshots</h2>
+    <div id="compare-form" class="controls"></div>
+    <div id="compare" aria-live="polite"></div>
+  </section>
+  <section>
+    <h2>Check plan preview</h2>
+    <div class="controls">
+      <label>Plan ID <input id="plan-id" inputmode="numeric" autocomplete="off" size="12"></label>
+      <button id="plan-go" type="button">Preview</button>
+    </div>
+    <div id="plan" aria-live="polite"></div>
+  </section>
 </main>
 <footer>Read-only. Change configuration or run checks with the dot-logger CLI.</footer>
 <script src="dashboard.js"></script>

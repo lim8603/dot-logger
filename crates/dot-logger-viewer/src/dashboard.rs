@@ -1,10 +1,11 @@
 //! Read-only operations dashboard over loopback HTTP (ADR-016).
 //!
-//! One poller asks the upstream for `GetStatus` at most once per second, one
-//! request at a time, and keeps the last successful report next to the latest
-//! failure. A small HTTP/1.1 responder answers bounded GET requests for the
-//! embedded page and the status JSON, one request per connection. The upstream
-//! credential stays in this process.
+//! One upstream worker owns the connection and sends one request at a time:
+//! `GetStatus` at most once per second, and the page's read-only `Compare` and
+//! `PlanCheck` lookups from a bounded queue. It keeps the last successful
+//! status next to the latest failure. A small HTTP/1.1 responder answers
+//! bounded GET requests for the embedded page and the JSON documents, one
+//! request per connection. The upstream credential stays in this process.
 
 use crate::websocket::local_origin;
 use dot_logger::adapters::remote::{ManagementReply, ManagementRequest, RemoteError};
@@ -19,12 +20,19 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
+    sync::{mpsc, oneshot},
     time::{MissedTickBehavior, timeout},
 };
 
 /// Schema of the viewer's own status document.
 pub const SCHEMA: &str = "dot_logger.viewer.dashboard.v1";
+/// Schema of one read-only lookup reply.
+pub const REQUEST_SCHEMA: &str = "dot_logger.viewer.request.v1";
 const STATUS_SCHEMA: &str = "dot_logger.status.v1";
+const COMPARE_SCHEMA: &str = "dot_logger.compare.v1";
+const CHECK_SCHEMA: &str = "dot_logger.check.v1";
+// Queued page lookups; a full queue answers viewer_busy.
+const JOBS: usize = 4;
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 const HTTP_CLIENTS: usize = 8;
 const HEAD_BYTES: usize = 8 * 1024;
@@ -39,6 +47,69 @@ const STYLE: &[u8] = include_bytes!("../assets/dashboard/dashboard.css");
 const POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; \
     connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; \
     frame-ancestors 'none'";
+
+/// A read-only lookup the page may ask for. Running a check or changing the
+/// configuration is not offered (ADR-016).
+#[derive(Clone, Copy)]
+pub enum Query {
+    /// `Compare` of two held snapshots (`dot_logger.compare.v1`).
+    Compare,
+    /// `PlanCheck` preview of a registered plan (`dot_logger.check.v1` plan).
+    Plan,
+}
+
+impl Query {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Compare => "compare",
+            Self::Plan => "plan",
+        }
+    }
+
+    /// The `dot_logger.viewer.request.v1` document for one outcome at `at`
+    /// (Unix milliseconds). The host report passes through unchanged; a
+    /// failure carries its reason and no partial report.
+    pub fn json(self, at: u64, outcome: Result<ManagementReply, ClientError>) -> Value {
+        self.document(
+            at,
+            outcome.map_err(reason).and_then(|reply| self.report(reply)),
+        )
+    }
+
+    fn document(self, at: u64, result: Result<Value, &'static str>) -> Value {
+        let mut document = json!({
+            "schema": REQUEST_SCHEMA, "request": self.name(), "at_unix_ms": at,
+        });
+        match result {
+            Ok(report) => {
+                document["outcome"] = json!("ok");
+                document["report"] = report;
+            }
+            Err(reason) => {
+                document["outcome"] = json!("failed");
+                document["reason"] = json!(reason);
+            }
+        }
+        document
+    }
+
+    fn report(self, reply: ManagementReply) -> Result<Value, &'static str> {
+        let ManagementReply::Report(bytes) = reply else {
+            return Err("corrupt");
+        };
+        let report: Value = serde_json::from_slice(&bytes).map_err(|_| "corrupt")?;
+        let expected = match self {
+            Self::Compare => report["schema"] == COMPARE_SCHEMA,
+            Self::Plan => report["schema"] == CHECK_SCHEMA && report["kind"] == "plan",
+        };
+        if expected { Ok(report) } else { Err("corrupt") }
+    }
+}
+
+struct Job {
+    request: ManagementRequest,
+    reply: oneshot::Sender<Result<ManagementReply, ClientError>>,
+}
 
 /// Last successful upstream status and the latest failure. They are kept
 /// apart, so a failure never erases or zeroes the value it follows.
@@ -187,57 +258,104 @@ pub async fn serve(
 ) -> io::Result<()> {
     let port = listener.local_addr()?.port();
     let status = Arc::new(Mutex::new(Status::new(&upstream.endpoint)));
-    let poller = tokio::spawn(poll(status.clone(), upstream));
-    let allow_origin = Arc::new(allow_origin);
+    // A lookup may wait behind a status request and the queued lookups.
+    let deadline = upstream.timeout.saturating_mul(JOBS as u32 + 2);
+    let (jobs, queue) = mpsc::channel(JOBS);
+    let worker = tokio::spawn(work(status.clone(), upstream, queue));
+    let shared = Arc::new(Shared {
+        status,
+        jobs,
+        deadline,
+        port,
+        allow_origin,
+    });
     let result = crate::listen(&listener, HTTP_CLIENTS, stop, |socket| {
-        respond(socket, status.clone(), port, allow_origin.clone())
+        respond(socket, shared.clone())
     })
     .await;
-    poller.abort();
+    worker.abort();
     result
 }
 
-// One GetStatus at a time, at most once per interval. Any failure drops the
-// connection; the next attempt reconnects.
-async fn poll(status: Arc<Mutex<Status>>, upstream: RemoteConfig) {
+struct Shared {
+    status: Arc<Mutex<Status>>,
+    jobs: mpsc::Sender<Job>,
+    deadline: Duration,
+    port: u16,
+    allow_origin: Option<String>,
+}
+
+// The only upstream user: one request at a time, GetStatus at most once per
+// interval and queued lookups in between.
+async fn work(status: Arc<Mutex<Status>>, upstream: RemoteConfig, mut queue: mpsc::Receiver<Job>) {
     let cancel = Cancellation::new();
     let mut client: Option<RemoteClient> = None;
     let mut tick = tokio::time::interval(POLL_INTERVAL);
     tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
     loop {
-        tick.tick().await;
-        if client.is_none() {
-            match RemoteClient::connect(upstream.clone(), &cancel).await {
-                Ok(connected) => client = Some(connected),
-                Err(error) => {
-                    lock(&status).record(now_ms(), Err(error));
-                    continue;
-                }
-            }
-        }
-        let Some(connected) = client.as_mut() else {
-            continue;
+        let (request, reply) = tokio::select! {
+            _ = tick.tick() => (ManagementRequest::GetStatus, None),
+            Some(job) = queue.recv() => (job.request, Some(job.reply)),
         };
-        let outcome = connected
-            .request(ManagementRequest::GetStatus, &cancel)
-            .await;
-        if outcome.is_err() {
-            if let Some(mut failed) = client.take() {
-                failed.disconnect();
+        let outcome = ask(&mut client, &upstream, &cancel, request).await;
+        match reply {
+            None => lock(&status).record(now_ms(), outcome),
+            Some(reply) => {
+                let _ = reply.send(outcome);
             }
         }
-        lock(&status).record(now_ms(), outcome);
     }
 }
 
-async fn respond(
-    mut socket: TcpStream,
-    status: Arc<Mutex<Status>>,
-    port: u16,
-    allow_origin: Arc<Option<String>>,
-) {
+// Connect when needed; a transport-level failure drops the connection so the
+// next request reconnects. Host answers such as Gone keep it.
+async fn ask(
+    client: &mut Option<RemoteClient>,
+    upstream: &RemoteConfig,
+    cancel: &Cancellation,
+    request: ManagementRequest,
+) -> Result<ManagementReply, ClientError> {
+    if client.is_none() {
+        *client = Some(RemoteClient::connect(upstream.clone(), cancel).await?);
+    }
+    let connected = client.as_mut().ok_or(ClientError::Disconnected)?;
+    let outcome = connected.request(request, cancel).await;
+    if outcome.as_ref().is_err_and(broken) {
+        if let Some(mut failed) = client.take() {
+            failed.disconnect();
+        }
+    }
+    outcome
+}
+
+fn broken(error: &ClientError) -> bool {
+    !matches!(
+        error,
+        ClientError::Remote(
+            RemoteError::InvalidInput
+                | RemoteError::Limit
+                | RemoteError::PermissionDenied
+                | RemoteError::Disabled
+                | RemoteError::Gone
+                | RemoteError::Unsupported
+                | RemoteError::Conflict
+                | RemoteError::Busy
+                | RemoteError::RestartRequired
+        )
+    )
+}
+
+enum Answer {
+    Now(Vec<u8>),
+    Ask(Query, ManagementRequest),
+}
+
+async fn respond(mut socket: TcpStream, shared: Arc<Shared>) {
     let response = match timeout(HEAD_DEADLINE, read_head(&mut socket)).await {
-        Ok(Ok(head)) => route(&head, &status, port, allow_origin.as_deref()),
+        Ok(Ok(head)) => match route(&head, &shared) {
+            Answer::Now(response) => response,
+            Answer::Ask(query, request) => lookup(&shared, query, request).await,
+        },
         Ok(Err(code)) => rejection(code),
         Err(_) => return,
     };
@@ -282,7 +400,22 @@ async fn read_head(socket: &mut TcpStream) -> Result<Vec<u8>, u16> {
     }
 }
 
-fn route(head: &[u8], status: &Mutex<Status>, port: u16, allow_origin: Option<&str>) -> Vec<u8> {
+async fn lookup(shared: &Shared, query: Query, request: ManagementRequest) -> Vec<u8> {
+    let (reply, answer) = oneshot::channel();
+    let document = if shared.jobs.try_send(Job { request, reply }).is_err() {
+        query.document(now_ms(), Err("viewer_busy"))
+    } else {
+        match timeout(shared.deadline, answer).await {
+            Ok(Ok(outcome)) => query.json(now_ms(), outcome),
+            Ok(Err(_)) => query.document(now_ms(), Err("viewer_stopped")),
+            Err(_) => query.document(now_ms(), Err("timed_out")),
+        }
+    };
+    ok("application/json", document.to_string().as_bytes())
+}
+
+fn route(head: &[u8], shared: &Shared) -> Answer {
+    let rejection = |code| Answer::Now(rejection(code));
     let mut headers = [httparse::EMPTY_HEADER; MAX_HEADERS];
     let mut request = httparse::Request::new(&mut headers);
     let Ok(httparse::Status::Complete(_)) = request.parse(head) else {
@@ -299,7 +432,7 @@ fn route(head: &[u8], status: &Mutex<Status>, port: u16, allow_origin: Option<&s
     let [Some(host)] = hosts.as_slice() else {
         return rejection(400);
     };
-    match loopback_host(host, port) {
+    match loopback_host(host, shared.port) {
         None => return rejection(400),
         Some(false) => return rejection(403),
         Some(true) => {}
@@ -307,7 +440,8 @@ fn route(head: &[u8], status: &Mutex<Status>, port: u16, allow_origin: Option<&s
     let origins: Vec<_> = values("origin").collect();
     match origins.as_slice() {
         [] => {}
-        [Some(origin)] if Some(*origin) == allow_origin || local_origin(origin) => {}
+        [Some(origin)]
+            if Some(*origin) == shared.allow_origin.as_deref() || local_origin(origin) => {}
         _ => return rejection(403),
     }
     if values("transfer-encoding").next().is_some()
@@ -315,17 +449,46 @@ fn route(head: &[u8], status: &Mutex<Status>, port: u16, allow_origin: Option<&s
     {
         return rejection(400);
     }
-    let path = target.split_once('?').map_or(target, |(path, _)| path);
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    let now = |content_type, body: &[u8]| Answer::Now(ok(content_type, body));
     match path {
-        "/" => ok("text/html; charset=utf-8", INDEX),
-        "/dashboard.js" => ok("text/javascript; charset=utf-8", SCRIPT),
-        "/dashboard.css" => ok("text/css; charset=utf-8", STYLE),
+        "/" => now("text/html; charset=utf-8", INDEX),
+        "/dashboard.js" => now("text/javascript; charset=utf-8", SCRIPT),
+        "/dashboard.css" => now("text/css; charset=utf-8", STYLE),
         "/api/status" => {
-            let body = lock(status).json(now_ms()).to_string();
-            ok("application/json", body.as_bytes())
+            let body = lock(&shared.status).json(now_ms()).to_string();
+            now("application/json", body.as_bytes())
         }
+        "/api/compare" => match ids(query, ["before", "after"]) {
+            Some([before, after]) => {
+                Answer::Ask(Query::Compare, ManagementRequest::Compare { before, after })
+            }
+            None => rejection(400),
+        },
+        "/api/plan" => match ids(query, ["id"]) {
+            Some([plan]) => Answer::Ask(Query::Plan, ManagementRequest::PlanCheck { plan }),
+            None => rejection(400),
+        },
         _ => rejection(404),
     }
+}
+
+// Exactly the named decimal u64 parameters, each once, and nothing else.
+fn ids<const N: usize>(query: &str, names: [&str; N]) -> Option<[u64; N]> {
+    let mut found = [None; N];
+    for pair in query.split('&') {
+        let (name, value) = pair.split_once('=')?;
+        let slot = found.get_mut(names.iter().position(|n| *n == name)?)?;
+        if slot.is_some() || value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        *slot = Some(value.parse().ok()?);
+    }
+    let mut ids = [0; N];
+    for (id, value) in ids.iter_mut().zip(found) {
+        *id = value?;
+    }
+    Some(ids)
 }
 
 // Every value of one header; None for a value that is not UTF-8.

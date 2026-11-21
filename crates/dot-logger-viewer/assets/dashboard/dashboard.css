@@ -27,12 +27,15 @@ dt { color: var(--muted); }
 dd { margin: 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 table { border-collapse: collapse; font-variant-numeric: tabular-nums; width: 100%; }
 th, td { text-align: left; padding: 2px 10px 2px 0; border-bottom: 1px solid var(--line); }
-td.num { text-align: right; font-family: ui-monospace, monospace; }
+td { overflow-wrap: anywhere; }
+td.num { text-align: right; font-family: ui-monospace, monospace; white-space: nowrap; }
+th { white-space: nowrap; }
 td.absent { color: var(--muted); }
 tr.bad td.num { color: var(--failed); font-weight: 600; }
 tr.unknown td.num { color: var(--unknown); font-weight: 600; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .card { border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.stack { display: grid; gap: 12px; }
 .badge { display: inline-block; padding: 0 6px; border-radius: 4px; color: #fff;
   font-size: 12px; font-weight: 600; margin-right: 6px; }
 .badge.observed { background: var(--observed); }
@@ -43,6 +46,12 @@ tr.unknown td.num { color: var(--unknown); font-weight: 600; }
 .badge.failed, .badge.saturated { background: var(--failed); }
 .badge.pending { background: var(--muted); }
 .note { color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
+.controls label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+select, input, button { font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
+button { cursor: pointer; }
+td.differs { color: var(--stale); font-weight: 600; }
 .notice { margin: 0; padding: 8px 12px; border-left: 4px solid var(--failed);
   background: var(--panel); }
 .error { color: var(--failed); }

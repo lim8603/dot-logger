@@ -363,7 +363,27 @@ pub fn linux_available_bytes(path: &Path) -> io::Result<u64> {
         Err(io::ErrorKind::Unsupported.into())
     }
 }
-#[cfg(target_os = "linux")]
+/// Fresh free space for an unprivileged writer below `path`, on every
+/// supported OS: `statvfs` on Unix (Linux and macOS), `GetDiskFreeSpaceExW`
+/// through `fs4` on Windows. Other platforms return Unsupported, never zero
+/// or infinite capacity. A snapshot, not a quota reservation.
+pub fn available_bytes(path: &Path) -> io::Result<u64> {
+    #[cfg(unix)]
+    {
+        let s = rustix::fs::statvfs(path)?;
+        space_bytes(s.f_bavail, s.f_frsize, s.f_blocks)
+    }
+    #[cfg(windows)]
+    {
+        fs4::available_space(path)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        Err(io::ErrorKind::Unsupported.into())
+    }
+}
+#[cfg(unix)]
 fn space_bytes(available: u64, fragment: u64, total: u64) -> io::Result<u64> {
     // Reject impossible/wrapped filesystem counters rather than treating them
     // as enormous free space. Fragment size is the statvfs block-count unit.
@@ -373,6 +393,26 @@ fn space_bytes(available: u64, fragment: u64, total: u64) -> io::Result<u64> {
     available
         .checked_mul(fragment)
         .ok_or_else(|| io::ErrorKind::InvalidData.into())
+}
+#[cfg(all(test, any(unix, windows)))]
+#[allow(clippy::unwrap_used)]
+mod portable_tests {
+    #[test]
+    fn available_bytes_reads_an_existing_directory_and_rejects_a_missing_one() {
+        let dir = std::env::temp_dir();
+        let free = super::available_bytes(&dir).unwrap();
+        assert!(
+            free > 0,
+            "a writable temp directory reports some free space"
+        );
+        assert!(super::available_bytes(&dir.join("dot-logger-no-such-dir/x")).is_err());
+        #[cfg(target_os = "linux")]
+        {
+            // Same statvfs source as the Linux-only probe, within ongoing writes.
+            let linux = super::linux_available_bytes(&dir).unwrap();
+            assert!(free.abs_diff(linux) < 1 << 30);
+        }
+    }
 }
 #[cfg(all(test, target_os = "linux"))]
 #[allow(clippy::unwrap_used)]

@@ -11,7 +11,9 @@ mod file;
 mod host;
 mod routed;
 mod run;
-pub use host::{CheckEvidence, CheckHost, CheckSource, HostError, linux_available_bytes};
+pub use host::{
+    CheckEvidence, CheckHost, CheckSource, HostError, available_bytes, linux_available_bytes,
+};
 pub use routed::{HostCheckEvidence, RoutedCheckBackend, RoutedCheckEvidence, RoutedCheckReport};
 pub use run::{
     CheckIssue, CheckOutcome, CheckReport, CheckRuntime, CheckStage, CheckStartError, CheckStop,

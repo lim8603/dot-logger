@@ -29,9 +29,16 @@ tracing = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 subtle = { workspace = true, optional = true }
 
+# File-output free space on every Unix (statvfs); Linux also places worker
+# threads (`thread`: sched_{get,set}affinity).
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
 [target.'cfg(target_os = "linux")'.dependencies]
-# `thread`: optional facade worker CPU placement (sched_{get,set}affinity).
 rustix = { workspace = true, features = ["thread"] }
+
+[target.'cfg(windows)'.dependencies]
+fs4.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

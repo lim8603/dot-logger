@@ -17,7 +17,7 @@ use crate::control::{
     ControlConfig, ControlOwner, ShutdownPlan, ShutdownPoll, ShutdownReport, SyncResult, SyncToken,
     SyncWork,
 };
-use crate::diagnostics::linux_available_bytes;
+use crate::diagnostics::available_bytes;
 use crate::platform::Requirement;
 use crate::routing::{Delivery, Router, RoutingConfig, TargetConsumer};
 use crate::storage::{
@@ -327,7 +327,7 @@ fn open_logs(
             let target = u32::try_from(index + 1).map_err(|_| StartError::InvalidBudget)?;
             let budget = router.writer_budget(target)?;
             let probe_path = base.clone();
-            let probe: Probe = Box::new(move || linux_available_bytes(&probe_path));
+            let probe: Probe = Box::new(move || available_bytes(&probe_path));
             let store = FileStore::new(base, &budget, probe).map_err(StartError::Io)?;
             directories.push(store.directory().to_path_buf());
             logs.push(SegmentLog::new(

@@ -27,8 +27,12 @@ pub trait SegmentStore {
 }
 /// Standard filesystem store in a fresh system-named session/target directory.
 /// The host supplies an actual free-space probe; there is no invented capacity.
-/// This adapter currently requires Unix directory synchronization. Other hosts
-/// can implement SegmentStore with their own capability-aware primitives.
+/// On Unix, directory entries are made durable with a directory fsync. On
+/// Windows, which cannot open a directory for flushing through std, file
+/// contents are still flushed and directory entries rely on NTFS metadata
+/// journaling: after a crash a rename is either present or absent, and
+/// recovery reads `.active` files either way. Other hosts can implement
+/// SegmentStore with their own capability-aware primitives.
 pub struct FileStore<F: FnMut() -> io::Result<u64>> {
     directory: PathBuf,
     free: F,
@@ -38,7 +42,13 @@ fn sync_dir(path: &Path) -> io::Result<()> {
     {
         std::fs::File::open(path)?.sync_all()
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        // No std primitive flushes a directory; NTFS journals the entry.
+        let _ = path;
+        Ok(())
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = path;
         Err(io::ErrorKind::Unsupported.into())
@@ -53,7 +63,7 @@ impl<F: FnMut() -> io::Result<u64>> FileStore<F> {
     /// The host must keep the trusted base and session namespace exclusively
     /// controlled during use; this check does not prevent concurrent path replacement.
     pub fn new(base: &Path, budget: &WriterBudget, free: F) -> io::Result<Self> {
-        if !cfg!(unix) {
+        if !cfg!(any(unix, windows)) {
             return Err(io::ErrorKind::Unsupported.into());
         }
         let session = base.join(format!("{:032x}", budget.session));
@@ -79,7 +89,7 @@ impl<F: FnMut() -> io::Result<u64>> FileStore<F> {
 impl<F: FnMut() -> io::Result<u64>> SegmentStore for FileStore<F> {
     type Sink = std::fs::File;
     fn directory_sync_supported(&self) -> bool {
-        cfg!(unix)
+        cfg!(any(unix, windows))
     }
     fn available_bytes(&mut self) -> io::Result<u64> {
         (self.free)()

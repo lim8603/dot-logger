@@ -1819,6 +1819,14 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **결과: 6/6 Pass.** 모든 회차에서 kill 시점에 자식이 살아 있었고(3,000 ms), 생산자 정지 18~40 ms, `shutdown` 성공 확인 41~63 ms(예산 2,759~2,781 ms). 경보 전 수락 기록 59,900~434,800건(제어)·150~900건(프레임)이 누락·중복·손상 0으로 모두 파일에 있었다. 파일 4~27개, 읽기 실패·잘린 파일 0, 손실 보고 23~144개에서 0이 아닌 행 0. 거절 0, 제어 루프 deadline miss 0, 최악 응답 673~1,082 µs(기한 10 ms).
 - **판정에 쓰는 범위:** 외부 경보 뒤 3초 안에 facade가 수락 기록 전부를 파일에 쓰고 동기화를 마치며, 그 뒤의 강제 종료가 그 기록을 해치지 않는다는 근거. SIGKILL은 OS 페이지 캐시를 버리지 않으므로 물리 전원 소실 내구성은 관측하지 않았다(`shutdown` 성공은 fsync 완료를 뜻하지만 디스크 캐시·전원 동작은 장비별이다, ADR-011 A-4). 고급 경로의 순위별 `notify_power`는 EV-043 범위에 그대로 있다. 원시 결과는 이 PC `/home/lim8603/s3-data/power-2026-11-22/power.jsonl`.
 
+### EV-119 — TASK-024 S1 OS 간 파일 교환(Linux·Windows·macOS)
+
+- **대상:** `crates/dot-logger/examples/os_exchange.rs`(`4ee4996`)와 CI `exchange-write`·`exchange-read`(Rust 1.96.0, release). 수정 커밋 `9f687dd`·`ad11ba3` 위의 run `44987267000`(2026-11-22 04:57~05:38 UTC).
+- **기록 세트:** facade로 두 채널 — `exchange/fixed`(256 B, schema id·version 3, `jsonschema` descriptor 포함, Info, Normal) 30,000건, `exchange/blob`([u8] 512~4,096 B, Warn, Important) 10,000건. 시계는 고정값(mono·real 모두 쓰기 순서에서 계산)이라 세 OS가 같은 내용을 쓴다. 회전으로 OS마다 파일 4개.
+- **결과: 9/9 Pass.** 세 OS가 각각 쓰고(4개 파일, 40,000건), 세 OS 각각이 세 OS의 출력 모두를 `NativeReader`로 기록 단위 대조했다 — 채널 등록(topic·schema id/version·encoding·descriptor·이름), payload 바이트, mono/real 시계, level, importance, session, 중복·누락 0. 손실 보고는 Linux 19·Windows 16·macOS 38개 모두 0인 행만, 일반 MCAP reader(`mcap::MessageStream`)의 topic별 개수도 세 OS 모두 같았다(`.logger/meta` 40,000, fixed 30,000, blob 10,000).
+- **발견과 수정:** 첫 실행(run `44974563161`)에서 facade 파일 출력이 macOS·Windows에서 `start()`부터 `Unsupported`였다(여유 공간 조회 Linux 전용, Windows 디렉터리 동기화). [ADR-009 개정 2](../03_design_artifacts/adrs/ADR-009_storage_transport_toolchain.md#개정-2--macoswindows-파일-출력2026-11-22)로 `diagnostics::available_bytes`(Unix statvfs·Windows `fs4`)와 Windows 디렉터리 동기화 생략(NTFS 저널링)을 넣었다(`9f687dd`). 이어 run `44985700707`에서 드러난 Miri의 FFI 시험·Windows의 없는 경로 의미·calibrate Linux 전용 계약을 `ad11ba3`에서 정리했고, debug 쓰기가 Windows에서 `Capacity`로 거절돼 교환 작업은 release·속도 절반으로 바꿨다.
+- **판정에 쓰는 범위:** 같은 기록의 OS 간 읽기/교환(ADR-006 결정 5, Tier 2 크로스 파일 판독)의 실행 근거. 성능·장기·전원은 범위 밖이다. 같은 run의 `contracts (ubuntu-24.04, 1.85.0)`는 이 변경과 무관한 `f19_reserve_shrinks_the_write_limit`(여유 공간을 두 번 재는 사이 병렬 시험이 파일을 지우면 깨질 수 있음)로 실패해 해당 job만 재실행했다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

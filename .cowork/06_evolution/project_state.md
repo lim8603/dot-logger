@@ -10,7 +10,7 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 장기·OS 간 파일 교환(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 2단계부터 TASK-026 뒤. MS-009 Done |
-| 활성 Task | 없음 — TASK-036·037 Done(2026-11-22). 남은 Task는 마지막 단계 TASK-024·026과 선택 TASK-018 |
+| 활성 Task | 없음 — TASK-036·037 Done(2026-11-22). 남은 Task는 마지막 단계 TASK-024·026. TASK-018은 Cancelled(2026-11-22, B2) |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
 | 상태 | 34/37 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
@@ -59,7 +59,7 @@
 - **실제 장치 대체 환경 확정 — ADR-011 Accepted / 2026-10-31:** Human이 현재 Ubuntu PC 실측을 실제 장치 시험으로 대체 수락하고 실물 UPS 없이 시뮬레이션 결과로 판정하도록 승인했다. native는 GitHub 공개 완료 후 진행한다. 기본 부팅은 generic(7.0.0-43). RT 행이 필요하면 AI가 요청서를 내고 Human 승인 뒤 `scripts/rt-boot.sh once`(1회 RT 부팅)·확인·`back` 절차로 진행한다(2026-11-11 실행, EV-070). 상세 [TASK-022](../04_implementation/tasks/TASK-022.md)·[ADR-011](../03_design_artifacts/adrs/ADR-011_local_pc_simulated_ups_verification.md).
 - RT 무대기·별도 중요도·중요 우선 기본값, 보존 모드 옵션과 처리/저장 예산 분리 유지. FR-018은 선택 옵션·기본 off, 전체 약3초는 신호 발생→차단 예산.
 - 플랫폼 Tier 1/2 유지. affinity는 간섭 감소이며 완전 격리/보편적 성능 보장 아님. Tier 2 고급 기능 미지원은 capability로 표시한다.
-- FR-015는 장비 측정 auto preset만 2026-11-04 TASK-028 S2로 부분 채택(선택·기본 off). 질문 프리셋 TASK-018은 별도 범위 승인 전 착수하지 않고 Must 완료에 몰래 넣지 않는다.
+- FR-015는 장비 측정 auto preset만 2026-11-04 TASK-028 S2로 부분 채택(선택·기본 off). 질문 프리셋 TASK-018은 2026-11-22 Human 「하지 않음 — B2로 이관」(Cancelled).
 
 ## 활성 Task 요약
 
@@ -69,7 +69,6 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 |---|---|---|---|---|---|
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-22 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. native CI는 T3 해소(EV-116), 다른 OS 사이 파일 생성·읽기 교환 잔여 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
-| TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
 ## 코드리뷰 현황 (Reviews)
 
@@ -94,10 +93,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **다음 작업 선택(Human):** v0.1.0 미리보기 공개 완료(2026-11-22). 남은 것은 마지막 단계 TASK-024(24h·전원 차단·OS 간 파일 교환)·TASK-026(dot-probe 적용, 그 뒤 MS-010 2~3단계), INT-002 구체화, 선택 TASK-018.
-   - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
+0. **TASK-024 착수(2026-11-22 Human 「TASK-024로 넘어가자」):** 24h·전원 차단(UPS 모의)·OS 간 파일 생성·읽기 교환. 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 그 뒤 TASK-026(dot-probe 적용 → MS-010 2~3단계), INT-002 구체화.
+   - `delete_repo` 권한 회수 확인(2026-11-22 `gh auth status` 범위: gist·read:org·repo·workflow).
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
-1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
+1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).
 
 ## 승인·재개 제약
 
@@ -113,7 +112,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 이월 백로그
 
-다음 T = T8 / 다음 B = B2. 트리거 감시는 AI 책임이다.
+다음 T = T8 / 다음 B = B3. 트리거 감시는 AI 책임이다.
 
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
@@ -125,6 +124,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
+| B2 | FR-015 질문 프리셋 — 짧은 질문에 답하면 `Sizing`을 채워 주는 설정 추천 흐름(CLI 마법사 등). 과신 추천·자동 적용 금지는 TASK-028 규칙을 따른다 | 사용처 요구 또는 INT-002 구체화 시 | [TASK-018](../04_implementation/tasks/TASK-018.md) Cancelled / FR-015 | 2026-11-22 Human 「하지 않음 — B2로 이관」 |
 **T2 해소**(2026-11-21 공개 전환), **T3 해소**(2026-11-22 EV-113~116, native CI 3 OS × 2 Rust Pass·GAP-004 Closed — 다른 OS 사이 파일 교환·24h는 TASK-024), **T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1·T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. **T7 해소**(포화 회복 EV-097, P5 EV-103, LAN P4 EV-104, 유선 P4-bulk EV-105). native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
@@ -134,7 +134,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | OQ-002 | ADR-011로 현재 PC 실측·UPS 시뮬레이션 수락 확정. local-pc-v1 수치 Approved(EV-021), UPS 하위 EV-043 수락·성능/RT 실측 잔여 | 실앱/성능 harness·RT 부팅 확인 후 현재 PC 성능/TC-012·장기 통합 실행 |
 | OQ-003 | 계약/US-002 AC6~10 승인. 장비별 보호량·실제 앱/장비 수명 수락은 미검증 | TASK-004~009·021·022 및 장비 검증 |
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
-| OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
+| OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증. 질문 프리셋은 B2 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
 | GAP-001·002·005 | PC 환경 확정·프로필/후속 TC 실행 잔여·paste 경고. GAP-003 Closed, GAP-004 Closed(2026-11-22 native CI, EV-116) | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 | Closed GAP·RV | GAP-006~010·RV-006~035 로컬 조치/수락 완료(native는 GAP-004 이월) | 원문 [상태 아카이브](state_archive.md) #023 |

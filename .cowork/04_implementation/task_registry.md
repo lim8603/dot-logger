@@ -32,7 +32,7 @@
 | TASK-015 | 여유·병목·보존 시간 리포트 | MS-005 | INT-001 | US-004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-014·TASK-008 | [상세](tasks/TASK-015.md) | 2~3 |
 | TASK-016 | revision 설정 변경과 전후 비교 | MS-005 | INT-001 | US-004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-015·TASK-013 | [상세](tasks/TASK-016.md) | 2~3 |
 | TASK-017 | 예산 제한 간편 점검 | MS-005 | INT-001 | US-004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-015·TASK-013 | [상세](tasks/TASK-017.md) | 2~3 |
-| TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Planned | 2026-11-04 | 질문 프리셋 부분만 FR-015 승인 대기(장비 측정 preset은 TASK-028 S2) | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
+| TASK-018 | 질문 프리셋·설정 추천 선택 기능 | MS-005 | INT-001 | US-004 | AI | Cancelled | 2026-11-22 | 하지 않음 — 2026-11-22 Human 「하지 않음 — B2로 이관」(범위 밖 백로그). 장비 측정 preset은 TASK-028 S2 | TASK-017 | [상세](tasks/TASK-018.md) | 1~2 |
 | TASK-019 | InfluxDB 어댑터와 충돌·장애 | MS-006 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-006·TASK-007 | [상세](tasks/TASK-019.md) | 2~3 |
 | TASK-020 | tracing 어댑터와 dot-probe 통합 예제 | MS-006 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-013·TASK-016·TASK-019 | [상세](tasks/TASK-020.md) | 2~3 |
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |

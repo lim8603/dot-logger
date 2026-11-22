@@ -94,6 +94,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 다음 시작점
 
 0. **TASK-024 착수(2026-11-22 Human 「TASK-024로 넘어가자」):** 24h·전원 차단(UPS 모의)·OS 간 파일 생성·읽기 교환. 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 그 뒤 TASK-026(dot-probe 적용 → MS-010 2~3단계), INT-002 구체화.
+   - 24h 뒤: `tc_013_calibrate::f19_reserve_shrinks_the_write_limit` 간헐 실패(여유 공간을 두 번 재는 사이 병렬 시험이 파일을 지우면 깨짐, EV-119) 견고화. v0.1.1(macOS·Windows 파일 출력 수정, ADR-009 개정 2) CHANGELOG·태그는 Human 결정 「v0.1.1 때 함께 정리」.
    - `delete_repo` 권한 회수 확인(2026-11-22 `gh auth status` 범위: gist·read:org·repo·workflow).
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
 1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).

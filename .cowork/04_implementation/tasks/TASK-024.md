@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | Planned |
 | 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | 마지막 단계(일정 판단 밖, 2026-11-15 Human 결정). 현재 PC P6 장애/24h·UPS 모의 차단/복구 oracle 준비. native·다른 OS 행(GAP-004)은 T3 공개 후 — 기능 Task의 native 잔여를 이 Task로 통합(2026-11-13) |
+| 다음 액션 | 마지막 단계(일정 판단 밖, 2026-11-15 Human 결정). 현재 PC P6 장애/24h·UPS 모의 차단/복구 oracle 준비. native·다른 OS 행(GAP-004)은 T3 공개 후 — 기능 Task의 native 잔여를 이 Task로 통합(2026-11-13). 2026-11-22 T3 native CI(3 OS × 2 Rust)는 Pass로 GAP-004 Closed([EV-116](../../05_verification/verification_evidence.md#ev-116)), 다른 OS 사이 생성·읽기 교환은 남음 |
 | 의존 | TASK-023 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 

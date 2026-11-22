@@ -10,19 +10,19 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 장기/native(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 Planned(2026-11-21). MS-009 Done |
-| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) In Progress — S1~S5 Done(Linux, [EV-115](../05_verification/verification_evidence.md#ev-115)). 남은 것: `a0fcfcf` CI(run `44919471193`)의 macOS RT 할당 시험 확인 → Human 수락 |
+| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) In Progress — S1~S5 Done, macOS CI 확인([EV-116](../05_verification/verification_evidence.md#ev-116)). 남은 것: Human 리뷰(수락) |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
-| 상태 | 32/36 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3: `378c6ba`에서 contracts 3 OS × 2 Rust Pass. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 상태 | 32/36 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-22 / #006 세션 마감 / AI |
-| 세션 상태 | **종료 — 2026-11-21~22 #006(개발) 마감.** 다음 세션은 run `44919471193`(macOS 잠금 예열) 결과 확인부터 |
+| 갱신 | 2026-11-22 / #007 CI 확인·TASK-036 리뷰 / AI |
+| 세션 상태 | **진행 — 2026-11-22 #007.** CI 확인(EV-116·GAP-004 Closed), CI 액션 Node 24판(`9d8bdd3`, run `44966535824` 확인 중), TASK-036 Human 리뷰 요청 |
 | 최근 완료 세션 | 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·Phase Verify·public 전환·T3·MS-010 계획·TASK-036 S1~S5 |
 
 ## 현재 결정과 제약
 
 - **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
-- **2026-11-21 T3 native CI([EV-113](../05_verification/verification_evidence.md#ev-113)~[EV-115](../05_verification/verification_evidence.md#ev-115)):** 첫 실행에서 Windows 시험 하네스(accept 소켓 non-blocking 상속)·`macos-14` 러너 지원 종료를 고쳤다. macOS std `Mutex`의 첫 잠금 할당(64 B)은 Human 「A로 진행」으로 core 잠금 9개 생성 시 예열·`MUTEX_BYTES` 회계로 처리했다(TASK-036 S5, coding_convention 규칙). `378c6ba`에서 contracts 3 OS × 2 Rust Pass, 예열 커밋 `a0fcfcf`의 macOS 결과 대기.
+- **2026-11-21 T3 native CI([EV-113](../05_verification/verification_evidence.md#ev-113)~[EV-115](../05_verification/verification_evidence.md#ev-115)):** 첫 실행에서 Windows 시험 하네스(accept 소켓 non-blocking 상속)·`macos-14` 러너 지원 종료를 고쳤다. macOS std `Mutex`의 첫 잠금 할당(64 B)은 Human 「A로 진행」으로 core 잠금 9개 생성 시 예열·`MUTEX_BYTES` 회계로 처리했다(TASK-036 S5, coding_convention 규칙). `378c6ba`에서 contracts 3 OS × 2 Rust Pass, 예열 커밋 `a0fcfcf`(run `44919471193`)에서 macOS 할당 시험 3개도 ignore 없이 Pass([EV-116](../05_verification/verification_evidence.md#ev-116)) → GAP-004 Closed(native CI 범위), T3 해소. 2026-11-22 Human 「진행해」로 CI 액션을 Node 24판(`checkout@v5`·`setup-python@v6`)으로 올렸다(`9d8bdd3`).
 
 - **2026-11-21 Human 「지금 공개」·「그대로 공개」 — 공개 전환(T2 해소):** 공개 전 재점검: gitleaks(커밋 369개) 1건은 기존 시험 전용 TLS 키, 커밋 주소 전부 noreply, gmail 0, `imported_context` 추적은 `.gitkeep`만, 의존성 197개 라이선스 모두 허용형(`cargo metadata` 집계). 문서·perf 결과의 로컬 경로(`/home/lim8603`·`/data/build`)와 사설 IP 1곳(총 205곳, #004 시점 196곳)은 비밀이 아니므로 그대로 둔다(Human 선택, 이력 재정리 안 함). `ae22f9d`에서 저장소를 public으로 전환했다(gh 구버전이라 REST API로 변경). T3 트리거 도래.
 
@@ -67,8 +67,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-036 | 배포 가능화(MS-010 0단계) | AI | In Progress | 2026-11-21 | S1~S4 Done(EV-114), CI·Human 리뷰 대기 |
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-15 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. 기능 Task의 native·다른 OS 잔여 통합(T3) |
+| TASK-036 | 배포 가능화(MS-010 0단계) | AI | In Progress | 2026-11-22 | S1~S5 Done(EV-114~116, 3 OS CI Pass), Human 리뷰 대기 |
+| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-22 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. native CI는 T3 해소(EV-116), 다른 OS 사이 파일 생성·읽기 교환 잔여 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
 
@@ -95,11 +95,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **CI 확인:** run `44919471193`(`a0fcfcf`)에서 macOS RT 할당 시험 3개가 ignore 없이 통과하는지 확인하고 GAP-004와 TASK-036 S5를 판정한다. 실패하면 macOS 할당 출처를 다시 본다.
-0-1. **TASK-036 Human 수락 → v0.1.0 미리보기(MS-010 1단계):** 별칭 crate 이름·버전은 「권장대로」 확정. 남은 리뷰 포인트는 `^` 범위, 잠금 예열. 그다음 `CHANGELOG.md`·주석 태그·GitHub pre-release.
+0. **TASK-036 Human 수락 → v0.1.0 미리보기(MS-010 1단계):** 별칭 crate 이름·버전은 「권장대로」 확정. 남은 리뷰 포인트는 `^` 범위, 잠금 예열. 그다음 `CHANGELOG.md`·주석 태그·GitHub pre-release.
    - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
-1. **마지막 단계:** TASK-024 장기/native T3·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
+1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.
 
 ## 승인·재개 제약
 
@@ -120,7 +119,6 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
-| T3 | 이월 native 검증 실행·결과 반영 | GitHub 저장소 공개 완료가 확인된 때 — **2026-11-21 도래, run `44907519022` 진행 중** | GAP-004 / ADR-011 / TASK-004~017·019~021 | 2026-10-31 Human 검증 시점 결정 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 
 범위 밖 백로그 B:
@@ -128,7 +126,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | B1 | TASK-033 S3 기능 공백(범위 밖, 일정 판단 제외): UC-02 오래된 기록 덮어쓰기·정책 선택, UC-05 high-water 지표, UC-07 시간 기준 rate·출력/상태별 rate, UC-10 정규식·프로필 채널 선택, UC-11 시계 객체 주입·epoch 이전 표시, UC-12 사용자 파일 metadata·첨부, UC-14 `log` kv·span, UC-16/19 요청 시 분할·sync(facade ④), UC-18 backtrace, UC-21 panic hook·signal, UC-22 쓰기 오류 재열기, UC-23 압축, UC-24 반복·step·remap·real 순서, UC-25 병합·필터 export, UC-28 원격 일시정지·분할·snapshot, UC-29 상태 기반 기록, UC-31 텍스트 검색 | 사용처 요구 또는 Human 요청 시 | [TASK-033](../04_implementation/tasks/TASK-033.md#uctc-대응--s3-2026-11-15) | 2026-11-15 Human 「모두 권고대로」 |
-**T2 해소**(2026-11-21 공개 전환), **T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1·T4는 미도래(T3은 2026-11-21 도래)이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. **T7 해소**(포화 회복 EV-097, P5 EV-103, LAN P4 EV-104, 유선 P4-bulk EV-105). native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
+**T2 해소**(2026-11-21 공개 전환), **T3 해소**(2026-11-22 EV-113~116, native CI 3 OS × 2 Rust Pass·GAP-004 Closed — 다른 OS 사이 파일 교환·24h는 TASK-024), **T5 해소**(EV-066~068), **T6 해소**(EV-083: Envelope scratch 복사 제거, 정량 효과 미측정). T1·T4는 미도래이며 EV-088 재측정에서도 256B 인코드·복사 p50은 시계 대조와 같은 21ns였다. **T7 해소**(포화 회복 EV-097, P5 EV-103, LAN P4 EV-104, 유선 P4-bulk EV-105). native 실행을 공개 후로 정한 것은 공개 전환 요청이 아니므로 T2를 발동하지 않는다. OQ는 T/B에 중복 등록하지 않는다.
 
 ## 열린 결정과 검증 공백
 
@@ -139,7 +137,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | OQ-004 | 구조·클라이언트·형식/DB/통신 채택. patch/MSRV 로컬/native CI 확인(EV-001), 실제 DB·장비 호환 잔여 | TASK-019·022 호환 확인 |
 | OQ-005 | 계측 비용 ≤5%·안정 추정 오차 ≤20% 및 점검/변경/시험 계획 승인. FR-015 제안 | 관련 Task 실행 검증, TASK-018은 별도 범위 승인 후 |
 | ONB-001 | lim8603·solo 확인 완료, 공식 산출물 생성 세부 미정 | docs 공식 생성 전에만 확인 |
-| GAP-001·002·004·005 | PC 환경 확정·프로필/후속 TC 실행 잔여, TASK-004~017·019~021 native 공개 후(T3) 이월·paste 경고. GAP-003 Closed | [검증 근거](../05_verification/verification_evidence.md) 참조 |
+| GAP-001·002·005 | PC 환경 확정·프로필/후속 TC 실행 잔여·paste 경고. GAP-003 Closed, GAP-004 Closed(2026-11-22 native CI, EV-116) | [검증 근거](../05_verification/verification_evidence.md) 참조 |
 | Closed GAP·RV | GAP-006~010·RV-006~035 로컬 조치/수락 완료(native는 GAP-004 이월) | 원문 [상태 아카이브](state_archive.md) #023 |
 
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.

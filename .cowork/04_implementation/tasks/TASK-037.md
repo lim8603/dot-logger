@@ -1,0 +1,34 @@
+# TASK-037 — v0.1.0 미리보기 릴리즈(1단계)
+
+| 항목 | 값 |
+|---|---|
+| Intent / Milestone | INT-001 / MS-010 |
+| Story | US-001·003 |
+| 요구사항 | NFR-004 |
+| 설계 | [릴리즈 노트 §버전·호환 정책](../../07_delivery/release_note.md#버전호환-정책) · [MS-010](../milestones/MS-010.md) |
+| ADR | 없음(MS-010 계획, 2026-11-21 Human 결정 3 「미리보기」) |
+| 담당 | AI |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-22 |
+| 다음 액션 | S1 공개 문서 정리 → S2 릴리즈 커밋 CI 확인 → S3 태그·pre-release(Human 확인 뒤) |
+| 의존 | TASK-036 Done, T3 native CI 통과(2026-11-22 충족) |
+| 예상 소요 | 0.5 인일 |
+
+## 배경
+
+MS-010 1단계. Gate 5 전이므로 Gate 5 예외(2026-11-21 Human 결정 3)로 GitHub 미리보기를 낸다. 노트에 검증 범위(이 PC Linux 로컬, 3 OS native CI, 24h·실사용처 미실행)를 적는다.
+
+## 작업 단계
+
+| 단계 | 목표 | 종료 상태 | 상태 |
+|---|---|---|---|
+| S1 | 공개 문서 | `CHANGELOG.md`(영어) 작성, README의 설치(`tag = "v0.1.0"`)·검증 절 최신화, 릴리즈 노트 알려진 이슈 갱신 | In Progress |
+| S2 | 릴리즈 커밋 CI | S1 커밋에서 `Rust contracts` 9개 작업 Pass | Planned |
+| S3 | 태그·pre-release | 주석 태그 `v0.1.0` 푸시, GitHub Release(pre-release, 본문 = CHANGELOG v0.1.0 절). 외부 공개 동작이라 Human 확인 뒤 실행 | Planned |
+
+## 완료 기준
+
+- [ ] `CHANGELOG.md`·README·릴리즈 노트가 v0.1.0 범위와 검증 범위를 사실대로 적는다.
+- [ ] 태그 커밋의 CI가 통과한다.
+- [ ] 워크스페이스 밖 소비자가 `tag = "v0.1.0"` git 의존으로 빌드된다.
+- [ ] Human 확인.

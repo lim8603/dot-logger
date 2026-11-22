@@ -9,14 +9,14 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — 장기/native(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 Planned(2026-11-21). MS-009 Done |
-| 활성 Task | [TASK-036](../04_implementation/tasks/TASK-036.md) In Progress — S1~S5 Done, macOS CI 확인([EV-116](../05_verification/verification_evidence.md#ev-116)). 남은 것: Human 리뷰(수락) |
+| 활성 Milestone | MS-007 In Progress — 장기·OS 간 파일 교환(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0단계 Done, 1단계 v0.1.0 미리보기 진행. MS-009 Done |
+| 활성 Task | [TASK-037](../04_implementation/tasks/TASK-037.md) In Progress — v0.1.0 미리보기. S1 공개 문서(CHANGELOG·README·릴리즈 노트) 작성, S2 CI 확인 뒤 S3 태그·pre-release는 Human 확인 대기. TASK-036 Done(2026-11-22 Human 「승인」) |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
-| 상태 | 32/36 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 상태 | 33/37 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-22 / #007 CI 확인·TASK-036 리뷰 / AI |
-| 세션 상태 | **진행 — 2026-11-22 #007.** CI 확인(EV-116·GAP-004 Closed), CI 액션 Node 24판(`9d8bdd3`, run `44966535824` 확인 중), TASK-036 Human 리뷰 요청 |
+| 세션 상태 | **진행 — 2026-11-22 #007.** CI 확인(EV-116·GAP-004 Closed), CI 액션 Node 24판(`9d8bdd3`, run `44966535824` 확인 중), TASK-036 Done, TASK-037 S1 |
 | 최근 완료 세션 | 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·Phase Verify·public 전환·T3·MS-010 계획·TASK-036 S1~S5 |
 
 ## 현재 결정과 제약
@@ -63,11 +63,11 @@
 
 ## 활성 Task 요약
 
-Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(32건: TASK-001~017·019~023·025·027~035).
+Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(33건: TASK-001~017·019~023·025·027~036).
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-036 | 배포 가능화(MS-010 0단계) | AI | In Progress | 2026-11-22 | S1~S5 Done(EV-114~116, 3 OS CI Pass), Human 리뷰 대기 |
+| TASK-037 | v0.1.0 미리보기 릴리즈(MS-010 1단계) | AI | In Progress | 2026-11-22 | S1 공개 문서 → S2 릴리즈 커밋 CI → S3 태그·pre-release(Human 확인 뒤) |
 | TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | Planned | 2026-11-22 | 마지막 단계(일정 판단 밖, 2026-11-15). P6/24h·UPS 모의 준비. native CI는 T3 해소(EV-116), 다른 OS 사이 파일 생성·읽기 교환 잔여 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 | TASK-018 | 질문 프리셋(선택) | AI | Planned | 2026-11-04 | FR-015 범위 승인 대기, Must 아님 |
@@ -95,7 +95,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **TASK-036 Human 수락 → v0.1.0 미리보기(MS-010 1단계):** 별칭 crate 이름·버전은 「권장대로」 확정. 남은 리뷰 포인트는 `^` 범위, 잠금 예열. 그다음 `CHANGELOG.md`·주석 태그·GitHub pre-release.
+0. **v0.1.0 미리보기(MS-010 1단계, [TASK-037](../04_implementation/tasks/TASK-037.md)):** S1 문서 커밋의 CI 9개 작업 Pass 확인 → Human 확인 뒤 주석 태그 `v0.1.0`·GitHub pre-release(본문 = CHANGELOG v0.1.0 절) → 태그로 외부 소비자 빌드 확인. CHANGELOG·릴리즈 노트의 날짜 확정.
    - **Human 조치 대기:** `delete_repo` 권한 회수는 브라우저 인증이 필요해 AI가 실행하지 못했다. 터미널에서 `gh auth refresh -h github.com --remove-scopes delete_repo`를 실행한다.
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.
 1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 별도 범위 승인 대기의 선택 기능이다.

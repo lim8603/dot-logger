@@ -8,9 +8,9 @@
 | 설계 | [ADR-010 개정 2](../../03_design_artifacts/adrs/ADR-010_mcap_security_update.md#개정-2--배포-가능한-vendor-구조2026-11-21) · [ADR-009 개정](../../03_design_artifacts/adrs/ADR-009_storage_transport_toolchain.md#개정--라이브러리-의존성-버전-범위2026-11-21) |
 | ADR | ADR-009·010 개정(2026-11-21 Human 결정) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-22 |
-| 다음 액션 | Human 리뷰(수락) — 리뷰 포인트 `^` 범위·잠금 예열. S1~S5 모두 Done, macOS CI 확인 [EV-116](../../05_verification/verification_evidence.md#ev-116). 별칭 crate 이름·버전은 2026-11-21 Human 「권장대로」 확정 |
+| 다음 액션 | 없음 — 2026-11-22 Human 「승인」으로 수락. 다음은 MS-010 1단계 [TASK-037](TASK-037.md) |
 | 의존 | 없음(T3 native CI와 병행 가능) |
 | 예상 소요 | 1~2 인일 |
 
@@ -33,7 +33,7 @@
 - [x] 워크스페이스 밖 소비자가 git·path 의존성으로 빌드된다(로컬 확인, CI의 Linux 두 행에서 run `44914448830`·`44919471193` Pass).
 - [x] macOS를 포함한 3 OS × 2 Rust CI에서 RT 할당 시험이 ignore 없이 통과한다([EV-116](../../05_verification/verification_evidence.md#ev-116)).
 - [x] 기존 회귀와 출력 바이트(MCAP CRC 포함)가 바뀌지 않는다(MCAP 소스 변경 없음, EV-114).
-- [ ] Human 리뷰.
+- [x] Human 리뷰 — 2026-11-22 「승인」(리뷰 포인트: `^` 범위·잠금 예열·client/viewer 잠금 범위 밖·crates.io 게시 시 `dot-logger-mcap` 선행).
 
 ## 결과 — 2026-11-21
 

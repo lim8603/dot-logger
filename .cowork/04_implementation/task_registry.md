@@ -50,7 +50,8 @@
 | TASK-033 | 로깅 사용 사례 조사와 커버리지 기반 완료 판정 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-11-18 | S1~S4 완료. E 수락 후 최종 커버리지와 UC 대응 기준 Pass(EV-089) | 없음 | [상세](tasks/TASK-033.md) | 3~5 |
 | TASK-034 | facade에 core 기능 노출(실행 중 level·샘플링, 이벤트 보존, 중요도) | MS-008 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-18 | S1 계약, S2 facade 기능, S3 API 표면·레시피와 E 완료(EV-088, REV-061 Closed) | TASK-027·TASK-029 | [상세](tasks/TASK-034.md) | 5~6 |
 | TASK-035 | 손실 기록의 파일 내 표시와 채널별 손실 수 | MS-009 | INT-001 | US-002·003·004 | AI | Done | 2026-11-18 | S1 형식, S2 손실·회전과 E 파일 판독·비용·최종 회귀 완료(EV-088, REV-061 Closed) | TASK-030 | [상세](tasks/TASK-035.md) | 3~4 |
-| TASK-036 | 배포 가능화(MCAP 별칭 crate·외부 소비자 빌드·의존성 범위) | MS-010 | INT-001 | US-001·003 | AI | In Progress | 2026-11-22 | S1~S5 Done(EV-114·115, macOS CI EV-116), Human 리뷰 대기. 외부 소비자 컴파일 실패(E0599) 해소 | 없음 | [상세](tasks/TASK-036.md) | 1~2 |
+| TASK-036 | 배포 가능화(MCAP 별칭 crate·외부 소비자 빌드·의존성 범위) | MS-010 | INT-001 | US-001·003 | AI | Done | 2026-11-22 | Done — S1~S5(EV-114~116, 3 OS CI Pass), 2026-11-22 Human 승인. 외부 소비자 컴파일 실패(E0599) 해소 | 없음 | [상세](tasks/TASK-036.md) | 1~2 |
+| TASK-037 | v0.1.0 미리보기 릴리즈(CHANGELOG·태그·pre-release) | MS-010 | INT-001 | US-001·003 | AI | In Progress | 2026-11-22 | S1 공개 문서 → S2 CI → S3 태그·pre-release(Human 확인 뒤) | TASK-036 | [상세](tasks/TASK-037.md) | 0.5 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

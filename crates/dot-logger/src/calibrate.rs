@@ -94,8 +94,9 @@ impl Calibration {
         if cancel.load(Ordering::Acquire) {
             return Err(CalibrateError::Cancelled);
         }
-        let free =
-            crate::diagnostics::available_bytes(&self.directory).map_err(CalibrateError::Io)?;
+        // Calibration reads Linux host facts and stays Linux-only (API §19.9).
+        let free = crate::diagnostics::linux_available_bytes(&self.directory)
+            .map_err(CalibrateError::Io)?;
         let room = free.saturating_sub(self.disk_reserve);
         if room == 0 {
             return Err(CalibrateError::NoSpace {

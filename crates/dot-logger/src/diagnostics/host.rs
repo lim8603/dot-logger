@@ -398,6 +398,7 @@ fn space_bytes(available: u64, fragment: u64, total: u64) -> io::Result<u64> {
 #[allow(clippy::unwrap_used)]
 mod portable_tests {
     #[test]
+    #[cfg_attr(miri, ignore = "statvfs/GetDiskFreeSpaceExW are foreign calls")]
     fn available_bytes_reads_an_existing_directory_and_rejects_a_missing_one() {
         let dir = std::env::temp_dir();
         let free = super::available_bytes(&dir).unwrap();
@@ -405,6 +406,8 @@ mod portable_tests {
             free > 0,
             "a writable temp directory reports some free space"
         );
+        // Windows reports the volume of a missing path; Unix rejects it.
+        #[cfg(unix)]
         assert!(super::available_bytes(&dir.join("dot-logger-no-such-dir/x")).is_err());
         #[cfg(target_os = "linux")]
         {

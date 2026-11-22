@@ -82,7 +82,7 @@ jobs:
       - name: Install fixed Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal
       - name: Write the exchange set
-        run: cargo +1.96.0 run --locked -p dot-logger --example os_exchange -- write exchange-out/${{ runner.os }}
+        run: cargo +1.96.0 run --locked --release -p dot-logger --example os_exchange -- write exchange-out/${{ runner.os }}
       - uses: actions/upload-artifact@v6
         with:
           name: exchange-${{ runner.os }}
@@ -106,7 +106,7 @@ jobs:
           pattern: exchange-*
           path: exchange-in
       - name: Read every OS's files
-        run: cargo +1.96.0 run --locked -p dot-logger --example os_exchange -- verify exchange-in/exchange-Linux exchange-in/exchange-Windows exchange-in/exchange-macOS
+        run: cargo +1.96.0 run --locked --release -p dot-logger --example os_exchange -- verify exchange-in/exchange-Linux exchange-in/exchange-Windows exchange-in/exchange-macOS
 
   audit:
     runs-on: ubuntu-24.04

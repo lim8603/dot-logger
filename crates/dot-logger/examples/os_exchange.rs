@@ -113,7 +113,7 @@ fn write(dir: &Path) -> Result<()> {
             accept(writer.try_log_at(blob, &buffer[..len], mono, real), "blob")?;
         }
         // Paced well below the declared rate, so admission never rejects.
-        std::thread::sleep(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(20));
     }
     drop(writer);
     let shutdown = logger

@@ -1803,6 +1803,12 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **참고:** 모든 job에 Node.js 20 지원 종료 경고(`actions/checkout@v4`·`actions/setup-python@v5`가 Node 24로 강제 실행)가 있었다. 결과에는 영향이 없다.
 - **판정에 쓰는 범위:** TASK-036 S5의 macOS native 확인, T3 native CI(GAP-004)의 최신 소스 3 OS × 2 Rust 통과 근거. 다른 OS 사이의 파일 생성·읽기 교환과 24h·전원 차단은 이 실행의 범위가 아니며 TASK-024에 남는다.
 
+### EV-117 — Node 24 CI 액션과 v0.1.0 릴리즈 커밋 CI
+
+- **Node 24 액션(`9d8bdd3`, run `44966535824`):** `actions/checkout@v5`·`actions/setup-python@v6`(둘 다 `action.yml` `using: node24` 확인)로 올린 뒤 9개 작업 모두 Pass. 모든 job의 annotation에서 Node.js 20 지원 종료 경고가 사라졌고, macOS arm64 러너 대기열 안내만 남았다.
+- **릴리즈 커밋(`f124f19`, run `44966993272`, 2026-11-22 00:30~01:11 UTC):** `CHANGELOG.md` 추가·README 설치 예시 `tag = "v0.1.0"`·검증 절 갱신. 9개 작업 모두 Pass(contracts 3 OS × 2 Rust, audit, integration-surface, raw-memory).
+- **판정에 쓰는 범위:** TASK-037 S2. 이후 날짜 확정 커밋은 `CHANGELOG.md`·작업 문서만 바꾸므로(`[skip ci]`) 이 실행이 태그 커밋의 코드 근거다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

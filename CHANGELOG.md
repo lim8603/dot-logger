@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The project follows
 bumps the minor version (0.1 → 0.2) and every workspace crate shares one
 version.
 
-## [0.1.0] — Unreleased (preview)
+## [0.1.0] — 2026-11-22 (preview)
 
 The first preview release of dot-logger, a Rust logging and telemetry library
 for robotics and real-time applications. It is a GitHub pre-release: the API

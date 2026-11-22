@@ -22,9 +22,9 @@ MS-010 1단계. Gate 5 전이므로 Gate 5 예외(2026-11-21 Human 결정 3)로 
 
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
-| S1 | 공개 문서 | `CHANGELOG.md`(영어) 작성, README의 설치(`tag = "v0.1.0"`)·검증 절 최신화, 릴리즈 노트 알려진 이슈 갱신 | In Progress |
-| S2 | 릴리즈 커밋 CI | S1 커밋에서 `Rust contracts` 9개 작업 Pass | Planned |
-| S3 | 태그·pre-release | 주석 태그 `v0.1.0` 푸시, GitHub Release(pre-release, 본문 = CHANGELOG v0.1.0 절). 외부 공개 동작이라 Human 확인 뒤 실행 | Planned |
+| S1 | 공개 문서 | `CHANGELOG.md`(영어) 작성, README의 설치(`tag = "v0.1.0"`)·검증 절 최신화, 릴리즈 노트 알려진 이슈 갱신 | Done — `f124f19`, 날짜 확정은 태그 커밋 |
+| S2 | 릴리즈 커밋 CI | S1 커밋에서 `Rust contracts` 9개 작업 Pass | Done — run `44966993272`([EV-117](../../05_verification/verification_evidence.md#ev-117)) |
+| S3 | 태그·pre-release | 주석 태그 `v0.1.0` 푸시, GitHub Release(pre-release, 본문 = CHANGELOG v0.1.0 절). 외부 공개 동작이라 Human 확인 뒤 실행 | In Progress — 2026-11-22 Human 「CI 통과하면 진행해」 |
 
 ## 완료 기준
 

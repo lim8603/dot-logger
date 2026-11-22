@@ -8,9 +8,9 @@
 | 설계 | [도메인](../../03_design_artifacts/domain_model.md) · [인터페이스](../../03_design_artifacts/interface_contract.md) · [데이터](../../03_design_artifacts/data_model.md) |
 | ADR | ADR-003~009 Accepted |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-11-15 |
-| 다음 액션 | 마지막 단계(일정 판단 밖, 2026-11-15 Human 결정). 현재 PC P6 장애/24h·UPS 모의 차단/복구 oracle 준비. native·다른 OS 행(GAP-004)은 T3 공개 후 — 기능 Task의 native 잔여를 이 Task로 통합(2026-11-13). 2026-11-22 T3 native CI(3 OS × 2 Rust)는 Pass로 GAP-004 Closed([EV-116](../../05_verification/verification_evidence.md#ev-116)), 다른 OS 사이 생성·읽기 교환은 남음 |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-22 |
+| 다음 액션 | S1 OS 간 파일 교환(CI) 착수. 24h 실행(S4)은 시작 전 시간·쓰기량을 알리고 Human 승인 |
 | 의존 | TASK-023 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -49,3 +49,21 @@ Human 승인 [ADR-011](../../03_design_artifacts/adrs/ADR-011_local_pc_simulated
 - GitHub CI 6 contracts·audit·raw-memory·`integration-surface` job을 공개 시점 source hash로 실행·확인(GAP-004).
 - Windows/macOS 등 Tier 2 대상의 생성·읽기 교환(기존 범위).
 - 공개 전에는 CI 재시도나 계정·과금 조회를 하지 않는다(기존 결정 유지).
+
+## 2026-11-22 착수와 결정
+
+Human 「TASK-024로 넘어가자」로 착수했다. 결정(같은 날 Human 선택, 모두 권고안):
+
+- **24h 부하:** 대표 부하 약 2 MB/s — 256 B 기록 5,000건/s + 64 KiB 원본 10건/s, 링 보존 상한 16 GiB, 10 ms 제어 루프 동시 실행. 24h SSD 쓰기 약 170 GB.
+- **커널:** 지금 부팅된 RT 커널(`7.0.0-43-realtime`)에서 실행. generic 장기 행은 미실행으로 남긴다.
+- **디스크:** T500(루트 파일 시스템, `/home/lim8603/s3-data`) — 이전 성능 측정(EV-064·071)과 같은 디스크. 빌드 디스크 `/data/build`(HP 512 GB)와 분리.
+
+native CI(3 OS × 2 Rust)는 T3로 끝났다([EV-116](../../05_verification/verification_evidence.md#ev-116), GAP-004 Closed). UPS 모의 차단·복구 하위 행은 EV-043으로 수락됐다.
+
+| 단계 | 목표 | 종료 상태 | 상태 |
+|---|---|---|---|
+| S1 | OS 간 파일 교환 | 각 OS(Linux·Windows·macOS)가 결정적 기록 세트(여러 채널·중요 기록·이벤트·회전 2개 이상)를 쓰고, 세 OS 각각이 세 OS의 파일을 모두 읽어 내용·개수·손실 0을 대조하는 CI 작업 | Planned |
+| S2 | P6 장애 주입(단기) | 대표 부하 아래 느린 파일·느린 구독자·공간 부족·DB/네트워크 단절·프로세스 강제 종료 후 `recover`를 각 몇 분씩 주입. 버퍼 상한 유지, 정책별 손실 보고, 복구 뒤 정상 경로 회복 | Planned |
+| S3 | soak harness와 리허설 | 대표 부하·제어 루프·주기 표본(RSS·fd·예약 바이트·손실/거절 카운터·디스크 사용·deadline miss)을 JSON으로 남기는 harness, 10분 리허설 | Planned |
+| S4 | 24h 실행(RT, T500) | 24h 완주. 판정: 정상 부하 손실 0, 제어 루프 추가 deadline miss 0, RSS·fd·예약 바이트가 예열 뒤 증가 추세 없음, 디스크 사용 ≤ 링 상한, 회전 파일 전부 읽기 대조 Pass | Planned |
+| S5 | 근거·리뷰 | EV, TC-012 P6 행·추적표 갱신, Human 리뷰 | Planned |

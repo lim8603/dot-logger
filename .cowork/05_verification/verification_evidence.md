@@ -1810,6 +1810,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **판정에 쓰는 범위:** TASK-037 S2. 이후 날짜 확정 커밋은 `CHANGELOG.md`·작업 문서만 바꾸므로(`[skip ci]`) 이 실행이 태그 커밋의 코드 근거다.
 - **태그 소비자(2026-11-22, TASK-037 S3):** 주석 태그 `v0.1.0`(`e870bc1`)과 GitHub pre-release를 만든 뒤, 워크스페이스 밖 임시 프로젝트가 `dot-logger = { git = …, tag = "v0.1.0", default-features = false }`로 `tests/api-consumer`를 Rust 1.96.0에서 `run`·`run --features remote` 모두 통과했다(lock 출처 `?tag=v0.1.0#e870bc1`, `dot-logger-mcap` 포함, 24초). 임시 빌드 출력은 지웠다.
 
+### EV-118 — TASK-024 S2-P 외부 경보 → 3초 뒤 강제 종료 정전 모의
+
+- **방식(2026-11-22 Human 지시):** 실물 UPS 대신 프로세스 밖 구동기가 기록 중인 프로세스에 경보를 보내고, 정확히 3초 뒤 SIGKILL한다. EV-043은 프로세스가 경보를 스스로 만들고 sync 뒤 스스로 종료(exit 17)했는데, 이번에는 경보와 종료가 모두 밖에서 오고 종료 시점에 프로세스의 협조가 없다.
+- **대상/환경:** `crates/dot-logger/examples/soak.rs`(`fe6f705`, 실행 바이너리는 fmt 정리 전 같은 논리), facade `Logger` 경로. 이 PC RT 커널 `7.0.0-43-realtime`, `DOT_LOGGER_PERF_RT=fifo`(제어 스레드 CPU 2·SCHED_FIFO 70·메모리 잠금), T500 ext4(`/home/lim8603/s3-data`), 링 1 GiB. 2026-11-22 10:40 KST 무렵 AI 실행.
+- **부하:** TASK-024 대표 부하 — 10 ms 제어 루프(합성 작업 500 µs, 주기 보정)에서 256 B 기록 5,000건/s, 64 KiB 프레임 10건/s(zero-copy loan). 실측 쓰기 약 2.55 MB/s.
+- **절차:** `soak power <parent> 15,30,45,60,75,90` — 매회 자식 `soak run`을 띄우고 지연 뒤 stdin으로 `alarm`을 보낸다. 자식(호스트 앱 역할)은 생산자를 멈추고 수락 개수를 출력한 뒤 남은 예산(3초 − 200 ms − 경과)으로 `Logger::shutdown`을 하고 종료하지 않고 대기한다. 구동기는 경보 3,000 ms 뒤 SIGKILL하고, 남은 `.mcap` 전부를 `NativeReader`·`LossReader`로 읽어 경보 시점 수락 기록 전부를 index·payload 패턴으로 대조한다.
+- **결과: 6/6 Pass.** 모든 회차에서 kill 시점에 자식이 살아 있었고(3,000 ms), 생산자 정지 18~40 ms, `shutdown` 성공 확인 41~63 ms(예산 2,759~2,781 ms). 경보 전 수락 기록 59,900~434,800건(제어)·150~900건(프레임)이 누락·중복·손상 0으로 모두 파일에 있었다. 파일 4~27개, 읽기 실패·잘린 파일 0, 손실 보고 23~144개에서 0이 아닌 행 0. 거절 0, 제어 루프 deadline miss 0, 최악 응답 673~1,082 µs(기한 10 ms).
+- **판정에 쓰는 범위:** 외부 경보 뒤 3초 안에 facade가 수락 기록 전부를 파일에 쓰고 동기화를 마치며, 그 뒤의 강제 종료가 그 기록을 해치지 않는다는 근거. SIGKILL은 OS 페이지 캐시를 버리지 않으므로 물리 전원 소실 내구성은 관측하지 않았다(`shutdown` 성공은 fsync 완료를 뜻하지만 디스크 캐시·전원 동작은 장비별이다, ADR-011 A-4). 고급 경로의 순위별 `notify_power`는 EV-043 범위에 그대로 있다. 원시 결과는 이 PC `/home/lim8603/s3-data/power-2026-11-22/power.jsonl`.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -10,7 +10,7 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 장기·OS 간 파일 교환(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 2단계부터 TASK-026 뒤. MS-009 Done |
-| 활성 Task | [TASK-024](../04_implementation/tasks/TASK-024.md) In Progress(2026-11-22 착수) — S1 OS 간 파일 교환(CI)부터. 24h는 RT 커널·T500·약 2 MB/s(약 170 GB), 시작 전 Human 승인. TASK-018 Cancelled(B2) |
+| 활성 Task | [TASK-024](../04_implementation/tasks/TASK-024.md) In Progress — S2-P 정전 모의 6/6 Pass([EV-118](../05_verification/verification_evidence.md#ev-118)). S3 10분 리허설 → S4 24h 2026-11-22 17:00 시작(RT·T500·약 2.55 MB/s·약 220 GB, 16:57 세션 예약). TASK-018 Cancelled(B2) |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
 | 상태 | 34/37 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |

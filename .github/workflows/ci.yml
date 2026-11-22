@@ -17,8 +17,8 @@ jobs:
         toolchain: [1.85.0, 1.96.0]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install fixed Rust toolchain
@@ -57,8 +57,8 @@ jobs:
   integration-surface:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install fixed toolchains
@@ -73,7 +73,7 @@ jobs:
   audit:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install fixed Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal
       - name: Install fixed audit tool
@@ -84,7 +84,7 @@ jobs:
   raw-memory:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install fixed Miri toolchain
         run: rustup toolchain install nightly-2026-10-26 --profile minimal --component miri
       - name: Prepare Miri sysroot

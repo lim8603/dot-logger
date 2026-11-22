@@ -246,6 +246,8 @@ No feature is enabled by default.
 | [`dot_probe_*`](crates/dot-logger-client/examples) | Advanced-path integrations modeled on the same application, including InfluxDB output and a configuration before/after comparison; see the [client README](crates/dot-logger-client/README.md) |
 | [`general_logs`](examples/general_logs.rs) | `tracing`/`log` input on the advanced path |
 | [`ups_simulation`](crates/dot-logger/examples/ups_simulation.rs) | Power-alarm and shutdown-deadline simulation (`--plan`, `--run DIR`) |
+| [`soak`](crates/dot-logger/examples/soak.rs) | Long-run load with resource samples, and an external power cut: alarm, then a kill 3 s later (Linux) |
+| [`os_exchange`](crates/dot-logger/examples/os_exchange.rs) | Files written on one OS and checked record by record on another (`write DIR`, `verify DIR...`) |
 | [`live_host`](crates/dot-logger-viewer/examples/live_host.rs), [`operations_host`](crates/dot-logger-viewer/examples/operations_host.rs) | Demo hosts for the viewer and dashboard |
 | [`tests/api-consumer`](tests/api-consumer/src/main.rs) | Using the public API from a separate crate |
 

@@ -70,6 +70,44 @@ jobs:
       - name: Check facade surface and recipes
         run: python scripts/check-integration-surface.py
 
+  # TASK-024 S1: native files written on each OS are read back on every OS.
+  exchange-write:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install fixed Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+      - name: Write the exchange set
+        run: cargo +1.96.0 run --locked -p dot-logger --example os_exchange -- write exchange-out/${{ runner.os }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: exchange-${{ runner.os }}
+          path: exchange-out/${{ runner.os }}
+          if-no-files-found: error
+          retention-days: 7
+
+  exchange-read:
+    needs: exchange-write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install fixed Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: exchange-*
+          path: exchange-in
+      - name: Read every OS's files
+        run: cargo +1.96.0 run --locked -p dot-logger --example os_exchange -- verify exchange-in/exchange-Linux exchange-in/exchange-Windows exchange-in/exchange-macOS
+
   audit:
     runs-on: ubuntu-24.04
     steps:

@@ -10,8 +10,8 @@
 | --- | --- |
 | 프로젝트 | dot-logger |
 | 버전 | 0.1.0 (첫 릴리즈 후보, 미리보기) |
-| 릴리즈 일자 | 미정 — 릴리즈·태그·공개는 Human 결정 사항이며 아직 하지 않았다 |
-| 상태 | **초안.** 2026-11-21 main 기준으로 포함 범위를 정리했다. 릴리즈 시점에 날짜·범위·알려진 이슈를 다시 확인한다 |
+| 릴리즈 일자 | 미정 — [TASK-037](../04_implementation/tasks/TASK-037.md) S3(태그·pre-release)에서 Human 확인 뒤 확정 |
+| 상태 | **초안.** 2026-11-22 TASK-036·T3 결과로 배포 대상·알려진 이슈를 갱신했다. 외부 공개본은 저장소의 `CHANGELOG.md`(영어, FR 번호 없음) |
 
 ---
 
@@ -44,14 +44,14 @@
 - 로보틱스용 Rust 로그·텔레메트리 라이브러리의 첫 릴리즈 후보다.
 - 실시간 스레드는 기다리거나 할당하지 않고 기록을 넘긴다. 기록은 표준 MCAP 파일로 남고, 모든 자원에 한도가 있으며, 남지 못한 기록은 개수로 보고된다.
 - 라이브러리, `dot-logger` CLI, Rust 클라이언트, Foxglove bridge와 운영 대시보드(viewer)를 함께 낸다.
-- pre-release다. API가 바뀔 수 있고 검증된 플랫폼은 Linux뿐이다.
+- pre-release다. API가 바뀔 수 있다. 실측은 Linux 한 대뿐이고, Windows·macOS는 CI 시험만 통과했다.
 
 #### 릴리즈 범위
 
 | 항목 | 내용 |
 | --- | --- |
-| 관련 Milestone / Intent | INT-001 / MS-001~006·008·009 Done, MS-007 진행 중(인수 정리·장기/native·실사용처 잔여) |
-| 배포 대상 | GitHub git 의존성(`lim8603/dot-logger`). crates.io 미게시(`publish = false`). 저장소는 2026-11-21 현재 비공개, 남은 Task 뒤 공개 예정 |
+| 관련 Milestone / Intent | INT-001 / MS-001~006·008·009 Done, MS-007 진행 중(장기·OS 간 파일 교환·실사용처 잔여), MS-010 1단계 |
+| 배포 대상 | GitHub pre-release와 주석 태그 `v0.1.0`, git 의존성 `tag = "v0.1.0"`(공개 저장소 `lim8603/dot-logger`, 2026-11-21 공개). crates.io 미게시(`publish = false`, TASK-026 뒤) |
 | 라이선스 | `MIT OR Apache-2.0`. vendor `mcap` 0.26.0은 MIT(Foxglove) |
 | 도구 체인 | MSRV Rust 1.85, 개발 1.96.0 |
 | 비고 | 성능 수치는 단일 Linux PC 실측이며 보장이 아니다 |
@@ -99,18 +99,18 @@
 
 | ID | 내용 | 심각도 | 우회 방법 |
 | --- | --- | --- | --- |
-| K1 | Windows·macOS 미검증. CI 구성은 있으나 실행 결과 없음 | 높음(해당 OS 사용 시) | Linux에서 사용. 공개 후 native 검증(T3) 예정(US-005 잔여) |
+| K1 | Windows·macOS는 CI 시험(3 OS × 2 Rust, RT 할당 시험 포함, EV-116)만 통과했다. 성능 실측과 OS 간 파일 생성·읽기 교환은 미실행 | 중간(해당 OS 사용 시) | 운영 전 대상 OS에서 자체 확인. TASK-024 예정 |
 | K2 | 24시간 이상 연속 운영 미검증 | 중간 | 운영 전 자체 장시간 시험. TASK-024 예정 |
 | K3 | 실제 애플리케이션 적용 전(첫 사용처 dot-probe 적용은 마지막 단계) | 중간 | 예제(`dot_probe_*`)로 통합 지점 확인 |
 | K4 | 전원 경보는 실물 UPS가 아닌 시뮬레이션 신호로 검증. 물리 전원 소실 내구성은 주장하지 않음 | 중간 | 장비별 확인 |
 | K5 | 간접 의존성 `paste`가 유지보수 중단으로 보고됨(RustSec 경고 1건, 취약점 0) | 낮음 | 상위 의존성 갱신 시 재확인 |
 | K6 | 일부 이전 `standard/2` 파일은 Lichtblick이 1970년 시작 범위로 보여 주며 미리 읽기 실패 | 낮음 | `recover`로 호환 사본 생성 |
 | K7 | 쓰기 오류 후 자동 재열기, 압축 쓰기, 원격 일시정지·분할 등은 범위 밖(B1) | 낮음 | 재시작으로 대응 |
-| K8 | crates.io 미게시, 저장소 비공개 | — | 접근 권한 계정에서 git 의존성 사용 |
+| K8 | crates.io 미게시 | — | git 의존성 `tag = "v0.1.0"` 사용 |
 
 #### 업그레이드 / 배포 메모
 
 - 첫 릴리즈라 업그레이드 절차는 없다.
-- `Cargo.lock`을 함께 쓰고 `--locked`로 빌드한다. vendor `mcap`에는 로컬 패치가 있다(`vendor/mcap-0.26.0/VENDORED.md`).
+- 라이브러리 의존성은 `^` 범위다(하한 = 검증한 lock 버전). 저장소 안 개발은 `Cargo.lock`과 `--locked`로 빌드한다. vendor MCAP은 별칭 crate `dot-logger-mcap`(lib 이름 `mcap`)으로 들어가 외부 프로젝트에서도 패치가 적용된다(`vendor/mcap-0.26.0/VENDORED.md`, TASK-036).
 - `cargo audit`은 path 패키지를 검사하지 않는다. MCAP 보안 공지는 수동으로 확인한다.
-- 릴리즈 시 남은 일: 태그와 날짜, 공개 전환, 알려진 이슈 재확인, FR 번호를 뺀 외부 공개본 작성.
+- 릴리즈 시 남은 일: 태그와 날짜(TASK-037 S3). 공개 전환은 2026-11-21 완료, 외부 공개본은 `CHANGELOG.md`로 작성(2026-11-22).

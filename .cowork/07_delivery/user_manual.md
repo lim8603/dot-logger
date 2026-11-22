@@ -58,7 +58,7 @@ Rust 1.85 이상이 필요하다. crates.io에는 아직 없으므로 git 의존
 
 ```toml
 [dependencies]
-dot-logger = { git = "https://github.com/lim8603/dot-logger" }
+dot-logger = { git = "https://github.com/lim8603/dot-logger", tag = "v0.1.0" }
 ```
 
 - 저장소는 2026-11-21 현재 **비공개**다. 공개 전에는 접근 권한이 있는 계정에서만 받을 수 있다.

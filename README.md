@@ -9,7 +9,8 @@ reservation has a declared limit, and every record that does not make it is
 counted rather than silently lost.
 
 > **Status:** pre-release (0.1). The API may still change. Linux is the
-> verified platform; see [Verification](#verification). Licensed under MIT or
+> measured platform, and CI passes on Linux, Windows and macOS; see
+> [Verification](#verification). Licensed under MIT or
 > Apache-2.0; see [License](#license).
 
 ## Features
@@ -45,11 +46,12 @@ counted rather than silently lost.
 ## Getting started
 
 Rust 1.85 or newer is required. dot-logger is not published on crates.io yet;
-use it as a git dependency:
+use it as a git dependency pinned to a release tag (see
+[CHANGELOG.md](CHANGELOG.md)):
 
 ```toml
 [dependencies]
-dot-logger = { git = "https://github.com/lim8603/dot-logger" }
+dot-logger = { git = "https://github.com/lim8603/dot-logger", tag = "v0.1.0" }
 ```
 
 `dot_logger::logger` is the default path. This is the complete L1 recipe,
@@ -249,14 +251,15 @@ No feature is enabled by default.
 
 ## Verification
 
-- **Tests.** The workspace has about 720 unit and integration tests, run with
+- **Tests.** The workspace has about 740 unit and integration tests, run with
   Rust 1.96.0 and the 1.85 MSRV. The library's unit tests and its pool,
   routing, completion, control, retention, storage-fault, query and replay
   tests also run under Miri.
 - **Platform.** Measured on one Linux x86_64 PC, with both a generic and a
-  PREEMPT_RT kernel. A CI workflow for Ubuntu 24.04, Windows Server 2025 and
-  macOS 14 is configured but has not produced results yet, so macOS and
-  Windows are unverified.
+  PREEMPT_RT kernel. CI runs the tests, including the real-time allocation
+  tests, on Ubuntu 24.04, Windows Server 2025 and macOS 15 with both Rust
+  versions, and they pass. Performance was not measured on Windows or macOS,
+  and files have not yet been exchanged between operating systems in a test.
 - **Power loss** was verified with simulated UPS signals and real file IO,
   not with a physical UPS.
 - **Not yet done:** a 24-hour soak test and a production integration.

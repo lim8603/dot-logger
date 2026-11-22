@@ -1808,6 +1808,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Node 24 액션(`9d8bdd3`, run `44966535824`):** `actions/checkout@v5`·`actions/setup-python@v6`(둘 다 `action.yml` `using: node24` 확인)로 올린 뒤 9개 작업 모두 Pass. 모든 job의 annotation에서 Node.js 20 지원 종료 경고가 사라졌고, macOS arm64 러너 대기열 안내만 남았다.
 - **릴리즈 커밋(`f124f19`, run `44966993272`, 2026-11-22 00:30~01:11 UTC):** `CHANGELOG.md` 추가·README 설치 예시 `tag = "v0.1.0"`·검증 절 갱신. 9개 작업 모두 Pass(contracts 3 OS × 2 Rust, audit, integration-surface, raw-memory).
 - **판정에 쓰는 범위:** TASK-037 S2. 이후 날짜 확정 커밋은 `CHANGELOG.md`·작업 문서만 바꾸므로(`[skip ci]`) 이 실행이 태그 커밋의 코드 근거다.
+- **태그 소비자(2026-11-22, TASK-037 S3):** 주석 태그 `v0.1.0`(`e870bc1`)과 GitHub pre-release를 만든 뒤, 워크스페이스 밖 임시 프로젝트가 `dot-logger = { git = …, tag = "v0.1.0", default-features = false }`로 `tests/api-consumer`를 Rust 1.96.0에서 `run`·`run --features remote` 모두 통과했다(lock 출처 `?tag=v0.1.0#e870bc1`, `dot-logger-mcap` 포함, 24초). 임시 빌드 출력은 지웠다.
 
 ## Open Evidence Gaps
 

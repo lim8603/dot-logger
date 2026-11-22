@@ -51,3 +51,9 @@ Human 승인 [ADR-011](ADR-011_local_pc_simulated_ups_verification.md)에 따라
 - **결정(2026-11-21 Human 결정(1 A·2 권장대로·3 미리보기·4 TASK-026 뒤·5 권장대로)의 2):** 라이브러리 crate의 의존성은 `^` 범위로 바꾸고, 하한은 지금 검증한 버전으로 둔다. 보안 수정 때문에 올린 하한(tokio 1.51.6, rustix 1.1.6 등)은 그대로 하한이 된다. `Cargo.lock`은 계속 커밋하고 CI는 `--locked`로 재현한다. MSRV(1.85)는 resolver 3의 rust-version 인식 해석에 맡긴다. 하한 버전이 실제로 빌드되는지는 TASK-036에서 확인 방법을 정한다.
 - **유지되는 것:** 위 표의 기술 계열 선택과 MSRV.
 
+## 개정 2 — macOS·Windows 파일 출력(2026-11-22)
+
+- **문제:** TASK-024 S1의 OS 간 교환 CI(run `44974563161`)에서 facade `Logger`의 파일 출력이 macOS·Windows에서 `start()`부터 `Unsupported`로 실패했다. 여유 공간 조회가 Linux 전용(`rustix::fs::statvfs`)이었고, `FileStore`가 Unix 디렉터리 동기화를 전제했다. RV-098이 이를 "Tier 2 한계"로 문서화만 했는데, 이는 ADR-006 결정 3(공통 기록을 세 OS에서 제공)과 Tier 2 계약(데이터 수집·파일 생성)에 어긋난다.
+- **결정(2026-11-22 Human 「작은 crate 추가로 지원」):** 여유 공간은 Unix 전체에서 `statvfs`(rustix를 `cfg(unix)`로 확대)로, Windows에서는 `fs4` 1.1.0(`GetDiskFreeSpaceExW`, MIT OR Apache-2.0, MSRV 1.75, `windows-sys` 0.61은 이미 lock에 있음, `default-features = false`)으로 조회한다. 새 공개 함수 `diagnostics::available_bytes`를 facade와 calibrate가 쓰고, `linux_available_bytes`는 그대로 둔다. Windows는 std로 디렉터리를 flush할 수 없으므로 디렉터리 동기화는 하지 않고 파일 내용만 flush한다. 디렉터리 항목은 NTFS 메타데이터 저널링에 맡기며, 사고 뒤 rename은 있거나 없고 복구는 어느 경우든 `.active`를 읽는다.
+- **영향:** crate 소스의 unsafe 정책은 그대로다(unsafe는 `fs4`/`windows-sys` 안). v0.1.0에는 이 수정이 없으므로 v0.1.1 CHANGELOG에 알린다(2026-11-22 Human 「v0.1.1 때 함께 정리」).
+

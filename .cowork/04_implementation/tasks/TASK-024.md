@@ -64,7 +64,7 @@ native CI(3 OS × 2 Rust)는 T3로 끝났다([EV-116](../../05_verification/veri
 
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
-| S1 | OS 간 파일 교환 | 각 OS(Linux·Windows·macOS)가 결정적 기록 세트(여러 채널·중요 기록·이벤트·회전 2개 이상)를 쓰고, 세 OS 각각이 세 OS의 파일을 모두 읽어 내용·개수·손실 0을 대조하는 CI 작업 | Planned |
+| S1 | OS 간 파일 교환 | 각 OS(Linux·Windows·macOS)가 결정적 기록 세트(여러 채널·중요 기록·이벤트·회전 2개 이상)를 쓰고, 세 OS 각각이 세 OS의 파일을 모두 읽어 내용·개수·손실 0을 대조하는 CI 작업 | In Progress — `os_exchange.rs`·CI `exchange-write/read`(`4ee4996`). 첫 CI(run `44974563161`)에서 macOS·Windows `Logger` 파일 출력 시작 실패를 발견 → ADR-009 개정 2로 수정(`9f687dd`, run `44985700707` 확인 중) |
 | S2 | P6 장애 주입(단기) | 대표 부하 아래 느린 파일·느린 구독자·공간 부족·DB/네트워크 단절·프로세스 강제 종료 후 `recover`를 각 몇 분씩 주입. 버퍼 상한 유지, 정책별 손실 보고, 복구 뒤 정상 경로 회복 | Planned |
 | S2-P | 정전 모의(외부 경보 → 3초 뒤 강제 종료) | 2026-11-22 Human 지시: 실물 UPS 대신, 대표 부하로 기록 중인 프로세스에 외부 구동기가 경보를 보내고(호스트 앱이 받아 생산자를 멈추고 facade `Logger::shutdown`을 남은 예산 3초 − 200 ms로 호출. local-pc-v1·EV-043과 같은 3초. 고급 경로 `notify_power`는 EV-043 범위) 정확히 3초 뒤 SIGKILL한다. 종료 협조 없음. 판정: 경보 전에 수락된 보호 대상(중요) 기록이 강제 종료 뒤 파일에 모두 남고, 파일은 `recover`로 읽히며 잘린 꼬리만 제외되고, 손실 보고가 실제 누락과 맞는다. 경보 시점을 바꿔 여러 회 반복 | Done — 6/6 Pass([EV-118](../../05_verification/verification_evidence.md#ev-118)), harness `soak.rs` |
 | S3 | soak harness와 리허설 | 대표 부하·제어 루프·주기 표본(RSS·fd·예약 바이트·손실/거절 카운터·디스크 사용·deadline miss)을 JSON으로 남기는 harness, 10분 리허설 | Done — 2026-11-22 10:50 KST 10분 리허설(RT·T500·링 16 GiB·60초 표본): 제어 2,980,000건·프레임 6,000건, 거절 0·miss 0·최악 1,426 µs, RSS 31.7 MB(10분간 +44 KiB, 링이 아직 안 참)·fd 5 고정, 1.53 GB·파일 183개, `verify` 전량 Pass(누락·중복·손상·손실 0). 링이 차는 약 1.9시간까지는 예열로 본다 |

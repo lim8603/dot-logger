@@ -894,7 +894,7 @@ let report = logger.shutdown(Duration::from_secs(3))?.wait_closed()?;
 - **`LogError` 실제 variant:** `Closing`·`Capacity`·`TooLarge`·`Encode`·`InvalidInput`·`SchemaMismatch`·`Exhausted`. core에 긴급 전원 전용 거절이 없어 `EmergencyPowerOff`는 넣지 않았다(긴급 종료는 `Closing`으로 보인다, RV-099).
 - **`FacadeReport`:** `core`·`writers_outstanding`·`worker_failed`·`io_failed`·`unconfirmed`. 파일 목록 요약 대신 `Logger::directories()`가 출력별 session/target 디렉터리를 준다.
 - **API 표면:** `Budget::new()`의 손실 값 setter(`memory_bytes`·`sync_every`·`drop_deadline`·`writer_quota`)와 성능 값 setter(`io_threads`·`batching`·`idle_wait`), `WriterQuota::small(..).with_raw(..)`, `Retention::{ring, continuous}.reserve(..)`, `Channel::at(level)`, `Writer::{try_log, try_log_at, producer, now_ns}`, `Logger::{channel, take_writer, directories, worker_failed, shutdown}`, `PendingShutdown::wait`.
-- **S3 이후:** CPU 고정(RV-096), `health()`(주기 sync 실패 노출 포함, RV-095), slot 직접 encode, tracing·remote·telemetry 선택 연결, worker panic 자동 시험(GAP-009). 비 Linux Unix에서는 여유 공간 관측이 없어 `start()`가 거절된다(RV-098, Tier 2).
+- **S3 이후:** CPU 고정(RV-096), `health()`(주기 sync 실패 노출 포함, RV-095), slot 직접 encode, tracing·remote·telemetry 선택 연결, worker panic 자동 시험(GAP-009). (2026-11-22 해소: `diagnostics::available_bytes`로 macOS·Windows도 시작, [ADR-009 개정 2](adrs/ADR-009_storage_transport_toolchain.md#개정-2--macoswindows-파일-출력2026-11-22)) 당시에는 비 Linux Unix에서 여유 공간 관측이 없어 `start()`가 거절됐다(RV-098, Tier 2).
 
 
 ### 18.9 S3a 구현 반영 — 2026-11-07

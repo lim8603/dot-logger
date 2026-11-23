@@ -398,6 +398,9 @@ fn f9_health_is_running_and_tracks_periodic_sync_per_output() {
     assert!(report.is_success(), "{report:?}");
 }
 
+// The fault is a failing directory sync; Windows does not sync directories
+// (it relies on NTFS journaling, REV-072 RV-194), so it never sees it.
+#[cfg(unix)]
 #[test]
 fn f9_health_reports_a_poisoned_output_as_failed() {
     use dot_logger::logger::{Failure, HealthState};
@@ -505,6 +508,9 @@ fn f10_opt_in_telemetry_samples_capture_counts_once_per_second() {
     assert!(report.is_success(), "{report:?}");
 }
 
+// Worker CPU placement exists only on Linux; elsewhere an Optional request
+// is reported as not applied instead of validated (tc_013_affinity).
+#[cfg(target_os = "linux")]
 #[test]
 fn f11_unknown_worker_cpu_is_rejected_before_anything_starts() {
     use dot_logger::platform::Requirement;

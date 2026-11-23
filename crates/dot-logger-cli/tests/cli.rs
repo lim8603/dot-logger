@@ -2301,7 +2301,7 @@ fn obsolete_export_command_is_rejected_without_creating_a_file() {
     assert_eq!(std::fs::read(&f.source).unwrap(), before);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(unix, windows))]
 fn mixed_revision_fixture() -> Fixture {
     let mut f = fixture([10, 20]);
     let mut config = support::plan().config().clone();
@@ -2416,7 +2416,7 @@ fn mixed_revision_fixture() -> Fixture {
     std::fs::write(&f.manifest, serde_json::to_vec(&manifest).unwrap()).unwrap();
     f
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(unix, windows))]
 #[test]
 fn manifest_v2_queries_and_replays_multiple_revisions_and_rejects_wrong_identity() {
     let f = mixed_revision_fixture();
@@ -2462,7 +2462,7 @@ fn manifest_v2_queries_and_replays_multiple_revisions_and_rejects_wrong_identity
         assert!(records(&result.1).is_empty());
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(any(unix, windows))]
 #[test]
 fn recovery_v2_keeps_each_source_revision_in_separate_new_files() {
     let f = mixed_revision_fixture();
@@ -2498,7 +2498,7 @@ fn recovery_v2_keeps_each_source_revision_in_separate_new_files() {
     assert_eq!(std::fs::read(output.join("0.mcap")).unwrap(), before);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(unix, windows))]
 #[test]
 fn multi_file_recovery_bounds_the_job_and_keeps_the_completed_prefix_on_later_damage() {
     let f = mixed_revision_fixture();

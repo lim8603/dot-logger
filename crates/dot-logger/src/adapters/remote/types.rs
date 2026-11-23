@@ -77,6 +77,15 @@ impl RemoteLimits {
             })
             .and_then(|n| n.checked_add(self.connections.checked_mul(16384)?))
             .and_then(|n| n.checked_add(16384))
+            // The hub's registry lock and one state lock per subscription
+            // (Apple allocates each on first lock, REV-072 RV-199).
+            .and_then(|n| {
+                n.checked_add(
+                    self.subscriptions
+                        .checked_add(1)?
+                        .checked_mul(crate::sync::MUTEX_BYTES)?,
+                )
+            })
             .ok_or(RemoteError::Limit)
     }
     pub(crate) fn chunk_bytes(&self) -> usize {

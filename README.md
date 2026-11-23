@@ -54,6 +54,12 @@ use it as a git dependency pinned to a release tag (see
 dot-logger = { git = "https://github.com/lim8603/dot-logger", tag = "v0.1.0" }
 ```
 
+dot-logger's dependencies are version ranges, so Cargo picks their newest
+compatible releases. On Rust 1.85 itself, a project on edition 2021 should set
+`resolver = "3"` in its `[package]` (or `[workspace]`) so Cargo picks releases
+that still support 1.85; edition 2024 projects already do, and a committed
+`Cargo.lock` keeps whatever versions it records.
+
 `dot_logger::logger` is the default path. This is the complete L1 recipe,
 [`examples/recipes/l1_file.rs`](examples/recipes/l1_file.rs):
 

@@ -7,12 +7,19 @@ version.
 
 ## [Unreleased]
 
+### Added
+
+- `diagnostics::available_bytes`: free space below a path on Linux, macOS
+  and Windows. A missing path is an error on every OS.
+
 ### Fixed
 
 - File output on macOS and Windows: `Logger::start()` failed with
   `Unsupported` because the free-space check and the directory sync were
   Linux-only. They now use `statvfs` on Unix and the `fs4` crate on Windows,
-  and Windows skips the directory sync (NTFS journals it).
+  and Windows skips the directory sync (NTFS journals it). On Windows, keep
+  logs on a local NTFS volume: after a power loss a just-removed ring file
+  can reappear, and FAT32, exFAT and network shares give no such guarantee.
 
 ### Verified
 

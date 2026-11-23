@@ -87,41 +87,65 @@ mod heap {
     #[global_allocator]
     static GLOBAL: Counting = Counting;
 
-    /// glibc `struct mallinfo2` (all arenas, glibc 2.33+).
-    #[repr(C)]
-    struct MallInfo2 {
-        arena: usize,
-        ordblks: usize,
-        smblks: usize,
-        hblks: usize,
-        hblkhd: usize,
-        usmblks: usize,
-        fsmblks: usize,
-        uordblks: usize,
-        fordblks: usize,
-        keepcost: usize,
-    }
-    unsafe extern "C" {
-        fn mallinfo2() -> MallInfo2;
-        fn malloc_trim(pad: usize) -> i32;
-    }
-
     /// Live bytes now, their lowest point since the last sample, the
-    /// allocator calls so far and glibc's own view of its arenas.
+    /// allocator calls so far (`alloc`, `alloc_zeroed` and `realloc`; frees
+    /// are not counted) and glibc's own view of its arenas.
     pub fn sample() -> Value {
         let live = LIVE.load(Relaxed);
         let low = LOW.swap(live, Relaxed).min(live);
-        // SAFETY: mallinfo2 takes no arguments and only reads allocator state.
-        let info = unsafe { mallinfo2() };
-        let _ = (info.smblks, info.usmblks, info.fsmblks, info.keepcost);
         json!({"live_bytes":live,"low_bytes":low,"calls":CALLS.load(Relaxed),
-            "glibc":{"arena":info.arena,"chunks_free":info.ordblks,"mmap_chunks":info.hblks,
-                "mmap_bytes":info.hblkhd,"in_use":info.uordblks,"free":info.fordblks}})
+            "glibc":glibc::arenas()})
     }
     /// Return free heap pages to the kernel; true when some were released.
     pub fn trim() -> bool {
-        // SAFETY: malloc_trim takes a plain size and is thread-safe.
-        unsafe { malloc_trim(0) == 1 }
+        glibc::trim()
+    }
+
+    /// `mallinfo2` and `malloc_trim` are glibc extensions; other Linux C
+    /// libraries such as musl report no arenas and trim nothing (REV-072
+    /// RV-197), so the counting allocator still builds there.
+    #[cfg(target_env = "gnu")]
+    mod glibc {
+        use serde_json::{Value, json};
+
+        /// glibc `struct mallinfo2` (all arenas, glibc 2.33+).
+        #[repr(C)]
+        struct MallInfo2 {
+            arena: usize,
+            ordblks: usize,
+            smblks: usize,
+            hblks: usize,
+            hblkhd: usize,
+            usmblks: usize,
+            fsmblks: usize,
+            uordblks: usize,
+            fordblks: usize,
+            keepcost: usize,
+        }
+        unsafe extern "C" {
+            fn mallinfo2() -> MallInfo2;
+            fn malloc_trim(pad: usize) -> i32;
+        }
+        pub fn arenas() -> Value {
+            // SAFETY: mallinfo2 takes no arguments and only reads allocator state.
+            let info = unsafe { mallinfo2() };
+            let _ = (info.smblks, info.usmblks, info.fsmblks, info.keepcost);
+            json!({"arena":info.arena,"chunks_free":info.ordblks,"mmap_chunks":info.hblks,
+                "mmap_bytes":info.hblkhd,"in_use":info.uordblks,"free":info.fordblks})
+        }
+        pub fn trim() -> bool {
+            // SAFETY: malloc_trim takes a plain size and is thread-safe.
+            unsafe { malloc_trim(0) == 1 }
+        }
+    }
+    #[cfg(not(target_env = "gnu"))]
+    mod glibc {
+        pub fn arenas() -> serde_json::Value {
+            serde_json::Value::Null
+        }
+        pub fn trim() -> bool {
+            false
+        }
     }
 }
 #[cfg(target_os = "linux")]

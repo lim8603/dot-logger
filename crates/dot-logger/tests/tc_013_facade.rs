@@ -1,6 +1,6 @@
 //! TC-013 TASK-027: facade builder, owned writers, default worker and shutdown.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#![cfg(target_os = "linux")]
+#![cfg(any(unix, windows))]
 
 use dot_logger::logger::{
     Budget, Channel, ChannelOptions, EncodeError, Level, Logged, Logger, LookupError, Missing,

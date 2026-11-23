@@ -8,17 +8,25 @@
 # so a background build or regression is never broken.
 #
 # Usage: scripts/clean-build-cache.sh [--threshold PERCENT] [--dry-run]
+# Linux only: reads usage with GNU coreutils `df --output`.
 set -euo pipefail
 
 threshold=60
 dry_run=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --threshold) threshold="$2"; shift 2 ;;
+    --threshold)
+      if [ $# -lt 2 ]; then echo "--threshold needs a value" >&2; exit 2; fi
+      threshold="$2"; shift 2 ;;
     --dry-run) dry_run=1; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+case "$threshold" in
+  ''|*[!0-9]*) echo "--threshold must be a whole percent, got: $threshold" >&2; exit 2 ;;
+esac
+if [ "$threshold" -gt 100 ]; then echo "--threshold must be at most 100" >&2; exit 2; fi
 
 target="${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd)/target}"
 if [ ! -d "$target" ]; then

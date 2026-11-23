@@ -12,7 +12,11 @@ use std::path::{Path, PathBuf};
 pub trait SegmentStore {
     /// Seekable file/adapter sink; logger buffering is separately reserved.
     type Sink: SyncSink;
-    /// Whether directory metadata synchronization is implemented by this adapter.
+    /// Whether this adapter meets its platform's directory-entry contract:
+    /// `sync_directory` either makes created, renamed and removed entries
+    /// durable or, where the platform offers no such call, relies on a
+    /// documented guarantee instead (see [`FileStore`] on Windows). False
+    /// means neither, and the logger refuses to start such a store.
     fn directory_sync_supported(&self) -> bool;
     /// Fresh observed filesystem free bytes. Concurrent external writes can race it.
     fn available_bytes(&mut self) -> io::Result<u64>;
@@ -20,7 +24,8 @@ pub trait SegmentStore {
     fn create(&mut self, sequence: u64) -> io::Result<Self::Sink>;
     /// Rename the synced, closed active file to sequence.mcap without replacement.
     fn finalize(&mut self, sequence: u64) -> io::Result<()>;
-    /// Synchronize directory metadata; unsupported operations must return an error.
+    /// Synchronize directory metadata as `directory_sync_supported` describes;
+    /// an adapter without any such contract must return an error, never `Ok`.
     fn sync_directory(&mut self) -> io::Result<()>;
     /// Remove only the named previously published closed file.
     fn remove(&mut self, sequence: u64) -> io::Result<()>;
@@ -29,10 +34,15 @@ pub trait SegmentStore {
 /// The host supplies an actual free-space probe; there is no invented capacity.
 /// On Unix, directory entries are made durable with a directory fsync. On
 /// Windows, which cannot open a directory for flushing through std, file
-/// contents are still flushed and directory entries rely on NTFS metadata
-/// journaling: after a crash a rename is either present or absent, and
-/// recovery reads `.active` files either way. Other hosts can implement
-/// SegmentStore with their own capability-aware primitives.
+/// contents are still flushed (`FlushFileBuffers`) but the directory is not:
+/// entries rely on local NTFS metadata journaling, which keeps each entry
+/// change atomic but may apply it late. After a power loss a rename may be
+/// missing, which loses nothing because recovery reads `.active` files, and a
+/// ring file removed shortly before may reappear, so the directory can briefly
+/// hold more than the ring limit. FAT32, exFAT and network shares (SMB) do not
+/// journal entries and give no such guarantee; use a local NTFS directory.
+/// Other hosts can implement SegmentStore with their own capability-aware
+/// primitives.
 pub struct FileStore<F: FnMut() -> io::Result<u64>> {
     directory: PathBuf,
     free: F,
@@ -44,7 +54,8 @@ fn sync_dir(path: &Path) -> io::Result<()> {
     }
     #[cfg(windows)]
     {
-        // No std primitive flushes a directory; NTFS journals the entry.
+        // No std primitive flushes a directory; local NTFS journals the entry
+        // (atomic, possibly late; see FileStore, REV-072 RV-194).
         let _ = path;
         Ok(())
     }

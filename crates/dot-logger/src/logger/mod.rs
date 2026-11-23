@@ -46,7 +46,7 @@ mod preset;
 mod remote;
 #[cfg(feature = "tracing-adapter")]
 mod sink;
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, any(unix, windows)))]
 mod tests;
 mod writer;
 

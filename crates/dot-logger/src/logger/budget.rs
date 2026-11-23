@@ -419,8 +419,10 @@ pub(crate) const HOST_EVENTS: usize = 256;
 /// RV-124): per writer the encode scratch (one small slot) and the 1-slot
 /// return mailbox; per output the IO write batch and, for `events` event
 /// slots in total, the mark map of its IO thread; on the host the dispatch
-/// event buffer and three per-producer sync range arrays. Thread stacks,
-/// channel queues and the bounded sync work list are not included.
+/// event buffer and three per-producer sync range arrays; and the facade's
+/// own locks (writer table, telemetry history, tracing sink), which Apple
+/// allocates on first lock (REV-072 RV-199). Thread stacks, channel queues
+/// and the bounded sync work list are not included.
 pub(crate) fn facade_bytes(
     quotas: &[WriterQuota],
     outputs: usize,
@@ -446,8 +448,14 @@ pub(crate) fn facade_bytes(
     writers
         .checked_add(batches)?
         .checked_add(host)?
-        .checked_add(super::event::held_bytes(events)?)
+        .checked_add(super::event::held_bytes(events)?)?
+        .checked_add(FACADE_LOCKS.checked_mul(crate::sync::MUTEX_BYTES)?)
 }
+
+/// Locks the facade warms beside the core: `Held::writers`,
+/// `Shared::telemetry` and the tracing `SinkState::writer` (counted even when
+/// telemetry or tracing is off).
+const FACADE_LOCKS: usize = 3;
 
 /// Longest horizon an `Instant` deadline is clamped to: far enough to mean
 /// "unbounded" for any caller, small enough never to overflow (RV-123).

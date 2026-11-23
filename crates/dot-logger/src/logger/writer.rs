@@ -390,7 +390,7 @@ impl Drop for Writer {
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, any(unix, windows)))]
 mod closing_tests {
     #![allow(clippy::unwrap_used)]
     use super::*;

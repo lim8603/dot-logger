@@ -9,7 +9,7 @@
 use dot_logger::calibrate::Stop;
 use dot_logger::calibrate::{CalibrateError, Calibration, Fact, Profile, ProfileError};
 use dot_logger::logger::{EncodeError, Logger, LoggerBuilder, Preset, Record, Retention, Schema};
-#[cfg(target_os = "linux")]
+#[cfg(any(unix, windows))]
 use dot_logger::logger::{PlanWarning, Shutdown};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -133,7 +133,9 @@ fn f19_reserve_shrinks_the_write_limit() {
     // Leave about 16 MiB above the reserve, well under the 64 MiB limit.
     // Other processes may move free space before `run` reads it again, so
     // the check uses the free space the run itself saw (EV-119 flake).
-    let reserve = free - 16 * MIB;
+    let reserve = free
+        .checked_sub(16 * MIB)
+        .expect("the temp directory needs more than 16 MiB free");
     let profile = Calibration::new(&temp.0)
         .write_limit(64 * MIB)
         .disk_reserve(reserve)
@@ -145,7 +147,8 @@ fn f19_reserve_shrinks_the_write_limit() {
     assert_eq!(profile.write().stopped_by, Stop::DiskReserve);
     assert_eq!(
         profile.write().bytes,
-        seen - reserve,
+        seen.checked_sub(reserve)
+            .expect("free space fell below the reserve during the run"),
         "the room above the reserve"
     );
     assert!(profile.write().bytes < 64 * MIB);
@@ -396,8 +399,8 @@ fn f20_profile_stall_lengthens_the_absorb_but_a_user_absorb_wins() {
 }
 
 #[test]
-// Starts the facade, whose file output needs the Linux free-space probe (RV-172).
-#[cfg(target_os = "linux")]
+// Starts the facade, whose file output needs a free-space probe (RV-172).
+#[cfg(any(unix, windows))]
 fn f20_plan_warns_on_memory_and_load_but_start_is_not_blocked() {
     let _disk = disk();
     let temp = Temp::new();

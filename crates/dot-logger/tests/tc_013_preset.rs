@@ -1,7 +1,7 @@
 //! TC-013 F15 (TASK-028 S1): presets and sizing fill missing loss values
 //! deterministically, never override user values, and explain the result.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-#![cfg(target_os = "linux")]
+#![cfg(any(unix, windows))]
 
 use dot_logger::config::Resource;
 use dot_logger::logger::{

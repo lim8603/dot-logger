@@ -88,6 +88,7 @@ impl Reassembler {
         let bytes = max_record_bytes
             .checked_add(1024)
             .and_then(|n| n.checked_mul(records))
+            .and_then(|n| n.checked_add(crate::sync::MUTEX_BYTES))
             .ok_or(RemoteError::Limit)?;
         let reservation = budget.reserve(bytes).map_err(|_| RemoteError::Limit)?;
         Ok(Self {

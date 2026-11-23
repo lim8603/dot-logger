@@ -10,7 +10,9 @@ use std::sync::Mutex;
 
 /// Heap bytes a std `Mutex` allocates on its first lock: the Apple
 /// `pthread_mutex_t`, and nothing elsewhere. Reservations that cover a struct
-/// holding a mutex add this.
+/// holding a mutex add this. The 64-byte Apple size is an assumption about
+/// std's implementation; the RT allocation tests on the macOS CI runner
+/// fail if a warmed lock or its accounting falls short.
 pub(crate) const MUTEX_BYTES: usize = if cfg!(target_vendor = "apple") { 64 } else { 0 };
 
 /// A std `Mutex` already locked once, so later locks never allocate.

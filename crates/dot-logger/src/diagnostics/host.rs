@@ -367,6 +367,14 @@ pub fn linux_available_bytes(path: &Path) -> io::Result<u64> {
 /// supported OS: `statvfs` on Unix (Linux and macOS), `GetDiskFreeSpaceExW`
 /// through `fs4` on Windows. Other platforms return Unsupported, never zero
 /// or infinite capacity. A snapshot, not a quota reservation.
+///
+/// A missing `path` is an error on every OS (Windows would otherwise report
+/// the free space of the volume the path would be on). What "free" means
+/// follows the OS: Unix reports blocks available to unprivileged users
+/// (`f_bavail`, without per-user quotas; on macOS APFS purgeable space is not
+/// included), Windows reports the bytes available to the caller, which does
+/// apply NTFS per-user quotas. On Windows the volume path is resolved into a
+/// buffer of 261 UTF-16 units, so a longer volume mount path fails.
 pub fn available_bytes(path: &Path) -> io::Result<u64> {
     #[cfg(unix)]
     {
@@ -375,6 +383,9 @@ pub fn available_bytes(path: &Path) -> io::Result<u64> {
     }
     #[cfg(windows)]
     {
+        // GetVolumePathNameW resolves a missing path to its volume; reject it
+        // as statvfs does (REV-072 RV-195).
+        std::fs::metadata(path)?;
         fs4::available_space(path)
     }
     #[cfg(not(any(unix, windows)))]
@@ -406,9 +417,8 @@ mod portable_tests {
             free > 0,
             "a writable temp directory reports some free space"
         );
-        // Windows reports the volume of a missing path; Unix rejects it.
-        #[cfg(unix)]
-        assert!(super::available_bytes(&dir.join("dot-logger-no-such-dir/x")).is_err());
+        let missing = super::available_bytes(&dir.join("dot-logger-no-such-dir/x")).unwrap_err();
+        assert_eq!(missing.kind(), std::io::ErrorKind::NotFound, "{missing}");
         #[cfg(target_os = "linux")]
         {
             // Same statvfs source as the Linux-only probe, within ongoing writes.

@@ -10,7 +10,7 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 장기·OS 간 파일 교환(TASK-024)·실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 2단계부터 TASK-026 뒤. MS-009 Done |
-| 활성 Task | [TASK-024](../04_implementation/tasks/TASK-024.md) In Progress — S1 OS 간 교환 9/9 Pass([EV-119](../05_verification/verification_evidence.md#ev-119), macOS·Windows 파일 출력 결함 발견·수정 = ADR-009 개정 2, v0.1.1 대상), S2-P 정전 모의 6/6 Pass([EV-118](../05_verification/verification_evidence.md#ev-118)), S3 리허설 Pass. S4 24h **진행 중** — 2026-11-22 16:57:23 시작, 2026-11-23 16:57 무렵 종료(RT·T500·약 2.55 MB/s·약 220 GB, 매시 7분 세션 점검, 이 PC 빌드 금지). 남은 S2 장애 주입·S5. TASK-018 Cancelled(B2) |
+| 활성 Task | [TASK-024](../04_implementation/tasks/TASK-024.md) In Progress — S1 OS 간 교환 9/9 Pass([EV-119](../05_verification/verification_evidence.md#ev-119), macOS·Windows 파일 출력 결함 발견·수정 = ADR-009 개정 2, v0.1.1 대상), S2-P 정전 모의 6/6 Pass([EV-118](../05_verification/verification_evidence.md#ev-118)), S3 리허설 Pass. S4 24h **완주**(2026-11-22 16:57 → 11-23 16:57, [EV-120](../05_verification/verification_evidence.md#ev-120)): 손실·거절·miss 0, 최악 1.94 ms, 디스크 ≤ 링, fd 5, `verify --ring` Pass. RSS 예열 뒤 +328 KiB 단조 증가로 판정 보류(원인 확인 중). 남은 S4 판정·S2 장애 주입·S5. TASK-018 Cancelled(B2) |
 | 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
 | 상태 | 34/37 Task Done, MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
@@ -67,7 +67,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-22 | 착수(일정 판단 밖). S1 OS 간 파일 교환(CI) → S2 장애 주입 → S3 soak harness·10분 리허설 → S4 24h(RT·T500·약 2 MB/s·약 170 GB, 시작 전 승인) → S5 |
+| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | 착수(일정 판단 밖). S1 OS 간 파일 교환(CI) → S2 장애 주입 → S3 soak harness·10분 리허설 → S4 24h(RT·T500·약 2 MB/s·약 170 GB, 시작 전 승인) → S5 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 
 ## 코드리뷰 현황 (Reviews)
@@ -94,6 +94,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 다음 시작점
 
 0. **TASK-024 착수(2026-11-22 Human 「TASK-024로 넘어가자」):** 24h·전원 차단(UPS 모의)·OS 간 파일 생성·읽기 교환. 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 그 뒤 TASK-026(dot-probe 적용 → MS-010 2~3단계), INT-002 구체화.
+   - S4: 24h 완주·대조 Pass(EV-120). RSS 원인 확인(heap/파일 매핑 구분) → 판정. soak 데이터 16 GB(`/home/lim8603/s3-data/soak-24h-2026-11-22`)는 판정 뒤 지우고 `soak.jsonl`만 남긴다.
    - 24h 뒤: `tc_013_calibrate::f19_reserve_shrinks_the_write_limit` 간헐 실패(여유 공간을 두 번 재는 사이 병렬 시험이 파일을 지우면 깨짐, EV-119) 견고화. v0.1.1(macOS·Windows 파일 출력 수정, ADR-009 개정 2) CHANGELOG·태그는 Human 결정 「v0.1.1 때 함께 정리」.
    - `delete_repo` 권한 회수 확인(2026-11-22 `gh auth status` 범위: gist·read:org·repo·workflow).
    - 공개 준비 점검·권장 방식 기록(#003·#004)은 [상태 아카이브](state_archive.md) #032로 옮겼다.

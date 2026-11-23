@@ -1827,6 +1827,16 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **발견과 수정:** 첫 실행(run `44974563161`)에서 facade 파일 출력이 macOS·Windows에서 `start()`부터 `Unsupported`였다(여유 공간 조회 Linux 전용, Windows 디렉터리 동기화). [ADR-009 개정 2](../03_design_artifacts/adrs/ADR-009_storage_transport_toolchain.md#개정-2--macoswindows-파일-출력2026-11-22)로 `diagnostics::available_bytes`(Unix statvfs·Windows `fs4`)와 Windows 디렉터리 동기화 생략(NTFS 저널링)을 넣었다(`9f687dd`). 이어 run `44985700707`에서 드러난 Miri의 FFI 시험·Windows의 없는 경로 의미·calibrate Linux 전용 계약을 `ad11ba3`에서 정리했고, debug 쓰기가 Windows에서 `Capacity`로 거절돼 교환 작업은 release·속도 절반으로 바꿨다.
 - **판정에 쓰는 범위:** 같은 기록의 OS 간 읽기/교환(ADR-006 결정 5, Tier 2 크로스 파일 판독)의 실행 근거. 성능·장기·전원은 범위 밖이다. 같은 run의 `contracts (ubuntu-24.04, 1.85.0)`는 이 변경과 무관한 `f19_reserve_shrinks_the_write_limit`(여유 공간을 두 번 재는 사이 병렬 시험이 파일을 지우면 깨질 수 있음)로 실패해 해당 job만 재실행했고 재실행은 Pass였다 — run 전체 Success. 이 시험은 간헐 실패로 보고, 24h 뒤 견고하게 고친다(project_state 다음 시작점).
 
+### EV-120 — TASK-024 S4 24시간 soak(RT, T500)
+
+- **대상:** `crates/dot-logger/examples/soak.rs`, HEAD `7ab23f5`에서 release 빌드(sha256 `342e6d0e87e13b62…`). 커널 `7.0.0-43-realtime`, 제어 스레드 SCHED_FIFO 70·CPU 2·`mlockall`. 출력 T500(루트 파일 시스템) `/home/lim8603/s3-data/soak-24h-2026-11-22`, 링 보존 16 GiB, 60초 표본 1,440개. 2026-11-22 16:57:23 → 2026-11-23 16:57 KST(86,400초).
+- **부하:** facade 256 B 기록 5,000건/s(10 ms 주기 제어 루프, 매 주기 500 µs 합성 작업을 `calibrate_periodic`으로 보정) + 64 KiB 원본 대여 10건/s. 약 2.56 MB/s, 24h SSD 쓰기 약 220 GB.
+- **실행 결과(`soak.jsonl` end):** `success: true`. 제어 431,970,050건·프레임 864,001건, 거절 0·0, deadline miss 0/8,639,401 주기, 최악 응답 1,940 µs(기한 10 ms). 셧다운 `Closed`, 기한 초과 없음, 총 432,834,051건 완료·failed/dropped/unknown 0, worker·IO 실패 없음, `soak.err` 비어 있음.
+- **자원:** 디스크는 링이 찬 뒤(약 1.9시간) 16.86~16.88 GB(15.71~15.72 GiB ≤ 16 GiB), 파일 2,009~2,015개. fd는 5개로 유지되고 회전 순간 6개로 잡힌 표본이 1,440개 중 5개(모두 다음 표본에서 5). RSS는 시작 31,732 KiB, 링이 찬 직후 32,288 KiB, 종료 직전 32,616 KiB(2시간 단위 증가 100·40·4·16·8·4·0·8·8·4·4 KiB, 감소 없음, 변화 56번 모두 4~144 KiB 단위). 셧다운 뒤 RSS 19,608 KiB.
+- **읽기 대조(2026-11-23, `soak verify <dir> 431970050 864001 --ring`):** Pass. 파일 2,009개 모두 읽힘(torn·unreadable 0), payload 손상 0·중복 0·외부 기록 0. 남은 기록은 제어 32,834,940건·프레임 65,671건(각각 마지막 약 1.82시간)이고 빠진 것은 앞부분(링 삭제)뿐, 중간 빈 곳 0. 손실 보고 10,582개 모두 0인 행. 대조는 16초·최대 RSS 43 MB(페이지 캐시에서 읽음).
+- **판정(S4 기준):** 정상 부하 손실 0·추가 deadline miss 0·디스크 ≤ 링 상한·fd 증가 없음·회전 파일 전부 읽기 대조 Pass. **RSS는 보류** — 예열 뒤에도 22시간 동안 +328 KiB(1%) 단조 증가했다. 증가 폭은 줄었지만 마지막 16시간도 시간당 약 3 KiB 남아 있다. 회전(시간당 약 1,100개)·기록(시간당 1,800만 건) 단위 누수라면 훨씬 크거나 일정한 크기여야 해서 누수 가능성은 낮지만, 표본이 VmRSS 하나뿐이라 heap과 파일 매핑 페이지를 구분하지 못했다. 원인을 확인한 뒤 판정한다.
+- **범위:** RT 커널 한 대의 장기 실행 근거. generic 커널 장기 행은 미실행. 물리 전원 소실은 범위 밖(EV-043·EV-118).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

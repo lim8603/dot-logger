@@ -13,9 +13,18 @@ use dot_logger::logger::{EncodeError, Logger, LoggerBuilder, Preset, Record, Ret
 use dot_logger::logger::{PlanWarning, Shutdown};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const MIB: u64 = 1024 * 1024;
+
+/// Tests that write to the temp file system run one at a time, so a free-space
+/// reading in one test is not moved by another test's probe (EV-119 flake).
+fn disk() -> MutexGuard<'static, ()> {
+    static DISK: Mutex<()> = Mutex::new(());
+    DISK.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 struct Temp(PathBuf);
 impl Temp {
@@ -51,6 +60,7 @@ fn go() -> AtomicBool {
 #[cfg(target_os = "linux")]
 #[test]
 fn f19_write_limit_stops_the_run_and_leaves_no_file() {
+    let _disk = disk();
     let temp = Temp::new();
     let profile = Calibration::new(&temp.0)
         .write_limit(3 * MIB)
@@ -78,6 +88,7 @@ fn f19_write_limit_stops_the_run_and_leaves_no_file() {
 #[cfg(target_os = "linux")]
 #[test]
 fn f19_time_limit_stops_after_the_first_block() {
+    let _disk = disk();
     let temp = Temp::new();
     let profile = Calibration::new(&temp.0)
         .write_limit(64 * MIB)
@@ -116,16 +127,28 @@ fn f19_reserve_without_room_for_one_block_is_rejected_without_files() {
 #[cfg(target_os = "linux")]
 #[test]
 fn f19_reserve_shrinks_the_write_limit() {
+    let _disk = disk();
     let temp = Temp::new();
     let free = dot_logger::diagnostics::linux_available_bytes(&temp.0).unwrap();
-    // Leave exactly 2 MiB above the reserve.
+    // Leave about 16 MiB above the reserve, well under the 64 MiB limit.
+    // Other processes may move free space before `run` reads it again, so
+    // the check uses the free space the run itself saw (EV-119 flake).
+    let reserve = free - 16 * MIB;
     let profile = Calibration::new(&temp.0)
         .write_limit(64 * MIB)
-        .disk_reserve(free - 2 * MIB)
+        .disk_reserve(reserve)
         .run(&go())
         .unwrap();
-    assert!(profile.write().bytes <= 2 * MIB);
+    let Fact::Observed(seen) = profile.host().free_bytes else {
+        panic!("free space not observed");
+    };
     assert_eq!(profile.write().stopped_by, Stop::DiskReserve);
+    assert_eq!(
+        profile.write().bytes,
+        seen - reserve,
+        "the room above the reserve"
+    );
+    assert!(profile.write().bytes < 64 * MIB);
     assert_eq!(temp.entries(), 0);
 }
 
@@ -135,6 +158,7 @@ fn f19_reserve_shrinks_the_write_limit() {
 #[cfg(target_os = "linux")]
 #[test]
 fn f19_cancellation_during_measurement_stops_and_removes_the_probe() {
+    let _disk = disk();
     fn probe_bytes(dir: &Path) -> u64 {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return 0;
@@ -235,6 +259,7 @@ fn f19_other_platforms_fail_unsupported_without_files() {
 #[cfg(target_os = "linux")]
 #[test]
 fn f19_linux_host_facts_are_observed() {
+    let _disk = disk();
     let temp = Temp::new();
     let profile = Calibration::new(&temp.0)
         .write_limit(MIB)
@@ -374,6 +399,7 @@ fn f20_profile_stall_lengthens_the_absorb_but_a_user_absorb_wins() {
 // Starts the facade, whose file output needs the Linux free-space probe (RV-172).
 #[cfg(target_os = "linux")]
 fn f20_plan_warns_on_memory_and_load_but_start_is_not_blocked() {
+    let _disk = disk();
     let temp = Temp::new();
     // Sustained estimate = 2 bytes/s burst / 2 = 1 byte/s.
     let slow =

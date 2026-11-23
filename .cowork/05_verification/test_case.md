@@ -237,7 +237,7 @@ TASK-021 [EV-043](verification_evidence.md#ev-043): TC-011 신규11개·정상 �
 ### TC-012 — 플랫폼·실사용 성능·장시간 종합
 
 - 관련: MS-007 / NFR-001~007 / 주요 FR 종단
-- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097)에 있다. 8 GiB P3·정식 P5 Pass는 [EV-103](verification_evidence.md#ev-103)이다. LAN P4 소형은 ADR-015 뒤 [EV-104](verification_evidence.md#ev-104)에서 충족됐다(Wi-Fi p99 10.86 ms). 유선 P4-bulk는 하드웨어 CRC 뒤 [EV-105](verification_evidence.md#ev-105)에서 쌍별 98.8–100.5%로 충족됐다. 장기 P6·native·3 OS는 TASK-024에 남는다.
+- 상태: Partial. P1~P3 당시 근거는 EV-064~070. 루프백 포화 정량은 [EV-097](verification_evidence.md#ev-097)에 있다. 8 GiB P3·정식 P5 Pass는 [EV-103](verification_evidence.md#ev-103)이다. LAN P4 소형은 ADR-015 뒤 [EV-104](verification_evidence.md#ev-104)에서 충족됐다(Wi-Fi p99 10.86 ms). 유선 P4-bulk는 하드웨어 CRC 뒤 [EV-105](verification_evidence.md#ev-105)에서 쌍별 98.8–100.5%로 충족됐다. 장기 P6·native·3 OS는 TASK-024에 남는다. 2026-11-23: native 3 OS·파일 교환 [EV-116](verification_evidence.md#ev-116)·[EV-119](verification_evidence.md#ev-119), 정전 모의 [EV-118](verification_evidence.md#ev-118), P6 중 24h(기록·회전 부하, RT) [EV-120](verification_evidence.md#ev-120) Pass. P6 장애 주입(TASK-024 S2)과 조회·전송 동시 장시간(TASK-040)은 남는다.
 
 | 단계 | 입력·동작 | 기대 결과 |
 |---|---|---|

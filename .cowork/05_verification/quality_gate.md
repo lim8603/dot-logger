@@ -218,7 +218,7 @@ F-11 소비자 목록(최근 계약 강화와 영향 경로):
 | 항목 | 판정 | 근거·남은 일 |
 |---|---|---|
 | 통합 테스트 전체 통과 | Not Ready | 로컬 통합·종단은 통과. TC-012의 P6 24시간·native·3 OS·실사용처, TC-011의 MS-007 부분이 Not Run |
-| NFR 검증 | Not Ready | NFR-001·002·005·006은 이 PC 측정 근거가 있다([EV-064](verification_evidence.md#ev-064)~[EV-070](verification_evidence.md#ev-070), [EV-097](verification_evidence.md#ev-097)~[EV-105](verification_evidence.md#ev-105)). NFR-003 24h·NFR-007 3 OS는 Not Run |
+| NFR 검증 | Not Ready | NFR-001·002·005·006은 이 PC 측정 근거가 있다([EV-064](verification_evidence.md#ev-064)~[EV-070](verification_evidence.md#ev-070), [EV-097](verification_evidence.md#ev-097)~[EV-105](verification_evidence.md#ev-105)). NFR-003 24h는 기록·회전 부하 RT 24h Pass([EV-120](verification_evidence.md#ev-120), 2026-11-23 갱신 — 조회·전송 동시 장시간은 TASK-040). NFR-007 3 OS는 native CI·파일 교환 Pass([EV-116](verification_evidence.md#ev-116)·[EV-119](verification_evidence.md#ev-119)). 장애 주입 P6(TASK-024 S2)·Gate 5 재판정은 남음 |
 | 문서 최종 업데이트 | Partial | 공개 README와 `07_delivery` 작업 문서(TASK-025 S2·S3) 완료. 릴리즈 노트는 미배포 초안이고 TASK-024·026 결과 반영 전 |
 | 산출물 범위 충족 | Not Ready | deliverable_plan의 필수 산출물 다수가 수집중이고 공식 `docs/`는 만들지 않았다 |
 

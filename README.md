@@ -260,11 +260,18 @@ No feature is enabled by default.
 - **Platform.** Measured on one Linux x86_64 PC, with both a generic and a
   PREEMPT_RT kernel. CI runs the tests, including the real-time allocation
   tests, on Ubuntu 24.04, Windows Server 2025 and macOS 15 with both Rust
-  versions, and they pass. Performance was not measured on Windows or macOS,
-  and files have not yet been exchanged between operating systems in a test.
+  versions, and they pass. A CI job also writes a log on each of the three
+  systems and reads all three logs back on each of them. Performance was not
+  measured on Windows or macOS.
 - **Power loss** was verified with simulated UPS signals and real file IO,
   not with a physical UPS.
-- **Not yet done:** a 24-hour soak test and a production integration.
+- **24-hour soak** on the PREEMPT_RT kernel: 432 million records at about
+  2.5 MB/s into a 16 GiB ring, with no loss, no rejected record, no missed
+  control-loop deadline and every remaining file read back intact. Open files
+  and the live heap stayed flat; the resident size rose 1% over 22 hours as
+  the system allocator kept freed pages. It covered recording and rotation;
+  queries and remote streaming were not running at the same time.
+- **Not yet done:** a production integration.
 - **Dependencies** are audited with RustSec. One indirect dependency, `paste`,
   is reported as unmaintained.
 

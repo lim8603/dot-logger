@@ -5,6 +5,22 @@ All notable changes to this project are documented here. The project follows
 bumps the minor version (0.1 → 0.2) and every workspace crate shares one
 version.
 
+## [Unreleased]
+
+### Fixed
+
+- File output on macOS and Windows: `Logger::start()` failed with
+  `Unsupported` because the free-space check and the directory sync were
+  Linux-only. They now use `statvfs` on Unix and the `fs4` crate on Windows,
+  and Windows skips the directory sync (NTFS journals it).
+
+### Verified
+
+- Logs written on Linux, Windows and macOS are read back on all three in CI.
+- A 24-hour soak on the PREEMPT_RT kernel (432 million records, about
+  2.5 MB/s, 16 GiB ring) finished with no loss, rejection or missed deadline,
+  and every remaining file read back intact.
+
 ## [0.1.0] — 2026-11-22 (preview)
 
 The first preview release of dot-logger, a Rust logging and telemetry library

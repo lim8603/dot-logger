@@ -38,7 +38,7 @@
 | TASK-021 | UPS 긴급 계획·상태·모의 시험 | MS-006 | INT-001 | US-001·002·003·004 | AI | Done | 2026-11-13 | Done(2026-11-13 완료 기준 변경, EV-078). 잔여 native TASK-024·실사용처 TASK-026 | TASK-009·TASK-006 | [상세](tasks/TASK-021.md) | 2~4 |
 | TASK-022 | 실제 장비·플랫폼 검증 프로필 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-11-13 | Done — local-pc-v1·RT capability(EV-021·070). native·다른 OS는 TASK-024(T3) | TASK-001 | [상세](tasks/TASK-022.md) | 1~2 |
 | TASK-023 | P0~P5 성능·RT·자원 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-11-13 | Done — P0~P3·계측 비용·RT 행(EV-064~070). P4·P5·RV-049 이월 T7, 실앱 행 TASK-026 | TASK-027·TASK-017·TASK-021·TASK-022 | [상세](tasks/TASK-023.md) | 3~5 |
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-22 | 2026-11-22 착수 — S1 OS 간 파일 교환(CI) → S2 장애 주입 → S3 soak harness → S4 24h(RT·T500·약 2 MB/s, 시작 전 Human 승인) → S5 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
+| TASK-024 | 24시간·전원 차단·OS 교환 검증 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | In Progress | 2026-11-23 | S1 OS 교환(EV-119)·S2-P 정전 모의(EV-118)·S3 리허설·S4 24h(EV-120) Done. 남은 S2 장애 주입 → S5 | TASK-023 | [상세](tasks/TASK-024.md) | 3~5 |
 | TASK-025 | 사용 문서·MS 추적표·인수 정리 | MS-007 | INT-001 | US-001·002·003·004·005 | AI | Done | 2026-11-21 | S1~S4 Done, 2026-11-21 Human 수락(Gate 4 Pass·Gate 5 Not Ready). TASK-033·MS-009 뒤, TASK-024·026 앞(2026-11-15). 문서 검토: 설치/통합/관측/조절/장애/보존 예제와 실제 기능의 불일치 | TASK-033·TASK-032 | [상세](tasks/TASK-025.md) | 1~2 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | MS-007 | INT-001 | US-001·002·003·004 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖, 2026-11-13). 그 전 착수 안 함 | TASK-020·TASK-021 | [상세](tasks/TASK-026.md) | 2~4 |
 | TASK-027 | 기본 실행 계층(facade)과 기본 worker | MS-008 | INT-001 | US-001·002·003 | AI | Done | 2026-11-13 | Done — S1~S3·REV-051 승인. S3d 이월 T4, Skipped 경로 시험은 TASK-033 | TASK-006·TASK-008·TASK-014·TASK-021 | [상세](tasks/TASK-027.md) | 4~6 |
@@ -52,6 +52,10 @@
 | TASK-035 | 손실 기록의 파일 내 표시와 채널별 손실 수 | MS-009 | INT-001 | US-002·003·004 | AI | Done | 2026-11-18 | S1 형식, S2 손실·회전과 E 파일 판독·비용·최종 회귀 완료(EV-088, REV-061 Closed) | TASK-030 | [상세](tasks/TASK-035.md) | 3~4 |
 | TASK-036 | 배포 가능화(MCAP 별칭 crate·외부 소비자 빌드·의존성 범위) | MS-010 | INT-001 | US-001·003 | AI | Done | 2026-11-22 | Done — S1~S5(EV-114~116, 3 OS CI Pass), 2026-11-22 Human 승인. 외부 소비자 컴파일 실패(E0599) 해소 | 없음 | [상세](tasks/TASK-036.md) | 1~2 |
 | TASK-037 | v0.1.0 미리보기 릴리즈(CHANGELOG·태그·pre-release) | MS-010 | INT-001 | US-001·003 | AI | Done | 2026-11-22 | Done — 태그 `v0.1.0`·GitHub pre-release·태그 소비자 빌드(EV-117) | TASK-036 | [상세](tasks/TASK-037.md) | 0.5 |
+| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | MS-007 | INT-001 | US-004 | AI | In Progress | 2026-11-23 | 2026-11-23 Human 등록 지시. 시험 격리(디스크 쓰기 시험 순서화·여유 확대) | 없음 | [상세](tasks/TASK-038.md) | 0.25 |
+| TASK-039 | 대표 부하의 할당 경로 확인 | MS-007 | INT-001 | US-001 | AI | Planned | 2026-11-23 | EV-120 진단의 할당기 호출 초당 약 13,100번 — 제어 스레드 할당 여부 확인 | 없음 | [상세](tasks/TASK-039.md) | 0.5~1 |
+| TASK-040 | 조회·전송을 섞은 장시간 실행 | MS-007 | INT-001 | US-002·003 | AI | Planned | 2026-11-23 | 요구 "회전·조회·전송 포함 24h" 중 EV-120에 없는 부분. S0 범위 Human 결정 | TASK-024 S4 | [상세](tasks/TASK-040.md) | 0.5+실행 |
+| TASK-041 | v0.1.1 패치 릴리즈 | MS-010 | INT-001 | US-001·003 | AI | Planned | 2026-11-23 | macOS·Windows 파일 출력 수정(ADR-009 개정 2)·24h 결과. 태그는 Human 확인 뒤 | TASK-037 | [상세](tasks/TASK-041.md) | 0.5 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

@@ -212,8 +212,8 @@ dot-logger config apply --endpoint ... --base-revision N --patch patch.json
 | ID | 항목 | 질문 | 상태 |
 | --- | --- | --- | --- |
 | OQ-OPS-1 | 경고·위험 임계값 | 거절 수, 디스크 사용률, 대응 시간 기준 | TASK-026 첫 사용처에서 결정 |
-| OQ-OPS-2 | 장기 운영 | 24시간 이상 연속 운영의 자원 추이 | TASK-024 미실행 |
-| OQ-OPS-3 | 다른 OS | Windows·macOS 동작과 성능 | T3(공개 후 native 검증) 미실행 |
+| OQ-OPS-2 | 장기 운영 | 24시간 이상 연속 운영의 자원 추이 | 기록·회전 부하 24h 확인(EV-120): RSS 약 32 MB에서 22시간 +1%(glibc 할당기 보유, heap 누수 없음), fd 5, 디스크 ≤ 링 상한. 조회·전송 동시는 TASK-040 |
+| OQ-OPS-3 | 다른 OS | Windows·macOS 동작과 성능 | 동작: native CI·파일 교환 Pass(EV-116·119, v0.1.0의 파일 출력 결함은 v0.1.1에서 수정). 성능: 미실행 |
 | OQ-OPS-4 | 쓰기 오류 후 재열기 | 디스크 복구 뒤 재시작 없이 이어 쓰기 | B1 범위 밖 |
 | OQ-OPS-5 | 백업 주기 | 기록 파일 외부 보관 정책 | 호스트 정책, 미확정 |
 

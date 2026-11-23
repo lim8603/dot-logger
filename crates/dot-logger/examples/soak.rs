@@ -13,6 +13,13 @@
 //! `verify` checks a finished `run` directory; `--ring` allows the ring to
 //! have deleted the oldest records, as long as the rest is a gapless suffix.
 //!
+//! For fault injection (TASK-024 S2) `run` also takes `--sample-ms`,
+//! `--reserve-mib` and, with the `remote` feature, `--remote <port>`; samples
+//! then carry each output's failed records and time since its last sync.
+//! `inspect` reports what a directory holds (closed and, with `--active`,
+//! unfinished files) and the latest cumulative loss checkpoint, without a
+//! pass/fail judgment: the S2 driver (`scripts/soak-faults.py`) judges.
+//!
 //! Measurement harness only, never a product API. RT rows set
 //! `DOT_LOGGER_PERF_RT=fifo` (control thread SCHED_FIFO 70 on CPU 2, memory
 //! locked), as `perf_baseline` does; the control thread is always pinned.
@@ -206,9 +213,38 @@ mod linux {
     const SAFETY: Duration = Duration::from_millis(200);
     const POWER_RING_MIB: u64 = 1024;
     const MAX_PRODUCERS: usize = 8;
-    const USAGE: &str = "usage: soak run <parent> <seconds> <sample_s> <ring_mib> | \
+    const USAGE: &str = "usage: soak run <parent> <seconds> <sample_s> <ring_mib> \
+        [--sample-ms <ms>] [--reserve-mib <mib>] [--remote <port>] | \
         power <parent> <delay_s>[,<delay_s>...] | \
-        verify <dir> <control_records> <frames> [--ring]";
+        verify <dir> <control_records> <frames> [--ring] | \
+        inspect <dir> <control_records> <frames> [--active]";
+
+    /// Fault-injection options of `run` (TASK-024 S2).
+    #[derive(Default)]
+    struct Options {
+        sample_ms: Option<u64>,
+        reserve_mib: u64,
+        remote: Option<u16>,
+    }
+    impl Options {
+        fn parse(rest: &[&str]) -> Result<Self, Error> {
+            let mut options = Self::default();
+            let mut it = rest.iter();
+            while let Some(flag) = it.next() {
+                let value = it.next().ok_or_else(|| invalid(USAGE))?;
+                match *flag {
+                    "--sample-ms" => options.sample_ms = Some(value.parse()?),
+                    "--reserve-mib" => options.reserve_mib = value.parse()?,
+                    "--remote" => options.remote = Some(value.parse()?),
+                    _ => return Err(invalid(USAGE)),
+                }
+            }
+            if options.remote.is_some() && !cfg!(feature = "remote") {
+                return Err(invalid("--remote needs the remote feature"));
+            }
+            Ok(options)
+        }
+    }
 
     fn invalid(text: impl Into<String>) -> Error {
         io::Error::other(text.into()).into()
@@ -401,10 +437,14 @@ mod linux {
         }
         Ok(())
     }
-    fn mcap_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
+    /// Closed `.mcap` files and, with `active`, unfinished `.active` ones.
+    fn log_files(dir: &Path, active: bool) -> io::Result<Vec<PathBuf>> {
         let mut all = Vec::new();
         files(dir, &mut all)?;
-        all.retain(|p| p.extension().is_some_and(|e| e == "mcap"));
+        all.retain(|p| {
+            p.extension()
+                .is_some_and(|e| e == "mcap" || (active && e == "active"))
+        });
         all.sort();
         Ok(all)
     }
@@ -435,19 +475,37 @@ mod linux {
         Ok(())
     }
 
-    fn run(parent: &Path, seconds: u64, sample_s: u64, ring_mib: u64) -> Result<(), Error> {
+    fn run(
+        parent: &Path,
+        seconds: u64,
+        sample_s: u64,
+        ring_mib: u64,
+        options: &Options,
+    ) -> Result<(), Error> {
         let rt = rt_mode()?;
         if rt {
             perf::lock_memory()?;
         }
-        let logger = Logger::builder()
+        let builder = Logger::builder()
             .preset(Preset::sensor(FRAME_HZ, FRAME_BYTES).small(CONTROL_HZ, CONTROL_BYTES))
-            .file_output(parent, Retention::ring(ring_mib << 20))
+            .file_output(
+                parent,
+                Retention::ring(ring_mib << 20).reserve(options.reserve_mib << 20),
+            )
             .channel::<Control>("soak/control")
             .channel::<[u8]>("soak/frame")
             .writer("control")
-            .writer("frame")
-            .start()?;
+            .writer("frame");
+        #[cfg(feature = "remote")]
+        let builder = match options.remote {
+            Some(port) => builder.remote(dot_logger::adapters::remote::ServerConfig {
+                enabled: true,
+                address: std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+                ..Default::default()
+            }),
+            None => builder,
+        };
+        let logger = builder.start()?;
         let control = logger.channel::<Control>("soak/control")?;
         let frame = logger.channel::<[u8]>("soak/frame")?;
         let control_writer = logger.take_writer("control")?;
@@ -458,6 +516,7 @@ mod linux {
         let started = Instant::now();
         emit(json!({"event":"start","kernel":perf::kernel()?,
             "realtime":perf::realtime_kernel(),"rt_mode":rt,"ring_mib":ring_mib,
+            "reserve_mib":options.reserve_mib,"remote":options.remote,
             "seconds":seconds,"dirs":dirs,
             "load":{"control_hz":CONTROL_HZ,"control_bytes":CONTROL_BYTES,
                 "frame_hz":FRAME_HZ,"frame_bytes":FRAME_BYTES}}))?;
@@ -485,7 +544,11 @@ mod linux {
         });
         let mut alarms = Some(alarm_rx);
         let end = started + Duration::from_secs(seconds);
-        let sample = Duration::from_secs(sample_s.max(1));
+        let sample = options
+            .sample_ms
+            .map_or(Duration::from_secs(sample_s.max(1)), |ms| {
+                Duration::from_millis(ms.max(10))
+            });
         let mut next_sample = started + sample;
         let alarm = loop {
             let now = Instant::now();
@@ -519,11 +582,21 @@ mod linux {
                 let mut counts = stats.counts();
                 counts["interval_max_response_us"] =
                     json!(stats.interval_max_ns.swap(0, Ordering::AcqRel) / 1000);
+                let health = logger.health();
+                let outputs: Vec<Value> = health
+                    .outputs
+                    .iter()
+                    .map(|o| {
+                        json!({"failed_records":o.failed_records,"failed":o.failed,
+                            "since_sync_ms":o.since_sync.map(|d| d.as_millis() as u64)})
+                    })
+                    .collect();
                 emit(json!({"event":"sample","t_s":started.elapsed().as_secs(),
+                    "t_ms":started.elapsed().as_millis() as u64,"outputs":outputs,
                     "rss_kib":status_kib("VmRSS:"),"hwm_kib":status_kib("VmHWM:"),
                     "rss_anon_kib":status_kib("RssAnon:"),"rss_file_kib":status_kib("RssFile:"),
                     "heap":super::heap::sample(),"fds":fds(),"disk_bytes":bytes,"files":count,
-                    "health":format!("{:?}",logger.health().state),
+                    "health":format!("{:?}",health.state),
                     "worker_failed":logger.worker_failed(),"counts":counts}))?;
             }
         };
@@ -563,6 +636,29 @@ mod linux {
             thread::sleep(Duration::from_secs(120));
             return Err(invalid("not killed after the alarm"));
         }
+        // Producers are stopped; let records still in the pipeline settle so
+        // the failed count compares with the shutdown report (TASK-024 S2).
+        let mut health = logger.health();
+        let mut steady = 0;
+        for _ in 0..50 {
+            thread::sleep(Duration::from_millis(100));
+            let next = logger.health();
+            let same = next
+                .outputs
+                .iter()
+                .map(|o| o.failed_records)
+                .eq(health.outputs.iter().map(|o| o.failed_records));
+            health = next;
+            steady = if same { steady + 1 } else { 0 };
+            if steady == 5 {
+                break;
+            }
+        }
+        let outputs: Vec<Value> = health
+            .outputs
+            .iter()
+            .map(|o| json!({"failed_records":o.failed_records,"failed":o.failed}))
+            .collect();
         let shutdown = logger
             .shutdown(Duration::from_secs(30))
             .map_err(|e| invalid(format!("shutdown: {e:?}")))?;
@@ -570,6 +666,7 @@ mod linux {
         emit(json!({"event":"end","success":shutdown.is_success(),
             "elapsed_s":started.elapsed().as_secs(),"counts":stats.counts(),
             "failures":failures,"disk_bytes":bytes,"files":count,
+            "health":format!("{:?}",health.state),"outputs":outputs,
             "rss_kib":status_kib("VmRSS:"),"hwm_kib":status_kib("VmHWM:"),"fds":fds(),
             "report":format!("{shutdown:?}")}))?;
         if shutdown.is_success() && failures.is_empty() {
@@ -592,6 +689,11 @@ mod linux {
         corrupt_payloads: u64,
         loss_reports: u64,
         nonzero_loss_rows: u64,
+        /// `.active` files read (only with `--active`) and how many end torn.
+        active_files: usize,
+        torn_active: usize,
+        /// Latest cumulative checkpoint per observer: id and "scope/cause" sums.
+        losses: std::collections::BTreeMap<u32, (u64, std::collections::BTreeMap<String, u64>)>,
     }
     /// Missing indices: oldest prefix (allowed for a ring) and gaps after it.
     fn missing(seen: &[bool]) -> (usize, usize) {
@@ -600,13 +702,21 @@ mod linux {
         (prefix, gaps)
     }
     fn scan(dir: &Path, control: u64, frames: u64) -> Result<Found, Error> {
+        scan_files(dir, control, frames, false)
+    }
+    fn scan_files(dir: &Path, control: u64, frames: u64, active: bool) -> Result<Found, Error> {
         let mut found = Found {
             control: vec![false; usize::try_from(control)?],
             frames: vec![false; usize::try_from(frames)?],
             ..Found::default()
         };
-        for path in mcap_files(dir)? {
-            found.files += 1;
+        for path in log_files(dir, active)? {
+            let is_active = path.extension().is_some_and(|e| e == "active");
+            if is_active {
+                found.active_files += 1;
+            } else {
+                found.files += 1;
+            }
             let bytes = fs::read(&path)?;
             let reader = match NativeReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
                 Ok(reader) => reader,
@@ -622,7 +732,12 @@ mod linux {
                 .collect();
             for item in reader {
                 let Ok(stored) = item else {
-                    found.torn_files += 1;
+                    // A killed writer leaves a torn tail; recovery drops it.
+                    if is_active {
+                        found.torn_active += 1;
+                    } else {
+                        found.torn_files += 1;
+                    }
                     break;
                 };
                 let id = stored.record.metadata.channel_id;
@@ -655,10 +770,53 @@ mod linux {
                     found.loss_reports += 1;
                     found.nonzero_loss_rows +=
                         report.counts.iter().filter(|c| c.count != 0).count() as u64;
+                    let latest = found
+                        .losses
+                        .entry(report.observer)
+                        .or_insert_with(|| (report.checkpoint, Default::default()));
+                    if report.checkpoint > latest.0 {
+                        *latest = (report.checkpoint, Default::default());
+                    }
+                    if report.checkpoint == latest.0 {
+                        for c in &report.counts {
+                            *latest
+                                .1
+                                .entry(format!("{:?}/{:?}", c.scope, c.cause))
+                                .or_default() += c.count;
+                        }
+                    }
                 }
             }
         }
         Ok(found)
+    }
+    /// Indices seen: count, first, last, and holes between first and last.
+    fn span(seen: &[bool]) -> Value {
+        let first = seen.iter().position(|s| *s);
+        let last = seen.iter().rposition(|s| *s);
+        let holes = match (first, last) {
+            (Some(a), Some(b)) => seen[a..=b].iter().filter(|s| !**s).count(),
+            _ => 0,
+        };
+        json!({"seen":seen.iter().filter(|s| **s).count(),"first":first,"last":last,
+            "holes":holes})
+    }
+    fn inspect(dir: &Path, control: u64, frames: u64, active: bool) -> Result<(), Error> {
+        let found = scan_files(dir, control, frames, active)?;
+        let losses: serde_json::Map<String, Value> = found
+            .losses
+            .iter()
+            .map(|(observer, (checkpoint, sums))| {
+                (
+                    observer.to_string(),
+                    json!({"checkpoint":checkpoint,"counts":sums}),
+                )
+            })
+            .collect();
+        emit(json!({"event":"inspect","dir":dir,"active":active,
+            "found":found_json(&found),"active_files":found.active_files,
+            "torn_active":found.torn_active,"losses":losses,
+            "control":span(&found.control),"frames":span(&found.frames)}))
     }
     fn found_json(found: &Found) -> Value {
         let (control_prefix, control_gaps) = missing(&found.control);
@@ -811,12 +969,19 @@ mod linux {
         let args: Vec<String> = std::env::args().skip(1).collect();
         let a: Vec<&str> = args.iter().map(String::as_str).collect();
         match a.as_slice() {
-            ["run", parent, seconds, sample, ring] => run(
+            ["run", parent, seconds, sample, ring, rest @ ..] => run(
                 Path::new(parent),
                 seconds.parse()?,
                 sample.parse()?,
                 ring.parse()?,
+                &Options::parse(rest)?,
             ),
+            ["inspect", dir, control, frames] => {
+                inspect(Path::new(dir), control.parse()?, frames.parse()?, false)
+            }
+            ["inspect", dir, control, frames, "--active"] => {
+                inspect(Path::new(dir), control.parse()?, frames.parse()?, true)
+            }
             ["power", parent, delays] => power(Path::new(parent), delays),
             ["verify", dir, control, frames] => {
                 verify(Path::new(dir), control.parse()?, frames.parse()?, false)

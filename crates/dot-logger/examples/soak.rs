@@ -19,6 +19,111 @@
 #[cfg(target_os = "linux")]
 #[path = "support/perf/mod.rs"]
 mod perf;
+
+/// Heap accounting for the RSS judgment (TASK-024 S4, EV-120): live bytes
+/// and their lowest point between samples, so a leak (live bytes rising)
+/// can be told apart from allocator retention (RSS rising, live bytes flat).
+/// Harness only; the unsafe here forwards to `System` unchanged.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+mod heap {
+    use serde_json::{Value, json};
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
+
+    struct Counting;
+    static LIVE: AtomicUsize = AtomicUsize::new(0);
+    static LOW: AtomicUsize = AtomicUsize::new(usize::MAX);
+    static CALLS: AtomicU64 = AtomicU64::new(0);
+
+    fn grow(by: usize) {
+        LIVE.fetch_add(by, Relaxed);
+        CALLS.fetch_add(1, Relaxed);
+    }
+    fn shrink(by: usize) {
+        // Wrapping: an allocator must never panic.
+        let now = LIVE.fetch_sub(by, Relaxed).wrapping_sub(by);
+        LOW.fetch_min(now, Relaxed);
+    }
+
+    // SAFETY: every method passes the caller's pointer, layout and size to
+    // `System` unchanged and returns its result; the counters only observe.
+    unsafe impl GlobalAlloc for Counting {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: the caller upholds `GlobalAlloc::alloc`'s contract.
+            let ptr = unsafe { System.alloc(layout) };
+            if !ptr.is_null() {
+                grow(layout.size());
+            }
+            ptr
+        }
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: as for `alloc`.
+            let ptr = unsafe { System.alloc_zeroed(layout) };
+            if !ptr.is_null() {
+                grow(layout.size());
+            }
+            ptr
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            // SAFETY: `ptr` came from this allocator (that is, `System`) with `layout`.
+            unsafe { System.dealloc(ptr, layout) };
+            shrink(layout.size());
+        }
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            // SAFETY: as for `dealloc`, and the caller checked `new_size`.
+            let new = unsafe { System.realloc(ptr, layout, new_size) };
+            if !new.is_null() {
+                if new_size >= layout.size() {
+                    grow(new_size - layout.size());
+                } else {
+                    shrink(layout.size() - new_size);
+                    CALLS.fetch_add(1, Relaxed);
+                }
+            }
+            new
+        }
+    }
+    #[global_allocator]
+    static GLOBAL: Counting = Counting;
+
+    /// glibc `struct mallinfo2` (all arenas, glibc 2.33+).
+    #[repr(C)]
+    struct MallInfo2 {
+        arena: usize,
+        ordblks: usize,
+        smblks: usize,
+        hblks: usize,
+        hblkhd: usize,
+        usmblks: usize,
+        fsmblks: usize,
+        uordblks: usize,
+        fordblks: usize,
+        keepcost: usize,
+    }
+    unsafe extern "C" {
+        fn mallinfo2() -> MallInfo2;
+        fn malloc_trim(pad: usize) -> i32;
+    }
+
+    /// Live bytes now, their lowest point since the last sample, the
+    /// allocator calls so far and glibc's own view of its arenas.
+    pub fn sample() -> Value {
+        let live = LIVE.load(Relaxed);
+        let low = LOW.swap(live, Relaxed).min(live);
+        // SAFETY: mallinfo2 takes no arguments and only reads allocator state.
+        let info = unsafe { mallinfo2() };
+        let _ = (info.smblks, info.usmblks, info.fsmblks, info.keepcost);
+        json!({"live_bytes":live,"low_bytes":low,"calls":CALLS.load(Relaxed),
+            "glibc":{"arena":info.arena,"chunks_free":info.ordblks,"mmap_chunks":info.hblks,
+                "mmap_bytes":info.hblkhd,"in_use":info.uordblks,"free":info.fordblks}})
+    }
+    /// Return free heap pages to the kernel; true when some were released.
+    pub fn trim() -> bool {
+        // SAFETY: malloc_trim takes a plain size and is thread-safe.
+        unsafe { malloc_trim(0) == 1 }
+    }
+}
 #[cfg(target_os = "linux")]
 fn main() -> std::process::ExitCode {
     match linux::execute() {
@@ -392,11 +497,22 @@ mod linux {
                     json!(stats.interval_max_ns.swap(0, Ordering::AcqRel) / 1000);
                 emit(json!({"event":"sample","t_s":started.elapsed().as_secs(),
                     "rss_kib":status_kib("VmRSS:"),"hwm_kib":status_kib("VmHWM:"),
-                    "fds":fds(),"disk_bytes":bytes,"files":count,
+                    "rss_anon_kib":status_kib("RssAnon:"),"rss_file_kib":status_kib("RssFile:"),
+                    "heap":super::heap::sample(),"fds":fds(),"disk_bytes":bytes,"files":count,
                     "health":format!("{:?}",logger.health().state),
                     "worker_failed":logger.worker_failed(),"counts":counts}))?;
             }
         };
+        if alarm.is_none() {
+            // Still under load: how much of the RSS is free heap glibc keeps.
+            let rss = |f| status_kib(f);
+            let before = json!({"rss_kib":rss("VmRSS:"),"rss_anon_kib":rss("RssAnon:"),
+                "heap":super::heap::sample()});
+            let released = super::heap::trim();
+            emit(json!({"event":"trim","released":released,"before":before,
+                "after":{"rss_kib":rss("VmRSS:"),"rss_anon_kib":rss("RssAnon:"),
+                    "heap":super::heap::sample()}}))?;
+        }
         stop.store(true, Ordering::Release);
         let mut failures = Vec::new();
         for worker in workers {

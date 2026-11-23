@@ -1,0 +1,117 @@
+{
+  "scenario": "f3a",
+  "pass": true,
+  "error": null,
+  "started_unix": 1795444089.430206,
+  "seconds": 241.2,
+  "phases": [
+    {
+      "phase": "pre",
+      "t": 0.407
+    },
+    {
+      "phase": "fill",
+      "t": 60.451
+    },
+    {
+      "phase": "free",
+      "t": 181.233
+    }
+  ],
+  "checks": {
+    "closed_files_deleted_under_pressure": true,
+    "records_failed_during_fault": true,
+    "failed_stop_after_free": true,
+    "output_not_failed": true,
+    "health_records_failed": true,
+    "rejected_0": true,
+    "shutdown_not_success_expected": true,
+    "failed_records": 562774,
+    "loss_report_matches_failed": true,
+    "file_holes_match_failed": true,
+    "files_intact": true,
+    "deadline_misses_0": true,
+    "heap_growth_bytes": 66722,
+    "heap_bounded": true,
+    "heap_returns": true
+  },
+  "detail": {
+    "exit": 4,
+    "end": {
+      "counts": {
+        "control": 1180000,
+        "control_iterations": 2080916,
+        "control_rejected": 0,
+        "frames": 2400,
+        "frames_rejected": 0,
+        "misses": 0,
+        "periods": 23600,
+        "worst_response_us": 1793
+      },
+      "disk_bytes": 154154121,
+      "elapsed_s": 240,
+      "event": "end",
+      "failures": [],
+      "fds": 4,
+      "files": 27,
+      "health": "Degraded(RecordsFailed)",
+      "hwm_kib": 33492,
+      "outputs": [
+        {
+          "failed": false,
+          "failed_records": 562774
+        }
+      ],
+      "report": "Closed(FacadeReport { core: ShutdownReport { phase: Closed, deadline_elapsed: false, totals: CompletionTotals { records: 1182400, assigned: 1182400, complete: 619626, failed: 562774, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1167474, overflowed: false }, required: CompletionTotals { records: 1182400, assigned: 1182400, complete: 619626, failed: 562774, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1167474, overflowed: false }, ingress: 0, queued: 0, pending: 0, in_flight: 0, feedback: 0, raw_loaned: 0, raw_in_use: 0, raw_queued: 0, raw_return_pending: 0, producer_calls: 0, sync_in_flight: 0, sync_failed: false }, writers_outstanding: 0, worker_failed: false, io_failed: false, unconfirmed: [ProducerRange { producer_id: 0, first: 1, last: 1180000 }, ProducerRange { producer_id: 1, first: 1, last: 2400 }] })",
+      "rss_kib": 29960,
+      "success": false
+    },
+    "inspect": {
+      "active": false,
+      "active_files": 0,
+      "control": {
+        "first": 316685,
+        "holes": 561650,
+        "last": 1179999,
+        "seen": 301665
+      },
+      "dir": "/home/lim8603/s3-data/task024-s2/f3a",
+      "event": "inspect",
+      "found": {
+        "control": {
+          "expected": 1180000,
+          "missing_gaps": 561650,
+          "missing_prefix": 316685
+        },
+        "corrupt_payloads": 0,
+        "duplicates": 0,
+        "files": 27,
+        "foreign": 0,
+        "frames": {
+          "expected": 2400,
+          "missing_gaps": 1124,
+          "missing_prefix": 673
+        },
+        "loss_reports": 228,
+        "nonzero_loss_rows": 452,
+        "torn_files": 0,
+        "unreadable_files": 0
+      },
+      "frames": {
+        "first": 673,
+        "holes": 1124,
+        "last": 2399,
+        "seen": 603
+      },
+      "losses": {
+        "1": {
+          "checkpoint": 351,
+          "counts": {
+            "OutputFailed/Adapter": 562774
+          }
+        }
+      },
+      "torn_active": 0
+    }
+  }
+}

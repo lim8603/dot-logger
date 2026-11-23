@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-23 |
-| 다음 액션 | CI run `45181597098` 확인 → Done. CLI `tail` ACK 시험 간헐 실패 관찰(EV-121) 추적 |
+| 다음 액션 | run `45181597098`은 macOS·Windows Clippy 실패(`disk()` 미사용, REV-072 RV-196으로 해결). CI run `45197725224` 통과 확인 → Done. CLI `tail` ACK 시험 간헐 실패 관찰(EV-121) 추적 |
 | 의존 | 없음 |
 | 예상 소요 | 0.25 인일 |
 

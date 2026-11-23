@@ -56,6 +56,9 @@
 | TASK-039 | 대표 부하의 할당 경로 확인 | MS-007 | INT-001 | US-001 | AI | Planned | 2026-11-23 | EV-120 진단의 할당기 호출 초당 약 13,100번 — 제어 스레드 할당 여부 확인 | 없음 | [상세](tasks/TASK-039.md) | 0.5~1 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | MS-007 | INT-001 | US-002·003 | AI | Planned | 2026-11-23 | 요구 "회전·조회·전송 포함 24h" 중 EV-120에 없는 부분. S0 범위 Human 결정 | TASK-024 S4 | [상세](tasks/TASK-040.md) | 0.5+실행 |
 | TASK-041 | v0.1.1 패치 릴리즈 | MS-010 | INT-001 | US-001·003 | AI | Planned | 2026-11-23 | macOS·Windows 파일 출력 수정(ADR-009 개정 2)·24h 결과. 태그는 Human 확인 뒤 | TASK-037 | [상세](tasks/TASK-041.md) | 0.5 |
+| TASK-042 | `try_log` 지연 분포 측정과 README 공개 | MS-011 | INT-001 | US-001·004 | AI | Planned | 2026-11-23 | D1=둘 다·D2=A 결정(2026-11-23), D3 대기 → 하네스. v0.1.1 전. 외부 관점 지적 1(RT 로거 비교 입장권) | TASK-024 S2, TASK-039(하네스 공유) | [상세](tasks/TASK-042.md) | 1.5~2.5+실행 |
+| TASK-043 | RT용 미룬 서식 로그(서식 id + 인자) | MS-011 | INT-001 | US-001·002 | AI | Planned | 2026-11-23 | 0.2 후보. MS-010 2단계 전 기능 논의에서 채택 → 설계·ADR | 기능 논의 | [상세](tasks/TASK-043.md) | 4~7+ADR |
+| TASK-044 | `Record` derive 또는 prost 연동 | MS-011 | INT-001 | US-001 | AI | Planned | 2026-11-23 | 0.2 후보. 기능 논의에서 A(prost)/B(derive)/C 결정 | 기능 논의 | [상세](tasks/TASK-044.md) | 2~4 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

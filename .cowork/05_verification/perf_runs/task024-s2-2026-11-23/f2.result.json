@@ -1,0 +1,164 @@
+{
+  "scenario": "f2",
+  "pass": true,
+  "error": null,
+  "started_unix": 1795443734.6291366,
+  "seconds": 354.8,
+  "phases": [
+    {
+      "phase": "pre",
+      "t": 0.051
+    },
+    {
+      "phase": "F2a stop 0 (8s)",
+      "t": 60.095
+    },
+    {
+      "phase": "F2a stop 1 (8s)",
+      "t": 88.109
+    },
+    {
+      "phase": "F2a stop 2 (8s)",
+      "t": 116.124
+    },
+    {
+      "phase": "F2b stop (120s)",
+      "t": 149.143
+    },
+    {
+      "phase": "reconnect",
+      "t": 284.143
+    }
+  ],
+  "checks": {
+    "subscribers_receive_before": true,
+    "f2a_gap_events_after_stops": 229,
+    "f2a_gap_stream_alive": true,
+    "f2a_gap_receives_after_last_resume": true,
+    "f2a_disconnect_ended": true,
+    "f2a_disconnect_outcome": {
+      "command": "tail",
+      "data": {
+        "acknowledged": 600,
+        "exit_code": 3,
+        "outcome": "unknown",
+        "posted_host_io": "completion_unconfirmed",
+        "records": 604
+      },
+      "kind": "summary",
+      "schema_version": 1
+    },
+    "f2b_gap_ended": true,
+    "f2b_gap_outcome": {
+      "command": "tail",
+      "data": {
+        "acknowledged": 1262,
+        "exit_code": 3,
+        "outcome": "unknown",
+        "posted_host_io": "completion_unconfirmed",
+        "records": 1266
+      },
+      "kind": "summary",
+      "schema_version": 1
+    },
+    "f2b_disconnect_ended": true,
+    "f2b_disconnect_outcome": {
+      "command": "tail",
+      "data": {
+        "acknowledged": 50,
+        "exit_code": 3,
+        "outcome": "unknown",
+        "posted_host_io": "completion_unconfirmed",
+        "records": 54
+      },
+      "kind": "summary",
+      "schema_version": 1
+    },
+    "f2b_reconnect_receives": true,
+    "file_failed_records_0": true,
+    "file_rejected_0": true,
+    "files_gapless": true,
+    "shutdown_success": true,
+    "deadline_misses_0": true,
+    "heap_growth_bytes": 525334,
+    "heap_bounded": true,
+    "heap_returns": true
+  },
+  "detail": {
+    "exit": 0,
+    "end": {
+      "counts": {
+        "control": 1745000,
+        "control_iterations": 1330632,
+        "control_rejected": 0,
+        "frames": 3540,
+        "frames_rejected": 0,
+        "misses": 0,
+        "periods": 34900,
+        "worst_response_us": 1392
+      },
+      "disk_bytes": 208310951,
+      "elapsed_s": 354,
+      "event": "end",
+      "failures": [],
+      "fds": 4,
+      "files": 36,
+      "health": "Running",
+      "hwm_kib": 36448,
+      "outputs": [
+        {
+          "failed": false,
+          "failed_records": 0
+        }
+      ],
+      "report": "Closed(FacadeReport { core: ShutdownReport { phase: Closed, deadline_elapsed: false, totals: CompletionTotals { records: 1748540, assigned: 1748540, complete: 1748540, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1732474, overflowed: false }, required: CompletionTotals { records: 1748540, assigned: 1748540, complete: 1748540, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1732474, overflowed: false }, ingress: 0, queued: 0, pending: 0, in_flight: 0, feedback: 0, raw_loaned: 0, raw_in_use: 0, raw_queued: 0, raw_return_pending: 0, producer_calls: 0, sync_in_flight: 0, sync_failed: false }, writers_outstanding: 0, worker_failed: false, io_failed: false, unconfirmed: [] })",
+      "rss_kib": 31956,
+      "success": true
+    },
+    "inspect": {
+      "active": false,
+      "active_files": 0,
+      "control": {
+        "first": 1337412,
+        "holes": 0,
+        "last": 1744999,
+        "seen": 407588
+      },
+      "dir": "/dev/shm/task024-s2/f2",
+      "event": "inspect",
+      "found": {
+        "control": {
+          "expected": 1745000,
+          "missing_gaps": 0,
+          "missing_prefix": 1337412
+        },
+        "corrupt_payloads": 0,
+        "duplicates": 0,
+        "files": 36,
+        "foreign": 0,
+        "frames": {
+          "expected": 3540,
+          "missing_gaps": 0,
+          "missing_prefix": 2724
+        },
+        "loss_reports": 155,
+        "nonzero_loss_rows": 0,
+        "torn_files": 0,
+        "unreadable_files": 0
+      },
+      "frames": {
+        "first": 2724,
+        "holes": 0,
+        "last": 3539,
+        "seen": 816
+      },
+      "losses": {
+        "1": {
+          "checkpoint": 663,
+          "counts": {}
+        }
+      },
+      "torn_active": 0
+    }
+  }
+}

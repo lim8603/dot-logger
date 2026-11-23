@@ -1,0 +1,75 @@
+{
+  "scenario": "f3b",
+  "pass": true,
+  "error": null,
+  "started_unix": 1795444330.6305656,
+  "seconds": 301.1,
+  "phases": [
+    {
+      "phase": "pre",
+      "t": 0.396
+    },
+    {
+      "phase": "take all inodes",
+      "t": 60.437
+    },
+    {
+      "phase": "poisoned",
+      "t": 62.386
+    },
+    {
+      "phase": "inodes freed",
+      "t": 62.451
+    }
+  ],
+  "checks": {
+    "bytes_free_at_fault": 388497408,
+    "io_poisoned": true,
+    "output_failed_sticks": true,
+    "rt_keeps_accepting": true,
+    "failures_keep_counting": true,
+    "failed_records": 1193131,
+    "report_failed_counts": [
+      1193131,
+      1193131
+    ],
+    "memory_failed_matches_report": true,
+    "shutdown_not_success_expected": true,
+    "deadline_misses_0": true,
+    "heap_growth_bytes": 109362,
+    "heap_bounded": true,
+    "heap_returns": true
+  },
+  "detail": {
+    "exit": 4,
+    "end": {
+      "counts": {
+        "control": 1485000,
+        "control_iterations": 1302434,
+        "control_rejected": 0,
+        "frames": 3000,
+        "frames_rejected": 0,
+        "misses": 0,
+        "periods": 29700,
+        "worst_response_us": 1379
+      },
+      "disk_bytes": 152117353,
+      "elapsed_s": 300,
+      "event": "end",
+      "failures": [],
+      "fds": 4,
+      "files": 26,
+      "health": "Failed(IoPoisoned)",
+      "hwm_kib": 33636,
+      "outputs": [
+        {
+          "failed": true,
+          "failed_records": 1193131
+        }
+      ],
+      "report": "Closed(FacadeReport { core: ShutdownReport { phase: Closed, deadline_elapsed: false, totals: CompletionTotals { records: 1488000, assigned: 1488000, complete: 294869, failed: 1193131, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1472474, overflowed: false }, required: CompletionTotals { records: 1488000, assigned: 1488000, complete: 294869, failed: 1193131, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1472474, overflowed: false }, ingress: 0, queued: 0, pending: 0, in_flight: 0, feedback: 0, raw_loaned: 0, raw_in_use: 0, raw_queued: 0, raw_return_pending: 0, producer_calls: 0, sync_in_flight: 0, sync_failed: true }, writers_outstanding: 0, worker_failed: false, io_failed: true, unconfirmed: [ProducerRange { producer_id: 0, first: 1, last: 1485000 }, ProducerRange { producer_id: 1, first: 1, last: 3000 }] })",
+      "rss_kib": 31452,
+      "success": false
+    }
+  }
+}

@@ -16,6 +16,7 @@
 | MS-008 | 소비처 통합 접점 경량화 | Build | Done | TASK-027·TASK-028·TASK-029·TASK-034 | facade 기본 worker·preset/auto preset·support 없는 레시피 | 8~13 | [상세](milestones/MS-008.md) |
 | MS-009 | 표준 호환과 원격 시각화 | Build | Done(2026-11-21) | TASK-030·TASK-031·TASK-032·TASK-035 | 표준 MCAP 판독·분리된 viewer 시각화·운영 대시보드 | 8~13 | [상세](milestones/MS-009.md) |
 | MS-010 | 릴리즈와 배포 | Verify→Deliver | In Progress(0·1단계 Done) | TASK-036·TASK-037·TASK-041 (2~4단계 Task는 착수 때 등록) | 외부 소비자 빌드·v0.1.0 미리보기·crates.io(TASK-026 뒤)·1.0(Gate 5) | 미정 | [상세](milestones/MS-010.md) |
+| MS-011 | RT 로거 비교 근거와 채택 편의 | Verify→Build | Planned(2026-11-23 등록) | TASK-042·TASK-043·TASK-044 | `try_log` 지연 분포 공개, RT 미룬 서식 로그·`Record` derive/prost(0.2 후보, 기능 논의에서 채택) | 7.5~13.5 | [상세](milestones/MS-011.md) |
 
 필수 합계 **61~102 인일**(주 5일 전담 기준 약 12.2~20.4주; 2026-11-04 MS-008/009 16~26 인일 추가), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
 

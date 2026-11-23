@@ -9,17 +9,20 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — TASK-024 S2 장애 주입·S5, TASK-038~040, 실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). MS-009 Done |
-| 활성 Task | **REV-072 Open(P1 1·P2 5·P3 3 조치 대기).** [TASK-038](../04_implementation/tasks/TASK-038.md) 로컬 Done(EV-121, CI 확인 남음) · [TASK-024](../04_implementation/tasks/TASK-024.md) S1·S2-P·S3·S4 Done(EV-118~120), S2 설계 작성(결정 D1~D3·RV-193 정렬 대기) · TASK-039·040·041 Planned · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | **[REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open / Conditional (2026-11-23)** — `ae22f9d..f30ae5a` 및 TASK-024 S2 설계 독립 리뷰(`RV-193~201`: **P1 1건[S2 설계 3항목] · P2 5건 · P3 3건**). REV-001~071 Closed |
-| 상태 | 34/41 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 활성 Milestone | MS-007 In Progress — TASK-024 S5, TASK-038~040, 실사용처(TASK-026) 잔여. [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 Planned(2026-11-23 등록, TASK-042~044). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). MS-009 Done |
+| 활성 Task | **REV-072 Resolved(RV-193~201 전부 수용·조치, EV-122) — 3 OS CI 통과 확인 뒤 Closed.** [TASK-038](../04_implementation/tasks/TASK-038.md) 로컬 Done(EV-121, CI 확인 남음) · [TASK-024](../04_implementation/tasks/TASK-024.md) S1·S2·S2-P·S3·S4 Done(EV-118~120·123), S5 남음 · TASK-039·040·041·042 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 미처리 리뷰 | **[REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Resolved (2026-11-23 #002)** — `RV-193~201` 9건 수용·조치(`156bd68`·`00f53cd`·`4721903`·`2a63fd8`, [EV-122](../05_verification/verification_evidence.md#ev-122)). 3 OS CI 통과 뒤 위임 수락으로 Closed. REV-001~071 Closed |
+| 상태 | 34/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-23 / #001(리뷰) 종료 — REV-072 작성(`Open`, `Conditional`, `RV-193~201`) / AI |
-| 세션 상태 | **종료 — 2026-11-23 #001(리뷰 전용).** 다음 세션은 REV-072 조치(`RV-193~201`) · CI run `45181597098` 확인 · S2 결정 D1~D3부터 |
-| 최근 완료 세션 | 2026-11-23 #001(리뷰) — [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open/Conditional(`RV-193~201`: P1 1·P2 5·P3 3) · 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
+| 갱신 | 2026-11-23 / #002 — REV-072 반입·조치, TASK-024 S2 실행(EV-123), MS-011 등록 / AI |
+| 세션 상태 | **종료 — 2026-11-23 #002(개발).** 다음 세션은 CI run `45197725224`(`9c868a6`) 확인부터 |
+| 최근 완료 세션 | 2026-11-23 #002 — REV-072 반입·조치(EV-122), TASK-024 S2 F1~F5(EV-123), MS-011 등록 · 2026-11-23 #001(리뷰) — [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open/Conditional(`RV-193~201`: P1 1·P2 5·P3 3) · 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
 
 ## 현재 결정과 제약
+
+- **2026-11-23 Human — S2·MS-011 결정:** TASK-024 S2 D1=Docker 쓰기 제한(실행 중 `io.max` 전환에 권한 있는 보조 컨테이너 허용 「privileged 써도 돼」), D2=tc_008 갈음, D3=현재 동작 기록. 외부 관점 지적 3건(RT 수집 비용 숫자·RT 글줄 경로·`Record` derive)을 [MS-011](../04_implementation/milestones/MS-011.md) TASK-042~044로 등록, M1=하나로 묶음·M2=TASK-042는 v0.1.1 전, TASK-042 D1=`powersave`·`performance` 둘 다(전환은 sudo, 실행 때 Human)·D2=자체 숫자만. TASK-043·044 채택은 기능 논의.
+- **2026-11-23 사고 — 하네스 채움이 호스트 루트에:** S2 하네스 첫 구현의 tmpfs 마운트 경로 오류로 F3 디버그 채움이 T500 루트에 들어가 디스크 경고, 이어 832 GB 파일로 루트 100%(즉시 삭제, `fallocate`라 데이터 쓰기 없음). 채우기 직전 같은 chroot 안에서 tmpfs·크기 확인을 넣었고 본 실행 동안 루트 여유 변화 없음(EV-123).
 
 - **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
 - **2026-11-21 T3 native CI([EV-113](../05_verification/verification_evidence.md#ev-113)~[EV-115](../05_verification/verification_evidence.md#ev-115)):** 첫 실행에서 Windows 시험 하네스(accept 소켓 non-blocking 상속)·`macos-14` 러너 지원 종료를 고쳤다. macOS std `Mutex`의 첫 잠금 할당(64 B)은 Human 「A로 진행」으로 core 잠금 9개 생성 시 예열·`MUTEX_BYTES` 회계로 처리했다(TASK-036 S5, coding_convention 규칙). `378c6ba`에서 contracts 3 OS × 2 Rust Pass, 예열 커밋 `a0fcfcf`(run `44919471193`)에서 macOS 할당 시험 3개도 ignore 없이 Pass([EV-116](../05_verification/verification_evidence.md#ev-116)) → GAP-004 Closed(native CI 범위), T3 해소. 2026-11-22 Human 「진행해」로 CI 액션을 Node 24판(`checkout@v5`·`setup-python@v6`)으로 올렸다(`9d8bdd3`).
@@ -67,11 +70,14 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | AI | In Progress | 2026-11-23 | 로컬 Done(EV-121, 18/1000 → 0/1000). CI run `45181597098` 확인 → Done |
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | S1·S2-P·S3·S4 Done(EV-118~120). S2 설계 작성 — D1~D3 결정·REV-072 뒤 하네스 → 실행 → S5 |
+| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | AI | In Progress | 2026-11-23 | 로컬 Done(EV-121). `84d247b`가 macOS·Windows Clippy를 깼고(`disk()` 미사용) REV-072 RV-196 조치로 해결 — 3 OS CI 통과 확인 → Done |
+| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | S1·S2·S2-P·S3·S4 Done(EV-118~120·123; S2는 F4 조용한 단절 미감지 1항목 Fail 관측). S5 근거·Human 리뷰 |
 | TASK-039 | 대표 부하의 할당 경로 확인 | AI | Planned | 2026-11-23 | TASK-024 S2 뒤. 제어 스레드 할당 여부 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | AI | Planned | 2026-11-23 | S0 범위 Human 결정 |
-| TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | 태그는 Human 확인 뒤 |
+| TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | TASK-042 뒤. 태그는 Human 확인 뒤 |
+| TASK-042 | `try_log` 지연 분포 측정과 README 공개 | AI | Planned | 2026-11-23 | MS-011. TASK-039 뒤·v0.1.1 전. D1 둘 다·D2 A, D3 대기 |
+| TASK-043 | RT용 미룬 서식 로그 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
+| TASK-044 | `Record` derive 또는 prost 연동 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
 
 ## 코드리뷰 현황 (Reviews)
@@ -92,21 +98,16 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 및 조치 보충 리뷰 | **Closed** | 1차 `RV-171~188`([EV-111](../05_verification/verification_evidence.md#ev-111))·보충 `RV-189~192`(`9622e94`, [EV-112](../05_verification/verification_evidence.md#ev-112)) 조치. 2026-11-21 Human 수락 |
-| [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Open** | Conditional — `RV-193~201`(P1 1건[S2 설계 F3a/F2/F3b-F5 3항목] · P2 5건 · P3 3건). 제품 코드 RT 무할당·vendor patch·audit 건전 확인. 개발 세션 조치 대기 |
+| [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Resolved** | 9건 수용(RV-196 범위 확대, RV-201 `version`은 MS-010 3단계로)·조치([EV-122](../05_verification/verification_evidence.md#ev-122)). 새로 켠 macOS·Windows 시험 중 플랫폼 차이 3건(f9·f11·f15)은 해당 플랫폼으로 한정. 3 OS CI 통과 뒤 Closed |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **[REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) 조치(`Open`, `Conditional`, `RV-193~201`):**
-   - **P1 (1건 — S2 착수 전 필수):** `RV-193` — `TASK-024` §S2 설계 정렬(① F3a 손실 원인 `OutputFailed/Cause::Adapter`·채움 임계·`is_success()==false`, ② F2 2분 `SIGSTOP` vs `max_age=10s` 분리, ③ F3b/F5 공통 Pass 예외 및 F5 sync 오라클 추가).
-   - **P2 (5건):** `RV-194`(Windows `FileStore` directory sync 계약·NTFS 일관성/비-NTFS 한계 명시), `RV-195`(`available_bytes` Windows 없는 경로 `Ok`→`metadata` 검사 또는 문서·테스트 정렬), `RV-196`(기존 `RV-172` `#[cfg(target_os = "linux")]` facade 테스트 11곳 macOS/Windows 재활성화), `RV-197`(`soak.rs` glibc FFI `target_env = "gnu"` 가드), `RV-198`(외부 소비자 CI Windows/macOS 확대·`edition = "2021"` MSRV `resolver = "3"` 안내).
-   - **P3 (3건):** `RV-199`(Apple `MUTEX_BYTES` 잔여 3곳 회계/주석), `RV-200`(`tc_013_calibrate.rs` 뺄셈 언더플로 방어), `RV-201`(`clean-build-cache.sh` 인자 검증·게시 전 내부 `version` 준비).
-   - **리뷰어 D1~D3 의견:** D1=D(Docker), D2=A(`tc_008` 갈음 + 기능 논의), D3=A(현재 동작 기록 + 기능 논의). EV-120 초당 13,127회 할당은 RT 0회, 호스트 `routing::take_shared` ~10,010회/s(76%) + IO `write_batch`/`mcap` ~3,100회/s(24%)로 정적 확인.
-1. **REV-072 처리 뒤 순서(2026-11-23 Human):** S2 결정 D1~D3(Human) → **TASK-024 S2 장애 주입**(하네스 확장 약 1인일 + 실행 약 1~1.5시간, Docker로 느린 디스크·용량 제한 확인됨) → S5 → TASK-039 할당 경로 → TASK-040(S0 범위 Human 결정) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의**(Human 요청, 안건 후보: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복·Health 회복 표시·B1/B2) → TASK-026.
-   - CI 확인: `84d247b` run `45179903965`(audit은 RUSTSEC-2026-0592로 실패 → `f30ae5a`에서 조치), `f30ae5a` run `45181597098`. 통과하면 TASK-038 Done.
-   - TASK-024 S4 Pass(EV-120). 원시 결과는 `05_verification/perf_runs/task024-2026-11-22/`, 시험 데이터는 2026-11-23 삭제.
-   - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다.
+0. **CI 확인:** `9c868a6`(하네스 포함) run `45197725224`이 3 OS × 2 Rust 모두 통과하면 REV-072 Closed(위임 수락)·TASK-038 Done·EV-122 CI 줄 기록. 실패하면 새로 켠 시험의 플랫폼 차이인지 먼저 본다(지금까지 f9·f11·f15).
+1. **순서(2026-11-23 Human):** TASK-024 **S5**(EV-118~120·123 근거 정리, TC-012 P6 행·추적표, Human 리뷰) → TASK-039 할당 경로 → TASK-040(S0 범위 Human 결정) → **TASK-042** `try_log` 지연 분포(D3 README 범위 결정, `performance` governor 전환은 실행 때 Human) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
+   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량)·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
+   - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).
 
 ## 승인·재개 제약
@@ -116,7 +117,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 선택 로딩
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
-- [MS 목록](../04_implementation/milestone_registry.md): 9개 MS, [Task 목록](../04_implementation/task_registry.md): 41개 Task(TASK-018 Cancelled). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
+- [MS 목록](../04_implementation/milestone_registry.md): 11개 MS, [Task 목록](../04_implementation/task_registry.md): 44개 Task(TASK-018 Cancelled). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
 - [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 8 + CON 7 = 34행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
 - 2026-10-26 조사(비공개 원시 근거: `imported_context/research_2026-10-26_detailed_design.md`): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
@@ -154,6 +155,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
+- 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).
 - 2026-11-23 #001(리뷰) — REV-071 이후 코드 변경(`ae22f9d..f30ae5a`) 및 TASK-024 S2 설계 독립 리뷰 [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Conditional / Open(`RV-193~201`: P1 1·P2 5·P3 3)(비공개 세션 로그: `session_logs/session_2026-11-23_001.md`).
 - 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계, REV-072 요청(비공개 세션 로그: `session_logs/session_2026-11-22_007.md`).
 - 2026-11-21~22 #006 — REV-071 보충 조치(`9622e94`, EV-112), F-09·F-12 뒤 Gate 4 수락·Phase Verify, public 전환(T2 해소), T3 native CI(EV-113~115), 버전·릴리즈 계획 [MS-010](../04_implementation/milestones/MS-010.md), TASK-036 S1~S5(외부 소비자 빌드·`^` 범위·잠금 예열), 빌드 디스크 정리 스크립트(비공개 세션 로그: `session_logs/session_2026-11-21_006.md`).

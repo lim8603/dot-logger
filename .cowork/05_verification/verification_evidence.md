@@ -1850,6 +1850,39 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **관찰:** 같은 날 첫 전체 실행에서 `dot-logger-cli` `cli_tail_acks_only_after_successful_stdout_handoff`가 종료 코드 단정(cli.rs:1133)에서 1번 실패했고, 단독 20번·CLI 바이너리 전체 15번·전체 재실행에서는 재현되지 않았다. `url`과 무관한 타이밍 간헐 실패로 보고 TASK-038에서 추적한다.
 - **CI:** `84d247b` run `45179903965`(audit 외 진행 중), `f30ae5a` run `45181597098` 결과는 다음 세션에서 확인한다.
 
+### EV-122 — REV-072 조치(RV-193~201)
+
+- **대상:** `156bd68`(코드)와 같은 세션의 문서 커밋. 이 PC(Ubuntu, 7.0.0-43-realtime 부팅 상태, x86_64), 빌드 `/data/build/target`, 교차 검사 `/data/build/target-cross`. AI 실행, 2026-11-23 #002.
+- **판정:** 9건 모두 수용. RV-196은 같은 사유로 잠긴 시험(tc_017 facade 1, calibrate f20, CLI revision 4)까지 넓혔고, RV-201의 내부 `version` 지정은 MS-010 3단계로 이관. RV-193·194는 문서 정렬(동작 변경 없음). 항목별 내용은 [REV-072](reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) §4 C.
+- **Red → Green:**
+  - RV-197: `x86_64-unknown-linux-musl` 대상 `cargo build --example soak`이 조치 전 `undefined reference to mallinfo2 / malloc_trim`으로 링크 실패 → 조치 후 Pass. (`clippy`는 링크하지 않아 조치 전에도 통과하므로 판정에 쓰지 않음.)
+  - CI 실패 재현: `f30ae5a` run `45181597098`의 macOS·Windows `contracts`가 Clippy 단계에서 실패했다. 조치 전 HEAD를 `aarch64-apple-darwin` 교차 Clippy로 돌리면 `tc_013_calibrate.rs:23 function disk is never used`(`84d247b` TASK-038이 추가한 도우미를 쓰는 시험이 모두 Linux 전용). RV-196의 f20 가드 해제 뒤 macOS·Windows 교차 Clippy Pass.
+  - RV-195: 시험이 모든 OS에서 없는 경로 `NotFound`를 단정(Windows 실행은 CI).
+- **로컬 회귀:** 두 Rust(1.96.0·1.85.0) 각 **743 Pass, 실패 0, 5 ignored**(워크스페이스 all features). Clippy `-D warnings` 두 버전(Linux)과 1.96.0 macOS·Windows 교차, fmt, strict rustdoc, `api-consumer --features remote` 실행, 통합 표면 검사(README 레시피) Pass. `clean-build-cache.sh` 인자 거절 3종·정상 dry-run 확인. Linux는 `MUTEX_BYTES` 0이라 RV-199로 예약이 바뀌지 않는다.
+- **판정에 쓰는 범위:** 교차 Clippy는 타입 검사·lint 근거일 뿐이다. macOS·Windows에서 새로 켜진 facade·CLI·소비자·RT 할당 시험의 실행, 외부 소비자 3 OS, Windows `available_bytes` 동작은 CI run `45186126649`가 맡는다.
+- **CI:** run `45186126649`(`156bd68`)에서 새로 켠 시험 중 macOS·Windows f11(worker CPU는 Linux 전용)·Windows f9(디렉터리 sync 실패 주입, Windows는 디렉터리 sync 없음)가 실패 → `00f53cd`에서 해당 플랫폼으로 한정. run `45189880533`에서 Windows f15 시간 기준(약 24 s > 10 s) → `4721903`, run `45195150611`에서 macOS f15(11~12 s) → `2a63fd8`에서 Linux만 단정. 모두 플랫폼 차이이며 제품 결함 없음. 최종 확인 run `45197725224`(`9c868a6`, S2 하네스 포함)은 세션 종료 시점 진행 중 — 다음 세션에서 기록.
+
+<a id="ev-123"></a>
+### EV-123 — TASK-024 S2 장애 주입(F1~F5)
+
+- **대상·환경:** 하네스 `examples/soak.rs`(S2 옵션·`inspect`)와 `scripts/soak-faults.py`(같은 세션 커밋), 제품 코드는 `4721903` 기준(S2 동안 제품 변경 없음). 이 PC(Ryzen 7 H 255, `7.0.0-43-realtime`, `powersave`), RT 설정(제어 스레드 FIFO 70·CPU 2·mlock), 대표 부하(EV-120과 같음: 제어 256 B 5,000/s, 프레임 64 KiB 10/s). 2026-11-23 23:17~23:43 KST, AI 실행. 결정 D1=Docker·D2=tc_008 갈음·D3=현재 동작 기록(2026-11-23 Human), F1의 권한 있는 보조 컨테이너는 Human 승인. 판정 결과는 [perf_runs/task024-s2-2026-11-23](perf_runs/task024-s2-2026-11-23/README.md).
+- **공통:** 모든 시나리오에서 제어 루프 deadline miss **0**(최악 응답 677~1,822 µs, 주기 10 ms), 살아 있는 heap 증가 최대 7.6 MB(F1 제한 중 버퍼)이고 끝에는 기준선 +1 MiB 안으로 돌아옴.
+
+| # | 장애 | 결과 | 핵심 수치 |
+|---|---|---|---|
+| F1 | 느린 파일(Docker, T500 쓰기 1 MiB/s 186 s, `io.max` 실행 중 전환) | **Pass** | 제한 중 거절 제어 492,790(`SubmissionRejected/CompletionCapacity`)·프레임 1,394(`AcquireRejected/Capacity`) = 손실 보고 합계, 제한 전 거절 0, 해제 뒤 배출 후 거절 멈춤, `SyncOverdue` 관측, `failed_records` 0, 파일 빈칸 0(수락 972,210건), 종료 성공 |
+| F2a | 느린 구독자 8 s 정지 × 3(프레임 채널) | **Pass** | Gap: 같은 스트림 유지·gap 이벤트 229·재개 뒤 계속 수신. Disconnect: 정지 중 끊김(CLI `outcome: unknown`, exit 3). 파일 손실·거절 0 |
+| F2b | 120 s 정지 | **Pass** | 두 정책 모두 재개 뒤 끊김(`unknown`), 재접속 뒤 수신. 파일 손실 0 |
+| F3a | 공간 부족(probe, tmpfs 512 MiB) | **Pass** | 압박 중 자기 닫힌 파일 전부 삭제 → 실패 562,774건 = 손실 보고 `OutputFailed/Adapter` = 파일 빈칸(제어 561,650 + 프레임 1,124). 채움 삭제 뒤 실패 멈춤, 출력은 실패 아님, 상태 `Degraded(RecordsFailed)` 고착, 종료 `is_success() == false`(설계대로) |
+| F3b | 실제 ENOSPC(tmpfs inode 고갈, 바이트 여유 370 MiB) | **Pass**(현재 동작 기록, D3) | 장애 2 s 안에 `Failed(IoPoisoned)`, inode를 돌려줘도 고착, RT 수락 계속(제어 1,485,000건), 실패 1,193,131건 = 종료 보고 `totals.failed` = `required.failed` |
+| F4 | 네트워크(socat 프록시) | **Fail 1항목** | kill: 구독자가 즉시 `io_or_transport`(exit 4)로 끝나고 재접속 뒤 수신. **조용한 정지(SIGSTOP 15 s): 구독자가 감지하지 못함** — 클라이언트·서버 모두 keepalive가 없고 CLI는 명령 기한(`--timeout-ms`)에만 의존. 재개 뒤에는 서버가 이미 닫은 구독이 `unknown`으로 끝남. 파일 손실 0 |
+| F4-DB | DB 단절 | 미실행(D2) | DB 장시간 단절은 실행하지 않았고 tc_008 단기 가짜 서버 시험(멈춤·포화·타임아웃)으로 갈음. facade에는 DB 출력이 없다 |
+| F5 | 경보 없는 SIGKILL 6회(7~37 s) → 읽기 → 재시작 | **Pass 6/6** | 복구된 제어 기록이 sync 하한보다 많고(예: 37 s — 하한 164,950 ≤ 복구 175,100 ≤ 상한 177,754) 모두 0부터 빈칸 없음, 닫힌 파일 온전, 찢어진 `.active` 0(페이지 캐시 유지), 같은 디렉터리 재시작 시 새 세션·정상 종료 |
+
+- **설계와 달라진 점:** [TASK-024 §하네스 구현](../04_implementation/tasks/TASK-024.md#하네스-구현2026-11-23--설계와-달라진-점) — F3b는 바이트 경합 대신 inode 고갈, F5는 `NativeReader`로 `.active` 읽기, 구독자는 프레임 채널.
+- **사고(같은 날):** 첫 하네스가 tmpfs를 chroot 밖 경로에 마운트해 F3a·F3b 디버그 채움이 호스트 루트(T500)에 들어갔다(여유 16 MiB까지, 이어 832 GB 파일로 100%). 즉시 삭제(`fallocate`라 데이터 쓰기 없음). 수정 뒤 채우기 직전 같은 chroot 안에서 tmpfs·크기를 확인하고, 본 실행 동안 루트 여유는 851,764~852,216 MiB(F1의 의도된 쓰기만).
+- **관측(기능 논의 안건):** ① 원격 구독의 조용한 단절 감지 없음(keepalive) ② `IoPoisoned` 뒤 RT 수락 지속·세션 내 회복 없음 ③ `Degraded(RecordsFailed)` 고착이 `SyncOverdue`를 가림 ④ 외부 공간 압박 시 링이 자기 이력을 모두 지움 ⑤ 재시작 시 `.active` 자동 복구 없음 ⑥ CLI `tail` 종료 결과가 `Gone`·초과 끊김을 `unknown`으로만 보고 ⑦ (CI) Windows에서 짧은 대기가 타이머 해상도로 늘어 작은 슬롯 설정의 처리량이 낮음(tc_013_preset f15 약 24 s).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

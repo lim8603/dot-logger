@@ -1,0 +1,147 @@
+{
+  "scenario": "f4",
+  "pass": false,
+  "error": null,
+  "started_unix": 1795444631.756198,
+  "seconds": 240.8,
+  "phases": [
+    {
+      "phase": "pre",
+      "t": 0.552
+    },
+    {
+      "phase": "proxy stopped (silent)",
+      "t": 60.594
+    },
+    {
+      "phase": "reconnect",
+      "t": 85.652
+    },
+    {
+      "phase": "proxy killed",
+      "t": 115.676
+    },
+    {
+      "phase": "proxy back, reconnect",
+      "t": 130.705
+    }
+  ],
+  "checks": {
+    "receives_through_proxy": true,
+    "silent_stop_detected": false,
+    "silent_stop_outcome": null,
+    "after_resume_ended": true,
+    "after_resume_outcome": {
+      "command": "tail",
+      "data": {
+        "acknowledged": 600,
+        "exit_code": 3,
+        "outcome": "unknown",
+        "posted_host_io": "completion_unconfirmed",
+        "records": 604
+      },
+      "kind": "summary",
+      "schema_version": 1
+    },
+    "receives_after_silent_stop": true,
+    "kill_detected": true,
+    "kill_outcome": {
+      "command": "tail",
+      "data": {
+        "acknowledged": 300,
+        "exit_code": 4,
+        "outcome": "io_or_transport",
+        "posted_host_io": "completion_unconfirmed",
+        "records": 300
+      },
+      "kind": "error",
+      "schema_version": 1
+    },
+    "receives_after_kill": true,
+    "file_failed_records_0": true,
+    "file_rejected_0": true,
+    "files_gapless": true,
+    "shutdown_success": true,
+    "deadline_misses_0": true,
+    "heap_growth_bytes": 314349,
+    "heap_bounded": true,
+    "heap_returns": true
+  },
+  "detail": {
+    "exit": 0,
+    "end": {
+      "counts": {
+        "control": 1185000,
+        "control_iterations": 1330533,
+        "control_rejected": 0,
+        "frames": 2400,
+        "frames_rejected": 0,
+        "misses": 0,
+        "periods": 23700,
+        "worst_response_us": 1476
+      },
+      "disk_bytes": 205910517,
+      "elapsed_s": 240,
+      "event": "end",
+      "failures": [],
+      "fds": 4,
+      "files": 36,
+      "health": "Running",
+      "hwm_kib": 35808,
+      "outputs": [
+        {
+          "failed": false,
+          "failed_records": 0
+        }
+      ],
+      "report": "Closed(FacadeReport { core: ShutdownReport { phase: Closed, deadline_elapsed: false, totals: CompletionTotals { records: 1187400, assigned: 1187400, complete: 1187400, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1172474, overflowed: false }, required: CompletionTotals { records: 1187400, assigned: 1187400, complete: 1187400, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 1172474, overflowed: false }, ingress: 0, queued: 0, pending: 0, in_flight: 0, feedback: 0, raw_loaned: 0, raw_in_use: 0, raw_queued: 0, raw_return_pending: 0, producer_calls: 0, sync_in_flight: 0, sync_failed: false }, writers_outstanding: 0, worker_failed: false, io_failed: false, unconfirmed: [] })",
+      "rss_kib": 33172,
+      "success": true
+    },
+    "inspect": {
+      "active": false,
+      "active_files": 0,
+      "control": {
+        "first": 782018,
+        "holes": 0,
+        "last": 1184999,
+        "seen": 402982
+      },
+      "dir": "/dev/shm/task024-s2/f4",
+      "event": "inspect",
+      "found": {
+        "control": {
+          "expected": 1185000,
+          "missing_gaps": 0,
+          "missing_prefix": 782018
+        },
+        "corrupt_payloads": 0,
+        "duplicates": 0,
+        "files": 36,
+        "foreign": 0,
+        "frames": {
+          "expected": 2400,
+          "missing_gaps": 0,
+          "missing_prefix": 1594
+        },
+        "loss_reports": 154,
+        "nonzero_loss_rows": 0,
+        "torn_files": 0,
+        "unreadable_files": 0
+      },
+      "frames": {
+        "first": 1594,
+        "holes": 0,
+        "last": 2399,
+        "seen": 806
+      },
+      "losses": {
+        "1": {
+          "checkpoint": 451,
+          "counts": {}
+        }
+      },
+      "torn_active": 0
+    }
+  }
+}

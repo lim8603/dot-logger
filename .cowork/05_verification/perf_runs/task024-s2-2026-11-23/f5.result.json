@@ -1,0 +1,209 @@
+{
+  "scenario": "f5",
+  "pass": true,
+  "error": null,
+  "started_unix": 1795444872.5559862,
+  "seconds": 139.3,
+  "phases": [
+    {
+      "phase": "trial 0: kill after 7s",
+      "t": 0.051
+    },
+    {
+      "phase": "trial 1: kill after 13s",
+      "t": 7.129
+    },
+    {
+      "phase": "trial 2: kill after 19s",
+      "t": 20.223
+    },
+    {
+      "phase": "trial 3: kill after 23s",
+      "t": 39.331
+    },
+    {
+      "phase": "trial 4: kill after 29s",
+      "t": 62.448
+    },
+    {
+      "phase": "trial 5: kill after 37s",
+      "t": 91.578
+    },
+    {
+      "phase": "restart",
+      "t": 128.676
+    }
+  ],
+  "checks": {
+    "trials_passed": 6,
+    "trials": 6,
+    "all_trials_pass": true,
+    "restart_new_session": true,
+    "restart_success": true
+  },
+  "detail": {
+    "trials": [
+      {
+        "delay_s": 7,
+        "syncs_seen": 6,
+        "lower": [
+          9950,
+          49
+        ],
+        "upper": [
+          22733,
+          76
+        ],
+        "control_seen": 20100,
+        "frames_seen": 70,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      },
+      {
+        "delay_s": 13,
+        "syncs_seen": 12,
+        "lower": [
+          39900,
+          109
+        ],
+        "upper": [
+          52703,
+          136
+        ],
+        "control_seen": 50100,
+        "frames_seen": 130,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      },
+      {
+        "delay_s": 19,
+        "syncs_seen": 18,
+        "lower": [
+          69900,
+          169
+        ],
+        "upper": [
+          82708,
+          196
+        ],
+        "control_seen": 80050,
+        "frames_seen": 190,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      },
+      {
+        "delay_s": 23,
+        "syncs_seen": 22,
+        "lower": [
+          79900,
+          209
+        ],
+        "upper": [
+          92706,
+          236
+        ],
+        "control_seen": 90100,
+        "frames_seen": 230,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      },
+      {
+        "delay_s": 29,
+        "syncs_seen": 28,
+        "lower": [
+          119900,
+          269
+        ],
+        "upper": [
+          132708,
+          296
+        ],
+        "control_seen": 130050,
+        "frames_seen": 290,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      },
+      {
+        "delay_s": 37,
+        "syncs_seen": 36,
+        "lower": [
+          164950,
+          349
+        ],
+        "upper": [
+          177754,
+          376
+        ],
+        "control_seen": 175100,
+        "frames_seen": 370,
+        "starts_at_0": true,
+        "no_holes": true,
+        "at_least_last_sync": true,
+        "closed_files_intact": true,
+        "torn_active": 0,
+        "active_files": 1,
+        "misses_0": true,
+        "pass": true
+      }
+    ],
+    "restart_end": {
+      "counts": {
+        "control": 35000,
+        "control_iterations": 1306424,
+        "control_rejected": 0,
+        "frames": 100,
+        "frames_rejected": 0,
+        "misses": 0,
+        "periods": 700,
+        "worst_response_us": 1402
+      },
+      "disk_bytes": 19807433,
+      "elapsed_s": 10,
+      "event": "end",
+      "failures": [],
+      "fds": 4,
+      "files": 3,
+      "health": "Running",
+      "hwm_kib": 33912,
+      "outputs": [
+        {
+          "failed": false,
+          "failed_records": 0
+        }
+      ],
+      "report": "Closed(FacadeReport { core: ShutdownReport { phase: Closed, deadline_elapsed: false, totals: CompletionTotals { records: 35100, assigned: 35100, complete: 35100, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 22474, overflowed: false }, required: CompletionTotals { records: 35100, assigned: 35100, complete: 35100, failed: 0, dropped: 0, unknown: 0, pending: 0, busy: 0, expired_records: 22474, overflowed: false }, ingress: 0, queued: 0, pending: 0, in_flight: 0, feedback: 0, raw_loaned: 0, raw_in_use: 0, raw_queued: 0, raw_return_pending: 0, producer_calls: 0, sync_in_flight: 0, sync_failed: false }, writers_outstanding: 0, worker_failed: false, io_failed: false, unconfirmed: [] })",
+      "rss_kib": 33912,
+      "success": true
+    }
+  }
+}

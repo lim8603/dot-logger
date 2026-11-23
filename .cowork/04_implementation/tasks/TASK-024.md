@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-23 |
-| 다음 액션 | S2 장애 주입(TASK-038 뒤) → S5 |
+| 다음 액션 | S2 설계 결정 D1~D3(Human)·REV-072 리뷰 반영 → 하네스 확장 → F1~F5 실행 → S5 |
 | 의존 | TASK-023 |
 | 예상 소요 | 3~5 인일, 장비/리뷰 대기 제외 |
 
@@ -65,8 +65,61 @@ native CI(3 OS × 2 Rust)는 T3로 끝났다([EV-116](../../05_verification/veri
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
 | S1 | OS 간 파일 교환 | 각 OS(Linux·Windows·macOS)가 결정적 기록 세트(여러 채널·중요 기록·이벤트·회전 2개 이상)를 쓰고, 세 OS 각각이 세 OS의 파일을 모두 읽어 내용·개수·손실 0을 대조하는 CI 작업 | Done — 9/9 Pass([EV-119](../../05_verification/verification_evidence.md#ev-119), run `44987267000`). 도중 macOS·Windows 파일 출력 결함을 찾아 ADR-009 개정 2로 수정(`9f687dd`·`ad11ba3`) |
-| S2 | P6 장애 주입(단기) | 대표 부하 아래 느린 파일·느린 구독자·공간 부족·DB/네트워크 단절·프로세스 강제 종료 후 `recover`를 각 몇 분씩 주입. 버퍼 상한 유지, 정책별 손실 보고, 복구 뒤 정상 경로 회복 | Planned |
+| S2 | P6 장애 주입(단기) | 대표 부하 아래 느린 파일·느린 구독자·공간 부족·DB/네트워크 단절·프로세스 강제 종료 후 `recover`를 각 몇 분씩 주입. 버퍼 상한 유지, 정책별 손실 보고, 복구 뒤 정상 경로 회복 | 설계 작성(2026-11-23, 아래 [S2 설계](#s2-설계--2026-11-23)) — 결정 D1~D3 Human 대기, REV-072 리뷰 요청에 포함 |
 | S2-P | 정전 모의(외부 경보 → 3초 뒤 강제 종료) | 2026-11-22 Human 지시: 실물 UPS 대신, 대표 부하로 기록 중인 프로세스에 외부 구동기가 경보를 보내고(호스트 앱이 받아 생산자를 멈추고 facade `Logger::shutdown`을 남은 예산 3초 − 200 ms로 호출. local-pc-v1·EV-043과 같은 3초. 고급 경로 `notify_power`는 EV-043 범위) 정확히 3초 뒤 SIGKILL한다. 종료 협조 없음. 판정: 경보 전에 수락된 보호 대상(중요) 기록이 강제 종료 뒤 파일에 모두 남고, 파일은 `recover`로 읽히며 잘린 꼬리만 제외되고, 손실 보고가 실제 누락과 맞는다. 경보 시점을 바꿔 여러 회 반복 | Done — 6/6 Pass([EV-118](../../05_verification/verification_evidence.md#ev-118)), harness `soak.rs` |
 | S3 | soak harness와 리허설 | 대표 부하·제어 루프·주기 표본(RSS·fd·예약 바이트·손실/거절 카운터·디스크 사용·deadline miss)을 JSON으로 남기는 harness, 10분 리허설 | Done — 2026-11-22 10:50 KST 10분 리허설(RT·T500·링 16 GiB·60초 표본): 제어 2,980,000건·프레임 6,000건, 거절 0·miss 0·최악 1,426 µs, RSS 31.7 MB(10분간 +44 KiB, 링이 아직 안 참)·fd 5 고정, 1.53 GB·파일 183개, `verify` 전량 Pass(누락·중복·손상·손실 0). 링이 차는 약 1.9시간까지는 예열로 본다 |
 | S4 | 24h 실행(RT, T500) | 24h 완주. 판정: 정상 부하 손실 0, 제어 루프 추가 deadline miss 0, RSS·fd·예약 바이트가 예열 뒤 증가 추세 없음, 디스크 사용 ≤ 링 상한, 회전 파일 전부 읽기 대조 Pass | Done — Pass(AI 판정, S5 Human 리뷰), [EV-120](../../05_verification/verification_evidence.md#ev-120). 2026-11-22 16:57 → 11-23 16:57 KST 완주: 제어 431,970,050·프레임 864,001건, 거절·miss 0, 최악 1,940 µs, 디스크 ≤ 15.72 GiB, fd 5, `verify --ring` Pass. RSS +328 KiB/22h는 1시간 heap 진단에서 살아 있는 heap이 바이트 단위로 평평해 누수 아님(glibc 할당기 보유). 조회·전송 동시 장시간은 TASK-040 |
 | S5 | 근거·리뷰 | EV, TC-012 P6 행·추적표 갱신, Human 리뷰 | Planned |
+
+## S2 설계 — 2026-11-23
+
+2026-11-23 Human 「S2 설계까지 진행」. 실행은 결정 D1~D3과 REV-072 리뷰 뒤.
+
+### 코드로 확인한 전제
+
+1. facade 파일 저장소는 주입 불가 — `logger/host.rs`가 `FileStore`와 실제 `statvfs` probe를 고정한다(tc_013_facade의 주석도 같음). 느린 저장·공간 부족은 OS 수준으로 만든다.
+2. 공간 부족은 두 경로다(`storage/retention.rs` `room()`, `logger/host.rs` `settle`·`failure`).
+   - probe 경로: `free < reserve + max_segment`이면 ring은 보호되지 않은 자기 오래된 닫힌 파일부터 지우고, 지울 것이 없으면 `RetentionError::Capacity`. facade는 그 배치 기록을 실패로 보고하고 출력은 유지한다(RV-125). 공간이 돌아오면 다시 기록한다.
+   - 실제 쓰기 ENOSPC: log poisoned → `io_failed`·출력 `failed` → `Failed(IoPoisoned)`. 그 세션에서 회복하지 않는다.
+3. `HealthState::Degraded(RecordsFailed)`는 고착된다(`failed_records` 누적, 초기화 없음). 회복 판정은 `failed_records` 증가가 멈추는지로 한다.
+4. facade에는 DB(InfluxDB) 출력이 없다. 고급 경로 `adapters::influxdb::{Writer, RoutedWriter}`와 가짜 DB 시험(tc_008: 응답 지연·멈춤·포화)이 있다.
+5. facade는 시작할 때 이전 세션의 `.active`를 복구하지 않는다(매 `start()`가 새 세션). 공개 `storage::recover_segment`·`recover_to_store`는 세그먼트 단위이고 원래 채널 등록·`WriterBudget`이 필요하다. CLI `recover`는 손으로 쓴 manifest가 필요하다.
+6. 원격 구독자는 파일 출력 0이 쓴 것의 best-effort 사본을 받으며 완료 대상이 아니다. 구독 한도는 facade 기본 `subscription_bytes ≤ 4 MiB`, `max_age` 10 s, 정책 `Gap`/`Disconnect`는 구독자가 고른다.
+
+2·3·5는 S2에서 관측해 기록하는 현재 동작이다. 바꿀지는 MS-010 2단계 전 기능 논의 안건으로 올린다(권장, D3).
+
+### 환경(root 없이 확인)
+
+- 공간 부족: `unshare -rm` 안에서 크기 제한 tmpfs 마운트·실제 ENOSPC 확인(2026-11-23).
+- 네트워크: `socat` 프록시. SIGSTOP = 조용한 단절(패킷 정지), kill = 연결 끊김.
+- 느린 디스크: 사용자 cgroup에 io 컨트롤러 위임 없음(`cpu memory pids`), FUSE 라이브러리 없음. **Docker는 사용 가능**(29.1.3, cgroup v2, 사용자 docker 그룹) — 2026-11-23 Human 제안 「도커 쓰면 안되나?」·「디스크 사용량도 도커로 지정할 수 있잖아?」로 확인:
+  - `--device-write-bps /dev/nvme0n1:5mb`에서 40 MiB fsync 쓰기가 1.1 GB/s → **5.2 MB/s**(8.03초)로 제한됐다. 버퍼 쓰기의 writeback도 cgroup v2에서 컨테이너에 귀속된다.
+  - `--tmpfs /out:size=64m`에서 80 MiB 쓰기가 64 MiB에서 ENOSPC로 멈췄다.
+  - 로컬 이미지 `influxdb`·`postgres:16`이 있다. 이미지 glibc(Debian 2.36)가 호스트(2.43)보다 낮아 호스트 빌드 soak은 컨테이너 안에서 호스트 루트를 `chroot --userspec=1000:1000`으로 실행하는 방식을 하네스 작업 때 확인한다. RT는 `--cap-add SYS_NICE --ulimit rtprio=99 --ulimit memlock=-1`.
+- 출력은 `/dev/shm` 또는 작은 tmpfs → SSD 쓰기 약 0. F1만 T500에 제한 속도로 쓴다(10분 × 수 MB/s, 수 GB 이하).
+
+### 시나리오
+
+모두 대표 부하(EV-120과 같음)·RT 설정, 장애 전·중·후 구간을 나눠 판정한다. 시나리오당 약 10분, 합계 약 1~1.5시간.
+
+| # | 장애 | 주입 | 기대 결과 |
+|---|---|---|---|
+| F1 | 느린 파일 | D1 — Docker 쓰기 속도 제한(예: 대표 부하 2.56 MB/s보다 낮은 1 MB/s를 3분) | 버퍼 상한 유지, 차면 `try_log` `Capacity` 거절·손실 보고 일치, `SyncOverdue` 관측, 해제 뒤 거절 중지 |
+| F2 | 느린 구독자 | facade `.remote()` + CLI `tail`을 2분 SIGSTOP, 정책 Gap·Disconnect 각각 | 파일 기록 손실 0, 구독자 gap 이벤트/끊김, 서버 구독 메모리 ≤ 4 MiB, 재개 뒤 이어 받음 |
+| F3a | 공간 부족(probe) | Docker `--tmpfs size=512m`(또는 `unshare -rm`)·링 256 MiB, 채움 파일로 여유 축소 → 삭제 | 자기 오래된 파일 삭제 → `Capacity` 실패 → 손실 보고 `Cause::Capacity` → 채움 삭제 뒤 회복 |
+| F3b | 공간 부족(실제 ENOSPC) | probe 뒤 쓰기 전에 채우는 경합 또는 reserve 0·세그먼트보다 작은 여유 | `IoPoisoned`, 세션 안 회복 없음 — 현재 설계 동작 기록(D3) |
+| F4 | 네트워크 단절 | F2 구성 + socat 프록시 SIGSTOP / kill | 파일 손실 0, 구독자 끊김 감지·재접속 뒤 계속 |
+| F4-DB | DB 단절 | D2 | — |
+| F5 | 강제 종료 → 복구 | 경보 없이 SIGKILL 6회(시점 변경) → `.active`를 `recover_segment`로 복구 → 같은 디렉터리에서 재시작 | 닫힌 파일 전부 온전, `.active`는 마지막 sync 지점까지 복구·잘린 꼬리만 제외, 재시작 정상 |
+
+공통 Pass: 제어 루프 deadline miss 0(장애가 RT 스레드를 막지 않음), 살아 있는 heap·RSS 상한 안, 장애 구간 밖 거절·실패 0, 실패 기록 수 = 손실 보고 합계, 회복 뒤 기록 전부 존재.
+
+하네스(약 1인일): soak에 remote 옵션, 표본에 `failed_records`·`since_sync`·출력별 상태, `.active` 복구·대조 추가. 시나리오 구동 스크립트.
+
+### 결정 대기(Human)
+
+| ID | 질문 | 선택지 | 권장 |
+|---|---|---|---|
+| D1 | F1 느린 디스크 방법 | **D. Docker `--device-write-bps`·`--device-write-iops`(의존성 추가 없음, 속도 정확, 확인됨)** / A. 하네스 전용 FUSE 지연 파일 시스템(`fuser` dev-dependency) / B. 같은 SSD 경쟁 쓰기(재현성 낮음, 수십 GB) / C. sudo dm-delay | D(2026-11-23 Human 제안) |
+| D2 | DB 단절 | A. 기존 tc_008 가짜 DB 시험(멈춤·포화·타임아웃)으로 갈음하고 "facade DB 출력 없음"을 기능 논의 안건으로 / B. soak에 고급 경로 DB 출력을 붙이고 로컬 `influxdb` 컨테이너를 멈추거나(`docker pause`) 끊어 장시간 주입(+약 1인일) | A(B도 Docker로 쉬워짐) |
+| D3 | F3b·F5 판정 | A. 현재 설계 동작으로 기록, 변경은 기능 논의 안건 / B. 결함으로 보고 S2 안에서 수정 | A |

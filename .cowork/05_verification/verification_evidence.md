@@ -1843,6 +1843,13 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **원시 결과:** [perf_runs/task024-2026-11-22](perf_runs/task024-2026-11-22/) — `soak-24h.jsonl.gz`(sha256 원본 `8b846ae0bf262981…`), `soak-24h-verify.json`, `soak-rss-diag-1h.jsonl`, EV-118 `power-s2p.jsonl`, S3 `soak-rehearsal-10min.jsonl`. 데이터 파일(16 GB)은 2026-11-23 지웠다.
 - **범위:** RT 커널 한 대의 기록·회전 부하 장기 실행 근거. 요구의 "회전·조회·전송 포함" 중 조회·전송 동시 실행은 [TASK-040](../04_implementation/tasks/TASK-040.md)에 남는다. generic 커널 장기 행은 미실행. 물리 전원 소실은 범위 밖(EV-043·EV-118).
 
+### EV-121 — TASK-038 calibrate 시험 견고화와 RUSTSEC-2026-0592 조치
+
+- **TASK-038(`84d247b`):** `f19_reserve_shrinks_the_write_limit` 간헐 실패(EV-119)의 원인은 시험이 여유 공간을 잰 뒤 `Calibration::run`이 다시 재는 사이에 다른 쓰기가 남는 공간을 바꾸는 것이다. 재현: 수정 전 바이너리를 `/tmp`(tmpfs)에 4 MiB 파일을 쓰고 지우는 백그라운드 프로세스 4개와 함께 1,000번 실행 → 18번 실패(`bytes <= 2 MiB`). 병렬 시험만으로는 300번 중 0번. 수정: 디스크에 쓰는 시험 6개가 한 잠금을 잡고, 판정을 `run`이 본 여유 공간(`host().free_bytes`) − reserve와 정확히 같은지로 바꾸고, 여유를 16 MiB로 넓혔다. 같은 조건에서 단독 1,000번·바이너리 전체 300번 실패 0. 1.85·1.96 clippy·시험 Pass.
+- **RUSTSEC-2026-0592(`f30ae5a`):** run `45179903965`의 audit이 새 공지(`url` 2.5.8, 중첩 `blob:` URL에서 `Url::origin()` 스택 오버플로)로 실패했다. `url` 2.5.9(`form_urlencoded` 1.2.3)로 lock만 갱신, MSRV 1.63이라 1.85 유지. 1.85·1.96 `check --workspace --all-targets --all-features` Pass, 로컬 `cargo audit --deny unsound`는 허용된 `paste` 경고 1개만 남음. 워크스페이스 전체 시험(1.96, all features) 743 Pass·0 Fail·5 ignored.
+- **관찰:** 같은 날 첫 전체 실행에서 `dot-logger-cli` `cli_tail_acks_only_after_successful_stdout_handoff`가 종료 코드 단정(cli.rs:1133)에서 1번 실패했고, 단독 20번·CLI 바이너리 전체 15번·전체 재실행에서는 재현되지 않았다. `url`과 무관한 타이밍 간헐 실패로 보고 TASK-038에서 추적한다.
+- **CI:** `84d247b` run `45179903965`(audit 외 진행 중), `f30ae5a` run `45181597098` 결과는 다음 세션에서 확인한다.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

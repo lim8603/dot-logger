@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — TASK-024 S2 장애 주입·S5, TASK-038~040, 실사용처(TASK-026) 잔여. [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). MS-009 Done |
-| 활성 Task | [TASK-038](../04_implementation/tasks/TASK-038.md) In Progress(calibrate 시험 간헐 실패 견고화) → [TASK-024](../04_implementation/tasks/TASK-024.md) S2 장애 주입 → TASK-039·040·041. TASK-024는 S1 OS 교환 9/9([EV-119](../05_verification/verification_evidence.md#ev-119))·S2-P 정전 모의 6/6([EV-118](../05_verification/verification_evidence.md#ev-118))·S3 리허설·S4 24h Pass([EV-120](../05_verification/verification_evidence.md#ev-120), 2026-11-22 16:57 → 11-23 16:57, 손실·거절·miss 0, `verify --ring` Pass, RSS +1%는 heap 진단으로 누수 아님) Done. TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | 없음 — REV-001~071 Closed([REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) 2026-11-21 수락) |
+| 활성 Task | **REV-072 리뷰 요청 중.** [TASK-038](../04_implementation/tasks/TASK-038.md) 로컬 Done(EV-121, CI 확인 남음) · [TASK-024](../04_implementation/tasks/TASK-024.md) S1·S2-P·S3·S4 Done(EV-118~120), S2 설계 작성(결정 D1~D3 대기) · TASK-039·040·041 Planned · TASK-018 Cancelled(B2) |
+| 미처리 리뷰 | **REV-072 요청(2026-11-23)** — REV-071 이후 코드 변경(`ae22f9d..f30ae5a`)·TASK-024 S2 설계 리뷰. 리뷰 전용 세션에서 수행. 중점은 「다음 시작점」 0. REV-001~071 Closed |
 | 상태 | 34/41 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-22 / #007 CI 확인·TASK-036 리뷰 / AI |
-| 세션 상태 | **진행 — 2026-11-22 #007.** CI 확인(EV-116·GAP-004 Closed), CI 액션 Node 24판(`9d8bdd3`, EV-117 Pass), TASK-036 Done, TASK-037 Done(태그 `v0.1.0`·pre-release, EV-117) |
-| 최근 완료 세션 | 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·Phase Verify·public 전환·T3·MS-010 계획·TASK-036 S1~S5 |
+| 갱신 | 2026-11-23 / #007 종료 — 24h 판정·TASK-038·S2 설계·REV-072 요청 / AI |
+| 세션 상태 | **종료 — 2026-11-22~23 #007.** 다음 세션은 REV-072 리뷰(리뷰 전용 세션) 또는 CI 확인부터 |
+| 최근 완료 세션 | 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계, REV-072 요청 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
 
 ## 현재 결정과 제약
 
@@ -67,8 +67,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | AI | In Progress | 2026-11-23 | 수정 전 재현 → 수정 뒤 반복 Pass → 커밋·CI |
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | S1·S2-P·S3·S4 Done(EV-118~120). 다음 S2 장애 주입 → S5 |
+| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | AI | In Progress | 2026-11-23 | 로컬 Done(EV-121, 18/1000 → 0/1000). CI run `45181597098` 확인 → Done |
+| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | S1·S2-P·S3·S4 Done(EV-118~120). S2 설계 작성 — D1~D3 결정·REV-072 뒤 하네스 → 실행 → S5 |
 | TASK-039 | 대표 부하의 할당 경로 확인 | AI | Planned | 2026-11-23 | TASK-024 S2 뒤. 제어 스레드 할당 여부 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | AI | Planned | 2026-11-23 | S0 범위 Human 결정 |
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | 태그는 Human 확인 뒤 |
@@ -92,16 +92,25 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 및 조치 보충 리뷰 | **Closed** | 1차 `RV-171~188`([EV-111](../05_verification/verification_evidence.md#ev-111))·보충 `RV-189~192`(`9622e94`, [EV-112](../05_verification/verification_evidence.md#ev-112)) 조치. 2026-11-21 Human 수락 |
+| REV-072(요청) | REV-071 이후 코드 변경 `ae22f9d..f30ae5a`(커밋 13개: 배포 가능화·macOS 잠금 예열·Windows 시험 소켓·ADR-009 개정 2 파일 출력·soak/os_exchange 하네스·calibrate 시험·`url` 갱신·CI) + TASK-024 S2 설계 | Requested | 리뷰 전용 세션이 REV-072 문서를 만든다(RV-193부터). 결과 처리 뒤 S2 하네스 착수 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **2026-11-23 Human 순서 지시:** 문서 갱신·작은 일 Task 등록(TASK-038~041, 완료) → **TASK-038 f19 견고화**(수정 코드 작성됨, 수정 전 재현·반복 검증 남음) → **TASK-024 S2 장애 주입** → TASK-039 할당 경로 → TASK-040(S0 범위 Human 결정) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의**(Human 요청) → TASK-026.
-   - TASK-024 S4 24h Pass(EV-120). 원시 결과는 `05_verification/perf_runs/task024-2026-11-22/`, 데이터 16 GB는 2026-11-23 삭제.
-   - soak harness에 카운팅 할당기·RssAnon/File·`mallinfo2`·`malloc_trim` 진단이 들어갔다(`#[allow(unsafe_code)]` 하네스 전용 모듈, 미커밋이면 TASK-038과 함께 커밋).
+0. **REV-072 코드리뷰(요청, 2026-11-23 Human 「코드리뷰 요청한번 하고 세션 마무리해줘」):** 리뷰 전용 세션이 [세션 프로토콜 1E](../01_cowork_protocol/session_protocol.md)와 `.agents/skills/code-review` 기준으로 수행하고 `05_verification/reviews/REV-072_*.md`를 만든다(지적 번호 RV-193부터). 제품 코드는 고치지 않는다.
+   - **대상:** REV-071 마감(`ae22f9d`) 이후 코드 변경 `ae22f9d..f30ae5a` — 커밋 `d9d8b1f`(Windows 시험 소켓·macOS 15 CI), `378c6ba`(워크스페이스 밖 빌드: MCAP 별칭 crate·의존성 `^` 범위·`scripts/check-external-consumer.py`), `a0fcfcf`(`sync.rs` std mutex 예열 — macOS RT 무할당), `9d8bdd3`(CI 액션), `fe6f705`·`2f6e356`(`examples/soak.rs`, 하네스 전용 `unsafe` 카운팅 할당기·`mallinfo2`·`malloc_trim`), `4ee4996`(`examples/os_exchange.rs`·CI exchange 작업), `9f687dd`·`ad11ba3`(ADR-009 개정 2: `diagnostics::available_bytes` Unix statvfs·Windows `fs4`, Windows 디렉터리 sync 생략, calibrate Linux 전용 유지), `84d247b`(calibrate 시험 격리), `f30ae5a`(`url` 2.5.9). 근거는 [EV-113](../05_verification/verification_evidence.md#ev-113)~[EV-121](../05_verification/verification_evidence.md#ev-121).
+   - **중점 1 — 플랫폼 의미(ADR-009 개정 2):** Windows에서 디렉터리 sync를 생략해도 `.active` → `.mcap` 이름 변경과 ring 삭제의 내구성 주장이 맞는지(NTFS 메타데이터 저널링 범위, `MoveFileEx` 동작), `fs4::available_space`와 statvfs `f_bavail`의 의미 차이(사용자 quota 등), 없는 경로의 OS별 의미, macOS의 `F_FULLFSYNC` 필요 여부.
+   - **중점 2 — RT 무할당 불변식:** `sync.rs` mutex 예열이 모든 RT 진입 경로에서 첫 lock 할당을 없애는지, 다른 지연 초기화(thread-local, `OnceLock`, std 내부)가 남았는지. EV-120 진단에서 대표 부하 중 할당기 호출이 초당 약 13,100번 관측됐다(TASK-039) — 제어 스레드 경로가 할당하는지 정적으로 보아 달라.
+   - **중점 3 — 하네스 `unsafe`:** soak의 `GlobalAlloc` 구현(크기·realloc 회계, 오버플로·panic 금지)과 glibc FFI 선언(`mallinfo2` 구조체 배치, `musl`·비 glibc 대상에서의 빌드).
+   - **중점 4 — 배포·공급망:** 의존성 `^` 범위와 MSRV 1.85(외부 소비자가 새 버전을 받을 때), MCAP 별칭 crate의 vendor 패치 정합성, `fs4` 기능 최소화, `Cargo.lock`.
+   - **중점 5 — S2 설계 검토:** [TASK-024 §S2 설계](../04_implementation/tasks/TASK-024.md#s2-설계--2026-11-23)의 전제 1~6이 코드와 맞는지, 시나리오별 기대 결과·판정 기준의 빈틈, 결정 D1~D3에 대한 의견. 특히 실제 ENOSPC 시 출력이 세션 안에서 회복하지 않는 것, ring이 바깥 공간 부족에 자기 이력을 지우는 것, `Degraded(RecordsFailed)` 고착, 재시작 때 `.active` 미복구가 설계상 맞는지.
+   - **형식·제약:** REV-071과 같다(P1~P3, 파일:줄, 실패 시나리오, 확인 방법, 제안, Pass / Conditional / Fail). 긴 실행은 하지 않는다.
+1. **REV-072 처리 뒤 순서(2026-11-23 Human):** S2 결정 D1~D3(Human) → **TASK-024 S2 장애 주입**(하네스 확장 약 1인일 + 실행 약 1~1.5시간, Docker로 느린 디스크·용량 제한 확인됨) → S5 → TASK-039 할당 경로 → TASK-040(S0 범위 Human 결정) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의**(Human 요청, 안건 후보: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복·Health 회복 표시·B1/B2) → TASK-026.
+   - CI 확인: `84d247b` run `45179903965`(audit은 RUSTSEC-2026-0592로 실패 → `f30ae5a`에서 조치), `f30ae5a` run `45181597098`. 통과하면 TASK-038 Done.
+   - TASK-024 S4 Pass(EV-120). 원시 결과는 `05_verification/perf_runs/task024-2026-11-22/`, 시험 데이터는 2026-11-23 삭제.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다.
-1. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).
+2. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).
 
 ## 승인·재개 제약
 

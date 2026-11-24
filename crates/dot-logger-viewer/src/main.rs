@@ -14,9 +14,11 @@ mod websocket;
 use bridge::Bridge;
 use catalog::{Catalog, MAX_CATALOG_BYTES, read_file};
 use clap::{Args, Parser};
-use dot_logger_client::RemoteConfig;
+use dot_logger_client::{ReceiverConfig, RemoteConfig};
 use replay::{Playback, Rate};
-use std::{error::Error, io, net::SocketAddr, path::PathBuf, process::ExitCode, sync::Arc};
+use std::{
+    error::Error, io, net::SocketAddr, path::PathBuf, process::ExitCode, sync::Arc, time::Duration,
+};
 use tokio::{
     net::{TcpListener, TcpStream},
     task::JoinSet,
@@ -105,6 +107,25 @@ impl Default for Options {
 }
 
 impl Options {
+    /// Receiver limits requested for each upstream feed.
+    fn receiver(&self) -> ReceiverConfig {
+        ReceiverConfig {
+            records: self.receiver_records,
+            record_bytes: self.record_bytes,
+            ttl: Duration::from_millis(self.receiver_age_ms),
+        }
+    }
+
+    /// Live receiver budget for every feed, as the core reserves it
+    /// (platform bookkeeping included, REV-072 RV-199). Validation and the
+    /// bridge both use this, so the checked size is the reserved size.
+    fn live_bytes(&self) -> Option<usize> {
+        self.receiver()
+            .reservation_bytes()
+            .ok()?
+            .checked_mul(self.feeds)
+    }
+
     fn validate(&self) -> io::Result<()> {
         if !(1..=16).contains(&self.clients)
             || !(1..=128).contains(&self.feeds)
@@ -115,11 +136,7 @@ impl Options {
             || !(1..=16 * MIB - 1024).contains(&self.replay_blob_bytes)
             || !(self.record_bytes + output::DATA_HEADER..=64 * MIB).contains(&self.queue_bytes)
             || self.clients.saturating_mul(self.queue_bytes) > 256 * MIB
-            || self
-                .feeds
-                .saturating_mul(self.receiver_records)
-                .saturating_mul(self.record_bytes + 1024)
-                > 256 * MIB
+            || self.live_bytes().is_none_or(|bytes| bytes > 256 * MIB)
             || self.allow_origin.as_ref().is_some_and(|origin| {
                 origin.is_empty()
                     || origin.len() > 512

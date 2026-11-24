@@ -89,23 +89,16 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 impl Bridge {
     pub(crate) fn new(remote: RemoteConfig, options: &Options) -> Result<Self, ClientError> {
-        let limits = ReceiverConfig {
-            records: options.receiver_records,
-            record_bytes: options.record_bytes,
-            ttl: Duration::from_millis(options.receiver_age_ms),
-        };
-        // One receiver per feed, sized by the core so platform bookkeeping
-        // (Apple lock storage, REV-072 RV-199) is never left out.
-        let bytes = limits
-            .reservation_bytes()?
-            .checked_mul(options.feeds)
+        // One receiver per feed, sized by the core (Options::live_bytes).
+        let bytes = options
+            .live_bytes()
             .ok_or(ClientError::Remote(RemoteError::Limit))?;
         let budget = LiveBudget::new(bytes)?;
         Ok(Self {
             upstream: Arc::new(Upstream {
                 remote,
                 budget,
-                limits,
+                limits: options.receiver(),
             }),
             capacity: options.feeds,
             workers: AsyncMutex::new(HashMap::new()),

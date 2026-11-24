@@ -615,13 +615,15 @@ fn f17_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
     let mut writer = logger.take_writer("w").unwrap();
     let payload = [5u8; 64];
     let started = std::time::Instant::now();
-    let mut previous: Option<Duration> = None;
-    let mut completed_under_load = 0;
+    // When, measured from the start of the load, the latest sync seen so far
+    // completed, and the longest time any sample saw since the last sync.
+    let mut latest_sync = None;
     let mut stalest = Duration::ZERO;
     // Keep the writer saturated for 1.5 s and watch the last successful sync
     // while the load continues. One sync's duration is the disk's flush time
     // for what was written since the previous sync (about 0.5 s on a shared CI
-    // runner), so the test asserts that syncs keep completing, not how fast.
+    // runner), and a slow runner may sample only a few times, so the test
+    // asserts that syncs keep completing, not how fast or how often.
     while started.elapsed() < Duration::from_millis(1500) {
         for _ in 0..256 {
             loop {
@@ -632,25 +634,24 @@ fn f17_continuous_load_keeps_periodic_syncs_and_drops_nothing() {
                 }
             }
         }
+        let at = started.elapsed();
         let since = logger.health().outputs[0].since_sync;
-        if started.elapsed() > Duration::from_millis(500) {
-            // The time since the last sync fell: a new sync completed.
-            if let (Some(before), Some(now)) = (previous, since) {
-                completed_under_load += usize::from(now < before);
-            }
-            stalest = stalest.max(since.unwrap_or(started.elapsed()));
+        if let Some(since) = since {
+            latest_sync = latest_sync.max(at.checked_sub(since));
         }
-        previous = since;
+        if at > Duration::from_millis(500) {
+            stalest = stalest.max(since.unwrap_or(at));
+        }
     }
     drop(writer);
     let Shutdown::Closed(report) = logger.shutdown(Duration::from_secs(30)).unwrap() else {
         panic!("shutdown must close");
     };
-    // Syncs kept completing during the last second of continuous load, and
-    // none was later than the health lateness bound (4 periods + 1 s).
+    // A sync completed after the first 0.5 s of continuous load, and no
+    // sample was later than the health lateness bound (4 periods + 1 s).
     assert!(
-        completed_under_load > 0,
-        "no periodic sync completed under load"
+        latest_sync.is_some_and(|t| t > Duration::from_millis(500)),
+        "no periodic sync completed after 0.5 s of load: {latest_sync:?}"
     );
     assert!(stalest <= Duration::from_millis(1200), "{stalest:?}");
     assert_eq!(report.core.totals.dropped, 0, "{report:?}");

@@ -42,7 +42,11 @@ MIB = 1 << 20
 # `--limit` keeps each bounded `tail` below its 256 MiB output cap, so it
 # ends normally (exit 0) and is restarted: control lines carry metadata
 # only, frame lines a 64 KiB original.
-SUBSCRIBERS = {"control": ["--channel", "1", "--limit", "500000"],
+# The CLI's output cap ends a session with outcome `limit` (exit 3). Gap lines
+# are not bounded per record, so no record limit rules the cap out; a session
+# that ends at the cap is a restart, any other `limit` end is unexpected.
+OUTPUT_CAP = 256 * MIB
+SUBSCRIBERS = {"control": ["--channel", "1", "--limit", "200000"],
                "frame": ["--channel", "2", "--originals", "--limit", "1500"]}
 
 
@@ -114,6 +118,7 @@ class Subscriber(threading.Thread):
         self.records = 0
         self.gaps = 0
         self.ends = []
+        self.capped = []
         self.delays_ms = []
         self.reconnect_ms = []
         self.every = 1000 if name == "control" else 2
@@ -125,13 +130,15 @@ class Subscriber(threading.Thread):
             command = [str(self.args.cli), "tail", "--json", "--endpoint",
                        f"http://127.0.0.1:{self.args.port}", *self.flags,
                        "--records", "4", "--record-bytes", str(MIB),
-                       "--max-output-bytes", str(256 * MIB),
+                       "--max-output-bytes", str(OUTPUT_CAP),
                        "--timeout-ms", "3600000"]
             process = subprocess.Popen(command, stdout=subprocess.PIPE,
                                        stderr=subprocess.DEVNULL)
             first = True
             last = None
+            written = 0
             for raw in process.stdout:
+                written += len(raw)
                 if self.stop.is_set():
                     break
                 try:
@@ -159,7 +166,13 @@ class Subscriber(threading.Thread):
             code = process.wait()
             ended_at = now()
             if not self.stop.is_set():
-                self.ends.append({"code": code, "last": last, "t": time.time()})
+                end = {"code": code, "last": last, "t": time.time(), "bytes": written}
+                summary = (last or {}).get("data", {})
+                at_cap = written >= OUTPUT_CAP - MIB
+                if code == 3 and summary.get("outcome") == "limit" and at_cap:
+                    self.capped.append(end)
+                else:
+                    self.ends.append(end)
             time.sleep(0.2)
 
     def finish(self):
@@ -285,7 +298,11 @@ def main():
     for name, s in subscribers.items():
         # A `tail` the shutting-down server ends is the run's end, not a fault.
         unexpected = [e for e in s.ends if e["code"] != 0 and e["t"] < load_ends - 1]
-        subs[name] = {"records": s.records, "gaps": s.gaps, "restarts": len(s.ends),
+        subs[name] = {"records": s.records, "gaps": s.gaps,
+                      "restarts": len(s.ends) + len(s.capped),
+                      "output_cap_ends": s.capped[:20],
+                      "ends": [{k: e[k] for k in ("code", "bytes", "t")} | {
+                          "summary": (e["last"] or {}).get("data")} for e in s.ends[:20]],
                       "unexpected_ends": unexpected[:20],
                       "delay_ms": {"p50": percentile(s.delays_ms, 50),
                                    "p99": percentile(s.delays_ms, 99),

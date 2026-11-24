@@ -20,6 +20,10 @@
 //! unfinished files) and the latest cumulative loss checkpoint, without a
 //! pass/fail judgment: the S2 driver (`scripts/soak-faults.py`) judges.
 //!
+//! Heap samples also split allocations and frees per thread, and a `run`
+//! fails when the RT threads (control, frame) touch the heap once warm
+//! (`rt_heap` in the end line, TASK-039).
+//!
 //! Measurement harness only, never a product API. RT rows set
 //! `DOT_LOGGER_PERF_RT=fifo` (control thread SCHED_FIFO 70 on CPU 2, memory
 //! locked), as `perf_baseline` does; the control thread is always pinned.
@@ -29,28 +33,113 @@ mod perf;
 
 /// Heap accounting for the RSS judgment (TASK-024 S4, EV-120): live bytes
 /// and their lowest point between samples, so a leak (live bytes rising)
-/// can be told apart from allocator retention (RSS rising, live bytes flat).
+/// can be told apart from allocator retention (RSS rising, live bytes flat);
+/// and per thread, so the RT threads can be held to zero (TASK-039).
 /// Harness only; the unsafe here forwards to `System` unchanged.
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
 mod heap {
     use serde_json::{Value, json};
     use std::alloc::{GlobalAlloc, Layout, System};
-    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
+    use std::cell::Cell;
+    use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering::Relaxed};
 
     struct Counting;
     static LIVE: AtomicUsize = AtomicUsize::new(0);
     static LOW: AtomicUsize = AtomicUsize::new(usize::MAX);
     static CALLS: AtomicU64 = AtomicU64::new(0);
 
+    /// Per-thread counts (TASK-039): which thread allocates or frees. Each
+    /// thread takes the next slot on its first call and records its OS tid;
+    /// the last slot also takes every thread beyond it. Nothing here
+    /// allocates: a const, drop-free thread local and fixed static arrays.
+    const SLOTS: usize = 64;
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    static TID: [AtomicU32; SLOTS] = [const { AtomicU32::new(0) }; SLOTS];
+    static ALLOCS: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
+    static ALLOC_BYTES: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
+    static FREES: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
+    thread_local! {
+        static SLOT: Cell<usize> = const { Cell::new(usize::MAX) };
+    }
+
+    fn slot() -> usize {
+        SLOT.try_with(|slot| {
+            if slot.get() == usize::MAX {
+                let next = NEXT.fetch_add(1, Relaxed).min(SLOTS - 1);
+                if TID[next].load(Relaxed) == 0 {
+                    TID[next].store(
+                        rustix::thread::gettid().as_raw_nonzero().get() as u32,
+                        Relaxed,
+                    );
+                }
+                slot.set(next);
+            }
+            slot.get()
+        })
+        .unwrap_or(SLOTS - 1)
+    }
+
     fn grow(by: usize) {
         LIVE.fetch_add(by, Relaxed);
         CALLS.fetch_add(1, Relaxed);
+        let slot = slot();
+        ALLOCS[slot].fetch_add(1, Relaxed);
+        ALLOC_BYTES[slot].fetch_add(by as u64, Relaxed);
     }
     fn shrink(by: usize) {
         // Wrapping: an allocator must never panic.
         let now = LIVE.fetch_sub(by, Relaxed).wrapping_sub(by);
         LOW.fetch_min(now, Relaxed);
+        FREES[slot()].fetch_add(1, Relaxed);
+    }
+
+    /// RT threads (control, frame) registered at the start of their steady
+    /// loop, with their counts at that moment (TASK-039).
+    const RT_THREADS: usize = 2;
+    static RT_SLOT: [AtomicUsize; RT_THREADS] =
+        [const { AtomicUsize::new(usize::MAX) }; RT_THREADS];
+    static RT_BASE: [AtomicU64; RT_THREADS * 2] = [const { AtomicU64::new(0) }; RT_THREADS * 2];
+
+    /// Called by an RT thread once warm-up (calibration, first use) is done:
+    /// from here on it must neither allocate nor free.
+    pub fn rt_begin(index: usize) {
+        let slot = slot();
+        RT_BASE[index * 2].store(ALLOCS[slot].load(Relaxed), Relaxed);
+        RT_BASE[index * 2 + 1].store(FREES[slot].load(Relaxed), Relaxed);
+        RT_SLOT[index].store(slot, Relaxed);
+    }
+
+    /// Allocations and frees on the RT threads since `rt_begin`, and how many
+    /// of them registered. Read while they still run, before thread exit.
+    pub fn rt_since_begin() -> Value {
+        let (mut allocs, mut frees, mut threads) = (0, 0, 0);
+        for (index, slot) in RT_SLOT.iter().enumerate() {
+            let slot = slot.load(Relaxed);
+            if slot == usize::MAX {
+                continue;
+            }
+            threads += 1;
+            allocs += ALLOCS[slot].load(Relaxed) - RT_BASE[index * 2].load(Relaxed);
+            frees += FREES[slot].load(Relaxed) - RT_BASE[index * 2 + 1].load(Relaxed);
+        }
+        json!({"threads":threads,"allocs":allocs,"frees":frees})
+    }
+
+    /// Cumulative counts per thread that ever allocated, named from
+    /// `/proc` while the thread lives (reading it allocates on the caller).
+    fn threads() -> Vec<Value> {
+        let used = NEXT.load(Relaxed).min(SLOTS);
+        (0..used)
+            .map(|i| {
+                let tid = TID[i].load(Relaxed);
+                let name = std::fs::read_to_string(format!("/proc/self/task/{tid}/comm"))
+                    .map_or_else(|_| "(exited)".to_owned(), |n| n.trim_end().to_owned());
+                json!({"tid":tid,"name":name,"allocs":ALLOCS[i].load(Relaxed),
+                    "alloc_bytes":ALLOC_BYTES[i].load(Relaxed),"frees":FREES[i].load(Relaxed),
+                    "shared":i == SLOTS - 1})
+            })
+            .collect()
     }
 
     // SAFETY: every method passes the caller's pointer, layout and size to
@@ -86,6 +175,9 @@ mod heap {
                 } else {
                     shrink(layout.size() - new_size);
                     CALLS.fetch_add(1, Relaxed);
+                    let slot = slot();
+                    ALLOCS[slot].fetch_add(1, Relaxed);
+                    FREES[slot].fetch_sub(1, Relaxed);
                 }
             }
             new
@@ -101,7 +193,7 @@ mod heap {
         let live = LIVE.load(Relaxed);
         let low = LOW.swap(live, Relaxed).min(live);
         json!({"live_bytes":live,"low_bytes":low,"calls":CALLS.load(Relaxed),
-            "glibc":glibc::arenas()})
+            "glibc":glibc::arenas(),"threads":threads()})
     }
     /// Return free heap pages to the kernel; true when some were released.
     pub fn trim() -> bool {
@@ -358,6 +450,7 @@ mod linux {
         stats.iterations.store(iterations, Ordering::Release);
         let mut index = 0_u64;
         let mut release = perf::monotonic_ns() + PERIOD_NS;
+        super::heap::rt_begin(0);
         while !stop.load(Ordering::Acquire) {
             sleep_until(release)?;
             std::hint::black_box(perf::work(iterations));
@@ -402,6 +495,7 @@ mod linux {
     ) -> Result<(), Error> {
         let mut index = 0_u64;
         let mut next = Instant::now();
+        super::heap::rt_begin(1);
         while !stop.load(Ordering::Acquire) {
             next += FRAME_PERIOD;
             thread::sleep(next.saturating_duration_since(Instant::now()));
@@ -523,11 +617,15 @@ mod linux {
         let workers = [
             {
                 let (stats, stop) = (stats.clone(), stop.clone());
-                thread::spawn(move || control_loop(control_writer, control, &stats, &stop, rt))
+                thread::Builder::new()
+                    .name("soak-control".into())
+                    .spawn(move || control_loop(control_writer, control, &stats, &stop, rt))?
             },
             {
                 let (stats, stop) = (stats.clone(), stop.clone());
-                thread::spawn(move || frame_loop(frame_writer, frame, &stats, &stop))
+                thread::Builder::new()
+                    .name("soak-frame".into())
+                    .spawn(move || frame_loop(frame_writer, frame, &stats, &stop))?
             },
         ];
         let (alarm_tx, alarm_rx) = mpsc::channel();
@@ -610,8 +708,14 @@ mod linux {
                 "after":{"rss_kib":rss("VmRSS:"),"rss_anon_kib":rss("RssAnon:"),
                     "heap":super::heap::sample()}}))?;
         }
+        // RT threads must not touch the heap once warm (TASK-039); read
+        // before they stop, so thread exit is not counted.
+        let rt_heap = super::heap::rt_since_begin();
         stop.store(true, Ordering::Release);
         let mut failures = Vec::new();
+        if alarm.is_none() && (rt_heap["allocs"] != json!(0) || rt_heap["frees"] != json!(0)) {
+            failures.push(format!("RT threads used the heap under load: {rt_heap}"));
+        }
         for worker in workers {
             match worker.join() {
                 Ok(Ok(())) => {}
@@ -665,7 +769,7 @@ mod linux {
         let (bytes, count) = disk(&dirs);
         emit(json!({"event":"end","success":shutdown.is_success(),
             "elapsed_s":started.elapsed().as_secs(),"counts":stats.counts(),
-            "failures":failures,"disk_bytes":bytes,"files":count,
+            "failures":failures,"rt_heap":rt_heap,"disk_bytes":bytes,"files":count,
             "health":format!("{:?}",health.state),"outputs":outputs,
             "rss_kib":status_kib("VmRSS:"),"hwm_kib":status_kib("VmHWM:"),"fds":fds(),
             "report":format!("{shutdown:?}")}))?;

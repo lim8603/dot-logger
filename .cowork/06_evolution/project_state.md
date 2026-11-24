@@ -9,13 +9,13 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — TASK-039·040, 실사용처(TASK-026) 잔여(TASK-024·038 2026-11-24 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 Planned(2026-11-23 등록, TASK-042~044). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
-| 활성 Task | **[TASK-039](../04_implementation/tasks/TASK-039.md) In Progress**(2026-11-24 S1 스레드별 할당 계측 실행) · [TASK-024](../04_implementation/tasks/TASK-024.md) **Done**(2026-11-24 S5 Human 「모두 승인」, 추적표 7칸 체크) · [TASK-038](../04_implementation/tasks/TASK-038.md) **Done**(2026-11-24 CI) · TASK-040·041·042 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 활성 Milestone | MS-007 In Progress — TASK-040, 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 Planned(2026-11-23 등록, TASK-042~044). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
+| 활성 Task | [TASK-039](../04_implementation/tasks/TASK-039.md) **Done**(2026-11-24 EV-125: RT 스레드 heap 0) · 다음 TASK-040(S0 범위 Human 결정) · [TASK-024](../04_implementation/tasks/TASK-024.md) **Done**(2026-11-24 S5 Human 「모두 승인」, 추적표 7칸 체크) · [TASK-038](../04_implementation/tasks/TASK-038.md) **Done**(2026-11-24 CI) · TASK-040·041·042 Planned(TASK-042의 TASK-039 선행 해소) · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
 | 미처리 리뷰 | 없음 — **REV-072 Closed**(2026-11-24 위임 수락: RV-193~201 조치 EV-122, RV-199 후속 macOS viewer 회귀 수정 `e20aef4`·`641929c` EV-124, CI run `45370553005` 16개 작업 Pass). REV-001~072 Closed |
-| 상태 | 36/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 상태 | 37/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-24 / #001 — CI 실패(macOS viewer) 원인 수정·REV-072 Closed·TASK-038 Done, TASK-024 S5 Done·1.0.0 직전 재검증(T8), TASK-039 착수 / AI |
+| 갱신 | 2026-11-24 / #001 — CI 실패(macOS viewer) 원인 수정·REV-072 Closed·TASK-038 Done, TASK-024 S5 Done·1.0.0 직전 재검증(T8), TASK-039 Done(EV-125) / AI |
 | 세션 상태 | **진행 중 — 2026-11-24 #001(개발).** |
 | 최근 완료 세션 | 2026-11-23 #002 — REV-072 반입·조치(EV-122), TASK-024 S2 F1~F5(EV-123), MS-011 등록 · 2026-11-23 #001(리뷰) — [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open/Conditional(`RV-193~201`: P1 1·P2 5·P3 3) · 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
 
@@ -66,11 +66,10 @@
 
 ## 활성 Task 요약
 
-Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(36건: TASK-001~017·019~025·027~038).
+Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(37건: TASK-001~017·019~025·027~039).
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-039 | 대표 부하의 할당 경로 확인 | AI | In Progress | 2026-11-24 | S1 스레드별 할당 계측·300초 실행 → S2 판정 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | AI | Planned | 2026-11-23 | S0 범위 Human 결정 |
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | TASK-042 뒤. 태그는 Human 확인 뒤 |
 | TASK-042 | `try_log` 지연 분포 측정과 README 공개 | AI | Planned | 2026-11-23 | MS-011. TASK-039 뒤·v0.1.1 전. D1 둘 다·D2 A, D3 대기 |
@@ -103,7 +102,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 다음 시작점
 
 0. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
-1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → **TASK-039 할당 경로(진행 중)** → TASK-040(S0 범위 Human 결정) → **TASK-042** `try_log` 지연 분포(D3 README 범위 결정, `performance` governor 전환은 실행 때 Human) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
+1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → TASK-040(S0 범위 Human 결정) → **TASK-042** `try_log` 지연 분포(D3 README 범위 결정, `performance` governor 전환은 실행 때 Human) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124)**·Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량)·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).

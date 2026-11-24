@@ -1897,6 +1897,28 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **사고(같은 날):** 첫 하네스가 tmpfs를 chroot 밖 경로에 마운트해 F3a·F3b 디버그 채움이 호스트 루트(T500)에 들어갔다(여유 16 MiB까지, 이어 832 GB 파일로 100%). 즉시 삭제(`fallocate`라 데이터 쓰기 없음). 수정 뒤 채우기 직전 같은 chroot 안에서 tmpfs·크기를 확인하고, 본 실행 동안 루트 여유는 851,764~852,216 MiB(F1의 의도된 쓰기만).
 - **관측(기능 논의 안건):** ① 원격 구독의 조용한 단절 감지 없음(keepalive) ② `IoPoisoned` 뒤 RT 수락 지속·세션 내 회복 없음 ③ `Degraded(RecordsFailed)` 고착이 `SyncOverdue`를 가림 ④ 외부 공간 압박 시 링이 자기 이력을 모두 지움 ⑤ 재시작 시 `.active` 자동 복구 없음 ⑥ CLI `tail` 종료 결과가 `Gone`·초과 끊김을 `unknown`으로만 보고 ⑦ (CI) Windows에서 짧은 대기가 타이머 해상도로 늘어 작은 슬롯 설정의 처리량이 낮음(tc_013_preset f15 약 24 s).
 
+<a id="ev-125"></a>
+### EV-125 — TASK-039 스레드별 할당 경로(대표 부하)
+
+- **대상·환경:** `examples/soak.rs`(이 세션 커밋, 하네스 전용 변경), 제품 코드 `641929c`. 이 PC(`7.0.0-44-realtime`), `DOT_LOGGER_PERF_RT=fifo`(제어 스레드 FIFO 70·CPU 2·mlock), 출력 `/dev/shm`(링 256 MiB, SSD 쓰기 0), 대표 부하(EV-120과 같음). 2026-11-24 #001 AI 실행. `soak run /dev/shm/task039 300 10 256`.
+- **계측:** 카운팅 할당기가 스레드마다 첫 호출 때 슬롯(const thread local)과 OS tid를 잡고 할당·해제 수와 바이트를 정적 배열에 센다(할당기 안 할당 없음). 표본이 `/proc/self/task/<tid>/comm`으로 이름을 붙인다. soak 제어·프레임 스레드에 `soak-control`·`soak-frame` 이름을 붙였다.
+- **결과(20~300 s, 280초 구간):**
+
+| 스레드 | 할당 | 해제 | 평균 크기 | 비고 |
+|---|---|---|---|---|
+| `soak-control`(RT, `try_log` 5,000건/s) | **0** | **0** | — | 시작 18회는 보정·스레드 준비 |
+| `soak-frame`(RT, 64 KiB 대여 10건/s) | **0** | **0** | — | 시작 1회 |
+| `dot-logger-host` | 2,803,189(10,011/s) | 280 | 304 B | `routing::take_shared` — 기록마다 페이로드 복사본(`Box<[u8]>`)과 `Arc<SharedPayload>` |
+| `dot-logger-io` | 884,334(3,158/s) | 3,062,940(10,939/s) | 841 B | 쓰기 배치·MCAP chunk. host가 만든 공유 페이로드를 쓰고 난 뒤 해제 |
+| soak 메인 | 11,050(39/s) | 9,228 | 89 B | 하네스 표본(`/proc` 읽기) |
+
+  실행 `success: true`, 거절 0, deadline miss 0/29,700, 최악 응답 1,049 µs. 분포는 REV-072 §5A 정적 분석(host 약 10,010/s·IO 약 3,100/s)과 맞다. 같은 계측의 첫 300초 실행도 같은 값(host 10,011/s, RT 0)이었다.
+- **회귀 판정 추가:** 제어·프레임 스레드가 보정을 마치고 정상 루프에 들어갈 때(`heap::rt_begin`) 기준을 잡고, 부하를 멈추기 전에 증가분을 읽어 end 줄 `rt_heap`에 남긴다. 0이 아니면 `run`이 실패한다(경보 모드 제외). Red: 제어 루프에 임시 `vec![0_u8; 8]` → 20초 실행이 `rt_heap` 할당·해제 1,699회로 실패(exit 4). Green: 원래 코드 0·0, 성공. 1.0.0 직전 24h 재실행(T8)에도 이 판정이 들어간다.
+- **판정:** 제어 경로(`try_log`)와 원본 대여 경로는 대표 부하에서 heap을 쓰지 않는다 — NFR-001 숨은 지연 원인 없음. 할당은 RT가 아닌 host·IO 스레드뿐이고 `SharedLedger` 예산 한도 안이다.
+- **host·IO 할당 감축 제안: 지금은 하지 않음.** RT가 아닌 스레드에서 초당 약 1.3만 회(CPU 대략 0.1~0.2%)이고, 24h RSS 변화(+1%)는 할당기 보유로 확인됐다(EV-120). 재검토 조건: TASK-042 지연 분포에서 host 처리 속도가 `try_log` 거절에 영향을 줄 때, 또는 할당기 없는 대상 지원 요구가 생길 때(T4 slot 직접 encode와 함께 본다).
+- **검사:** fmt, clippy `-D warnings`(1.96.0·1.85.0, `-p dot-logger --all-targets --all-features`), musl 대상 soak 빌드(RV-197) Pass.
+- **원시 결과:** [perf_runs/task039-2026-11-24](perf_runs/task039-2026-11-24/) — `alloc-threads-300s.jsonl`, `rt-heap-red-20s.jsonl`, `rt-heap-green-20s.jsonl`.
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

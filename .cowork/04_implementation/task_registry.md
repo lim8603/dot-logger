@@ -53,7 +53,7 @@
 | TASK-036 | 배포 가능화(MCAP 별칭 crate·외부 소비자 빌드·의존성 범위) | MS-010 | INT-001 | US-001·003 | AI | Done | 2026-11-22 | Done — S1~S5(EV-114~116, 3 OS CI Pass), 2026-11-22 Human 승인. 외부 소비자 컴파일 실패(E0599) 해소 | 없음 | [상세](tasks/TASK-036.md) | 1~2 |
 | TASK-037 | v0.1.0 미리보기 릴리즈(CHANGELOG·태그·pre-release) | MS-010 | INT-001 | US-001·003 | AI | Done | 2026-11-22 | Done — 태그 `v0.1.0`·GitHub pre-release·태그 소비자 빌드(EV-117) | TASK-036 | [상세](tasks/TASK-037.md) | 0.5 |
 | TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | MS-007 | INT-001 | US-004 | AI | Done | 2026-11-24 | Done — `84d247b`, 18/1000 → 0/1000(EV-121). CI run `45370553005`(`641929c`) 16개 작업 모두 Pass | 없음 | [상세](tasks/TASK-038.md) | 0.25 |
-| TASK-039 | 대표 부하의 할당 경로 확인 | MS-007 | INT-001 | US-001 | AI | Planned | 2026-11-23 | EV-120 진단의 할당기 호출 초당 약 13,100번 — 제어 스레드 할당 여부 확인 | 없음 | [상세](tasks/TASK-039.md) | 0.5~1 |
+| TASK-039 | 대표 부하의 할당 경로 확인 | MS-007 | INT-001 | US-001 | AI | Done | 2026-11-24 | Done(EV-125) — 대표 부하에서 RT 제어·프레임 스레드 할당·해제 0, host 10,011/s·IO 3,158/s. soak `run`에 RT heap 0 판정 추가 | 없음 | [상세](tasks/TASK-039.md) | 0.5~1 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | MS-007 | INT-001 | US-002·003 | AI | Planned | 2026-11-23 | 요구 "회전·조회·전송 포함 24h" 중 EV-120에 없는 부분. S0 범위 Human 결정 | TASK-024 S4 | [상세](tasks/TASK-040.md) | 0.5+실행 |
 | TASK-041 | v0.1.1 패치 릴리즈 | MS-010 | INT-001 | US-001·003 | AI | Planned | 2026-11-23 | macOS·Windows 파일 출력 수정(ADR-009 개정 2)·24h 결과. 태그는 Human 확인 뒤 | TASK-037 | [상세](tasks/TASK-041.md) | 0.5 |
 | TASK-042 | `try_log` 지연 분포 측정과 README 공개 | MS-011 | INT-001 | US-001·004 | AI | Planned | 2026-11-23 | D1=둘 다·D2=A 결정(2026-11-23), D3 대기 → 하네스. v0.1.1 전. 외부 관점 지적 1(RT 로거 비교 입장권) | TASK-024 S2, TASK-039(하네스 공유) | [상세](tasks/TASK-042.md) | 1.5~2.5+실행 |

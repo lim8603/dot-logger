@@ -1860,7 +1860,21 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
   - RV-195: 시험이 모든 OS에서 없는 경로 `NotFound`를 단정(Windows 실행은 CI).
 - **로컬 회귀:** 두 Rust(1.96.0·1.85.0) 각 **743 Pass, 실패 0, 5 ignored**(워크스페이스 all features). Clippy `-D warnings` 두 버전(Linux)과 1.96.0 macOS·Windows 교차, fmt, strict rustdoc, `api-consumer --features remote` 실행, 통합 표면 검사(README 레시피) Pass. `clean-build-cache.sh` 인자 거절 3종·정상 dry-run 확인. Linux는 `MUTEX_BYTES` 0이라 RV-199로 예약이 바뀌지 않는다.
 - **판정에 쓰는 범위:** 교차 Clippy는 타입 검사·lint 근거일 뿐이다. macOS·Windows에서 새로 켜진 facade·CLI·소비자·RT 할당 시험의 실행, 외부 소비자 3 OS, Windows `available_bytes` 동작은 CI run `45186126649`가 맡는다.
-- **CI:** run `45186126649`(`156bd68`)에서 새로 켠 시험 중 macOS·Windows f11(worker CPU는 Linux 전용)·Windows f9(디렉터리 sync 실패 주입, Windows는 디렉터리 sync 없음)가 실패 → `00f53cd`에서 해당 플랫폼으로 한정. run `45189880533`에서 Windows f15 시간 기준(약 24 s > 10 s) → `4721903`, run `45195150611`에서 macOS f15(11~12 s) → `2a63fd8`에서 Linux만 단정. 모두 플랫폼 차이이며 제품 결함 없음. 최종 확인 run `45197725224`(`9c868a6`, S2 하네스 포함)은 세션 종료 시점 진행 중 — 다음 세션에서 기록.
+- **CI:** run `45186126649`(`156bd68`)에서 새로 켠 시험 중 macOS·Windows f11(worker CPU는 Linux 전용)·Windows f9(디렉터리 sync 실패 주입, Windows는 디렉터리 sync 없음)가 실패 → `00f53cd`에서 해당 플랫폼으로 한정. run `45189880533`에서 Windows f15 시간 기준(약 24 s > 10 s) → `4721903`, run `45195150611`에서 macOS f15(11~12 s) → `2a63fd8`에서 Linux만 단정. 모두 플랫폼 차이이며 제품 결함 없음. 최종 확인 run `45197725224`(`9c868a6`, S2 하네스 포함)은 macOS `contracts` 두 작업이 viewer `last_lease_can_be_replaced_at_the_feed_limit` 5초 초과로 실패했다. 위의 「제품 결함 없음」과 달리 이것은 RV-199 조치가 만든 제품 회귀(macOS viewer 실시간 구독 전부 거절)였다 → [EV-124](#ev-124).
+
+<a id="ev-124"></a>
+### EV-124 — RV-199 뒤 macOS viewer 실시간 구독 회귀 수정
+
+- **대상:** 이 세션의 코드 커밋. 이 PC(Ubuntu, 7.0.0-44-realtime 부팅 상태, x86_64), 빌드 `/data/build/target`, 교차 검사 `/data/build/target-cross`. AI 실행, 2026-11-24 #001.
+- **증상:** CI run `45197725224`(`9c868a6`) macOS-15 `contracts` 1.85.0·1.96.0이 「Client, CLI and viewer tests」 단계에서 `tests::last_lease_can_be_replaced_at_the_feed_limit` 하나로 실패(`tests.rs:114` `subscriptions()`의 5초 `Elapsed`). Ubuntu·Windows는 Pass. 이 PC에서는 단독 60회·3 CPU 묶음 20회 모두 Pass(시험 1회 약 10 ms)로 재현되지 않아 타이밍 문제가 아니라 플랫폼 차이로 봤다.
+- **원인:** `156bd68`(RV-199)이 `Reassembler::new` 예약에 `MUTEX_BYTES`(Apple 64 B, 그 밖 0)를 더했다. viewer `Bridge::new`는 `LiveBudget`을 `feeds × records × (record_bytes + 1024)`로 딱 맞게 잡으므로, macOS에서는 첫 구독부터 예약이 64 B 모자라 `Limit`으로 거절되고 재시도만 반복한다. 시험만이 아니라 macOS viewer의 실시간 구독이 모두 실패하는 제품 회귀다(v0.1.0 이후 미릴리즈 변경이라 배포본에는 없음). EV-122 회귀는 Linux에서만 돌아 `MUTEX_BYTES`가 0이었다.
+- **조치:** 예약량 공식을 코어 한 곳에 두고 공개했다 — `Reassembler::reservation_bytes(records, max_record_bytes)`(`new`가 같은 함수 사용), client `ReceiverConfig::reservation_bytes()`. viewer는 `feeds × limits.reservation_bytes()`로 `LiveBudget`을 잡는다(`e20aef4`). 자가 점검에서 viewer `Options::validate`의 256 MiB 상한도 같은 페이로드 공식 사본임을 찾아 `Options::live_bytes` 하나로 검증과 예약을 묶었다(`641929c`). `LiveBudget::new` 문서에 이 크기 산정법을 적고 CHANGELOG Added에 기록. 그 밖에 예약량을 밖에서 맞춰 잡는 사용처는 없다(나머지 시험·CLI는 MiB 단위 여유 예산). 코딩 규칙에 「예약량 변경 시 밖의 사용처 확인, 코어가 예약량 함수를 공개」를 더했다.
+- **Red → Green(Linux에서 macOS 조건 모사):** `MUTEX_BYTES`를 임시로 64로 바꾸고(확인 뒤 원복, diff 없음) 조치 전 `bridge.rs`로 viewer 시험 → `last_lease_can_be_replaced_at_the_feed_limit` FAILED, `tests.rs:114:6`, 5.00 s(CI와 같은 증상). 조치 후 같은 조건에서 23 Pass.
+- **새 시험(모든 OS에서 의미 있음):** core `receiver_reservation_bytes_match_what_a_receiver_reserves`(공개 함수 값 = `new`가 실제 잡는 양, 잘못된 입력·넘침 거절), client `budget_sized_from_reservation_bytes_admits_exactly_that_many_receivers`(그 크기의 `LiveBudget`이 수신기를 정확히 N개 받고 N+1번째는 `Limit`).
+- **로컬 회귀:** 두 Rust(1.96.0·1.85.0) 각 **745 Pass, 실패 0, 5 ignored**(워크스페이스 all features, 743 + 새 시험 2). client 기능 없는 시험, Clippy `-D warnings` 두 버전 × Linux·macOS·Windows 교차(빈 object 대체 컴파일러·archiver, MSVC `-out:` 형식 포함), fmt, strict rustdoc(전체·core 단독), 통합 표면 자가시험·검사 Pass. feature 조합 검사는 로컬에서 돌리지 않았다(변경이 `remote` 모듈 안이라 CI에 맡김).
+- **같은 유형 점검:** 코어 `reserve()` 호출 12곳 중 hub·writer·query·recovery는 공개 예약량 함수와 같은 값을 쓰고, CLI·시험도 그 함수를 쓴다. influxdb 예약에는 잠금이 없어 플랫폼에 따라 값이 바뀌지 않는다. 공식을 밖에서 베낀 곳은 viewer뿐이었다.
+- **CI:** run `45365551552`(`e20aef4`)은 macOS 1.85.0이 러너 미배정(「The job was not acquired by Runner … even after multiple attempts」, 시험 단계 미실행)으로 cancelled, 나머지 15개 Pass. run `45370553005`(`641929c`)은 **16개 작업 모두 Pass** — macOS 1.85.0·1.96.0 `contracts`에서 viewer 시험 포함 통과. → REV-072 Closed, TASK-038 Done(2026-11-24 위임 수락).
+- **판정에 쓰는 범위:** macOS 실행 근거는 이 커밋의 CI run이다. 로컬 모사는 `MUTEX_BYTES` 값만 바꾼 것으로 Apple std `Mutex` 동작 자체를 재현하지 않는다.
 
 <a id="ev-123"></a>
 ### EV-123 — TASK-024 S2 장애 주입(F1~F5)

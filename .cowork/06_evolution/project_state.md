@@ -9,14 +9,14 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — TASK-024 S5, TASK-038~040, 실사용처(TASK-026) 잔여. [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 Planned(2026-11-23 등록, TASK-042~044). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). MS-009 Done |
-| 활성 Task | **REV-072 Resolved(RV-193~201 전부 수용·조치, EV-122) — 3 OS CI 통과 확인 뒤 Closed.** [TASK-038](../04_implementation/tasks/TASK-038.md) 로컬 Done(EV-121, CI 확인 남음) · [TASK-024](../04_implementation/tasks/TASK-024.md) S1·S2·S2-P·S3·S4 Done(EV-118~120·123), S5 남음 · TASK-039·040·041·042 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | **[REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Resolved (2026-11-23 #002)** — `RV-193~201` 9건 수용·조치(`156bd68`·`00f53cd`·`4721903`·`2a63fd8`, [EV-122](../05_verification/verification_evidence.md#ev-122)). 3 OS CI 통과 뒤 위임 수락으로 Closed. REV-001~071 Closed |
-| 상태 | 34/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 활성 Milestone | MS-007 In Progress — TASK-039·040, 실사용처(TASK-026) 잔여(TASK-024·038 2026-11-24 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 Planned(2026-11-23 등록, TASK-042~044). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
+| 활성 Task | **[TASK-039](../04_implementation/tasks/TASK-039.md) In Progress**(2026-11-24 S1 스레드별 할당 계측 실행) · [TASK-024](../04_implementation/tasks/TASK-024.md) **Done**(2026-11-24 S5 Human 「모두 승인」, 추적표 7칸 체크) · [TASK-038](../04_implementation/tasks/TASK-038.md) **Done**(2026-11-24 CI) · TASK-040·041·042 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 미처리 리뷰 | 없음 — **REV-072 Closed**(2026-11-24 위임 수락: RV-193~201 조치 EV-122, RV-199 후속 macOS viewer 회귀 수정 `e20aef4`·`641929c` EV-124, CI run `45370553005` 16개 작업 Pass). REV-001~072 Closed |
+| 상태 | 36/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-23 / #002 — REV-072 반입·조치, TASK-024 S2 실행(EV-123), MS-011 등록 / AI |
-| 세션 상태 | **종료 — 2026-11-23 #002(개발).** 다음 세션은 CI run `45197725224`(`9c868a6`) 확인부터 |
+| 갱신 | 2026-11-24 / #001 — CI 실패(macOS viewer) 원인 수정·REV-072 Closed·TASK-038 Done, TASK-024 S5 Done·1.0.0 직전 재검증(T8), TASK-039 착수 / AI |
+| 세션 상태 | **진행 중 — 2026-11-24 #001(개발).** |
 | 최근 완료 세션 | 2026-11-23 #002 — REV-072 반입·조치(EV-122), TASK-024 S2 F1~F5(EV-123), MS-011 등록 · 2026-11-23 #001(리뷰) — [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open/Conditional(`RV-193~201`: P1 1·P2 5·P3 3) · 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
 
 ## 현재 결정과 제약
@@ -66,13 +66,11 @@
 
 ## 활성 Task 요약
 
-Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(34건: TASK-001~017·019~023·025·027~037).
+Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(36건: TASK-001~017·019~025·027~038).
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | AI | In Progress | 2026-11-23 | 로컬 Done(EV-121). `84d247b`가 macOS·Windows Clippy를 깼고(`disk()` 미사용) REV-072 RV-196 조치로 해결 — 3 OS CI 통과 확인 → Done |
-| TASK-024 | 24시간·전원 차단·OS 교환 검증 | AI | In Progress | 2026-11-23 | S1·S2·S2-P·S3·S4 Done(EV-118~120·123; S2는 F4 조용한 단절 미감지 1항목 Fail 관측). S5 근거·Human 리뷰 |
-| TASK-039 | 대표 부하의 할당 경로 확인 | AI | Planned | 2026-11-23 | TASK-024 S2 뒤. 제어 스레드 할당 여부 |
+| TASK-039 | 대표 부하의 할당 경로 확인 | AI | In Progress | 2026-11-24 | S1 스레드별 할당 계측·300초 실행 → S2 판정 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | AI | Planned | 2026-11-23 | S0 범위 Human 결정 |
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | TASK-042 뒤. 태그는 Human 확인 뒤 |
 | TASK-042 | `try_log` 지연 분포 측정과 README 공개 | AI | Planned | 2026-11-23 | MS-011. TASK-039 뒤·v0.1.1 전. D1 둘 다·D2 A, D3 대기 |
@@ -98,17 +96,17 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 및 조치 보충 리뷰 | **Closed** | 1차 `RV-171~188`([EV-111](../05_verification/verification_evidence.md#ev-111))·보충 `RV-189~192`(`9622e94`, [EV-112](../05_verification/verification_evidence.md#ev-112)) 조치. 2026-11-21 Human 수락 |
-| [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Resolved** | 9건 수용(RV-196 범위 확대, RV-201 `version`은 MS-010 3단계로)·조치([EV-122](../05_verification/verification_evidence.md#ev-122)). 새로 켠 macOS·Windows 시험 중 플랫폼 차이 3건(f9·f11·f15)은 해당 플랫폼으로 한정. 3 OS CI 통과 뒤 Closed |
+| [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Closed** | 9건 수용(RV-196 범위 확대, RV-201 `version`은 MS-010 3단계로)·조치([EV-122](../05_verification/verification_evidence.md#ev-122)). 새로 켠 macOS·Windows 시험 중 플랫폼 차이 3건(f9·f11·f15)은 해당 플랫폼으로 한정. RV-199 후속 macOS viewer 회귀 수정(EV-124). 2026-11-24 CI run `45370553005` 16개 Pass로 위임 수락 Closed |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **CI 확인:** `9c868a6`(하네스 포함) run `45197725224`이 3 OS × 2 Rust 모두 통과하면 REV-072 Closed(위임 수락)·TASK-038 Done·EV-122 CI 줄 기록. 실패하면 새로 켠 시험의 플랫폼 차이인지 먼저 본다(지금까지 f9·f11·f15).
-1. **순서(2026-11-23 Human):** TASK-024 **S5**(EV-118~120·123 근거 정리, TC-012 P6 행·추적표, Human 리뷰) → TASK-039 할당 경로 → TASK-040(S0 범위 Human 결정) → **TASK-042** `try_log` 지연 분포(D3 README 범위 결정, `performance` governor 전환은 실행 때 Human) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
-   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량)·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
+0. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
+1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → **TASK-039 할당 경로(진행 중)** → TASK-040(S0 범위 Human 결정) → **TASK-042** `try_log` 지연 분포(D3 README 범위 결정, `performance` governor 전환은 실행 때 Human) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
+   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124)**·Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량)·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
-2. **마지막 단계:** TASK-024 장기·OS 간 파일 교환·TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-018은 Cancelled(B2).
+2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).
 
 ## 승인·재개 제약
 
@@ -124,11 +122,12 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 이월 백로그
 
-다음 T = T8 / 다음 B = B3. 트리거 감시는 AI 책임이다.
+다음 T = T9 / 다음 B = B3. 트리거 감시는 AI 책임이다.
 
 | ID | 항목 | 트리거 | 관련 | 출처 |
 |---|---|---|---|---|
 | T1 | ROS 2 파일 호환·토픽 연동 필요/범위 검토 | dot-probe 첫 적용 완료가 확인된 때 | INT-001 / OQ-008 / TASK-026 | 2026-10-25 Human Q5 |
+| T8 | 1.0.0 직전 재검증 — 후보 revision으로 24h soak·멀티 OS CI(3 OS × 2 Rust·exchange)·Gate 4/5 재판정([MS-010](../04_implementation/milestones/MS-010.md) 3a) | MS-010 4단계(v1.0.0) 착수 또는 1.0.0 후보 revision 확정 시 | MS-010 / TASK-024 / quality_gate | 2026-11-24 Human 「모두 승인, 그러나 24시간 테스트와 멀티OS CI, 게이트는 최종 릴리즈 1.0.0 직전 다시 할 수있게」 |
 | T4 | facade 소형 기록 slot 직접 encode 별도 설계(scratch encode + byte ring 복사 대체) | TASK-023 S2 P1(256B) 측정에서 encode·복사 비용이 의미 있게 나온 때 | NFR-001 / API §18.3 / TASK-027 S3d / TASK-023 S2 | 2026-11-07 Human 「승인」·백로그 기록 요청 |
 
 범위 밖 백로그 B:

@@ -9,7 +9,7 @@
 | 대상 | REV-071 마감(`ae22f9d`) 이후 코드 변경 `ae22f9d..f30ae5a`(33개 파일: `d9d8b1f`, `378c6ba`, `a0fcfcf`, `9d8bdd3`, `fe6f705`, `4ee4996`, `9f687dd`, `ad11ba3`, `2f6e356`, `84d247b`, `f30ae5a` 등) 및 [TASK-024 §S2 설계](../../04_implementation/tasks/TASK-024.md#s2-설계--2026-11-23) (`HEAD` `b02671f`) |
 | 관련 Task / ADR | [TASK-024](../../04_implementation/tasks/TASK-024.md), [TASK-036](../../04_implementation/tasks/TASK-036.md), [TASK-038](../../04_implementation/tasks/TASK-038.md), [TASK-039](../../04_implementation/tasks/TASK-039.md), [ADR-009 개정 1·2](../../03_design_artifacts/adrs/ADR-009_storage_transport_toolchain.md), [ADR-010 개정 2](../../03_design_artifacts/adrs/ADR-010_mcap_security_update.md) |
 | 종합 판정 | **Conditional** — 제품 코드 `ae22f9d..f30ae5a`는 런타임 P1 결함 없이 건전하나, **TASK-024 S2 설계에 코드 계약과 어긋나는 P1 1건(3항목)**과 플랫폼 계약·CI 커버리지·하네스 이식성·외부 소비자 검증의 **P2 5건 · P3 3건**(`RV-193~201`) 보완 필요 |
-| 상태 | **Resolved** — 2026-11-23 #002 개발 세션 조치(`156bd68`, [EV-122](../verification_evidence.md#ev-122)). CI 확인 뒤 위임 수락으로 Closed |
+| 상태 | **Closed** — 2026-11-24 위임 수락. 2026-11-23 #002 조치(`156bd68`, [EV-122](../verification_evidence.md#ev-122)), RV-199 후속 macOS viewer 회귀 수정(`e20aef4`·`641929c`, [EV-124](../verification_evidence.md#ev-124)), CI run `45370553005`(`641929c`) 16개 작업 모두 Pass |
 
 REV-071 마감(`ae22f9d`) 이후 v0.1.0 배포 가능화, macOS std `Mutex` 예열, Windows/macOS 파일 출력 지원(ADR-009 개정 2), 24h soak/OS 간 교환 하네스, calibrate 간헐 실패 조치, `url 2.5.9` 보안 갱신 및 TASK-024 S2 장애 주입 설계를 5개 중점 관점에서 독립 검토했다.
 
@@ -85,15 +85,15 @@ REV-071 마감(`ae22f9d`) 이후 v0.1.0 배포 가능화, macOS std `Mutex` 예�
 
 | ID | 중요도 | 중점 | 위치 | 문제 요약 | 판정 | 상태 |
 |---|---|---|---|---|---|---|
-| **RV-193** | **P1** | 중점 5 | `TASK-024.md:108-115`, `logger/host.rs:1069-1077,1144-1147`, `completion/mod.rs:1074`, `adapters/remote/hub.rs:185-198` | S2 설계와 실제 코드 계약 불일치 3건: ① F3a는 `Cause::Capacity`가 아닌 `OutputFailed/Cause::Adapter`이며 링 임계·`is_success()==false` 반영 필요 ② F2 2분 `SIGSTOP`은 `max_age=10s`로 `Gap` 정책도 서버 종료 ③ 공통 Pass `"실패 기록 수 = 손실 보고 합계"` 및 F3b/F5 오라클 불일치 | 수용 | Resolved |
-| **RV-194** | **P2** | 중점 1 | `storage/retention.rs:15-24,45-50,91-93`, `CHANGELOG.md:14`, `ADR-009:57` | Windows `FileStore::directory_sync_supported()`가 `true`를 반환하면서 `sync_dir`가 no-op `Ok(())` — trait 계약과 불일치하며, NTFS 저널링은 일관성(atomicity)만 보장하고 지연 flush·링 삭제 부활·비-NTFS(FAT32/exFAT/SMB) 한계가 있음 | 수용 | Resolved |
-| **RV-195** | **P2** | 중점 1 | `diagnostics/host.rs:366-419` | `available_bytes`가 Windows(`fs4::available_space`→`GetVolumePathNameW`)에서는 없는 경로에도 `Ok(볼륨 여유)`를 반환(Unix는 `ENOENT`)하고 quota·260자 경로 버퍼 차이가 있으나 rustdoc 미기재·테스트명 모순 | 수용 | Resolved |
-| **RV-196** | **P2** | 중점 1 | `logger/mod.rs:49`, `logger/writer.rs:393`, `logger/host.rs:1190`, `tc_013_*.rs`, `tc_014_standard.rs`, `facade_remote.rs`, `api-consumer/src/main.rs:320`, `rt-allocation/src/tests.rs:1554` | ADR-009 개정 2로 macOS/Windows 파일 출력이 가능해졌는데도 기존 `RV-172`의 `#[cfg(target_os = "linux")]` 가드 11곳이 남아 macOS/Windows CI에서 facade 통합 테스트가 실행되지 않음 | 수용 | Resolved |
-| **RV-197** | **P2** | 중점 3 | `crates/dot-logger/examples/soak.rs:27,90-125` | glibc 전용 FFI(`mallinfo2`, `malloc_trim`)가 `target_env = "gnu"` 없이 `target_os = "linux"`에 묶여 `*-linux-musl` 타깃 `--all-targets` 링크 실패 | 수용 | Resolved |
-| **RV-198** | **P2** | 중점 4 | `.github/workflows/ci.yml:31-33`, `scripts/check-external-consumer.py:18-45`, `Cargo.toml:14-18` | 외부 소비자 무잠금 빌드가 `ubuntu-24.04`에서만 돌아 Windows `fs4`·macOS `rustix` 미검증, `edition = "2021"` 소비자의 MSRV 1.85 `resolver = "3"` 필요성 미안내 | 수용 | Resolved |
-| **RV-199** | **P3** | 중점 2 | `sync.rs:14`, `adapters/remote/types.rs:59-80`, `receiver.rs:88-92`, `logger/budget.rs:424-450` | Apple `MUTEX_BYTES`(64 B)가 `RemoteHub`·`Reassembler`·`facade_bytes`에는 명시적 가산 대신 여유 상수에 암묵 흡수됨 | 수용 | Resolved |
-| **RV-200** | **P3** | 중점 3 | `crates/dot-logger/tests/tc_013_calibrate.rs:132-145` | `f19_reserve_shrinks_the_write_limit`의 `free - 16 * MIB`, `seen - reserve` 단순 뺄셈이 극단적 저여유 환경에서 언더플로 패닉 가능 | 수용 | Resolved |
-| **RV-201** | **P3** | 중점 4 | `scripts/clean-build-cache.sh:17,29`, `crates/dot-logger-{client,cli,viewer}/Cargo.toml` | `clean-build-cache.sh`의 `--threshold` 인자 검증 부족·GNU `df` 전용 표기 부재, crates.io 게시(MS-010 2단계) 전 내부 path 의존성 `version` 지정 필요 메모 | 수용(이관 1) | Resolved |
+| **RV-193** | **P1** | 중점 5 | `TASK-024.md:108-115`, `logger/host.rs:1069-1077,1144-1147`, `completion/mod.rs:1074`, `adapters/remote/hub.rs:185-198` | S2 설계와 실제 코드 계약 불일치 3건: ① F3a는 `Cause::Capacity`가 아닌 `OutputFailed/Cause::Adapter`이며 링 임계·`is_success()==false` 반영 필요 ② F2 2분 `SIGSTOP`은 `max_age=10s`로 `Gap` 정책도 서버 종료 ③ 공통 Pass `"실패 기록 수 = 손실 보고 합계"` 및 F3b/F5 오라클 불일치 | 수용 | Closed |
+| **RV-194** | **P2** | 중점 1 | `storage/retention.rs:15-24,45-50,91-93`, `CHANGELOG.md:14`, `ADR-009:57` | Windows `FileStore::directory_sync_supported()`가 `true`를 반환하면서 `sync_dir`가 no-op `Ok(())` — trait 계약과 불일치하며, NTFS 저널링은 일관성(atomicity)만 보장하고 지연 flush·링 삭제 부활·비-NTFS(FAT32/exFAT/SMB) 한계가 있음 | 수용 | Closed |
+| **RV-195** | **P2** | 중점 1 | `diagnostics/host.rs:366-419` | `available_bytes`가 Windows(`fs4::available_space`→`GetVolumePathNameW`)에서는 없는 경로에도 `Ok(볼륨 여유)`를 반환(Unix는 `ENOENT`)하고 quota·260자 경로 버퍼 차이가 있으나 rustdoc 미기재·테스트명 모순 | 수용 | Closed |
+| **RV-196** | **P2** | 중점 1 | `logger/mod.rs:49`, `logger/writer.rs:393`, `logger/host.rs:1190`, `tc_013_*.rs`, `tc_014_standard.rs`, `facade_remote.rs`, `api-consumer/src/main.rs:320`, `rt-allocation/src/tests.rs:1554` | ADR-009 개정 2로 macOS/Windows 파일 출력이 가능해졌는데도 기존 `RV-172`의 `#[cfg(target_os = "linux")]` 가드 11곳이 남아 macOS/Windows CI에서 facade 통합 테스트가 실행되지 않음 | 수용 | Closed |
+| **RV-197** | **P2** | 중점 3 | `crates/dot-logger/examples/soak.rs:27,90-125` | glibc 전용 FFI(`mallinfo2`, `malloc_trim`)가 `target_env = "gnu"` 없이 `target_os = "linux"`에 묶여 `*-linux-musl` 타깃 `--all-targets` 링크 실패 | 수용 | Closed |
+| **RV-198** | **P2** | 중점 4 | `.github/workflows/ci.yml:31-33`, `scripts/check-external-consumer.py:18-45`, `Cargo.toml:14-18` | 외부 소비자 무잠금 빌드가 `ubuntu-24.04`에서만 돌아 Windows `fs4`·macOS `rustix` 미검증, `edition = "2021"` 소비자의 MSRV 1.85 `resolver = "3"` 필요성 미안내 | 수용 | Closed |
+| **RV-199** | **P3** | 중점 2 | `sync.rs:14`, `adapters/remote/types.rs:59-80`, `receiver.rs:88-92`, `logger/budget.rs:424-450` | Apple `MUTEX_BYTES`(64 B)가 `RemoteHub`·`Reassembler`·`facade_bytes`에는 명시적 가산 대신 여유 상수에 암묵 흡수됨 | 수용(조치 뒤 macOS viewer 회귀를 EV-124에서 수정) | Closed |
+| **RV-200** | **P3** | 중점 3 | `crates/dot-logger/tests/tc_013_calibrate.rs:132-145` | `f19_reserve_shrinks_the_write_limit`의 `free - 16 * MIB`, `seen - reserve` 단순 뺄셈이 극단적 저여유 환경에서 언더플로 패닉 가능 | 수용 | Closed |
+| **RV-201** | **P3** | 중점 4 | `scripts/clean-build-cache.sh:17,29`, `crates/dot-logger-{client,cli,viewer}/Cargo.toml` | `clean-build-cache.sh`의 `--threshold` 인자 검증 부족·GNU `df` 전용 표기 부재, crates.io 게시(MS-010 2단계) 전 내부 path 의존성 `version` 지정 필요 메모 | 수용(이관 1) | Closed |
 
 ---
 
@@ -267,6 +267,7 @@ REV-071 마감(`ae22f9d`) 이후 v0.1.0 배포 가능화, macOS std `Mutex` 예�
 - 판정 결과: **수용**
 - 처리 내용: `RemoteLimits::reservation`에 `(구독 수 + 1) × MUTEX_BYTES`, `Reassembler::new` 예약에 `MUTEX_BYTES`, `facade_bytes`에 `FACADE_LOCKS(3) × MUTEX_BYTES`(writer 표·telemetry·tracing sink, 꺼져 있어도 셈)를 명시적으로 더했다. `MUTEX_BYTES` 주석에 64 B 가정을 macOS CI RT 할당 시험이 감시함을 적음. `warm_mutex` 9곳 모두 회계 대상 확인. Linux·Windows는 0이라 예약 변화 없음
 - 검증 근거: `156bd68`. macOS RT 할당 시험은 CI(RV-196으로 facade 모듈도 실행). [EV-122](../verification_evidence.md#ev-122)
+- **조치 후속 회귀(2026-11-24):** `Reassembler::new`에 더한 64 B를 viewer가 몰랐다. viewer는 `LiveBudget`을 `feeds × records × (record_bytes + 1024)`로 딱 맞게 잡으므로, macOS에서는 모든 실시간 구독이 예산 부족으로 거절됐다. CI run `45197725224`의 macOS `last_lease_can_be_replaced_at_the_feed_limit` 5초 초과가 그 증상이다. Linux는 `MUTEX_BYTES`가 0이라 로컬 회귀로는 보이지 않았다. 코어가 `Reassembler::reservation_bytes`, client가 `ReceiverConfig::reservation_bytes`로 예약량을 공개하고 viewer가 그것으로 예산을 잡게 고쳤다. 그 밖에 예약량을 밖에서 맞춰 잡는 사용처는 없다. [EV-124](../verification_evidence.md#ev-124)
 
 ---
 

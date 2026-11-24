@@ -267,7 +267,8 @@ mod linux {
     use super::perf::{self, Error};
     use dot_logger::capture::Importance;
     use dot_logger::logger::{
-        Channel, EncodeError, LogError, Logged, Logger, Preset, Record, Retention, Schema, Writer,
+        Channel, EncodeError, EventMark, EventWindow, LogError, Logged, Logger, Preset, Record,
+        Retention, Schema, Writer,
     };
     use dot_logger::pool::RawRecordOutcome;
     use dot_logger::storage::{LossReader, NativeReader};
@@ -298,6 +299,8 @@ mod linux {
     const FRAME_HZ: u32 = 10;
     const FRAME_BYTES: usize = 64 << 10;
     const FRAME_PERIOD: Duration = Duration::from_millis(100);
+    const EVENT_SIDE: Duration = Duration::from_secs(30);
+    const EVENT_LIMIT: usize = 6;
     const CONTROL_STEP: u64 = 31;
     const FRAME_STEP: u64 = 7;
     // Power cut: signal to cut-off, and the margin the host keeps (EV-043).
@@ -306,10 +309,12 @@ mod linux {
     const POWER_RING_MIB: u64 = 1024;
     const MAX_PRODUCERS: usize = 8;
     const USAGE: &str = "usage: soak run <parent> <seconds> <sample_s> <ring_mib> \
-        [--sample-ms <ms>] [--reserve-mib <mib>] [--remote <port>] | \
+        [--sample-ms <ms>] [--reserve-mib <mib>] [--remote <port>] \
+        [--events <every_s>,<hold_s>,<release_s>] | \
         power <parent> <delay_s>[,<delay_s>...] | \
         verify <dir> <control_records> <frames> [--ring] | \
-        inspect <dir> <control_records> <frames> [--active]";
+        inspect <dir> <control_records> <frames> [--active] | \
+        reader <dir> <interval_s> <seconds>";
 
     /// Fault-injection options of `run` (TASK-024 S2).
     #[derive(Default)]
@@ -317,6 +322,15 @@ mod linux {
         sample_ms: Option<u64>,
         reserve_mib: u64,
         remote: Option<u16>,
+        /// TASK-040: mark an event every `every`, protect it for `hold`
+        /// after its window, and release odd-numbered marks after `release`.
+        events: Option<Events>,
+    }
+    #[derive(Clone, Copy)]
+    struct Events {
+        every: Duration,
+        hold: Duration,
+        release: Duration,
     }
     impl Options {
         fn parse(rest: &[&str]) -> Result<Self, Error> {
@@ -328,6 +342,21 @@ mod linux {
                     "--sample-ms" => options.sample_ms = Some(value.parse()?),
                     "--reserve-mib" => options.reserve_mib = value.parse()?,
                     "--remote" => options.remote = Some(value.parse()?),
+                    "--events" => {
+                        let parts: Vec<u64> =
+                            value.split(',').map(str::parse).collect::<Result<_, _>>()?;
+                        let [every, hold, release] = parts[..] else {
+                            return Err(invalid(USAGE));
+                        };
+                        if every == 0 || hold == 0 || release == 0 {
+                            return Err(invalid(USAGE));
+                        }
+                        options.events = Some(Events {
+                            every: Duration::from_secs(every),
+                            hold: Duration::from_secs(hold),
+                            release: Duration::from_secs(release),
+                        });
+                    }
                     _ => return Err(invalid(USAGE)),
                 }
             }
@@ -580,12 +609,19 @@ mod linux {
         if rt {
             perf::lock_memory()?;
         }
+        let mut retention = Retention::ring(ring_mib << 20).reserve(options.reserve_mib << 20);
+        if let Some(events) = options.events {
+            // 30 s either side of each mark; up to EVENT_LIMIT marks and
+            // half the ring protected at once (the ring keeps the rest).
+            retention = retention.events(
+                EventWindow::new(EVENT_SIDE, EVENT_SIDE)
+                    .hold(events.hold)
+                    .limits(EVENT_LIMIT, (ring_mib << 20) / 2),
+            );
+        }
         let builder = Logger::builder()
             .preset(Preset::sensor(FRAME_HZ, FRAME_BYTES).small(CONTROL_HZ, CONTROL_BYTES))
-            .file_output(
-                parent,
-                Retention::ring(ring_mib << 20).reserve(options.reserve_mib << 20),
-            )
+            .file_output(parent, retention)
             .channel::<Control>("soak/control")
             .channel::<[u8]>("soak/frame")
             .writer("control")
@@ -648,12 +684,42 @@ mod linux {
                 Duration::from_millis(ms.max(10))
             });
         let mut next_sample = started + sample;
+        let mut next_mark = options.events.map(|e| started + e.every);
+        let mut marks = 0_u64;
+        let mut releases: Vec<(Instant, u64, EventMark)> = Vec::new();
         let alarm = loop {
             let now = Instant::now();
             if now >= end {
                 break None;
             }
-            let wait = next_sample.min(end).saturating_duration_since(now);
+            // Releases first, so a mark due at the same time finds room.
+            while let Some(index) = releases.iter().position(|(at, _, _)| now >= *at) {
+                let (_, n, mark) = releases.swap_remove(index);
+                let result = logger.release_event(mark);
+                emit(json!({"event":"release","n":n,
+                    "t_ms":started.elapsed().as_millis() as u64,
+                    "ok":result.is_ok(),"error":result.err().map(|e| format!("{e:?}"))}))?;
+            }
+            if let (Some(at), Some(events)) = (next_mark, options.events) {
+                if now >= at {
+                    next_mark = Some(at + events.every);
+                    marks += 1;
+                    let result = logger.mark_event();
+                    emit(json!({"event":"mark","n":marks,
+                        "t_ms":started.elapsed().as_millis() as u64,
+                        "control":stats.control.load(Ordering::Acquire),
+                        "ok":result.is_ok(),"error":result.as_ref().err().map(|e| format!("{e:?}"))}))?;
+                    if let (Ok(mark), true) = (result, marks % 2 == 1) {
+                        releases.push((now + events.release, marks, mark));
+                    }
+                }
+            }
+            let due = releases
+                .iter()
+                .map(|(at, _, _)| *at)
+                .chain(next_mark)
+                .fold(next_sample.min(end), Instant::min);
+            let wait = due.saturating_duration_since(Instant::now());
             let received = match &alarms {
                 Some(rx) => match rx.recv_timeout(wait) {
                     Ok(at) => Some(at),
@@ -905,6 +971,30 @@ mod linux {
         json!({"seen":seen.iter().filter(|s| **s).count(),"first":first,"last":last,
             "holes":holes})
     }
+    /// Contiguous index runs `[first, last]`, at most `MAX_RUNS` of them:
+    /// event-protected islands before the ring's suffix (TASK-040).
+    fn runs(seen: &[bool]) -> Value {
+        const MAX_RUNS: usize = 256;
+        let mut out = Vec::new();
+        let mut start = None;
+        for (i, s) in seen.iter().enumerate() {
+            match (start, *s) {
+                (None, true) => start = Some(i),
+                (Some(a), false) => {
+                    out.push(json!([a, i - 1]));
+                    start = None;
+                }
+                _ => {}
+            }
+            if out.len() == MAX_RUNS {
+                break;
+            }
+        }
+        if let (Some(a), true) = (start, out.len() < MAX_RUNS) {
+            out.push(json!([a, seen.len() - 1]));
+        }
+        Value::Array(out)
+    }
     fn inspect(dir: &Path, control: u64, frames: u64, active: bool) -> Result<(), Error> {
         let found = scan_files(dir, control, frames, active)?;
         let losses: serde_json::Map<String, Value> = found
@@ -920,7 +1010,170 @@ mod linux {
         emit(json!({"event":"inspect","dir":dir,"active":active,
             "found":found_json(&found),"active_files":found.active_files,
             "torn_active":found.torn_active,"losses":losses,
-            "control":span(&found.control),"frames":span(&found.frames)}))
+            "control":span(&found.control),"frames":span(&found.frames),
+            "runs":{"control":runs(&found.control),"frames":runs(&found.frames)}}))
+    }
+
+    /// One external reader pass's findings (TASK-040).
+    #[derive(Default)]
+    struct Pass {
+        files: u64,
+        bytes: u64,
+        vanished: u64,
+        deleted_while_open: u64,
+        unreadable: u64,
+        torn: u64,
+        corrupt: u64,
+        foreign: u64,
+        file_holes: u64,
+        control: u64,
+        frames: u64,
+        nonzero_loss_rows: u64,
+    }
+    impl Pass {
+        fn intact(&self) -> bool {
+            self.unreadable
+                + self.torn
+                + self.corrupt
+                + self.foreign
+                + self.file_holes
+                + self.nonzero_loss_rows
+                == 0
+        }
+        fn json(&self) -> Value {
+            json!({"files":self.files,"bytes":self.bytes,"vanished":self.vanished,
+                "deleted_while_open":self.deleted_while_open,"unreadable":self.unreadable,
+                "torn":self.torn,"corrupt":self.corrupt,"foreign":self.foreign,
+                "file_holes":self.file_holes,"control":self.control,"frames":self.frames,
+                "nonzero_loss_rows":self.nonzero_loss_rows})
+        }
+    }
+
+    /// Read every closed file newest first, as an operator tool would while
+    /// the logger writes and the ring deletes. Each file must be whole and
+    /// hold contiguous records per channel; files the ring removed before
+    /// they were opened, or while they were being read, are only counted.
+    fn read_pass(dir: &Path) -> Result<Pass, Error> {
+        let mut pass = Pass::default();
+        let mut paths = log_files(dir, false)?;
+        paths.reverse();
+        for path in paths {
+            let mut file = match fs::File::open(&path) {
+                Ok(file) => file,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                    pass.vanished += 1;
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            };
+            let mut bytes = Vec::new();
+            io::Read::read_to_end(&mut file, &mut bytes)?;
+            drop(file);
+            if !path.exists() {
+                pass.deleted_while_open += 1;
+            }
+            pass.files += 1;
+            pass.bytes += bytes.len() as u64;
+            let Ok(reader) = NativeReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) else {
+                pass.unreadable += 1;
+                continue;
+            };
+            let topics: Vec<(u32, String)> = reader
+                .channels()
+                .iter()
+                .map(|c| (c.channel.channel_id, c.topic.clone()))
+                .collect();
+            let mut last: [Option<u64>; 2] = [None, None];
+            for item in reader {
+                let Ok(stored) = item else {
+                    pass.torn += 1;
+                    break;
+                };
+                let id = stored.record.metadata.channel_id;
+                let topic = topics
+                    .iter()
+                    .find(|(c, _)| *c == id)
+                    .map(|(_, t)| t.as_str());
+                let (slot, len, step) = match topic {
+                    Some("soak/control") => (0, CONTROL_BYTES, CONTROL_STEP),
+                    Some("soak/frame") => (1, FRAME_BYTES, FRAME_STEP),
+                    _ => {
+                        pass.foreign += 1;
+                        continue;
+                    }
+                };
+                let Some(index) = index_of(stored.payload, len, step) else {
+                    pass.corrupt += 1;
+                    continue;
+                };
+                if last[slot].is_some_and(|prev| index != prev + 1) {
+                    pass.file_holes += 1;
+                }
+                last[slot] = Some(index);
+                if slot == 0 {
+                    pass.control += 1;
+                } else {
+                    pass.frames += 1;
+                }
+            }
+            if let Ok(losses) = LossReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
+                for report in losses.flatten() {
+                    pass.nonzero_loss_rows +=
+                        report.counts.iter().filter(|c| c.count != 0).count() as u64;
+                }
+            }
+        }
+        Ok(pass)
+    }
+
+    fn reader(dir: &Path, interval: Duration, seconds: u64) -> Result<(), Error> {
+        let started = Instant::now();
+        let end = started + Duration::from_secs(seconds);
+        let (mut passes, mut failed) = (0_u64, 0_u64);
+        let mut total = Pass::default();
+        let mut min_free = u64::MAX;
+        while Instant::now() < end {
+            let begun = Instant::now();
+            let pass = read_pass(dir)?;
+            let free = dot_logger::diagnostics::available_bytes(dir).unwrap_or(0);
+            min_free = min_free.min(free);
+            passes += 1;
+            if !pass.intact() {
+                failed += 1;
+            }
+            emit(
+                json!({"event":"pass","n":passes,"t_ms":started.elapsed().as_millis() as u64,
+                "read_ms":begun.elapsed().as_millis() as u64,"intact":pass.intact(),
+                "free_bytes":free,"found":pass.json()}),
+            )?;
+            for (sum, add) in [
+                (&mut total.files, pass.files),
+                (&mut total.bytes, pass.bytes),
+                (&mut total.vanished, pass.vanished),
+                (&mut total.deleted_while_open, pass.deleted_while_open),
+                (&mut total.unreadable, pass.unreadable),
+                (&mut total.torn, pass.torn),
+                (&mut total.corrupt, pass.corrupt),
+                (&mut total.foreign, pass.foreign),
+                (&mut total.file_holes, pass.file_holes),
+                (&mut total.control, pass.control),
+                (&mut total.frames, pass.frames),
+                (&mut total.nonzero_loss_rows, pass.nonzero_loss_rows),
+            ] {
+                *sum += add;
+            }
+            let next = (begun + interval).min(end);
+            thread::sleep(next.saturating_duration_since(Instant::now()));
+        }
+        emit(
+            json!({"event":"reader_end","passes":passes,"failed_passes":failed,
+            "min_free_bytes":min_free,"total":total.json()}),
+        )?;
+        if failed == 0 && passes > 0 {
+            Ok(())
+        } else {
+            Err(invalid("a reader pass found a damaged file"))
+        }
     }
     fn found_json(found: &Found) -> Value {
         let (control_prefix, control_gaps) = missing(&found.control);
@@ -1087,6 +1340,11 @@ mod linux {
                 inspect(Path::new(dir), control.parse()?, frames.parse()?, true)
             }
             ["power", parent, delays] => power(Path::new(parent), delays),
+            ["reader", dir, interval, seconds] => reader(
+                Path::new(dir),
+                Duration::from_secs(interval.parse()?),
+                seconds.parse()?,
+            ),
             ["verify", dir, control, frames] => {
                 verify(Path::new(dir), control.parse()?, frames.parse()?, false)
             }

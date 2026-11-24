@@ -71,6 +71,22 @@ impl ReceivedRecord {
     }
 }
 impl Reassembler {
+    /// External partition bytes one receiver reserves, including bookkeeping
+    /// that differs by platform. Size a shared budget from this, never from
+    /// the payload bytes alone (REV-072 RV-199 added Apple lock storage).
+    pub fn reservation_bytes(
+        records: usize,
+        max_record_bytes: usize,
+    ) -> Result<usize, RemoteError> {
+        if records == 0 || max_record_bytes == 0 {
+            return Err(RemoteError::InvalidInput);
+        }
+        max_record_bytes
+            .checked_add(1024)
+            .and_then(|n| n.checked_mul(records))
+            .and_then(|n| n.checked_add(crate::sync::MUTEX_BYTES))
+            .ok_or(RemoteError::Limit)
+    }
     /// Reserve all potential record storage against the shared external partition.
     pub fn new(
         budget: &QueryBudget,
@@ -85,11 +101,7 @@ impl Reassembler {
         {
             return Err(RemoteError::InvalidInput);
         }
-        let bytes = max_record_bytes
-            .checked_add(1024)
-            .and_then(|n| n.checked_mul(records))
-            .and_then(|n| n.checked_add(crate::sync::MUTEX_BYTES))
-            .ok_or(RemoteError::Limit)?;
+        let bytes = Self::reservation_bytes(records, max_record_bytes)?;
         let reservation = budget.reserve(bytes).map_err(|_| RemoteError::Limit)?;
         Ok(Self {
             ledger: Arc::new(Ledger {

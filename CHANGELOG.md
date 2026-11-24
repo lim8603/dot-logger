@@ -11,6 +11,11 @@ version.
 
 - `diagnostics::available_bytes`: free space below a path on Linux, macOS
   and Windows. A missing path is an error on every OS.
+- `ReceiverConfig::reservation_bytes` (client) and
+  `Reassembler::reservation_bytes` (core): the budget bytes one live receiver
+  reserves. Size a `LiveBudget` or `QueryBudget` as subscriptions times this
+  value; the receiver's bookkeeping differs by platform, so a formula built
+  from the payload size alone can fall short on macOS.
 
 ### Fixed
 

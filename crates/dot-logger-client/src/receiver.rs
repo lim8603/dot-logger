@@ -21,6 +21,15 @@ pub struct ReceiverConfig {
     pub ttl: Duration,
 }
 
+impl ReceiverConfig {
+    /// External budget bytes one receiver with these limits reserves,
+    /// including platform-dependent bookkeeping. Multiply by the number of
+    /// concurrent subscriptions to size a [`QueryBudget`] or `LiveBudget`.
+    pub fn reservation_bytes(&self) -> Result<usize, ClientError> {
+        Reassembler::reservation_bytes(self.records, self.record_bytes).map_err(ClientError::Remote)
+    }
+}
+
 /// Opaque identity of one transport connection, retained by its transport owner.
 /// Old identities cannot match a new connection, even if server IDs are reused.
 #[derive(Clone)]

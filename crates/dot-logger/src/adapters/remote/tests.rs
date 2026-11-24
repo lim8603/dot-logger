@@ -254,6 +254,33 @@ fn receiver_identity_ttl_and_shared_reservation_survive_owner_drop() {
 }
 
 #[test]
+fn receiver_reservation_bytes_match_what_a_receiver_reserves() {
+    // Applications size shared budgets from this; on Apple it includes lock
+    // storage the payload formula lacks (REV-072 RV-199).
+    let b = budget();
+    for (records, bytes) in [(1, 1), (1, 8), (3, 100), (16, 4096)] {
+        let expected = Reassembler::reservation_bytes(records, bytes).unwrap();
+        assert!(expected >= records * (bytes + 1024));
+        let rx = Reassembler::new(&b, records, bytes, Duration::from_secs(1)).unwrap();
+        assert_eq!(b.used_bytes(), expected);
+        drop(rx);
+        assert_eq!(b.used_bytes(), 0);
+    }
+    assert!(matches!(
+        Reassembler::reservation_bytes(0, 8),
+        Err(RemoteError::InvalidInput)
+    ));
+    assert!(matches!(
+        Reassembler::reservation_bytes(1, 0),
+        Err(RemoteError::InvalidInput)
+    ));
+    assert!(matches!(
+        Reassembler::reservation_bytes(2, usize::MAX - 1024),
+        Err(RemoteError::Limit)
+    ));
+}
+
+#[test]
 fn receiver_generation_change_rejects_late_old_network_fragments() {
     let b = budget();
     let mut rx = Reassembler::new(&b, 1, 8, Duration::from_secs(1)).unwrap();

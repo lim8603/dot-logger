@@ -18,7 +18,9 @@ pub struct LiveBudget(QueryBudget);
 
 impl LiveBudget {
     /// Set the total receiver storage available to live subscriptions, including
-    /// reassembly bookkeeping. Transport and downstream queues have separate limits.
+    /// reassembly bookkeeping: size it as concurrent subscriptions times
+    /// [`ReceiverConfig::reservation_bytes`], whose bookkeeping differs by
+    /// platform. Transport and downstream queues have separate limits.
     pub fn new(bytes: usize) -> Result<Self, ClientError> {
         let invalid = ClientError::Remote(RemoteError::InvalidInput);
         let plan = SessionBuilder::new(SessionConfig {
@@ -150,5 +152,37 @@ impl LiveSubscription {
     /// handoff so far. A failure reports AcknowledgementUnknown.
     pub async fn flush(&mut self, cancel: &Cancellation) -> Result<(), ClientError> {
         self.stream.flush(cancel).await
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::ClientReceiver;
+    use std::time::Duration;
+
+    #[test]
+    fn budget_sized_from_reservation_bytes_admits_exactly_that_many_receivers() {
+        // The viewer sizes its feeds this way; a payload-only formula fell
+        // short by the Apple lock storage (REV-072 RV-199).
+        for (count, records, record_bytes) in [(1, 1, 1), (1, 1, 1024), (3, 4, 4096)] {
+            let limits = ReceiverConfig {
+                records,
+                record_bytes,
+                ttl: Duration::from_secs(1),
+            };
+            let budget = LiveBudget::new(count * limits.reservation_bytes().unwrap()).unwrap();
+            let mut receivers: Vec<_> = (0..count).map(|_| ClientReceiver::new()).collect();
+            for receiver in &mut receivers {
+                receiver.begin_connection(&budget.0, limits).unwrap();
+            }
+            assert!(matches!(
+                ClientReceiver::new().begin_connection(&budget.0, limits),
+                Err(ClientError::Remote(RemoteError::Limit))
+            ));
+            drop(receivers);
+            assert_eq!(budget.0.used_bytes(), 0);
+        }
     }
 }

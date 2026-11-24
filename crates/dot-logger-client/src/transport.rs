@@ -930,6 +930,43 @@ mod tests {
             tokio::task::yield_now().await;
         }
     }
+    // REV-071 RV-191: a closed connection with a handed-off ACK still queued
+    // or still in flight reports it as unknown from next; only a connection
+    // with nothing unsettled reports a plain disconnect. The ACK RPC's timing
+    // is fixed here, which a loopback server cannot do.
+    #[test]
+    fn next_on_a_closed_connection_reports_unsettled_acks_as_unknown() {
+        runtime().block_on(async {
+            let cancel = Cancellation::new();
+            let mut queued = detached();
+            queued.acks.push(wire::AckItem::default());
+            queued.oldest = Some(Instant::now());
+            queued.state.close();
+            assert_eq!(
+                queued.next(&cancel).await.map(|_| ()),
+                Err(ClientError::AcknowledgementUnknown)
+            );
+            let mut in_flight = detached();
+            let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), ClientError>>();
+            in_flight
+                .in_flight
+                .push_back(tokio::spawn(async move { rx.await.unwrap() }));
+            in_flight.state.close();
+            assert_eq!(
+                in_flight.next(&cancel).await.map(|_| ()),
+                Err(ClientError::AcknowledgementUnknown)
+            );
+            drop(tx);
+            let mut confirmed = detached();
+            confirmed.in_flight.push_back(finished(Ok(())));
+            settled(&confirmed).await;
+            confirmed.state.close();
+            assert_eq!(
+                confirmed.next(&cancel).await.map(|_| ()),
+                Err(ClientError::Disconnected)
+            );
+        });
+    }
     // RV-163: the frame stream ended (EOF or a stream error) while a handed-off
     // record's ACK was still queued; flush must not claim it was confirmed.
     #[test]

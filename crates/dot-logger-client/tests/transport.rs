@@ -1179,9 +1179,12 @@ fn stream_end_with_unsettled_acks_reports_unknown_not_a_clean_end() {
     });
 }
 
-// REV-071 RV-191: a connection that closes while handed-off ACKs are still
-// queued reports them as unknown from next and handoff, not as a plain
-// disconnect.
+// REV-071 RV-191: a connection that closes while handed-off ACKs are not yet
+// confirmed reports them as unknown from next and handoff, not as a plain
+// disconnect. On loopback the ACK RPC may already be confirmed when the
+// connection closes; then a plain disconnect is the right answer, so the test
+// asserts that a disconnect is reported only for confirmed ACKs. The unsettled
+// cases with fixed timing are unit tests in transport.rs.
 #[test]
 fn a_closed_connection_with_queued_acks_reports_unknown_not_disconnected() {
     runtime().block_on(async {
@@ -1233,8 +1236,10 @@ fn a_closed_connection_with_queued_acks_reports_unknown_not_disconnected() {
         client.disconnect();
         let end = stream.next(&cancel).await.map(|_| ());
         assert!(
-            matches!(end, Err(ClientError::AcknowledgementUnknown)),
-            "next after a close with a queued ACK returned {end:?}"
+            matches!(end, Err(ClientError::AcknowledgementUnknown))
+                || (end == Err(ClientError::Disconnected) && stream.acknowledged() == 1),
+            "next after a close with an unconfirmed ACK returned {end:?} ({} confirmed)",
+            stream.acknowledged()
         );
         drop(stream);
         // handoff: the second record arrives, then the connection closes.
@@ -1258,8 +1263,10 @@ fn a_closed_connection_with_queued_acks_reports_unknown_not_disconnected() {
         client.disconnect();
         let end = stream.handoff(second, |_, _| true, &cancel).await;
         assert!(
-            matches!(end, Err(ClientError::AcknowledgementUnknown)),
-            "handoff after a close with a queued ACK returned {end:?}"
+            matches!(end, Err(ClientError::AcknowledgementUnknown))
+                || (end == Err(ClientError::Disconnected) && stream.acknowledged() == 1),
+            "handoff after a close with an unconfirmed ACK returned {end:?} ({} confirmed)",
+            stream.acknowledged()
         );
     });
 }

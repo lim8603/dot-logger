@@ -1919,6 +1919,38 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검사:** fmt, clippy `-D warnings`(1.96.0·1.85.0, `-p dot-logger --all-targets --all-features`), musl 대상 soak 빌드(RV-197) Pass.
 - **원시 결과:** [perf_runs/task039-2026-11-24](perf_runs/task039-2026-11-24/) — `alloc-threads-300s.jsonl`, `rt-heap-red-20s.jsonl`, `rt-heap-green-20s.jsonl`.
 
+### EV-126 — TASK-040 조회·전송을 섞은 4시간 실행(RT, T500)
+
+- **대상·환경:** 제품 코드 `641929c`(하네스 `29c302e`). 이 PC(`7.0.0-44-realtime`), `--rt`(제어 FIFO·mlock), 링 16 GiB를 T500(`~/s3-data/task040-2026-11-24`)에. 대표 부하(EV-120과 같음: 256 B 5,000건/s + 64 KiB 10건/s). 2026-11-24 22:43~2026-11-25 02:43 KST, 14,400 s. SSD 쓰기 약 30 GB(페이로드 27.9 GB + 틀). `scripts/soak-mixed.py ... --seconds 14400 --ring-mib 16384 --sample-s 60 --events 1800,9000,7200 --reader-s 300 --status-s 60 --rt`.
+- **동시 경로(S0 결정):** ① 다른 프로세스(`soak reader`)가 300 s마다 닫힌 파일을 새것부터 통째로 읽어 대조 ② CLI `tail` 2개(제어 채널 메타데이터, 프레임 채널 원본) + GetStatus 60 s마다 ③ `mark_event` 30분마다(창 ±30 s, 보호 9,000 s, 홀수 번째는 7,200 s 뒤 `release_event`). 링은 약 1.9시간 뒤 가득 차 나머지 약 2시간은 삭제·조회·구독이 겹쳤다.
+- **결과 — 13개 판정 중 12 Pass, 1 Fail(하네스 크기 오류):**
+
+| 항목 | 결과 |
+|---|---|
+| 기록 | 제어 71,965,050·프레임 144,001, 거절 0, deadline miss 0/1,439,301, 최악 응답 1,462 µs. 종료 보고 `Closed`, 완료 72,109,051 = 기록, 실패·drop·unknown 0 |
+| RT 스레드 heap | 제어·프레임 할당·해제 0·0(EV-125 판정) |
+| 디스크·메모리 | 최대 16,878,991,624 B ≤ 링 17,179,869,184 B. RSS 38,796 → 39,616 KiB(첫 시간 뒤 평평), fd 고정 |
+| 외부 조회 | 48회 모두 온전: 파일 73,385개·614.8 GB 읽음, 찢김·손상·외부 기록·파일 안 빈칸·손실 행 0. 열기 전에 사라진 파일 80(링 삭제 경합, 정상), 읽는 중 삭제 0. 여유 공간 최소 873 GB |
+| 원격 구독 | 제어 3,245,124건 수신(나머지는 gap — CLI가 5,000건/s를 다 받지 못함, TASK-024 S2와 같음), 지연 p50 12.9·p99 16.4·최대 24.6 ms, 재접속 약 217 ms. 프레임 143,823건, gap 0, 지연 p50 12.2·p99 14.4·최대 25.9 ms, 재접속 약 299 ms, 정상 재시작 96회 |
+| 상태 조회 | 239회 모두 응답, p50 4.7·최대 6.1 ms |
+| 이벤트 보호 | 표시 7·해제 2 모두 수락 |
+| 남은 기록 | 파일 2,013개 온전. 제어 = 빈칸 없는 꼬리(39,373,855~끝) + 섬 1개(35,809,272~36,119,946) — 표시 4(7,200 s, 35,965,000 ± 150,000)의 창과 겹침. 표시 1·3은 해제, 2는 보호 만료로 지워졌고 5~7은 꼬리 안 |
+| **구독 예상 밖 종료** | **Fail 1건** — 제어 `tail` 첫 세션이 478,530건에서 `outcome: limit`(exit 3)로 끝남 |
+
+- **Fail 원인:** 하네스가 준 `--max-output-bytes 256 MiB`(CLI 출력 상한)에 닿았다. gap 줄은 기록마다 하나로 묶이지 않아(첫 세션 gap 630,866줄 > 기록 478,530) `--limit 500000`으로는 상한을 막을 수 없다. 리허설 3에서 잰 줄 크기(기록 약 412 B, gap 약 112 B)로 첫 세션 출력이 약 267.9 MB = 상한 268.4 MB − 예약 512 B와 맞는다. CLI는 문서대로 동작했고 제품 결함이 아니다. 구독자는 다시 붙어 계속 받았다(재시작 7회, 나머지는 `record_limit` 정상 종료와 실행 끝 서버 종료).
+- **조치(`b389360`):** 출력이 상한에 닿아 `limit`로 끝난 세션은 재시작으로 세고(`output_cap_ends`), 그 밖의 `limit` 종료(서버 구독 한도 등)는 계속 예상 밖으로 판정한다. 세션마다 출력 바이트와 요약을 남기고 제어 `--limit`을 200,000으로 낮췄다. 리허설 3(`/dev/shm` 20분, 링 1 GiB, 이벤트 300/600/300 s): 13개 모두 Pass, 제어 200,000건 세션 112,697,431 B `record_limit` 정상 종료, 상한 종료 0.
+- **판정:** 조회·구독·상태·이벤트 보호를 링 삭제와 함께 4시간 돌려도 기록 손실·거절·miss·RT heap 사용이 없고, 다른 프로세스가 읽은 파일과 남은 파일이 모두 온전하며, 보호한 창만 섬으로 남는다. 4시간 재실행은 하지 않는다 — 실패 항목은 하네스 판정 크기 오류이고 고친 하네스로 1.0.0 직전 24h(T8)를 돌린다. 「회전·조회·전송 포함 24시간」은 T8이 충족한다. DB 내보내기는 facade에 출력이 없어 제외(기능 논의 안건).
+- **관찰(기능 논의 안건 근거):** CLI 출력 상한 도달과 서버 구독 한도가 모두 `outcome: limit`·exit 3이라 호출자가 출력 바이트를 세야 구분된다 — 이미 올린 「원격 구독 실패 원인 구분」 안건의 CLI 쪽 사례.
+- **원시 결과:** [perf_runs/task040-2026-11-24](perf_runs/task040-2026-11-24/) — `result.json`, `soak.jsonl`, `reader.jsonl`, `tail-frame.jsonl`, `tail-control-summaries.jsonl`(제어 `tail` 원본 379 MB는 gap 줄뿐이라 요약만), `rehearsal3-20min-result.json`. 링 데이터 16 GiB는 판정 뒤 삭제했다(EV-120과 같음).
+
+### EV-127 — CI 시간 의존 시험 2건 수정
+
+- **증상:** `76aa6c1` 수동 CI(run `45395881870`)의 ubuntu 1.85.0에서 `a_closed_connection_with_queued_acks_reports_unknown_not_disconnected`가 `Err(Disconnected)`, `29c302e` push CI(run `45406299114`)의 같은 작업에서 `f17_continuous_load_keeps_periodic_syncs_and_drops_nothing`이 마지막 sync 경과 531 ms(> 500 ms)로 실패. 나머지 15개 작업은 Pass.
+- **원인 1(client):** `handoff`는 진행 중인 ACK RPC가 없으면 ACK를 바로 보낸다. 루프백에서는 `disconnect` 전에 서버가 확인할 수 있고, 그러면 확인 안 된 ACK가 없으니 `Disconnected`가 맞는 답이다. 시험이 ACK가 아직 대기 중이라고 가정했다. 제품 동작은 맞다.
+- **원인 2(f17):** 제품의 늦음 기준은 `4 × sync_every + 1 s`(시험 설정에서 1.2 s)인데 시험은 500 ms를 요구했다. 속도 제한 없는 부하에서 sync 한 번은 직전 sync 뒤 쓴 양을 디스크가 내리는 시간이 걸린다(공유 CI 러너 약 0.5 s). 최근 CI 이력에서 첫 실패.
+- **조치(`3245c20`):** client 통합 시험은 `AcknowledgementUnknown`, 또는 서버가 ACK를 확인했을 때(`acknowledged() == 1`)만 `Disconnected`를 허용한다(`next`·`handoff` 둘 다). 새 unit 시험 `next_on_a_closed_connection_reports_unsettled_acks_as_unknown`이 서버 없이 대기 중·진행 중·확인됨 세 경우를 고정해 RV-191 판단을 확인한다. f17은 부하 마지막 1초 동안 새 sync가 완료됐는지와 마지막 sync 경과가 늦음 기준(1.2 s) 안인지를 본다 — 예전 결함(빈 큐를 기다리다 만료)은 완료 0으로 실패한다.
+- **검사:** client 전체(`--all-features`) Pass, 통합 시험 5회 반복 Pass, `tc_013_facade` 43 Pass, fmt, clippy `-D warnings`(1.96.0 workspace, 1.85.0 `dot-logger`·`dot-logger-client`).
+
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

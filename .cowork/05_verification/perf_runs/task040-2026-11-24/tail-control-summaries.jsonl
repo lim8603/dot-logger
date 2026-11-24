@@ -1,0 +1,7 @@
+{"t": 1795529939.1646361, "command": "tail", "data": {"acknowledged": 478528, "exit_code": 3, "outcome": "limit", "records": 478530}, "kind": "summary", "schema_version": 1}
+{"t": 1795532116.5870972, "command": "tail", "data": {"acknowledged": 500000, "gaps": 502314, "outcome": "complete", "records": 500000, "stopped": "record_limit"}, "kind": "summary", "schema_version": 1}
+{"t": 1795534293.9663718, "command": "tail", "data": {"acknowledged": 500000, "gaps": 371692, "outcome": "complete", "records": 500000, "stopped": "record_limit"}, "kind": "summary", "schema_version": 1}
+{"t": 1795536525.7969832, "command": "tail", "data": {"acknowledged": 500000, "gaps": 286805, "outcome": "complete", "records": 500000, "stopped": "record_limit"}, "kind": "summary", "schema_version": 1}
+{"t": 1795538761.3155267, "command": "tail", "data": {"acknowledged": 500000, "gaps": 284309, "outcome": "complete", "records": 500000, "stopped": "record_limit"}, "kind": "summary", "schema_version": 1}
+{"t": 1795540994.5963025, "command": "tail", "data": {"acknowledged": 500000, "gaps": 271705, "outcome": "complete", "records": 500000, "stopped": "record_limit"}, "kind": "summary", "schema_version": 1}
+{"t": 1795542188.1449003, "command": "tail", "data": {"acknowledged": 266594, "exit_code": 3, "outcome": "gone_or_expired", "records": 266594}, "kind": "summary", "schema_version": 1}

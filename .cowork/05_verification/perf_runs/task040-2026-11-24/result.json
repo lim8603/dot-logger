@@ -1,0 +1,153 @@
+{
+ "pass": false,
+ "checks": {
+  "soak_success": true,
+  "no_rejection": true,
+  "no_deadline_miss": true,
+  "rt_threads_off_heap": true,
+  "disk_within_ring": true,
+  "reader_all_passes_intact": true,
+  "subscribers_received": true,
+  "subscribers_ended_cleanly": false,
+  "status_all_answered": true,
+  "marks_accepted": true,
+  "releases_accepted": true,
+  "files_intact": true,
+  "kept_suffix_and_event_islands": true
+ },
+ "runs_note": "1 islands, suffix from 39373855",
+ "kernel": "7.0.0-44-realtime",
+ "rt_mode": true,
+ "seconds": 14400,
+ "ring_mib": 16384,
+ "events": "1800,9000,7200",
+ "counts": {
+  "control": 71965050,
+  "control_iterations": 1307378,
+  "control_rejected": 0,
+  "frames": 144001,
+  "frames_rejected": 0,
+  "misses": 0,
+  "periods": 1439301,
+  "worst_response_us": 1462
+ },
+ "worst_response_us": 1462,
+ "rt_heap": {
+  "allocs": 0,
+  "frees": 0,
+  "threads": 2
+ },
+ "disk_max_bytes": 16878991624,
+ "rss_kib": {
+  "first": 38796,
+  "last": 39616
+ },
+ "reader": {
+  "event": "reader_end",
+  "failed_passes": 0,
+  "min_free_bytes": 873315999744,
+  "passes": 48,
+  "total": {
+   "bytes": 614848913180,
+   "control": 1199938505,
+   "corrupt": 0,
+   "deleted_while_open": 0,
+   "file_holes": 0,
+   "files": 73385,
+   "foreign": 0,
+   "frames": 2401335,
+   "nonzero_loss_rows": 0,
+   "torn": 0,
+   "unreadable": 0,
+   "vanished": 80
+  }
+ },
+ "subscribers": {
+  "control": {
+   "records": 3245124,
+   "gaps": 2498955,
+   "restarts": 7,
+   "unexpected_ends": [
+    {
+     "code": 3,
+     "last": {
+      "command": "tail",
+      "data": {
+       "acknowledged": 478528,
+       "exit_code": 3,
+       "outcome": "limit",
+       "records": 478530
+      },
+      "kind": "summary",
+      "schema_version": 1
+     },
+     "t": 1795529939.1655066
+    }
+   ],
+   "delay_ms": {
+    "p50": 12.9,
+    "p99": 16.35,
+    "max": 24.6,
+    "samples": 3246
+   },
+   "reconnect_ms": {
+    "p50": 216.62,
+    "max": 219.6
+   }
+  },
+  "frame": {
+   "records": 143823,
+   "gaps": 0,
+   "restarts": 96,
+   "unexpected_ends": [],
+   "delay_ms": {
+    "p50": 12.15,
+    "p99": 14.41,
+    "max": 25.91,
+    "samples": 71912
+   },
+   "reconnect_ms": {
+    "p50": 298.95,
+    "max": 309.62
+   }
+  }
+ },
+ "status": {
+  "calls": 239,
+  "failed": [],
+  "ms_p50": 4.7,
+  "ms_max": 6.1
+ },
+ "marks": 7,
+ "releases": 2,
+ "found": {
+  "control": {
+   "expected": 71965050,
+   "missing_gaps": 3253908,
+   "missing_prefix": 35809272
+  },
+  "corrupt_payloads": 0,
+  "duplicates": 0,
+  "files": 2013,
+  "foreign": 0,
+  "frames": {
+   "expected": 144001,
+   "missing_gaps": 6508,
+   "missing_prefix": 71688
+  },
+  "loss_reports": 10604,
+  "nonzero_loss_rows": 0,
+  "torn_files": 0,
+  "unreadable_files": 0
+ },
+ "control_runs": [
+  [
+   35809272,
+   36119946
+  ],
+  [
+   39373855,
+   71965049
+  ]
+ ]
+}

@@ -1,0 +1,265 @@
+{
+ "pass": true,
+ "checks": {
+  "soak_success": true,
+  "no_rejection": true,
+  "no_deadline_miss": true,
+  "rt_threads_off_heap": true,
+  "disk_within_ring": true,
+  "reader_all_passes_intact": true,
+  "subscribers_received": true,
+  "subscribers_ended_cleanly": true,
+  "status_all_answered": true,
+  "marks_accepted": true,
+  "releases_accepted": true,
+  "files_intact": true,
+  "kept_suffix_and_event_islands": true
+ },
+ "runs_note": "2 islands, suffix from 4856306",
+ "kernel": "7.0.0-44-realtime",
+ "rt_mode": true,
+ "seconds": 1200,
+ "ring_mib": 1024,
+ "events": "300,600,300",
+ "counts": {
+  "control": 5985000,
+  "control_iterations": 1295551,
+  "control_rejected": 0,
+  "frames": 12000,
+  "frames_rejected": 0,
+  "misses": 0,
+  "periods": 119700,
+  "worst_response_us": 1371
+ },
+ "worst_response_us": 1371,
+ "rt_heap": {
+  "allocs": 0,
+  "frees": 0,
+  "threads": 2
+ },
+ "disk_max_bytes": 903524052,
+ "rss_kib": {
+  "first": 36548,
+  "last": 36932
+ },
+ "reader": {
+  "event": "reader_end",
+  "failed_passes": 0,
+  "min_free_bytes": 28635865088,
+  "passes": 20,
+  "total": {
+   "bytes": 14758548251,
+   "control": 28843545,
+   "corrupt": 0,
+   "deleted_while_open": 0,
+   "file_holes": 0,
+   "files": 1764,
+   "foreign": 0,
+   "frames": 57831,
+   "nonzero_loss_rows": 0,
+   "torn": 0,
+   "unreadable": 0,
+   "vanished": 2
+  }
+ },
+ "subscribers": {
+  "control": {
+   "records": 276531,
+   "gaps": 378124,
+   "restarts": 2,
+   "output_cap_ends": [],
+   "ends": [
+    {
+     "code": 0,
+     "bytes": 112697431,
+     "t": 1795543204.4938226,
+     "summary": {
+      "acknowledged": 200000,
+      "gaps": 270415,
+      "outcome": "complete",
+      "records": 200000,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 3,
+     "bytes": 43589170,
+     "t": 1795543536.7771804,
+     "summary": {
+      "acknowledged": 76531,
+      "exit_code": 3,
+      "outcome": "gone_or_expired",
+      "records": 76531
+     }
+    }
+   ],
+   "unexpected_ends": [],
+   "delay_ms": {
+    "p50": 11.91,
+    "p99": 13.12,
+    "max": 14.02,
+    "samples": 277
+   },
+   "reconnect_ms": {
+    "p50": 218.59,
+    "max": 218.59
+   }
+  },
+  "frame": {
+   "records": 11986,
+   "gaps": 0,
+   "restarts": 8,
+   "output_cap_ends": [],
+   "ends": [
+    {
+     "code": 0,
+     "bytes": 609940,
+     "t": 1795542486.2726455,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 612154,
+     "t": 1795542636.4761019,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 612154,
+     "t": 1795542786.6741846,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 612154,
+     "t": 1795542936.8735604,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 612154,
+     "t": 1795543087.0768483,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 612154,
+     "t": 1795543237.2736995,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 0,
+     "bytes": 613180,
+     "t": 1795543387.4758973,
+     "summary": {
+      "acknowledged": 1500,
+      "gaps": 0,
+      "outcome": "complete",
+      "records": 1500,
+      "stopped": "record_limit"
+     }
+    },
+    {
+     "code": 3,
+     "bytes": 609401,
+     "t": 1795543536.777396,
+     "summary": {
+      "acknowledged": 1486,
+      "exit_code": 3,
+      "outcome": "gone_or_expired",
+      "records": 1486
+     }
+    }
+   ],
+   "unexpected_ends": [],
+   "delay_ms": {
+    "p50": 10.97,
+    "p99": 12.84,
+    "max": 14.44,
+    "samples": 5993
+   },
+   "reconnect_ms": {
+    "p50": 299.57,
+    "max": 302.3
+   }
+  }
+ },
+ "status": {
+  "calls": 40,
+  "failed": [],
+  "ms_p50": 4.7,
+  "ms_max": 6.3
+ },
+ "marks": 3,
+ "releases": 1,
+ "found": {
+  "control": {
+   "expected": 5985000,
+   "missing_gaps": 1406211,
+   "missing_prefix": 2828745
+  },
+  "corrupt_payloads": 0,
+  "duplicates": 0,
+  "files": 108,
+  "foreign": 0,
+  "frames": {
+   "expected": 12000,
+   "missing_gaps": 2813,
+   "missing_prefix": 5687
+  },
+  "loss_reports": 567,
+  "nonzero_loss_rows": 0,
+  "torn_files": 0,
+  "unreadable_files": 0
+ },
+ "control_runs": [
+  [
+   2828745,
+   3139419
+  ],
+  [
+   4333064,
+   4643738
+  ],
+  [
+   4856306,
+   5984999
+  ]
+ ]
+}

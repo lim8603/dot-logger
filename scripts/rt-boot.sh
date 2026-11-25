@@ -4,6 +4,7 @@
 # happened after the reboot.
 #
 #   sudo scripts/rt-boot.sh once     # boot the RT kernel on the next boot only
+#   sudo scripts/rt-boot.sh generic  # boot the generic kernel on the next boot only
 #   sudo scripts/rt-boot.sh back     # make sure the next boot is the default
 #   scripts/rt-boot.sh status        # record the current state (no sudo)
 #
@@ -12,7 +13,12 @@
 # failed RT boot is undone by powering on again. Nothing is changed in
 # /etc/default/grub. Each command asks before it reboots.
 #
+# Since 7.0.0-44 (2026-11-24) GRUB's default entry is the realtime kernel
+# (it sorts before generic of the same version), so a generic comparison
+# needs `generic` (TASK-042).
+#
 # Environment: RT_KERNEL (default: the newest /boot/vmlinuz-*-realtime),
+# GENERIC_KERNEL (default: the newest /boot/vmlinuz-*-generic),
 # RT_BOOT_LOG (default: .cowork/05_verification/perf_runs/rt-boot/boot.log),
 # GRUB_CFG (default /boot/grub/grub.cfg), RT_BOOT_DRY=1 (no grub-reboot, no
 # reboot; for checking the script).
@@ -64,20 +70,22 @@ ask_reboot() {
   fi
 }
 
-case "${1:-}" in
-once)
-  need_root once
-  say "=== once"
-  facts
-  kernel=${RT_KERNEL:-$(ls /boot/vmlinuz-*-realtime 2>/dev/null | sed 's|/boot/vmlinuz-||' | sort -V | tail -1)}
+# Select `kernel` (realtime or generic flavour) for the next boot only.
+boot_once() {
+  local flavour=$1 kernel=$2
   if [ -z "$kernel" ] || [ ! -e "/boot/vmlinuz-$kernel" ] || [ ! -e "/boot/initrd.img-$kernel" ]; then
-    say "FAIL: no installed realtime kernel image and initrd (${kernel:-none})"
+    say "FAIL: no installed $flavour kernel image and initrd (${kernel:-none})"
     exit 1
   fi
-  grep -q '^CONFIG_PREEMPT_RT=y' "/boot/config-$kernel" || {
-    say "FAIL: /boot/config-$kernel lacks CONFIG_PREEMPT_RT=y"
+  if [ "$flavour" = realtime ]; then
+    grep -q '^CONFIG_PREEMPT_RT=y' "/boot/config-$kernel" || {
+      say "FAIL: /boot/config-$kernel lacks CONFIG_PREEMPT_RT=y"
+      exit 1
+    }
+  elif grep -q '^CONFIG_PREEMPT_RT=y' "/boot/config-$kernel"; then
+    say "FAIL: /boot/config-$kernel has CONFIG_PREEMPT_RT=y; not a generic kernel"
     exit 1
-  }
+  fi
   # grub-reboot works only if the generated config honours next_entry.
   if ! grep -q 'if \[ "\${next_entry}" \]' "$cfg"; then
     say "FAIL: $cfg does not handle next_entry; grub-reboot would be ignored"
@@ -104,6 +112,20 @@ once)
     say "OK: next boot only -> $target (default unchanged)"
   fi
   ask_reboot
+}
+
+case "${1:-}" in
+once)
+  need_root once
+  say "=== once"
+  facts
+  boot_once realtime "${RT_KERNEL:-$(ls /boot/vmlinuz-*-realtime 2>/dev/null | sed 's|/boot/vmlinuz-||' | sort -V | tail -1)}"
+  ;;
+generic)
+  need_root generic
+  say "=== generic"
+  facts
+  boot_once generic "${GENERIC_KERNEL:-$(ls /boot/vmlinuz-*-generic 2>/dev/null | sed 's|/boot/vmlinuz-||' | sort -V | tail -1)}"
   ;;
 back)
   need_root back

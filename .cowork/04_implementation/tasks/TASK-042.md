@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-25 |
-| 다음 액션 | S2 ③ generic 커널 측정(Human 재부팅 뒤, 아래 「③ 실행 절차」) → S3 README·EV. 순서: TASK-041(v0.1.1) 전 |
+| 다음 액션 | S2 ③-b generic·`performance` — Human governor 전환부터(아래 「③ 실행 절차」 3단계) → 원복 → S3 README·EV. 순서: TASK-041(v0.1.1) 전 |
 | 의존 | TASK-024 S2(같은 PC·RT 측정 창 겹치지 않게), TASK-039와 하네스 공유 |
 | 예상 소요 | 1.5~2.5 인일 + 실행(각 10~15분 이하) |
 
@@ -37,7 +37,7 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 |---|---|---|---|
 | S0 | 결정 | 아래 D1~D3 Human 결정 | Done — D1·D2 2026-11-23, D3 2026-11-25 |
 | S1 | 하네스 | `examples/support/perf`의 `call_cost`·`LatencyHistogram` 확장(최대·꼬리 분위수·식은 캐시·지터 행), JSON 원시 결과 | Done — `b94964b`·`0012ef8`(아래) |
-| S2 | 실행 | 행 H~M, 각 10~15분 이하, 반복 3회, 원시 결과를 `05_verification/perf_runs/`에 | In Progress — ①·② Done(2026-11-25), ③ generic 대기 |
+| S2 | 실행 | 행 H~M, 각 10~15분 이하, 반복 3회, 원시 결과를 `05_verification/perf_runs/`에 | In Progress — ①·② Done, ③-a generic·`powersave` Done(2026-11-25), ③-b 대기 |
 | S3 | 공개 | README 「Verification」에 조건·방법이 붙은 표(비교 대상 수치는 출처·환경이 다르면 같은 표에 섞지 않음), EV, 추적표 NFR-001 | Planned |
 
 ## 결정(Human, 2026-11-23 「D1은 둘 다, D2는 A」, 2026-11-25 D3 「A. 요약 3~5행」)
@@ -99,3 +99,21 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 3. Human이 `sudo cpupower frequency-set -g performance` → AI가 governor·EPP 확인 → `GOVERNOR_EXPECT=performance …/generic-performance`(약 30분).
 4. Human이 `sudo cpupower frequency-set -g powersave`와 `echo balance_performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference`로 원복 → AI 확인.
 5. 결과를 perf_runs에 복사, 부하 출력 삭제. 다음 재부팅은 기본 항목(RT 커널)으로 돌아간다.
+
+## S2 결과 ③-a — 2026-11-25 (generic 커널, `powersave`)
+
+`7.0.0-44-generic`(`sudo scripts/rt-boot.sh generic`으로 1회 부팅), governor `powersave`·EPP `balance_performance`, 그 밖의 조건은 ①과 같다. `826fb47`, `dirty: false`. 45개 행 성공, 놓침 0.
+
+| 행 | ① RT p50 / p99 / p99.99 / 최대 | ③-a generic p50 / p99 / p99.99 / 최대 |
+|---|---|---|
+| H 256 B | 287 / 543 / 5,631 / 53,950 | 327 / 527 / 5,375 / 154,576 |
+| C1 식은 캐시 | 751 / 1,695 / 7,039 / 17,201 | 735 / 1,503 / 9,983 / 41,145 |
+| C2 드문 호출 | 863 / 1,119 / 5,375 / 17,993 | 863 / 1,087 / 17,407 / 19,846 |
+| M writer 8개 | 383 / 559 / 6,015 / 36,217 | 375 / 543 / 5,119 / 42,789 |
+| J 10 ms 50건 묶음(IO) | 14,847 / 23,551 / 40,274 / 42,107 | 14,847 / 33,791 / 100,475 / 108,871 |
+| J 10 ms 깨어남(IO) | 45,055 / 135,167 / 138,093 / 139,605 | 46,079 / 135,167 / 184,930 / 217,256 |
+| J 1 kHz 깨어남(0건) | 4,607 / 6,271 / 27,135 / 88,466 | 4,479 / 6,783 / 34,815 / 209,699 |
+
+- p50·p99는 두 커널이 거의 같고, 차이는 꼬리·최대에서 난다(generic 최대 2~3배). PREEMPT_RT의 이점이 최악값에 있다는 것을 이 PC에서 확인.
+- 원시 결과 `perf_runs/task042-2026-11-25/generic-powersave.jsonl`. IO 부하 출력은 삭제.
+- **③-b 재개 조건:** 지금 부팅이 generic이어야 한다. 그사이 재부팅했으면 기본이 RT라 `sudo scripts/rt-boot.sh generic`으로 다시 부팅. 시작 전 `uname -r`·governor·EPP 확인.

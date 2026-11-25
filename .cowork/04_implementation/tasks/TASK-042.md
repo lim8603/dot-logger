@@ -94,8 +94,8 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 
 ### ③ 실행 절차(generic 커널, Human 재부팅 뒤)
 
-1. Human이 generic 커널로 부팅한다(ADR-011 절차, `scripts/rt-boot.sh` 참조). AI는 `uname -r`과 `/sys/kernel/realtime` 없음으로 확인한다.
+1. Human이 `sudo scripts/rt-boot.sh generic`으로 다음 한 번만 generic 커널로 재부팅한다(`5f06969` 이후, 기본 항목은 그대로). 7.0.0-44부터 GRUB 기본 항목이 RT 커널이라 그냥 재부팅하면 RT로 뜬다. AI는 `scripts/rt-boot.sh status`·`uname -r`·`/sys/kernel/realtime` 없음으로 확인한다.
 2. `powersave`(EPP `balance_performance`) 상태에서: `CARGO_TARGET_DIR=/data/build/target RT_EXPECT=generic GOVERNOR_EXPECT=powersave scripts/run-latency.sh /dev/shm <SSD>/load <out>/generic-powersave 3 60`(약 30분, SSD 약 2.4 GB). 빌드는 측정 전에 `cargo build --release -p dot-logger --example perf_baseline`.
 3. Human이 `sudo cpupower frequency-set -g performance` → AI가 governor·EPP 확인 → `GOVERNOR_EXPECT=performance …/generic-performance`(약 30분).
 4. Human이 `sudo cpupower frequency-set -g powersave`와 `echo balance_performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference`로 원복 → AI 확인.
-5. 결과를 perf_runs에 복사, 부하 출력 삭제, RT 커널로 되돌릴지는 Human 결정.
+5. 결과를 perf_runs에 복사, 부하 출력 삭제. 다음 재부팅은 기본 항목(RT 커널)으로 돌아간다.

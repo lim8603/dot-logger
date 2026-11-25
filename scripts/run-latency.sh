@@ -48,12 +48,13 @@ jq -cn --arg started "$(date -Iseconds)" --arg git "$(git -C "$repo" rev-parse H
   --argjson dirty "$([ -z "$(git -C "$repo" status --porcelain -- crates scripts)" ] && echo false || echo true)" \
   --arg kernel "$(uname -r)" --arg cmdline "$(cat /proc/cmdline)" --arg expect "$expect" \
   --arg governors "$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor | sort | uniq -c | xargs)" \
+  --arg epp "$(cat /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null | sort | uniq -c | xargs)" \
   --arg boost "$(cat /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || echo unknown)" \
   --arg smt "$(cat /sys/devices/system/cpu/smt/control 2>/dev/null || echo unknown)" \
   --arg cpu "$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)" \
   --arg rustc "$(rustc --version)" --argjson reps "$reps" --argjson jitter_s "$jitter_s" \
   '{scope:"LatencyRun",started:$started,git:$git,dirty:$dirty,kernel:$kernel,expect:$expect,
-    cmdline:$cmdline,governors:$governors,boost:$boost,smt:$smt,cpu:$cpu,rustc:$rustc,
+    cmdline:$cmdline,governors:$governors,epp:$epp,boost:$boost,smt:$smt,cpu:$cpu,rustc:$rustc,
     reps:$reps,jitter_s:$jitter_s}' >>"$log"
 
 row() {

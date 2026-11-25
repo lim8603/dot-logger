@@ -18,3 +18,6 @@ Thumbs.db
 *~
 .vscode/
 .idea/
+
+# Python bytecode from scripts importing each other
+__pycache__/

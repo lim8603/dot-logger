@@ -10,14 +10,14 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 진행 중, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
-| 활성 Task | [TASK-040](../04_implementation/tasks/TASK-040.md) **Done**(2026-11-25 EV-126: 조회·전송 혼합 4h 12/13 Pass, 1건 하네스 수정) · **[TASK-042](../04_implementation/tasks/TASK-042.md) In Progress**(D3=A 2026-11-25, S1 하네스 `b94964b`·`0012ef8`, S2 ①RT·`powersave` ②RT·`performance` Done, ③ generic 커널은 Human 재부팅 뒤 — TASK-042 「③ 실행 절차」) · [TASK-039](../04_implementation/tasks/TASK-039.md) **Done**(2026-11-24 EV-125: RT 스레드 heap 0) · [TASK-024](../04_implementation/tasks/TASK-024.md) **Done**(2026-11-24 S5 Human 「모두 승인」, 추적표 7칸 체크) · [TASK-038](../04_implementation/tasks/TASK-038.md) **Done**(2026-11-24 CI) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | 없음 — **REV-072 Closed**(2026-11-24 위임 수락: RV-193~201 조치 EV-122, RV-199 후속 macOS viewer 회귀 수정 `e20aef4`·`641929c` EV-124, CI run `45370553005` 16개 작업 Pass). REV-001~072 Closed |
-| 상태 | 38/44 Task Done(TASK-018 Cancelled), MS-009 Done. 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 활성 Task | **[TASK-042](../04_implementation/tasks/TASK-042.md) In Progress** — S1 하네스 Done, S2 ①RT·`powersave` ②RT·`performance` Done, ③ generic 커널은 Human 재부팅 뒤(TASK-042 「③ 실행 절차」) → S3 README·EV · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 미처리 리뷰 | 없음 — REV-001~072 Closed |
+| 상태 | 38/44 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`1795bc1`, 약 50분, [EV-128](../05_verification/verification_evidence.md#ev-128)). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-24 / #001 — CI 실패(macOS viewer) 원인 수정·REV-072 Closed·TASK-038 Done, TASK-024 S5 Done·1.0.0 직전 재검증(T8), TASK-039 Done(EV-125), TASK-040 Done(EV-126, 2026-11-25), CI 시간 의존 시험 4건 수정(EV-127), CI 151분 → 56분(EV-128) / AI |
-| 세션 상태 | **진행 중 — 2026-11-24 #001(개발).** |
-| 최근 완료 세션 | 2026-11-23 #002 — REV-072 반입·조치(EV-122), TASK-024 S2 F1~F5(EV-123), MS-011 등록 · 2026-11-23 #001(리뷰) — [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Open/Conditional(`RV-193~201`: P1 1·P2 5·P3 3) · 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계 · 2026-11-21~22 #006 — REV-071 보충 조치·Gate 4·public 전환·T3·MS-010 계획 |
+| 갱신 | 2026-11-25 / #001(2026-11-24~25) — CI 근본 수정·REV-072 Closed, TASK-024·038·039·040 Done(EV-124~126), CI 시간 의존 시험 정리·151 → 56분(EV-127·128), TASK-042 S1·S2 ①② / AI |
+| 세션 상태 | **마감 — 2026-11-24 #001(~11-25, 개발).** 다음 세션은 Human의 generic 커널 재부팅 뒤 TASK-042 ③부터 |
+| 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
 
@@ -25,26 +25,12 @@
 - **2026-11-23 사고 — 하네스 채움이 호스트 루트에:** S2 하네스 첫 구현의 tmpfs 마운트 경로 오류로 F3 디버그 채움이 T500 루트에 들어가 디스크 경고, 이어 832 GB 파일로 루트 100%(즉시 삭제, `fallocate`라 데이터 쓰기 없음). 채우기 직전 같은 chroot 안에서 tmpfs·크기 확인을 넣었고 본 실행 동안 루트 여유 변화 없음(EV-123).
 
 - **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
-- **2026-11-21 T3 native CI([EV-113](../05_verification/verification_evidence.md#ev-113)~[EV-115](../05_verification/verification_evidence.md#ev-115)):** 첫 실행에서 Windows 시험 하네스(accept 소켓 non-blocking 상속)·`macos-14` 러너 지원 종료를 고쳤다. macOS std `Mutex`의 첫 잠금 할당(64 B)은 Human 「A로 진행」으로 core 잠금 9개 생성 시 예열·`MUTEX_BYTES` 회계로 처리했다(TASK-036 S5, coding_convention 규칙). `378c6ba`에서 contracts 3 OS × 2 Rust Pass, 예열 커밋 `a0fcfcf`(run `44919471193`)에서 macOS 할당 시험 3개도 ignore 없이 Pass([EV-116](../05_verification/verification_evidence.md#ev-116)) → GAP-004 Closed(native CI 범위), T3 해소. 2026-11-22 Human 「진행해」로 CI 액션을 Node 24판(`checkout@v5`·`setup-python@v6`)으로 올렸다(`9d8bdd3`).
-
-- **2026-11-21 Human 「지금 공개」·「그대로 공개」 — 공개 전환(T2 해소):** 공개 전 재점검: gitleaks(커밋 369개) 1건은 기존 시험 전용 TLS 키, 커밋 주소 전부 noreply, gmail 0, `imported_context` 추적은 `.gitkeep`만, 의존성 197개 라이선스 모두 허용형(`cargo metadata` 집계). 문서·perf 결과의 로컬 경로(`/home/lim8603`·`/data/build`)와 사설 IP 1곳(총 205곳, #004 시점 196곳)은 비밀이 아니므로 그대로 둔다(Human 선택, 이력 재정리 안 함). `ae22f9d`에서 저장소를 public으로 전환했다(gh 구버전이라 REST API로 변경). T3 트리거 도래.
-
-- **2026-11-21 Human 「승인, Gate 4 수락 진행하자」 — Gate 4 Pass·Phase Verify:** REV-071 1차·보충 조치(EV-111·112)와 Gate 4 판정안(이 PC 로컬 범위)을 수락했다. REV-071 Closed, TASK-025 Done(추적표 구현 칸 5개 체크), Phase Verify. 전환 전 F-09(무근거 반전 0, 낡은 문서 3건 정정)·F-12(OQ 분기 없음) 점검. Gate 5는 Not Ready(24h·native·3 OS·실사용처 Not Run, 공식 산출물 미생성). [판정](../05_verification/quality_gate.md#dot-logger-gate-45-판정--2026-11-21)
 
 - **2026-11-21 Human 「INT-002로 하고싶다」 — 후속 Intent 아이디어:** AI가 로그와 소스코드에 접근해 애플리케이션의 자기개선(로그 기반 오류 분석·코드 개선·필요한 로그 추가 제안)을 돕는 분석 도구를 INT-002 Draft로 등록했다. 목표·범위는 미정이고, INT-001 마무리 뒤 구체화한다. 논의 기록은 [INT-002](../02_project_definition/intents/INT-002_ai_assisted_log_analysis.md).
 
+- **완료·문서화된 결정(아카이브 #034):** 2026-11-21 T3 native CI(EV-113~116, GAP-004 Closed)·공개 전환(T2)·Gate 4 수락(로컬 범위, Phase Verify)·`imported_context` 비공개(.gitignore).
 - **완료·문서화된 결정(아카이브 #033):** #004 공개 준비(이력 유지·`imported_context`만 제거·`MIT OR Apache-2.0`·단일 저장소, 원본 번들 `~/backup/dot-logger-original-2026-11-21.bundle`), TASK-025 README 영어화, TASK-032·MS-009 마감, ADR-013~016과 그 개정(0 행 생략, `.logger` 예약 토픽), TASK-027·029·030·033·034 범위 결정, 2026-11-15 일정 목표·커버리지 하한. 현재 효력은 각 ADR·Task·[quality_gate](../05_verification/quality_gate.md#2026-11-13-taskms-완료-기준-변경--human-결정)를 따른다.
 - **완료 기준(2026-11-13·15, quality_gate):** dot-logger는 범용 라이브러리이고 dot-probe는 첫 사용처다. 실사용처(TASK-026)·native·24h(TASK-024)는 마지막 단계이며 일정 판단에 넣지 않는다.
-
-- **2026-11-21 Human 「dot-logger에서는 비공개로 .gitignore에만 넣자」 — `imported_context` 비공개:** `imported_context`는 비공개 입력으로 의도했으나 `.gitignore`에 들어간 적이 없어 첫 커밋부터 추적되고 있었다. `.gitignore`에 `.cowork/06_evolution/imported_context/*`(`.gitkeep` 제외)를 추가하고 1,997개 파일의 추적을 해제했다. 로컬 파일은 남아 있고 과거 커밋에는 계속 있다. 새 자료는 git으로 백업되지 않는다. 프레임워크 규칙 보완은 dot-cowork 프로젝트 몫으로 넘기고 여기서는 하지 않는다. dot-tools(공개 저장소)는 공개해도 되는 내용이라 그대로 둔다.
-
-
-
-
-
-
-
-
 
 - **probe 연동 순서:** dot-logger 자체 작업·TASK-025 인계 뒤 별도 dot-probe 세션에서 TASK-026을 진행한다. 원격 성능 잔여는 T7, native/장기는 TASK-024다. RT 재부팅은 ADR-011의 사전 승인·once/back 절차를 유지하며 이 세션에서 dot-probe 저장소를 수정하지 않는다.
 
@@ -152,9 +138,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
+- 2026-11-24 #001(~11-25) — CI 근본 수정(RV-199, EV-124)·REV-072 Closed, TASK-024 S5·TASK-038·039·040 Done(EV-125·126), CI 시간 의존 시험 5건 정리·CI 151 → 56분(EV-127·128), TASK-042 D3·S1 하네스·S2 RT 측정 ①②(비공개 세션 로그: `session_logs/session_2026-11-24_001.md`).
 - 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).
 - 2026-11-23 #001(리뷰) — REV-071 이후 코드 변경(`ae22f9d..f30ae5a`) 및 TASK-024 S2 설계 독립 리뷰 [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) Conditional / Open(`RV-193~201`: P1 1·P2 5·P3 3)(비공개 세션 로그: `session_logs/session_2026-11-23_001.md`).
-- 2026-11-22~23 #007 — CI Node 24·v0.1.0 미리보기, TASK-024 S1·S2-P·S3·S4(EV-118~120), TASK-038(EV-121), S2 설계, REV-072 요청(비공개 세션 로그: `session_logs/session_2026-11-22_007.md`).
-- 2026-11-21~22 #006 — REV-071 보충 조치(`9622e94`, EV-112), F-09·F-12 뒤 Gate 4 수락·Phase Verify, public 전환(T2 해소), T3 native CI(EV-113~115), 버전·릴리즈 계획 [MS-010](../04_implementation/milestones/MS-010.md), TASK-036 S1~S5(외부 소비자 빌드·`^` 범위·잠금 예열), 빌드 디스크 정리 스크립트(비공개 세션 로그: `session_logs/session_2026-11-21_006.md`).
 
-완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033 및 관련 EV·세션 로그에 보존한다.
+완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033·#034 및 관련 EV·세션 로그에 보존한다.

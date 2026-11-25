@@ -614,13 +614,17 @@ mod reserve_tests {
             producers: 1,
             target_state: Arc::new(TargetLedger::default()),
         };
+        // Miri preempts threads at random points, so a few hundred rounds
+        // per seed already lose CAS races; 20,000 took about 30 minutes of
+        // the CI Miri job for the same check.
+        let rounds = if cfg!(miri) { 300 } else { 20_000 };
         let busy = std::thread::scope(|scope| {
             let handles: Vec<_> = (0..8)
                 .map(|_| {
                     let budget = budget.clone();
                     scope.spawn(move || {
                         let mut busy = 0;
-                        for _ in 0..20_000 {
+                        for _ in 0..rounds {
                             match budget.reserve(1) {
                                 Ok(lease) => drop(lease),
                                 Err(StorageError::Busy) => busy += 1,

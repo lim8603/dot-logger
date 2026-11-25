@@ -61,6 +61,10 @@ mod linux {
         --p1 <parent> <seconds> <warmup_s> <payload> <bytes_per_second> <files> <writers> <producers> <channels> <slots> <memory_mib> <telemetry> <control_iters> <safety_iters> | \
         --p1-max <parent> <total_bytes> <payload> <files> <writers> <producers> <channels> <slots> <memory_mib> | \
         --p1-cost <parent> <payload> <samples> | \
+        --latency <tmpfs_parent> warm|cold|reject <payload> <calls> | \
+        --latency <tmpfs_parent> sparse <payload> <hz> <seconds> <between_bytes> | \
+        --latency <tmpfs_parent> multi <payload> <calls> <writers> | \
+        --latency <tmpfs_parent> jitter <payload> <period_us> <seconds> <work_us> <per_release> [<load_dir> <load_bytes> <load_per_second>] | \
         --sustained <parent> <max_bytes> <files> <writers> <stable_s> | \
         --p0-mix-max <parent> <total_bytes> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> | \
         --p1-mix-max <parent> <total_bytes> <small_bytes> <small_per_second> <large_bytes> <large_per_second> <streams> <files> <writers> <producers> <channels> <slots> <raw_slots> <memory_mib> <telemetry> | \
@@ -400,8 +404,150 @@ mod linux {
                         "clock":latency(&cost.clock),"success":cost.success,"report":cost.report}),
                 )
             }
+            ["--latency", parent, row, rest @ ..] => latency_row(&mut out, parent, row, rest),
             _ => Err(USAGE.into()),
         }
+    }
+    /// TASK-042 rows: CPUs of the measuring threads (the control CPU first,
+    /// then other physical cores; SMT siblings are 8 apart on this PC).
+    const MULTI_CPUS: [usize; 8] = [CONTROL_CPU, 3, 4, 5, 6, 7, 0, 1];
+    const LATENCY_RING: u64 = 1 << 30;
+    fn latency_row(
+        out: &mut impl Write,
+        parent: &str,
+        row: &str,
+        rest: &[&str],
+    ) -> Result<(), Error> {
+        let dir = RunDir::create(Path::new(parent))?;
+        let output = dir.path().join("out-000");
+        std::fs::create_dir(&output)?;
+        let target = Target {
+            dir: &output,
+            ring: LATENCY_RING,
+        };
+        let rt = Rt {
+            cpu: CONTROL_CPU,
+            fifo: fifo(CONTROL_FIFO)?,
+        };
+        let env = json!({"scope":"Latency","row":row,"kernel":kernel()?,
+            "realtime":perf::realtime_kernel(),"rt_mode":rt_mode()?,"fifo":rt.fifo,
+            "cpu":CONTROL_CPU,"governor":governor(CONTROL_CPU),"smt":smt(),
+            "ring_bytes":LATENCY_RING.to_string()});
+        let number = |i: usize| -> Result<u64, Error> { Ok(rest.get(i).ok_or(USAGE)?.parse()?) };
+        let payload = usize::try_from(number(0)?)?;
+        let mut value = env;
+        value["payload_bytes"] = json!(payload);
+        match (row, rest.len()) {
+            ("warm" | "cold" | "reject", 2) => {
+                let calls = number(1)?;
+                value["calls"] = json!(calls);
+                let r = match row {
+                    "warm" => warm(target, payload, calls, rt)?,
+                    "cold" => {
+                        let (r, swept) = cold(target, payload, calls, rt)?;
+                        value["swept_bytes"] = json!(swept);
+                        r
+                    }
+                    _ => reject(target, payload, calls, rt)?,
+                };
+                row_json(&mut value, &r);
+            }
+            ("sparse", 4) => {
+                let (hz, seconds, between) = (number(1)?, number(2)?, number(3)?);
+                let period = Duration::from_nanos(1_000_000_000 / hz.max(1));
+                value["period_ns"] = json!(period.as_nanos().to_string());
+                value["between_bytes"] = json!(between);
+                let r = sparse(
+                    target,
+                    payload,
+                    period,
+                    hz * seconds,
+                    usize::try_from(between)?,
+                    rt,
+                )?;
+                row_json(&mut value, &r);
+            }
+            ("multi", 3) => {
+                let (calls, writers) = (number(1)?, usize::try_from(number(2)?)?);
+                let cpus = MULTI_CPUS.get(..writers).ok_or("at most 8 writers")?;
+                value["calls"] = json!(calls);
+                value["cpus"] = json!(cpus);
+                let rows = multi(target, payload, calls, cpus, rt)?;
+                let mut all = LatencyHistogram::default();
+                for r in &rows {
+                    all.merge(&r.accepted);
+                }
+                value["accepted"] = distribution(&all);
+                value["writers"] = rows
+                    .iter()
+                    .map(|r| json!({"accepted":distribution(&r.accepted),"capacity":r.capacity}))
+                    .collect();
+                value["success"] = json!(rows.iter().all(|r| r.success));
+            }
+            ("jitter", 5 | 8) => {
+                let period = Duration::from_micros(number(1)?);
+                let seconds = number(2)?;
+                let work = Duration::from_micros(number(3)?);
+                let per_release = number(4)?;
+                let releases = seconds * 1_000_000_000 / u64::try_from(period.as_nanos())?.max(1);
+                let load_dir = rest.get(5).map(Path::new);
+                let load = match load_dir {
+                    Some(dir) => Some(IoLoad {
+                        dir,
+                        bytes: usize::try_from(number(6)?)?,
+                        per_second: number(7)?,
+                    }),
+                    None => None,
+                };
+                value["period_ns"] = json!(period.as_nanos().to_string());
+                value["work_ns"] = json!(work.as_nanos().to_string());
+                value["per_release"] = json!(per_release);
+                value["releases"] = json!(releases);
+                value["load"] = json!(load.map(|l| json!({"dir":l.dir.display().to_string(),
+                    "bytes":l.bytes,"per_second":l.per_second})));
+                let j = jitter(
+                    target,
+                    payload,
+                    period,
+                    releases,
+                    work,
+                    per_release,
+                    load,
+                    rt,
+                )?;
+                value["wake"] = distribution(&j.wake);
+                value["response"] = distribution(&j.response);
+                value["calls_per_release"] = distribution(&j.calls);
+                value["misses"] = json!(j.misses);
+                value["capacity"] = json!(j.capacity);
+                value["work_iterations"] = json!(j.work_iterations.to_string());
+                value["load_records"] = json!(j.load_records);
+                value["success"] = json!(j.success);
+            }
+            _ => return Err(USAGE.into()),
+        }
+        line(out, value)
+    }
+    fn row_json(value: &mut Value, r: &Row) {
+        value["accepted"] = distribution(&r.accepted);
+        value["rejected"] = distribution(&r.rejected);
+        value["skipped"] = distribution(&r.skipped);
+        value["clock_pair"] = distribution(&r.clock);
+        value["capacity"] = json!(r.capacity);
+        value["success"] = json!(r.success);
+    }
+    /// Quantiles are bucket upper bounds (≤ 1/32 above the true value); the
+    /// maximum is exact; an empty histogram reports nulls.
+    fn distribution(h: &LatencyHistogram) -> Value {
+        let q = |q| h.quantile(q);
+        json!({"count":h.count(),"p50_ns":q(0.5),"p90_ns":q(0.9),"p99_ns":q(0.99),
+            "p999_ns":q(0.999),"p9999_ns":q(0.9999),"max_ns":(h.count() > 0).then(|| h.max())})
+    }
+    /// SMT state from sysfs ("on", "off", "forceoff", "notsupported").
+    fn smt() -> Option<String> {
+        std::fs::read_to_string("/sys/devices/system/cpu/smt/control")
+            .ok()
+            .map(|s| s.trim().to_owned())
     }
     fn workload(
         payload: usize,
@@ -541,7 +687,7 @@ mod linux {
             telemetry: false,
         })
     }
-    /// Quantiles are bucket upper bounds (≤ 1/8 above the true value); the
+    /// Quantiles are bucket upper bounds (≤ 1/32 above the true value); the
     /// maximum is exact; an empty histogram reports nulls.
     fn latency(h: &LatencyHistogram) -> Value {
         let q = |q| h.quantile(q).map(|n| n.to_string());

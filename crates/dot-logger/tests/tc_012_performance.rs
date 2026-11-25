@@ -273,10 +273,11 @@ fn p0_record_count_rejects_a_zero_payload() {
 }
 
 /// TASK-023 S2b: call latency is judged at p99 ≤ 5 µs / p99.9 ≤ 20 µs, so
-/// quantiles come from nanosecond log-linear buckets with ≤ 1/8 relative
-/// error, an exact maximum and no answer for an empty run.
+/// quantiles come from nanosecond log-linear buckets with an exact maximum
+/// and no answer for an empty run. TASK-042 publishes p50 of about 160 ns,
+/// so the relative error is ≤ 1/32 (5 ns there), not 1/8 (20 ns).
 #[test]
-fn latency_histogram_bounds_quantiles_within_an_eighth() {
+fn latency_histogram_bounds_quantiles_within_a_thirty_second() {
     let mut empty = LatencyHistogram::default();
     assert_eq!(empty.quantile(0.99), None);
     for ns in [3, 3, 5] {
@@ -285,6 +286,10 @@ fn latency_histogram_bounds_quantiles_within_an_eighth() {
     // Small values are exact.
     assert_eq!(empty.quantile(0.5), Some(3));
     assert_eq!(empty.quantile(1.0), Some(5));
+    let mut small = LatencyHistogram::default();
+    small.record(31);
+    small.record(1_000_000);
+    assert_eq!(small.quantile(0.5), Some(31));
     let mut h = LatencyHistogram::default();
     for ns in 1..=100_000_u64 {
         h.record(ns);
@@ -293,7 +298,7 @@ fn latency_histogram_bounds_quantiles_within_an_eighth() {
     assert_eq!(h.max(), 100_000);
     for (q, exact) in [(0.5, 50_000_u64), (0.99, 99_000), (0.999, 99_900)] {
         let got = h.quantile(q).unwrap();
-        assert!(got >= exact && got <= exact + exact / 8, "{q}: {got}");
+        assert!(got >= exact && got <= exact + exact / 32, "{q}: {got}");
     }
     // Never above the observed maximum.
     assert_eq!(h.quantile(1.0), Some(100_000));
@@ -948,4 +953,84 @@ fn fifo_control_loop_applies_and_reports_its_policy() {
             "a refused priority must not fall back"
         );
     }
+}
+
+/// TASK-042: latency rows write only to a tmpfs ring with room for twice
+/// the ring, checked from the writing process (2026-11-23 fill incident).
+#[test]
+fn latency_rows_refuse_an_output_that_is_not_tmpfs_or_too_small() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let err = require_tmpfs(Target {
+        dir: repo,
+        ring: 1 << 20,
+    })
+    .unwrap_err();
+    assert!(err.to_string().contains("is not tmpfs"), "{err}");
+    let shm = std::path::Path::new("/dev/shm");
+    let err = require_tmpfs(Target {
+        dir: shm,
+        ring: u64::MAX / 4,
+    })
+    .unwrap_err();
+    assert!(err.to_string().contains("free"), "{err}");
+    require_tmpfs(Target {
+        dir: shm,
+        ring: 64 << 20,
+    })
+    .unwrap();
+}
+
+/// TASK-042: every row times exactly the calls it was asked for, sorts them
+/// by outcome, measures as many clock pairs and shuts down cleanly.
+#[test]
+fn latency_rows_time_every_requested_call_by_outcome() {
+    let run = RunDir::create(std::path::Path::new("/dev/shm")).unwrap();
+    let out = run.path().join("out-000");
+    std::fs::create_dir(&out).unwrap();
+    let target = Target {
+        dir: &out,
+        ring: 64 << 20,
+    };
+    let rt = Rt { cpu: 0, fifo: None };
+    let h = warm(target, 16, 3000, rt).unwrap();
+    assert_eq!((h.accepted.count(), h.clock.count()), (3000, 3000));
+    assert_eq!((h.rejected.count(), h.skipped.count()), (0, 0));
+    assert!(h.success);
+    // C1 sizes its sweep from sysfs; a runner without cache data cannot run it.
+    match llc_bytes(0) {
+        Ok(llc) => {
+            let (c, swept) = cold(target, 64, 3, rt).unwrap();
+            assert_eq!(c.accepted.count(), 3);
+            assert_eq!(swept, 2 * llc);
+        }
+        Err(e) => eprintln!("C1 not checked: {e}"),
+    }
+    let sparse = sparse(target, 64, Duration::from_millis(1), 50, 4096, rt).unwrap();
+    assert_eq!(sparse.accepted.count() + sparse.capacity, 50);
+    let r = reject(target, 64, 200, rt).unwrap();
+    assert!(
+        r.skipped.count() >= 200 && r.rejected.count() >= 200,
+        "{r:?}"
+    );
+    assert_eq!(r.clock.count(), 200);
+    assert!(r.success);
+    let j = jitter(
+        target,
+        64,
+        Duration::from_millis(2),
+        20,
+        Duration::from_micros(100),
+        5,
+        None,
+        rt,
+    )
+    .unwrap();
+    assert_eq!(
+        (j.wake.count(), j.response.count(), j.calls.count()),
+        (20, 20, 20)
+    );
+    assert!(j.success);
+    let m = multi(target, 16, 1000, &[0, 1], rt).unwrap();
+    assert_eq!(m.len(), 2);
+    assert!(m.iter().all(|w| w.accepted.count() == 1000 && w.success));
 }

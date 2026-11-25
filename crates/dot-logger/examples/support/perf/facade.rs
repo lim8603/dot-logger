@@ -89,7 +89,7 @@ fn wall_ns() -> i64 {
 
 /// Harness record: its sequence and the P0 fill pattern, written straight
 /// into the writer's encode scratch (one small slot = the payload size).
-struct Seq(u64);
+pub(super) struct Seq(pub(super) u64);
 impl Record for Seq {
     const SCHEMA: Schema = Schema::new(0x0053_4551_5045_5246, 1, "dot-logger-perf-seq");
     fn encode(&self, out: &mut [u8]) -> Result<usize, EncodeError> {

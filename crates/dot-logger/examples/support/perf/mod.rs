@@ -19,10 +19,16 @@ use std::{
     time::{Duration, Instant},
 };
 mod facade;
+mod latency;
 #[allow(unused_imports)]
 pub use facade::{
     CallCost, FACADE_SEGMENT_RECORDS, LoggerLoad, LoggerRun, LoggerVerified, call_cost,
     verify_logger, write_logger,
+};
+#[allow(unused_imports)]
+pub use latency::{
+    IoLoad, Jitter, Row, Rt, Target, cold, jitter, llc_bytes, multi, reject, require_tmpfs, sparse,
+    warm,
 };
 
 /// Ordinary harness error; no measurement result is implied.
@@ -1415,9 +1421,9 @@ pub fn verify_p0(dir: &Path, run: &StorageRun) -> Result<Verified, Error> {
     Ok(v)
 }
 
-/// Nanosecond latency histogram for RT call costs: values below 8 ns are
-/// exact, larger ones fall into 8 linear sub-buckets per power of two, so a
-/// quantile is reported as its bucket's upper bound with ≤ 1/8 relative
+/// Nanosecond latency histogram for RT call costs: values below 32 ns are
+/// exact, larger ones fall into 32 linear sub-buckets per power of two, so a
+/// quantile is reported as its bucket's upper bound with ≤ 1/32 relative
 /// error, capped at the exact maximum.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatencyHistogram {
@@ -1425,7 +1431,7 @@ pub struct LatencyHistogram {
     max: u64,
     buckets: Vec<u64>,
 }
-const SUB_BITS: u32 = 3;
+const SUB_BITS: u32 = 5;
 const SUB: u64 = 1 << SUB_BITS;
 const LATENCY_BUCKETS: usize = (SUB as usize) * (64 - SUB_BITS as usize + 1);
 impl Default for LatencyHistogram {

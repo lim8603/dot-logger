@@ -1336,6 +1336,24 @@ fn event_logger(outputs: &[(&Path, Retention)]) -> Logger {
 }
 
 /// Log pose `x` at session monotonic `mono`, retrying capacity off the RT path.
+/// `Logger::mark_event`, asked again while it fails only because the IO
+/// thread did not answer within `4 × sync_every + 1 s` — documented as
+/// `Failed` with the output still healthy. On a shared Windows CI disk one
+/// sync can take that long (run 45610049980, f32). A failed output, any
+/// other error and a persistent timeout are returned as they are.
+fn mark_event(
+    logger: &Logger,
+) -> Result<dot_logger::logger::EventMark, dot_logger::logger::EventError> {
+    use dot_logger::logger::EventError;
+    for _ in 0..4 {
+        match logger.mark_event() {
+            Err(EventError::Failed) if !logger.health().outputs.iter().any(|o| o.failed) => {}
+            other => return other,
+        }
+    }
+    logger.mark_event()
+}
+
 fn log_at(w: &mut Writer, pose: Channel<Pose>, x: i32, mono: u64) {
     loop {
         match w.try_log_at(pose, &Pose { x, y: 0 }, mono, 0) {
@@ -1436,7 +1454,7 @@ fn f32_a_marked_event_window_survives_ring_deletion() {
         log_at(&mut w, pose, A_BASE + x, last_a);
     }
     std::thread::sleep(PRE + Duration::from_millis(50));
-    let mark = logger.mark_event().unwrap();
+    let mark = mark_event(&logger).unwrap();
     assert_eq!(mark.outputs(), 1);
     let at = mark.at_ns();
     assert!(
@@ -1491,7 +1509,7 @@ fn f33_a_released_event_window_is_deleted_like_any_other() {
     let mut w = logger.take_writer("control").unwrap();
     // The history start `at - PRE` is then a session time after the origin.
     std::thread::sleep(PRE);
-    let mark = logger.mark_event().unwrap();
+    let mark = mark_event(&logger).unwrap();
     let at = mark.at_ns();
     log_window(&mut w, pose, at, 80_000, 0);
     wait_written(&logger);
@@ -1551,16 +1569,16 @@ fn f34_marks_beyond_max_events_are_quota() {
         (&a.0, ring.events(window(3))),
         (&b.0, ring.events(window(1))),
     ]);
-    let first = logger.mark_event().unwrap();
+    let first = mark_event(&logger).unwrap();
     assert_eq!(first.outputs(), 2);
     for _ in 0..2 {
-        assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+        assert_eq!(mark_event(&logger).unwrap_err(), EventError::Quota);
     }
     logger.release_event(first).unwrap();
-    let second = logger.mark_event().unwrap();
+    let second = mark_event(&logger).unwrap();
     assert_ne!(second, first);
     assert_eq!(second.outputs(), 2);
-    assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+    assert_eq!(mark_event(&logger).unwrap_err(), EventError::Quota);
     logger.release_event(second).unwrap();
     assert!(
         logger
@@ -1624,7 +1642,7 @@ fn f34_a_window_over_protected_bytes_is_quota_and_rolled_back() {
     }
     wait_written(&logger);
     let before = w.now_ns();
-    assert_eq!(logger.mark_event().unwrap_err(), EventError::Quota);
+    assert_eq!(mark_event(&logger).unwrap_err(), EventError::Quota);
     // The mark's time lies after `before` and within two answer deadlines
     // (about 2.2 s) of it, so this is inside its window on output 0.
     let inside = before + HOUR.as_nanos() as u64 / 2;
@@ -1810,11 +1828,9 @@ fn f37_a_new_mark_reclaims_expired_quota_before_periodic_sync() {
         .writer("control")
         .start()
         .unwrap();
-    let mark = logger.mark_event().unwrap();
+    let mark = mark_event(&logger).unwrap();
     std::thread::sleep(Duration::from_millis(1100));
-    let next = logger
-        .mark_event()
-        .expect("expired slot must be reusable immediately");
+    let next = mark_event(&logger).expect("expired slot must be reusable immediately");
     assert_ne!(mark.id(), next.id());
     logger.release_event(mark).unwrap();
     logger.release_event(next).unwrap();

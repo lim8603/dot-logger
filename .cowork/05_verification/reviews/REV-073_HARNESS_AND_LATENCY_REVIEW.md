@@ -67,8 +67,8 @@
 | ID | 중요도 | 위치 | 문제 | 처리담당 판정 | 상태 |
 |---|---|---|---|---|---|
 | RV-202 | **P1** | [soak-faults.py:488](../../../scripts/soak-faults.py#L488), [534](../../../scripts/soak-faults.py#L534), [547](../../../scripts/soak-faults.py#L547) | tmpfs 확인을 거친 경로를 shell에서 다시 분리·확장해 채움·삭제 대상이 달라질 수 있음 | 수용·조치 | Open(CI 대기) |
-| RV-203 | P2 | [soak-faults.py:241](../../../scripts/soak-faults.py#L241), [387](../../../scripts/soak-faults.py#L387), [784](../../../scripts/soak-faults.py#L784) | F2a Gap 누락, 힙 증거 누락, producer 오류가 Pass 가능 | 수용 | Open |
-| RV-204 | P2 | [soak-faults.py:674](../../../scripts/soak-faults.py#L674), [698](../../../scripts/soak-faults.py#L698) | F5가 sync 완료 시점의 내구성 하한과 실제 SIGKILL 종료를 확인하지 못함 | 수용(범위 조치 때 확정) | Open |
+| RV-203 | P2 | [soak-faults.py:241](../../../scripts/soak-faults.py#L241), [387](../../../scripts/soak-faults.py#L387), [784](../../../scripts/soak-faults.py#L784) | F2a Gap 누락, 힙 증거 누락, producer 오류가 Pass 가능 | 수용·조치 | Open(CI 대기) |
+| RV-204 | P2 | [soak-faults.py:674](../../../scripts/soak-faults.py#L674), [698](../../../scripts/soak-faults.py#L698) | F5가 sync 완료 시점의 내구성 하한과 실제 SIGKILL 종료를 확인하지 못함 | 수용·조치(표현 좁힘) | Open(CI 대기) |
 | RV-205 | P2 | [soak-mixed.py:127](../../../scripts/soak-mixed.py#L127), [193](../../../scripts/soak-mixed.py#L193), [323](../../../scripts/soak-mixed.py#L323) | 조회·구독 워커가 중도 종료돼도 누적 성공 표본으로 통과 | 수용 | Open |
 | RV-206 | P2 | [soak-mixed.py:215](../../../scripts/soak-mixed.py#L215), [294](../../../scripts/soak-mixed.py#L294), [321](../../../scripts/soak-mixed.py#L321) | 보존·외부 파일 읽기의 실제 커버리지와 손실 판독 실패를 판정하지 않음 | 수용 | Open |
 | RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용 | Open |
@@ -90,13 +90,13 @@
 
 **[리뷰어]** F2a는 Gap 개수를 관측값으로만 넣어 0이어도 stream 생존·이후 기록 수신으로 통과한다. TASK-024의 Gap 통지 계약에 대해 양수 단정이 필요하다. `common_checks`는 heap 표본이 비면 두 필수 검사 자체를 생략하고, 정상 종료가 필요한 F1/F2/F4도 `code`와 end의 `failures`를 검사하지 않는다. Rust 하네스는 RT 힙 사용·producer 오류를 `failures`에 남기지만 `success`에는 logger shutdown 결과만 넣는다. F3a/b의 예상 출력 실패와 producer 실패도 따로 판정해야 한다. 필수 bool 키가 모두 존재할 때만 Pass로 두고, 공통 검사에 프로세스 결과·힙 표본·producer 실패를 포함한다. F5는 강제 종료라는 특성에 맞춰 종료 전 확보할 수 있는 공통 지표를 명시한다.
 
-**[처리담당]** **수용**(2026-11-26). `f2a_gap_events_after_stops`가 `OBSERVED`에 있어 0이어도 통과하고, `common_checks`는 heap 표본이 없으면 검사를 생략하며 종료 코드·end `failures`를 보지 않는 것을 확인했다. 조치: F2a Gap 양수 단정, 공통 검사에 heap 표본 존재·프로세스 종료 코드·`failures == []`(예상 실패 시나리오는 예상 항목만 허용)·producer 실패, 판정은 필수 키가 모두 있을 때만 Pass. F5는 종료 전 확보 가능한 지표를 명시. 짧은 실패 fixture(판정 함수 단위 시험)로 검출력 확인.
+**[처리담당]** **수용**(2026-11-26). `f2a_gap_events_after_stops`가 `OBSERVED`에 있어 0이어도 통과하고, `common_checks`는 heap 표본이 없으면 검사를 생략하며 종료 코드·end `failures`를 보지 않는 것을 확인했다. 조치: F2a Gap 양수 단정, 공통 검사에 heap 표본 존재·프로세스 종료 코드·`failures == []`(예상 실패 시나리오는 예상 항목만 허용)·producer 실패, 판정은 필수 키가 모두 있을 때만 Pass. F5는 종료 전 확보 가능한 지표를 명시. 짧은 실패 fixture(판정 함수 단위 시험)로 검출력 확인. **조치(2026-11-26):** `common_checks(soak, end, checks, code, clean)`가 `end_line`·`failures_none`(RT 힙 사용·producer 오류)·`exit_expected`(정상 0, F3a/b는 출력 장애로 1)·`worker_alive`·`heap_samples`를 항상 채우고 heap 표본이 없으면 `heap_bounded`·`heap_returns`도 False. `judge(name, checks)`는 F5 외 시나리오에서 `REQUIRED` 키가 하나라도 없으면 Fail. F2a는 `f2a_gap_notified`(Gap 이벤트 > 0, EV-123 실측 229) 필수. 거절은 producer가 카운터에만 올리므로 F1 정상 종료 기대와 충돌 없음을 확인. 자가 시험 7건(정상 Pass, heap 표본 없음·`failures`·종료 코드 불일치·end 없음·worker 실패·필수 키 누락·Gap 0 각각 Fail) — 수정 전 Red, 수정 후 Green.
 
 #### RV-204 — F5 내구성 하한과 종료 원인 (P2)
 
 **[리뷰어]** stdout 수신 시각에서 `since_sync_ms`를 빼고 300 ms 간격으로 묶으면 전달 지연이 sync 시각을 움직인다. 하나의 완료가 여럿으로 세어지거나, 마지막 완료 전 이미 sync된 기록 일부가 유실돼도 직전 완료 이전 표본만 만족하면 통과한다. 수락 수는 아직 큐에 있는 기록도 포함한다. 또한 `soak.wait(30)`의 종료 코드를 확인하지 않아 먼저 종료한 프로세스도 검사 대상으로 처리된다. sync 완료 시점의 파일별/채널별 확정 수나 시퀀스를 기록하고, 의도한 SIGKILL을 확인한다. SIGKILL은 페이지 캐시를 버리지 않으므로 이 증거의 범위는 프로세스 종료 뒤 읽을 수 있는 데이터다. EV-123에 보고한 6회 판독은 관측으로 유효하며 마지막 완료 sync 내구성의 단정은 별도 근거가 필요하다.
 
-**[처리담당]** **수용**(2026-11-26). `soak.wait(30)` 결과를 확인하지 않고, sync 시각을 stdout 수신 시각에서 역산하는 것을 확인했다. 조치: 종료 원인이 의도한 SIGKILL(-9)인지 단정, sync 완료 시점의 채널별 확정 수를 soak 표본에서 직접 내보낼 수 있으면 그것으로 하한을 바꾸고, 불가하면 EV-123의 「마지막 sync 이전 기록 회수」 표현을 관측 범위(프로세스 종료 뒤 읽을 수 있는 데이터)로 좁힌다. 어느 쪽인지는 조치 때 facade 노출 값을 보고 정한다.
+**[처리담당]** **수용**(2026-11-26). `soak.wait(30)` 결과를 확인하지 않고, sync 시각을 stdout 수신 시각에서 역산하는 것을 확인했다. 조치: 종료 원인이 의도한 SIGKILL(-9)인지 단정, sync 완료 시점의 채널별 확정 수를 soak 표본에서 직접 내보낼 수 있으면 그것으로 하한을 바꾸고, 불가하면 EV-123의 「마지막 sync 이전 기록 회수」 표현을 관측 범위(프로세스 종료 뒤 읽을 수 있는 데이터)로 좁힌다. 어느 쪽인지는 조치 때 facade 노출 값을 보고 정한다. **조치(2026-11-26):** facade `OutputHealth`는 `since_sync`만 주고 sync 시점 확정 건수는 없다(추가는 공개 API라 범위 밖). 따라서 ① sync 완료 시각을 soak 자체 시계 `t_ms - since_sync_ms`로 계산(`sync_completions`, stdout 지연 무관) ② 시험마다 `killed_by_sigkill`(종료 코드 −9)·`worker_alive`·`heap_samples`를 Pass 조건에 추가 ③ 하한 항목 이름을 `at_least_before_previous_sync`로 바꾸고 F5 docstring과 [EV-123](../verification_evidence.md#ev-123) F5 행에 범위(종료 뒤 읽을 수 있는 데이터, 느슨한 하한, 마지막 sync 내구성 미단정)를 명시. 자가 시험 3건 Red → Green, 실제 F5 1회(`--no-rt`, 7 s, `/dev/shm`) Pass — SIGKILL 인식, sync 6회, 하한 4,950 ≤ 복구 15,100.
 
 #### RV-205 — 혼합 하네스의 워커 중도 종료 (P2)
 

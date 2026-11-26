@@ -238,12 +238,26 @@ def counts(event):
     return c["control"], c["frames"]
 
 
-def common_checks(soak, end, checks):
-    """Checks every scenario shares: RT loop never missed, heap bounded."""
+# Present in every finished scenario but F5; a missing one fails (RV-203).
+REQUIRED = ("deadline_misses_0", "end_line", "failures_none", "exit_expected",
+            "worker_alive", "heap_samples", "heap_bounded", "heap_returns")
+
+
+def common_checks(soak, end, checks, code, clean=True):
+    """Checks every scenario shares: RT loop never missed, heap bounded, no
+    RT heap use or producer error, the expected exit. `clean` is False when
+    the fault itself makes the shutdown unsuccessful (F3: exit 1)."""
     samples = soak.samples()
     final = end or (samples[-1] if samples else {})
     checks["deadline_misses_0"] = final.get("counts", {}).get("misses") == 0
+    checks["end_line"] = end is not None
+    # RT heap use and producer errors go to `failures`, not to `success`.
+    checks["failures_none"] = end is not None and end.get("failures") == []
+    checks["exit_expected"] = code == (0 if clean else 1)
+    checks["worker_alive"] = bool(samples) and not any(s.get("worker_failed") for s in samples)
     lives = [s["heap"]["live_bytes"] for s in samples if s.get("heap")]
+    checks["heap_samples"] = bool(lives)
+    checks["heap_bounded"] = checks["heap_returns"] = False
     if lives:
         baseline = lives[min(len(lives) - 1, max(1, len(lives) // 20))]
         growth = max(lives) - baseline
@@ -349,7 +363,7 @@ def f1(args, out):
         and found["found"]["unreadable_files"] == 0,
         "shutdown_success": end["success"] is True,
     }
-    common_checks(soak, end, checks)
+    common_checks(soak, end, checks, code)
     if not args.keep:
         shutil.rmtree(parent, ignore_errors=True)
     return marks, checks, {"exit": code, "end": end, "inspect": found}
@@ -385,6 +399,8 @@ def f2(args, out):
         wait_samples(soak, args.f2_gap)
         gap_events += gap.kinds(after=stopped).get("gap", 0)
     checks["f2a_gap_events_after_stops"] = gap_events
+    # Stops below max_age must reach the Gap subscriber as Gap events (RV-203).
+    checks["f2a_gap_notified"] = gap_events > 0
     checks["f2a_gap_stream_alive"] = not gap.ended()
     checks["f2a_gap_receives_after_last_resume"] = gap.kinds(after=now() - args.f2_gap + 2).get("record", 0) > 0
     checks["f2a_disconnect_ended"] = disc.ended()
@@ -423,7 +439,7 @@ def f2(args, out):
         "shutdown_success": end["success"] is True,
     })
     del resumed
-    common_checks(soak, end, checks)
+    common_checks(soak, end, checks, code)
     shutil.rmtree(parent, ignore_errors=True)
     return marks, checks, {"exit": code, "end": end, "inspect": found}
 
@@ -524,7 +540,7 @@ def f3a(args, out):
         and found["found"]["unreadable_files"] == 0,
     }
     del freed_at
-    common_checks(soak, end, checks)
+    common_checks(soak, end, checks, code, clean=False)
     return marks, checks, {"exit": code, "end": end, "inspect": found}
 
 
@@ -580,7 +596,7 @@ def f3b(args, out):
         "memory_failed_matches_report": failed in report_failed,
         "shutdown_not_success_expected": end["success"] is False,
     }
-    common_checks(soak, end, checks)
+    common_checks(soak, end, checks, code, clean=False)
     return marks, checks, {"exit": code, "end": end}
 
 
@@ -653,7 +669,7 @@ def f4(args, out):
         "files_gapless": holes(found) == 0 and found["found"]["torn_files"] == 0,
         "shutdown_success": end["success"] is True,
     })
-    common_checks(soak, end, checks)
+    common_checks(soak, end, checks, code)
     shutil.rmtree(parent, ignore_errors=True)
     return marks, checks, {"exit": code, "end": end, "inspect": found}
 
@@ -666,8 +682,29 @@ def children(pid):
     return [int(x) for x in out.split()]
 
 
+def sync_completions(samples, merge_s=0.05):
+    """Sync completion times in seconds on the soak's own clock: each
+    sample's `t_ms - since_sync_ms`, so stdout delivery does not move them
+    (RV-204). Samples seeing the same completion agree to a few ms."""
+    times = sorted((v["t_ms"] - output(v)["since_sync_ms"]) / 1000 for v in samples
+                   if "t_ms" in v and output(v).get("since_sync_ms") is not None)
+    completions = []
+    for t in times:
+        if not completions or t - completions[-1] > merge_s:
+            completions.append(round(t, 3))
+    return completions
+
+
 def f5(args, out):
-    """SIGKILL without warning at several points, read back, restart."""
+    """SIGKILL without warning at several points, read back, restart.
+
+    Scope (RV-204): SIGKILL keeps the page cache, so this shows what can be
+    read after the process dies, not power-loss durability (that is the UPS
+    power-cut test). The lower bound is the accepted count before the
+    previous sync completed; accepted records may still have been queued,
+    so it is a lenient estimate, not proof that the last sync was durable.
+    Checks available before a kill: misses, worker state and heap samples
+    from the last samples, and the exit by the intended SIGKILL."""
     parent = pathlib.Path(args.shm_dir) / "f5"
     parent.mkdir(parents=True)
     marks = []
@@ -681,21 +718,14 @@ def f5(args, out):
         time.sleep(delay)
         killed_at = now()
         soak.process.send_signal(signal.SIGKILL)
-        soak.wait(30)
+        code = soak.wait(30)
         timed = [(at, v) for at, v in soak.lines.snapshot() if v.get("event") == "sample"]
+        samples = [v for _, v in timed]
         last_at, last = timed[-1]
-        # Sync completions (driver clock) from each sample's since_sync.
-        syncs = sorted({round(at - output(v)["since_sync_ms"] / 1000, 2)
-                        for at, v in timed if output(v).get("since_sync_ms") is not None})
-        completions = []
-        for s in syncs:
-            if not completions or s - completions[-1] > 0.3:
-                completions.append(s)
-        # Records accepted before the previous sync completed were written
-        # before the last completed sync began: a lower bound on recovery.
+        completions = sync_completions(samples)
         lower = (0, 0)
         if len(completions) >= 2:
-            before = [v for at, v in timed if at <= completions[-2]]
+            before = [v for v in samples if v["t_ms"] / 1000 <= completions[-2]]
             if before:
                 lower = counts(before[-1])
         since_last = killed_at - last_at + 0.5
@@ -709,15 +739,19 @@ def f5(args, out):
             "control_seen": c["seen"], "frames_seen": f["seen"],
             "starts_at_0": c["first"] in (0, None) and f["first"] in (0, None),
             "no_holes": c["holes"] == 0 and f["holes"] == 0,
-            "at_least_last_sync": c["seen"] >= lower[0] and f["seen"] >= lower[1],
+            "at_least_before_previous_sync": c["seen"] >= lower[0] and f["seen"] >= lower[1],
             "closed_files_intact": found["found"]["torn_files"] == 0
             and found["found"]["unreadable_files"] == 0,
             "torn_active": found["torn_active"], "active_files": found["active_files"],
             "misses_0": last["counts"]["misses"] == 0,
+            "killed_by_sigkill": code == -signal.SIGKILL,
+            "worker_alive": not any(v.get("worker_failed") for v in samples),
+            "heap_samples": any(v.get("heap") for v in samples),
         }
-        trial["pass"] = all(trial[k] for k in ("starts_at_0", "no_holes",
-                                               "at_least_last_sync", "closed_files_intact",
-                                               "misses_0")) and len(completions) >= 2
+        trial["pass"] = all(trial[k] for k in (
+            "starts_at_0", "no_holes", "at_least_before_previous_sync", "closed_files_intact",
+            "misses_0", "killed_by_sigkill", "worker_alive", "heap_samples")) \
+            and len(completions) >= 2
         trials.append(trial)
     # Restart in the same parent: a new session directory, a clean run.
     phase(marks, "restart")
@@ -744,6 +778,15 @@ OBSERVED = {"rejected_during_fault", "failed_records", "heap_growth_bytes",
             "after_resume_ended", "after_resume_outcome",
             "report_failed_counts", "trials_passed", "trials",
             "bytes_free_at_fault"}
+
+def judge(name, checks):
+    """Pass only when every pass/fail check is True and, except for F5 (its
+    own per-trial checks), every shared check is present."""
+    if name != "f5" and any(k not in checks for k in REQUIRED):
+        return False
+    return all(v is True for k, v in checks.items()
+               if k not in OBSERVED and isinstance(v, bool))
+
 
 marks_start = [0.0]
 args_global = None
@@ -795,8 +838,7 @@ def main():
         started = time.time()
         try:
             marks, checks, detail = SCENARIOS[name](args, out)
-            verdict = all(v is True for k, v in checks.items()
-                          if k not in OBSERVED and isinstance(v, bool))
+            verdict = judge(name, checks)
             error = None
         except Exception as e:  # report and go on with the next scenario
             marks, checks, detail, verdict, error = [], {}, {}, False, repr(e)

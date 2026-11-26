@@ -1994,11 +1994,30 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **판정:** 완료 기준 4개 충족 — README 「Verification」에 조건·방법이 붙은 요약 5행(H·C1·J, D3), 최대·식은 캐시 포함, 기록 유무에 따른 깨어남 분포(0건 = 50건), 원시 결과·재현 명령(아래).
 - **커널:** 호출 p50·p99·p99.99는 두 커널이 거의 같고 차이는 최대다 — H 최대는 RT 41~54 µs, generic은 6개(크기 3 × governor 2) 중 5개가 85~155 µs(나머지 42 µs). M writer 8개도 generic `performance`만 136 µs. 반면 M writer 1·4개는 두 커널 모두 32~50 µs, C1은 generic `performance` 최대가 RT보다 낮다(8.5 대 19.5 µs) — 2~3배는 모든 행이 아니라 H 중심의 차이다. 거절 경로 최대도 RT 5 µs, generic 19~80 µs. 10 ms 루프 깨어남 최대 RT 117~142 µs, generic 127~383 µs. 1 kHz 깨어남(IO)은 ③-b 2회째에 한 번 729 µs(나머지 42·91 µs, 놓침 없음).
 - **governor:** `powersave`에서 호출 p50이 15~45 %, p99가 약 40 % 높다(H·M, 두 커널). 10 ms 깨어남 p50은 44~46 → 23 µs(긴 idle 뒤 깊은 C-state). 호출 최대는 governor와 무관하다.
-- **관찰 — 50건 묶음의 꼬리(원인 미확인):** 1 kHz 루프에서 약 1,000주기에 한 번, 50건 처리에 75~115 µs가 걸린다(p50 11~17 µs, p99.9 74~98 µs). 네 조건 모두 같아 커널 선점이 아니라 프로세스 안(IO worker와의 경합, SMT 짝 CPU 10에 오는 스레드 등) 또는 하드웨어 요인으로 보인다. 한 건 최대(H)보다 크다. 10 ms 루프의 묶음 p99.99가 회차에 따라 19~106 µs로 흔들리는 것도 같은 사건이 6,000주기 안에 걸렸는지의 차이다. README에 원인 미확인으로 적었다. 후속 분석 후보(기능 논의).
+- **관찰 — 50건 묶음의 꼬리(원인은 [EV-130](#ev-130): 이 PC의 주기적 코어 감속, dot-logger 무관):** 1 kHz 루프에서 약 1,000주기에 한 번, 50건 처리에 75~115 µs가 걸린다(p50 11~17 µs, p99.9 74~98 µs). 네 조건 모두 같아 커널 선점이 아니라 프로세스 안(IO worker와의 경합, SMT 짝 CPU 10에 오는 스레드 등) 또는 하드웨어 요인으로 보인다. 한 건 최대(H)보다 크다. 10 ms 루프의 묶음 p99.99가 회차에 따라 19~106 µs로 흔들리는 것도 같은 사건이 6,000주기 안에 걸렸는지의 차이다. 처음 README에 원인 미확인으로 적었고, 같은 날 분석으로 고쳤다.
 - **관찰 — 레벨 skip 약 100 ns:** 걸러지는 호출도 시계 두 번을 먼저 읽는다(TASK-042 S1 관찰). 기능 논의 후보.
 - **측정 중 외부 요인(③-b):** sshd 기록 없음, NIC(`enp4s0`) 인터럽트는 CPU 15만. 큰 최대는 회차마다 고르게 나와 단일 사건이 아니다.
 - **재현:** `cargo build --release -p dot-logger --example perf_baseline` 뒤 `CARGO_TARGET_DIR=<target> RT_EXPECT=realtime|generic GOVERNOR_EXPECT=powersave|performance scripts/run-latency.sh /dev/shm <SSD 디렉터리> <출력> 3 60`. 커널 전환은 ADR-011 절차(`scripts/rt-boot.sh generic|once|back`), governor 전환·원복은 Human sudo([TASK-042 ③ 실행 절차](../04_implementation/tasks/TASK-042.md)).
 - **원시 결과:** [perf_runs/task042-2026-11-25](perf_runs/task042-2026-11-25/) — `rt-powersave.jsonl`·`rt-performance.jsonl`·`generic-powersave.jsonl`·`generic-performance.jsonl`(첫 줄 실행 머리줄: 커널·cmdline·governor·EPP·boost·SMT·CPU·git·dirty).
+
+<a id="ev-130"></a>
+### EV-130 — EV-129 50건 묶음 꼬리 원인: 이 PC의 주기적 코어 감속(dot-logger 무관)
+
+- **질문(Human 2026-11-26 「원인 분석 먼저」):** EV-129에서 1 kHz 루프 50건 묶음이 약 1,000주기에 한 번 75~115 µs(p50 11~17 µs)로, 네 조건(RT/generic × governor 2) 모두에서 나왔다. README에는 「원인 미확인」으로 공개했다.
+- **도구(`perf_baseline` 진단, 시험 `latency_rows_time_every_requested_call_by_outcome` 보강):** `DOT_LOGGER_PERF_SLOW_US`를 주면 J 행이 호출마다 시간을 재고, 기준을 넘은 묶음의 주기·시각·seq·묶음 시간·가장 느린 호출과 위치·2 µs 넘는 호출 수·그 주기의 깨어남과 계산(메모리 거의 없는 50 µs 연산) 시간을 미리 할당한 배열(4,096개)에 남긴다. 기준 0으로 모든 주기가 기록되는지 시험한다.
+- **조건:** `7.0.0-44-generic`, `powersave`/EPP `balance_performance`, FIFO 70·CPU 2·mlock, `/dev/shm` 링 1 GiB, 1 kHz·일 50 µs·주기당 50건, 30~60 s. 원시 결과 [perf_runs/task042-diag-2026-11-26](perf_runs/task042-diag-2026-11-26/)(실행 목록 README). SSD 쓰기는 IO 부하 행 2개 약 0.8 GB(삭제).
+
+| 실행 방식 | 실행 | 응답 p99.9 | 응답 최대 | 묶음 p99.9 | 묶음 최대 |
+|---|---|---|---|---|---|
+| 포그라운드(AI 세션이 작업 중) | 10회 — 진단 켬/끔, 원래 바이너리, IO 행 뒤, SMT 짝 강제/제외, 77 °C, 캐시 훑기(CPU 6·CPU 2) | 155~167 µs | 168~366 µs | 31~44 µs | 39~62 µs |
+| 백그라운드(세션 대기, 원래 측정과 같음) | 6회 — 전체 회차, 단독 3, CPU 6 busy, CPU 2 SCHED_IDLE busy | 368~573 µs | 388~619 µs | 83~110 µs | 109~148 µs |
+
+- **느린 주기의 모양:** 한 호출이 멈추는 것이 아니라 50건이 모두 약 4배 느리고 첫 호출이 가장 느리다(가장 느린 호출 3~7 µs). 같은 주기의 **계산이 50 µs → 중앙값 470 µs(약 9배)**, 깨어남 4 → 19 µs. 메모리를 거의 쓰지 않는 연산까지 느려지므로 코어 자체가 느려진 것이다. 대부분 600 ms 간격(예: 주기 561·1161·1761·2361·…)이다.
+- **dot-logger가 아닌 근거:** ① 원래 측정에서 **기록 0건** 1 kHz 행의 응답 p99.9가 네 조건 모두 475~507 µs(p99 79~124 µs) — 같은 감속이 기록 없이도 있다. ② 계산 구간이 9배 느려진다. ③ 커널·governor·CPU 2 사용률(SCHED_IDLE busy로 100 %)·다른 코어 부하와 무관하다.
+- **기각한 가설:** kcompactd 압축(부팅 뒤 compaction·migrate 카운터 0), 열(77 °C 직후 포그라운드에서 없음), SMT 짝 CPU 10의 다른 작업(강제해도 600 ms 사건 없음, 백그라운드에서는 CPU 10이 비어 있어도 있음), 다른 코어나 CPU 2의 캐시 훑기(재현 안 됨), 앞선 행이 남긴 상태(같은 순서를 포그라운드로 재현해도 없음, 백그라운드 단독에서 있음), 사용률이 낮아 클럭이 내려감(CPU 2를 100 %로 해도 남음).
+- **남은 것:** 정확한 기전은 모른다. 이 PC는 CPU·내장 GPU가 한 SoC(Ryzen 7 H 255, Radeon 780M)이고 fclk·socclk·mclk가 동적이다. 기계가 쉬는 동안의 SoC 펌웨어·전원 관리(클럭 전환, SMI 등)로 추정한다. 가리려면 루트 실험이 필요하다(GPU `power_dpm_force_performance_level=high`, GFXOFF 끄기, BIOS 전원 설정) — Human 판단. 다른 PC에서 같은지는 모른다.
+- **판정:** EV-129 50건 묶음 꼬리는 dot-logger 호출 비용이 아니라 측정 PC의 주기적 코어 감속(약 600 ms마다 약 0.5 ms, 약 9배)이 묶음에 걸린 것이다. 감속이 없는 실행에서 1 kHz 50건 묶음 p99.9는 31~36 µs, 최대 39~62 µs(generic·`powersave`, 진단 끔 a3·c1: 32~35 µs·48~54 µs). README 문구를 이에 맞춰 고쳤다. EV-129의 다른 행(H·C1·R·M)은 짧은 실행이라 영향이 작지만 같은 백그라운드 조건이었다 — 최대값에는 이 감속이 섞였을 수 있다.
+- **측정 절차 교훈:** 이 PC의 지연 측정은 실행 방식(세션 작업 중/대기)에 따라 꼬리가 달라진다. 이후 측정은 조건에 실행 방식을 기록하고, 응답 시간(기록 0건 행)으로 감속 사건 유무를 함께 본다.
 
 ## Open Evidence Gaps
 

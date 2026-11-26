@@ -15,13 +15,14 @@
 | 상태 | 39/44 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`1795bc1`, 약 50분, [EV-128](../05_verification/verification_evidence.md#ev-128)). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-26 / #001 — TASK-042 S2 ③-b generic·`performance` 측정·S3 README·EV-129, TASK-042 Done. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
+| 갱신 | 2026-11-26 / #001 — TASK-042 S2 ③-b generic·`performance` 측정·S3 README·EV-129, TASK-042 Done, 50건 묶음 꼬리 원인 분석(EV-130). 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
 | 세션 상태 | **진행 — 2026-11-26 #001(개발).** generic 커널 1회 부팅 중(다음 재부팅은 RT). 다음은 TASK-041 v0.1.1 |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
 
 - **2026-11-23 Human — S2·MS-011 결정:** TASK-024 S2 D1=Docker 쓰기 제한(실행 중 `io.max` 전환에 권한 있는 보조 컨테이너 허용 「privileged 써도 돼」), D2=tc_008 갈음, D3=현재 동작 기록. 외부 관점 지적 3건(RT 수집 비용 숫자·RT 글줄 경로·`Record` derive)을 [MS-011](../04_implementation/milestones/MS-011.md) TASK-042~044로 등록, M1=하나로 묶음·M2=TASK-042는 v0.1.1 전, TASK-042 D1=`powersave`·`performance` 둘 다(전환은 sudo, 실행 때 Human)·D2=자체 숫자만. TASK-043·044 채택은 기능 논의.
+- **2026-11-26 측정 환경 주의(EV-130):** 이 PC의 지연 측정은 AI 세션이 대기 중일 때(백그라운드 실행) 약 600 ms마다 약 0.5 ms 코어가 약 9배 느려지는 사건이 섞인다. 세션이 작업 중일 때는 없다. 지연 측정 조건에 실행 방식을 적고, 기록 0건 행의 응답 시간으로 사건 유무를 본다. 기전(SoC 펌웨어·전원 추정) 확인은 루트 실험이라 Human 판단.
 - **2026-11-23 사고 — 하네스 채움이 호스트 루트에:** S2 하네스 첫 구현의 tmpfs 마운트 경로 오류로 F3 디버그 채움이 T500 루트에 들어가 디스크 경고, 이어 832 GB 파일로 루트 100%(즉시 삭제, `fallocate`라 데이터 쓰기 없음). 채우기 직전 같은 chroot 안에서 tmpfs·크기 확인을 넣었고 본 실행 동안 루트 여유 변화 없음(EV-123).
 
 - **2026-11-21 Human 결정 — 버전·릴리즈 계획([MS-010](../04_implementation/milestones/MS-010.md)):** ① MCAP는 vendor를 별칭 crate로(ADR-010 개정 2) ② 라이브러리 의존성 `^` 범위(ADR-009 개정) ③ v0.1.0은 Gate 5 전 GitHub 미리보기(Gate 5 예외) ④ crates.io는 TASK-026 뒤 ⑤ SemVer·0.x 동일 버전·형식 버전 분리([릴리즈 노트 정책](../07_delivery/release_note.md#버전호환-정책)). 계획은 ADR이 아니라 MS-010에 기록하고(Human 「ADR은 아닌 것 같은데」), 기존 ADR 내용이 바뀌는 ①②만 개정 절로 남겼다. 계기: 워크스페이스 밖 소비자 프로젝트가 vendor 전용 API 때문에 컴파일되지 않음(`E0599`) → [TASK-036](../04_implementation/tasks/TASK-036.md).
@@ -87,7 +88,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 0. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
 1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
-   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**`try_log` 50건 묶음의 드문 꼬리(약 1,000주기에 한 번 75~115 µs, RT·generic 모두, 원인 미확인 — worker 경합·SMT 짝 CPU 후보, EV-129)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
+   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).
 
@@ -137,7 +138,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
-- 2026-11-26 #001 — TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done.
+- 2026-11-26 #001 — TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).
 - 2026-11-25 #001 — 재부팅 뒤 TASK-042 S2 ③-a generic·`powersave` 측정(RT 대비 꼬리 2~3배, TASK-042 문서)(비공개 세션 로그: `session_logs/session_2026-11-25_001.md`).
 - 2026-11-24 #001(~11-25) — CI 근본 수정(RV-199, EV-124)·REV-072 Closed, TASK-024 S5·TASK-038·039·040 Done(EV-125·126), CI 시간 의존 시험 5건 정리·CI 151 → 56분(EV-127·128), TASK-042 D3·S1 하네스·S2 RT 측정 ①②(비공개 세션 로그: `session_logs/session_2026-11-24_001.md`).
 - 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).

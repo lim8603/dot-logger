@@ -308,18 +308,23 @@ For single calls the two kernels agree up to p99.99; the difference is in the
 maximum. In the warm loop, five of the six generic-kernel results (three
 sizes, two governors) exceeded 85 µs, against at most 54 µs on PREEMPT_RT. In
 about one cycle in a thousand, the 50 calls of a cycle take 75–115 µs instead
-of about 11 µs, on both kernels. This is not the cost of `try_log`: while the
-machine is otherwise idle, the measuring core runs about nine times slower for
-about 0.5 ms, mostly every 600 ms, and the same episodes appear in the loop's
-response time when it logs nothing
-([EV-130](.cowork/05_verification/verification_evidence.md#ev-130)). In runs
-while other programs were active, the episodes did not occur and the 1 kHz row
-had a p99.9 of 32–35 µs and a maximum of 48–54 µs (generic kernel,
-`powersave`). With 6,000 cycles per run, the 10 ms loop's p99.99 is close to
-each run's maximum, so it depends on whether a run met one of those cycles.
-Logging does not change the loop's wake-up delay, which comes from the kernel
-and the CPU's idle states. Adding the SSD load raises the 1 kHz row's p99 by
-up to 20 % and its maximum to about 145 µs on both kernels. With the default
+of about 11 µs, on both kernels. On this PC those cycles coincide with a
+periodic slowdown of the measuring core: while the machine is otherwise idle,
+the core runs about nine times slower for about 0.5 ms, mostly every 600 ms,
+and the same episodes appear in the loop's response time when it logs nothing
+([EV-130](.cowork/05_verification/verification_evidence.md#ev-130)). We
+attribute these tails to that slowdown; the runs do not measure how much
+logging adds within such a cycle, and the warm-loop maxima may include the
+same slowdown. In runs while other programs were active, the episodes did not
+occur and the 1 kHz row had a p99.9 of 32–35 µs and a maximum of 48–54 µs
+(generic kernel, `powersave`). With 6,000 cycles per run, the 10 ms loop's
+p99.99 is the largest sample of each run, so it depends on whether a run met
+one of those cycles. In the 10 ms loop, wake-up p50 and p99 were the same with
+no calls, with 50 calls and with the SSD load, on both kernels and both
+governors. In the 1 kHz loop the wake-up p99 moved slightly between those
+three cases (4.5 / 5.2 / 5.5 µs on PREEMPT_RT with `performance`); these runs
+cannot tell whether logging caused that. Adding the SSD load raises the 1 kHz
+row's p99 by up to 20 % and its maximum to about 145 µs on both kernels. With the default
 `powersave` governor, call p50 is 15–45 % higher and p99 about 40 % higher.
 Every row, both governors, the rejection path and multiple writers are in
 [EV-129](.cowork/05_verification/verification_evidence.md#ev-129), together

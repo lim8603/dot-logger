@@ -73,7 +73,7 @@
 | RV-206 | P2 | [soak-mixed.py:215](../../../scripts/soak-mixed.py#L215), [294](../../../scripts/soak-mixed.py#L294), [321](../../../scripts/soak-mixed.py#L321) | 보존·외부 파일 읽기의 실제 커버리지와 손실 판독 실패를 판정하지 않음 | 수용·조치 | Open(CI 대기) |
 | RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용·조치 | Open(CI 대기) |
 | RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용·조치 | Open(CI 대기) |
-| RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용 | Open |
+| RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용·조치 | Open |
 | RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용 | Open |
 | RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용·조치 | Open |
 | RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용·조치 | Open(CI 대기) |
@@ -126,7 +126,7 @@
 
 **[리뷰어]** 10 ms 깨어남 p99는 네 조건 모두에서 기록 0건·50건·SSD 부하가 같은 버킷이다. 1 kHz RT `performance`에서 p99 중앙값은 각각 4.479 / 5.247 / 5.503 µs이며, 최대값도 변한다. 이 정도 차이가 기록에 따른 인과 효과인지 판정할 자료는 없다. `Logging does not change`는 10 ms에서 관측한 p50/p99의 유사성으로 좁히고, EV-130은 해당 PC에서 감속과 동반된 큰 꼬리의 설명으로 쓴다. 10 ms p99.99는 6,000개 중 6,000번째 표본이므로 현 집계에서는 각 회차의 최대다. Warm 최대에도 감속이 겹쳤을 가능성과 RT 두 원시 헤더의 `dirty=true`를 근거에 표시한다. 표 숫자와 generic 5/6 집계는 일치한다.
 
-**[처리담당]** **수용**(2026-11-26). 조치: README 「Logging does not change …」를 10 ms 행에서 관측한 p50/p99 유사성으로 좁히고, EV-130은 이 PC에서 감속과 동반된 큰 꼬리의 설명으로 표현, 10 ms p99.99가 회차 최대와 같다는 점, Warm 최대의 감속 중첩 가능성과 RT 원시 헤더 `dirty=true`를 근거에 표시. 표 숫자는 변경 없음(재측정 없음). v0.1.1 README에 포함.
+**[처리담당]** **수용**(2026-11-26). 조치: README 「Logging does not change …」를 10 ms 행에서 관측한 p50/p99 유사성으로 좁히고, EV-130은 이 PC에서 감속과 동반된 큰 꼬리의 설명으로 표현, 10 ms p99.99가 회차 최대와 같다는 점, Warm 최대의 감속 중첩 가능성과 RT 원시 헤더 `dirty=true`를 근거에 표시. 표 숫자는 변경 없음(재측정 없음). v0.1.1 README에 포함. **조치(2026-11-26):** README 문단 정정 — 꼬리는 「이 PC에서 코어 감속과 겹치며 감속 때문으로 본다, 그 주기 안 기록 몫은 재지 않았고 warm 최대에도 섞였을 수 있다」, 10 ms p99.99 = 회차 최대, 깨어남은 10 ms 루프 네 조건의 p50·p99 동일 관측으로 한정하고 1 kHz p99 차이(4.5 / 5.2 / 5.5 µs)는 인과 판정 불가로 명시. EV-129에 정정 내용과 `dirty: true`(추적 안 한 `__pycache__`, 지금은 `.gitignore`) 근거를 남겼다.
 
 #### RV-210 — 시간에 무관한 handoff 회귀 (P3)
 

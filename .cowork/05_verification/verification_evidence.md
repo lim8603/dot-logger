@@ -2002,6 +2002,8 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **재현:** `cargo build --release -p dot-logger --example perf_baseline` 뒤 `CARGO_TARGET_DIR=<target> RT_EXPECT=realtime|generic GOVERNOR_EXPECT=powersave|performance scripts/run-latency.sh /dev/shm <SSD 디렉터리> <출력> 3 60`. 커널 전환은 ADR-011 절차(`scripts/rt-boot.sh generic|once|back`), governor 전환·원복은 Human sudo([TASK-042 ③ 실행 절차](../04_implementation/tasks/TASK-042.md)).
 - **원시 결과:** [perf_runs/task042-2026-11-25](perf_runs/task042-2026-11-25/) — `rt-powersave.jsonl`·`rt-performance.jsonl`·`generic-powersave.jsonl`·`generic-performance.jsonl`(첫 줄 실행 머리줄: 커널·cmdline·governor·EPP·boost·SMT·CPU·git·dirty).
 
+- **공개 해석 정정(2026-11-26, REV-073 RV-209):** README 지연 문단을 관측 범위로 좁혔다. 숫자는 그대로다(재측정 없음). ① 「`try_log` 비용이 아니다」 → 「이 PC에서 느린 주기가 코어 감속과 겹치며 꼬리를 감속 때문으로 본다. 그 주기 안에서 기록이 더하는 몫은 재지 않았고, warm 최대에도 같은 감속이 섞였을 수 있다」. ② 10 ms p99.99는 6,000표본 중 마지막 표본, 즉 회차 최대다. ③ 「기록이 깨어남 지연을 바꾸지 않는다」 → 10 ms 루프에서 네 조건 모두 기록 0건·50건·SSD 부하의 깨어남 p50·p99가 같았다는 관측으로 한정. 1 kHz의 p99 차이(RT `performance` 4.479 / 5.247 / 5.503 µs)는 기록 때문인지 판정할 자료가 없다고 명시. ①②의 RT 원시 머리줄 `dirty: true`는 위 대상·환경에 적은 추적 안 한 `__pycache__`이고, 지금은 `.gitignore`에 있다.
+
 <a id="ev-130"></a>
 ### EV-130 — EV-129 50건 묶음 꼬리 원인: 이 PC의 주기적 코어 감속(dot-logger 무관)
 

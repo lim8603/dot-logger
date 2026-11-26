@@ -16,7 +16,7 @@
 //! load writes large records to a second output the caller chooses.
 use super::facade::Seq;
 use super::{
-    Error, LatencyHistogram, available_bytes, calibrate, invalid, now_ns, pin, set_fifo,
+    Error, Gate, LatencyHistogram, available_bytes, calibrate, invalid, now_ns, pin, set_fifo,
     sleep_until, work,
 };
 use dot_logger::logger::{
@@ -26,10 +26,7 @@ use dot_logger::logger::{
 use std::{
     hint::black_box,
     path::Path,
-    sync::{
-        Arc, Barrier,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -160,6 +157,23 @@ fn close(session: Session, row: &mut Row) -> Result<(), Error> {
             Ok(())
         }
         other => Err(format!("shutdown: {other:?}").into()),
+    }
+}
+
+/// Sets `stop` when dropped: a measuring thread that returns, fails or
+/// panics always releases the threads waiting on it (REV-073 RV-207).
+struct StopOnDrop<'a>(&'a AtomicBool);
+impl Drop for StopOnDrop<'_> {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+/// Aborts `gate` when dropped before the start, so a party that fails or
+/// panics in setup releases the others; no effect once started.
+struct AbortOnDrop<'a>(&'a Gate);
+impl Drop for AbortOnDrop<'_> {
+    fn drop(&mut self) {
+        self.0.abort();
     }
 }
 
@@ -350,6 +364,9 @@ pub fn sparse(
 /// without pausing until `calls` of them were rejected for `Capacity`.
 pub fn reject(target: Target<'_>, payload: usize, calls: u64, rt: Rt) -> Result<Row, Error> {
     let mut row = Row::default();
+    // Both sessions' shutdowns must succeed; `close` sets `row.success` for
+    // one session only (REV-073 RV-212).
+    let mut success = true;
     for filtered in [true, false] {
         let minimum = filtered.then_some(Level::Error);
         let mut s = session(target, payload, 64, 1, minimum)?;
@@ -370,6 +387,8 @@ pub fn reject(target: Target<'_>, payload: usize, calls: u64, rt: Rt) -> Result<
                             timed(&mut writer, channel, seq, &mut row)?;
                             seq += 1;
                         }
+                        // Same CPU and policy as the calls (REV-073 RV-212).
+                        clock_pairs(&mut row, calls);
                     }
                     Ok(())
                 })
@@ -379,8 +398,9 @@ pub fn reject(target: Target<'_>, payload: usize, calls: u64, rt: Rt) -> Result<
         s.writers.push(writer);
         result?;
         close(s, &mut row)?;
+        success &= row.success;
     }
-    clock_pairs(&mut row, calls);
+    row.success = success;
     Ok(row)
 }
 
@@ -531,8 +551,11 @@ pub fn jitter(
         };
         let j = j_ref;
         let control = &mut control;
+        let stop = &stop;
         let measured = scope
             .spawn(move || -> Result<(), Error> {
+                // The IO load stops however this thread ends (RV-207).
+                let _stop = StopOnDrop(stop);
                 rt.enter(rt.cpu)?;
                 j.work_iterations = calibrate(work_time);
                 let origin = now_ns() + period_ns;
@@ -598,14 +621,14 @@ pub fn jitter(
                 }
                 Ok(())
             })
-            .join()
-            .map_err(|_| "jitter row panicked")?;
+            .join();
         stop.store(true, Ordering::Relaxed);
         let written = match loader {
             Some(loader) => loader.join().map_err(|_| "load panicked")??,
             None => 0,
         };
-        measured.map(|()| written)
+        measured.map_err(|_| "jitter row panicked")??;
+        Ok(written)
     });
     drop(control);
     j.load_records = result?;
@@ -627,18 +650,20 @@ pub fn multi(
 ) -> Result<Vec<Row>, Error> {
     let mut s = session(target, payload, SLOTS, cpus.len(), None)?;
     let channel = s.channel;
-    let start = Arc::new(Barrier::new(cpus.len()));
+    // Every writer passes after its own setup; one that fails or panics
+    // aborts the start instead of leaving the others waiting (RV-207).
+    let start = Gate::new(0, cpus.len());
     let rows = std::thread::scope(|scope| {
         let handles: Vec<_> = s
             .writers
             .iter_mut()
             .zip(cpus)
             .map(|(writer, &cpu)| {
-                let start = start.clone();
+                let start = &start;
                 scope.spawn(move || -> Result<Row, Error> {
-                    rt.enter(cpu)?;
+                    let _abort = AbortOnDrop(start);
+                    start.after(|| rt.enter(cpu))?;
                     let mut row = Row::default();
-                    start.wait();
                     warm_loop(writer, channel, calls, &mut row)?;
                     clock_pairs(&mut row, calls);
                     Ok(row)

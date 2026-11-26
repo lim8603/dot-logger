@@ -20,13 +20,15 @@
 # Environment: RT_KERNEL (default: the newest /boot/vmlinuz-*-realtime),
 # GENERIC_KERNEL (default: the newest /boot/vmlinuz-*-generic),
 # RT_BOOT_LOG (default: .cowork/05_verification/perf_runs/rt-boot/boot.log),
-# GRUB_CFG (default /boot/grub/grub.cfg), RT_BOOT_DRY=1 (no grub-reboot, no
-# reboot; for checking the script).
+# GRUB_CFG (default /boot/grub/grub.cfg), BOOT_DIR (default /boot; kernel
+# images and configs), RT_BOOT_DRY=1 (no grub-reboot, no reboot; for
+# checking the script).
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 log=${RT_BOOT_LOG:-$repo/.cowork/05_verification/perf_runs/rt-boot/boot.log}
 cfg=${GRUB_CFG:-/boot/grub/grub.cfg}
+boot=${BOOT_DIR:-/boot}
 env_file=/boot/grub/grubenv
 dry=${RT_BOOT_DRY:-}
 owner=${SUDO_USER:-$(id -un)}
@@ -72,18 +74,30 @@ ask_reboot() {
 
 # Select `kernel` (realtime or generic flavour) for the next boot only.
 boot_once() {
-  local flavour=$1 kernel=$2
-  if [ -z "$kernel" ] || [ ! -e "/boot/vmlinuz-$kernel" ] || [ ! -e "/boot/initrd.img-$kernel" ]; then
-    say "FAIL: no installed $flavour kernel image and initrd (${kernel:-none})"
+  local flavour=$1 kernel=$2 config rc
+  # Only a plain Ubuntu kernel name of this flavour (REV-073 RV-211).
+  if ! [[ $kernel =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-$flavour$ ]]; then
+    say "FAIL: '${kernel:-none}' is not a $flavour kernel name (x.y.z-n-$flavour)"
     exit 1
   fi
-  if [ "$flavour" = realtime ]; then
-    grep -q '^CONFIG_PREEMPT_RT=y' "/boot/config-$kernel" || {
-      say "FAIL: /boot/config-$kernel lacks CONFIG_PREEMPT_RT=y"
-      exit 1
-    }
-  elif grep -q '^CONFIG_PREEMPT_RT=y' "/boot/config-$kernel"; then
-    say "FAIL: /boot/config-$kernel has CONFIG_PREEMPT_RT=y; not a generic kernel"
+  if [ ! -e "$boot/vmlinuz-$kernel" ] || [ ! -e "$boot/initrd.img-$kernel" ]; then
+    say "FAIL: no installed $flavour kernel image and initrd ($kernel)"
+    exit 1
+  fi
+  config="$boot/config-$kernel"
+  if [ ! -r "$config" ]; then
+    say "FAIL: cannot read $config"
+    exit 1
+  fi
+  # grep: 0 found, 1 not found, 2 read error. Only the expected answer passes.
+  rc=0
+  grep -q '^CONFIG_PREEMPT_RT=y' "$config" || rc=$?
+  if [ "$flavour" = realtime ] && [ "$rc" -ne 0 ]; then
+    say "FAIL: $config lacks CONFIG_PREEMPT_RT=y (grep $rc)"
+    exit 1
+  fi
+  if [ "$flavour" = generic ] && [ "$rc" -ne 1 ]; then
+    say "FAIL: $config is not a readable generic config (grep $rc; 0 = has CONFIG_PREEMPT_RT=y)"
     exit 1
   fi
   # grub-reboot works only if the generated config honours next_entry.
@@ -92,8 +106,10 @@ boot_once() {
     exit 1
   fi
   # submenu id > menuentry id; the recovery entry has its own id.
-  submenu=$(grep -E "^submenu " "$cfg" | grep -o "\\\$menuentry_id_option '[^']*'" | head -1 | cut -d"'" -f2)
-  entry=$(grep -E "^\s+menuentry " "$cfg" | grep -o "\\\$menuentry_id_option 'gnulinux-$kernel-advanced-[^']*'" | head -1 | cut -d"'" -f2)
+  submenu=$(grep -E "^submenu " "$cfg" | grep -o "\\\$menuentry_id_option '[^']*'" | head -1 | cut -d"'" -f2 || true)
+  # The kernel name is compared literally, not as a regex ('.' in versions).
+  entry=$(grep -E "^\s+menuentry " "$cfg" | grep -o "\\\$menuentry_id_option 'gnulinux-[^']*'" \
+    | cut -d"'" -f2 | awk -v p="gnulinux-$kernel-advanced-" 'index($0, p) == 1' | head -1 || true)
   if [ -z "$submenu" ] || [ -z "$entry" ]; then
     say "FAIL: GRUB entry for $kernel not found in $cfg (submenu='$submenu' entry='$entry')"
     exit 1
@@ -119,13 +135,13 @@ once)
   need_root once
   say "=== once"
   facts
-  boot_once realtime "${RT_KERNEL:-$(ls /boot/vmlinuz-*-realtime 2>/dev/null | sed 's|/boot/vmlinuz-||' | sort -V | tail -1)}"
+  boot_once realtime "${RT_KERNEL:-$(ls "$boot"/vmlinuz-*-realtime 2>/dev/null | sed "s|^$boot/vmlinuz-||" | sort -V | tail -1)}"
   ;;
 generic)
   need_root generic
   say "=== generic"
   facts
-  boot_once generic "${GENERIC_KERNEL:-$(ls /boot/vmlinuz-*-generic 2>/dev/null | sed 's|/boot/vmlinuz-||' | sort -V | tail -1)}"
+  boot_once generic "${GENERIC_KERNEL:-$(ls "$boot"/vmlinuz-*-generic 2>/dev/null | sed "s|^$boot/vmlinuz-||" | sort -V | tail -1)}"
   ;;
 back)
   need_root back

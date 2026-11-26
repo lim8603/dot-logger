@@ -71,12 +71,12 @@
 | RV-204 | P2 | [soak-faults.py:674](../../../scripts/soak-faults.py#L674), [698](../../../scripts/soak-faults.py#L698) | F5가 sync 완료 시점의 내구성 하한과 실제 SIGKILL 종료를 확인하지 못함 | 수용·조치(표현 좁힘) | Open(CI 대기) |
 | RV-205 | P2 | [soak-mixed.py:127](../../../scripts/soak-mixed.py#L127), [193](../../../scripts/soak-mixed.py#L193), [323](../../../scripts/soak-mixed.py#L323) | 조회·구독 워커가 중도 종료돼도 누적 성공 표본으로 통과 | 수용·조치 | Open(CI 대기) |
 | RV-206 | P2 | [soak-mixed.py:215](../../../scripts/soak-mixed.py#L215), [294](../../../scripts/soak-mixed.py#L294), [321](../../../scripts/soak-mixed.py#L321) | 보존·외부 파일 읽기의 실제 커버리지와 손실 판독 실패를 판정하지 않음 | 수용·조치 | Open(CI 대기) |
-| RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용 | Open |
-| RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용 | Open |
+| RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용·조치 | Open(CI 대기) |
+| RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용·조치 | Open(CI 대기) |
 | RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용 | Open |
 | RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용 | Open |
-| RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용 | Open |
-| RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용 | Open |
+| RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용·조치 | Open |
+| RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용·조치 | Open(CI 대기) |
 
 ### 개별 지적
 
@@ -114,13 +114,13 @@
 
 **[리뷰어]** M의 한 스레드가 CPU affinity나 FIFO 설정을 실패하면 `start.wait()`에 오지 않는다. 다른 스레드가 고정 인원 barrier를 기다리고 scope가 끝나지 않는다. CPU 일부가 제외된 cpuset에서 성립하는 경로다. 기존 perf의 실패 전파형 `Gate::after`를 재사용할 수 있다. J는 측정 스레드의 `join`이 패닉을 돌려주면 `?`가 `stop.store`를 건너뛴다. IO 부하를 켜면 loader가 종료 신호를 받지 못한 채 scope가 대기한다. 정상·오류·패닉 모두에서 먼저 stop을 게시한 뒤 결과를 반환하고, 작은 오류 주입 시험으로 유한 종료를 확인한다.
 
-**[처리담당]** **수용**(2026-11-26). J의 `join().map_err(..)?`가 `stop.store`보다 앞서는 것과 M의 고정 인원 `Barrier`를 확인했다. 조치: M은 실패 전파형 `Gate::after` 재사용, J는 결과와 무관하게 stop 게시 뒤 반환. 작은 오류 주입으로 유한 종료 확인.
+**[처리담당]** **수용**(2026-11-26). J의 `join().map_err(..)?`가 `stop.store`보다 앞서는 것과 M의 고정 인원 `Barrier`를 확인했다. 조치: M은 실패 전파형 `Gate::after` 재사용, J는 결과와 무관하게 stop 게시 뒤 반환. 작은 오류 주입으로 유한 종료 확인. **조치(2026-11-26):** M은 고정 인원 `Barrier` 대신 `Gate::new(0, n)`과 `Gate::after(|| rt.enter(cpu))`, 스레드 시작 때 `AbortOnDrop` guard를 둬 설정 실패·패닉 모두 다른 writer를 풀어 준다. J 측정 스레드는 시작 때 `StopOnDrop(stop)` guard를 둬 정상·오류·패닉 어느 경우에도 IO 부하 스레드가 종료 신호를 받고, join 결과는 stop 게시와 loader join 뒤에 판정한다. 시험 `latency_rows_end_when_a_measuring_thread_fails`(tc_012): M에 온라인이 아닌 CPU 1000(affinity 오류), J에 CPU 집합 밖 100000(`CpuSet` 패닉)과 IO 부하 — 각각 60 s 안에 오류로 끝나야 함. 수정 전 Red(M 60 s 초과), 수정 후 Green(0.32 s). 두 Rust Clippy `-D warnings` Pass.
 
 #### RV-208 — 지연 러너의 입력과 결과 증거 (P2)
 
 **[리뷰어]** 커널 확인은 sysfs와 config를 모두 읽었을 때만 realtime으로 보고, 파일이 없거나 읽기 실패면 generic으로 기록한다. 러너는 현재 checkout의 HEAD와 `crates scripts` 변경 상태를 쓰지만 실행 파일의 출처는 기록하지 않는다. 이전 release 바이너리, 또는 `Cargo.lock` 변경도 clean 출력과 공존할 수 있다. `reps=0`이면 헤더만 쓰고 끝나며, 하네스가 JSON으로 내는 `success=false`도 러너 종료 값에 반영되지 않는다. 미확인 커널은 실패시키고 양수 행 수·행별 성공과 표본 수를 확인하며, 바이너리 hash/빌드 revision과 잠금 파일까지 기록한다. CPU 2를 확인하는 governor 가드는 M 행에서 사용하는 다른 CPU까지 확인하지 않으므로 전체 governor가 다를 때는 행 조건을 검증하거나 메타데이터 범위를 명시한다.
 
-**[처리담당]** **수용**(2026-11-26). 조치: 커널 판별 불가 시 실패, 양수 행 수·행별 `success`·표본 수 확인 후 러너 종료 값 반영, 바이너리 hash·빌드 revision·`Cargo.lock` 상태 기록, M 행 CPU들의 governor 확인 또는 메타데이터 범위 명시.
+**[처리담당]** **수용**(2026-11-26). 조치: 커널 판별 불가 시 실패, 양수 행 수·행별 `success`·표본 수 확인 후 러너 종료 값 반영, 바이너리 hash·빌드 revision·`Cargo.lock` 상태 기록, M 행 CPU들의 governor 확인 또는 메타데이터 범위 명시. **조치(2026-11-26):** 커널은 `/sys/kernel/realtime`과 읽을 수 있는 config가 일치할 때만 realtime/generic, 그 밖(config 읽기 불가·불일치)은 `unknown`으로 실패. `reps`·`jitter_s` 양의 정수 검사. governor는 CPU 2가 아니라 **모든 CPU**가 기대값이어야 실행. 러너가 `perf_baseline`을 직접 빌드(`PERF_BASELINE` 지정 시 `built: prebuilt`)하고 머리줄에 바이너리 경로·sha256·빌드 방식, dirty 범위에 `Cargo.lock`·`Cargo.toml` 추가. 행마다 종료 코드 0·출력 줄 전부 `success == true`·어느 히스토그램이든 표본 > 0이어야 하고(실패 행 출력도 로그에 남김), 끝에 `LatencyRunEnd`(행 수 = `reps × 15`) 기록·불일치 시 실패. 확인: 행 판정 필터 5경우(성공·`success:false`·표본 0·중첩 count·빈 출력), 이 PC(generic)에서 `RT_EXPECT=realtime` 거절·governor 불일치 거절·`reps=0` 거절. 측정 행은 실행하지 않음.
 
 #### RV-209 — README의 지연 인과 해석 (P2)
 
@@ -138,13 +138,13 @@
 
 **[리뷰어]** `rt-boot.sh generic`은 config에 RT 설정이 있는지만 검사한다. config 누락이나 grep 읽기 실패도 통과해 `next_entry` 변경까지 갈 수 있다. config 읽기 성공과 허용한 커널 이름을 먼저 확인하고 GRUB ID는 리터럴로 대조한다. 정상 경로는 boot log와 `next_entry` 대조가 있고, 기본 GRUB 설정은 쓰지 않는다.
 
-**[처리담당]** **수용**(2026-11-26). generic 분기의 `grep -q`가 config 누락·읽기 실패에도 통과하는 것을 확인했다. 조치: config 읽기 성공과 허용 커널 이름을 먼저 확인하고 GRUB ID를 리터럴로 대조. 재부팅·`next_entry` 변경 없이 dry-run 경로로 검증.
+**[처리담당]** **수용**(2026-11-26). generic 분기의 `grep -q`가 config 누락·읽기 실패에도 통과하는 것을 확인했다. 조치: config 읽기 성공과 허용 커널 이름을 먼저 확인하고 GRUB ID를 리터럴로 대조. 재부팅·`next_entry` 변경 없이 dry-run 경로로 검증. **조치(2026-11-26):** `boot_once`가 커널 이름을 `x.y.z-n-<flavour>` 형식으로 제한, config 읽기 가능 여부를 먼저 확인하고 `grep` 종료 코드(0 있음·1 없음·2 오류)를 구분해 generic은 1만 통과. GRUB 항목 ID는 정규식이 아니라 `gnulinux-<kernel>-advanced-` 리터럴 접두로 대조(`awk index`). 일치 없음이 `pipefail`로 메시지 없이 끝나던 경로에 `|| true`를 둬 FAIL을 남긴다. 확인용 `BOOT_DIR` 환경 변수(기본 `/boot`) 추가. dry-run(가짜 boot·grub.cfg) 7경우: generic 정상(정규식이면 걸렸을 미끼 `7X0.0-44-generic`을 건너뜀), realtime 이름 거절, RT config인 generic 이름 거절, config 읽기 불가·없음 거절, 이름에 `;` 거절, realtime 정상.
 
 #### RV-212 — R 행의 시계 대조와 종료 결과 (P3)
 
 **[리뷰어]** R 행의 `clock_pairs`는 측정 스레드를 join한 뒤 호출자에서 실행돼 헤더가 말하는 같은 CPU·동일 FIFO 조건의 대조가 아니다. 시계 대조를 측정 스레드로 옮기고, R 두 세션의 shutdown 성공을 각각 보존한다(`close`가 현재 공유 `row.success`를 두 번 덮는다).
 
-**[처리담당]** **수용**(2026-11-26). 조치: R 행 시계 대조를 측정 스레드(같은 CPU·FIFO)로 옮기고, 두 세션의 shutdown 성공을 각각 보존. 재측정은 하지 않으며 README 숫자에 R 행은 없다.
+**[처리담당]** **수용**(2026-11-26). 조치: R 행 시계 대조를 측정 스레드(같은 CPU·FIFO)로 옮기고, 두 세션의 shutdown 성공을 각각 보존. 재측정은 하지 않으며 README 숫자에 R 행은 없다. **조치(2026-11-26):** `clock_pairs`를 거절 세션의 측정 스레드 안(같은 CPU·정책, 호출 직후)으로 옮기고, 두 세션의 shutdown 성공을 `success &=`로 모아 마지막에 기록. 기존 시험 `latency_rows_time_every_requested_call_by_outcome`(R 시계 200쌍·성공) Pass.
 
 ### 후속
 

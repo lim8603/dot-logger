@@ -1043,3 +1043,71 @@ fn latency_rows_time_every_requested_call_by_outcome() {
     assert_eq!(m.len(), 2);
     assert!(m.iter().all(|w| w.accepted.count() == 1000 && w.success));
 }
+
+/// Runs `f` on its own thread and fails the test if it has not returned
+/// within `limit`: a row that hangs must not hang the test run.
+fn within<T: Send + 'static>(limit: Duration, f: impl FnOnce() -> T + Send + 'static) -> T {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    match rx.recv_timeout(limit) {
+        Ok(value) => value,
+        Err(e) => panic!("latency row did not end in time: {e}"),
+    }
+}
+
+/// REV-073 RV-207: a measuring thread that fails its setup (M: a CPU that
+/// is not online) or panics (J: a CPU past the CPU set, with the IO load on)
+/// ends the row with an error in bounded time.
+#[test]
+fn latency_rows_end_when_a_measuring_thread_fails() {
+    let rt = Rt { cpu: 0, fifo: None };
+    let m = within(Duration::from_secs(60), move || {
+        let run = RunDir::create(std::path::Path::new("/dev/shm")).unwrap();
+        let out = run.path().join("out-000");
+        std::fs::create_dir(&out).unwrap();
+        let target = Target {
+            dir: &out,
+            ring: 64 << 20,
+        };
+        multi(target, 16, 1000, &[0, 1000], rt)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    });
+    assert!(m.is_err(), "{m:?}");
+    let j = within(Duration::from_secs(60), move || {
+        let run = RunDir::create(std::path::Path::new("/dev/shm")).unwrap();
+        let out = run.path().join("out-000");
+        let load = run.path().join("load-000");
+        std::fs::create_dir(&out).unwrap();
+        std::fs::create_dir(&load).unwrap();
+        let target = Target {
+            dir: &out,
+            ring: 64 << 20,
+        };
+        let io = IoLoad {
+            dir: &load,
+            bytes: 64,
+            per_second: 1000,
+        };
+        let panics = Rt {
+            cpu: 100_000,
+            fifo: None,
+        };
+        jitter(
+            target,
+            64,
+            Duration::from_millis(2),
+            20,
+            Duration::from_micros(100),
+            5,
+            Some(io),
+            None,
+            panics,
+        )
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+    });
+    assert!(j.unwrap_err().contains("panicked"));
+}

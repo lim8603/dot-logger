@@ -11,12 +11,12 @@
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
 | 활성 Task | **다음 세션: InfluxDB 연동 시험·샘플 코드 논의**(2026-11-26 Human 지시, Task 미등록) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(태그는 Human 확인 뒤, InfluxDB 작업과의 순서는 논의 때) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | **[REV-073 요청](../05_verification/reviews/REV-073_REQUEST.md) — 리뷰 대기**(REV-072 이후 `f30ae5a..2632b6c` 독립 리뷰, 별도 리뷰 세션). REV-001~072 Closed |
+| 미처리 리뷰 | **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Open** — Conditional, P1 1건·P2 7건·P3 3건(RV-202~212). REV-001~072 Closed |
 | 상태 | 39/44 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`2632b6c` run `45796420659` 19개 작업, 약 56분, 2026-11-26). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-26 / #001 — TASK-042 S2 ③-b generic·`performance` 측정·S3 README·EV-129, TASK-042 Done, 50건 묶음 꼬리 원인 분석(EV-130). 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
-| 세션 상태 | **마감 — 2026-11-26 #001(개발).** generic 커널 1회 부팅 중(다음 재부팅은 RT, governor `powersave` 원복 확인). CI `45796420659` Pass. 다음 세션: InfluxDB 연동 시험·샘플 코드 논의. REV-073은 별도 리뷰 세션 |
+| 갱신 | 2026-11-26 / #002 — REV-073 독립 리뷰, CI 19/19 Pass 확인, RV-202~212 등록. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
+| 세션 상태 | **마감 — 2026-11-26 #002(리뷰).** generic 커널 1회 부팅 중(다음 재부팅은 RT, governor `powersave` 원복 확인). REV-073 Open, CI `45796420659` 19/19 Pass. 다음 세션은 InfluxDB 연동 시험·샘플 코드 논의 |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -81,13 +81,13 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
 | [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 및 조치 보충 리뷰 | **Closed** | 1차 `RV-171~188`([EV-111](../05_verification/verification_evidence.md#ev-111))·보충 `RV-189~192`(`9622e94`, [EV-112](../05_verification/verification_evidence.md#ev-112)) 조치. 2026-11-21 Human 수락 |
 | [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Closed** | 9건 수용(RV-196 범위 확대, RV-201 `version`은 MS-010 3단계로)·조치([EV-122](../05_verification/verification_evidence.md#ev-122)). 새로 켠 macOS·Windows 시험 중 플랫폼 차이 3건(f9·f11·f15)은 해당 플랫폼으로 한정. RV-199 후속 macOS viewer 회귀 수정(EV-124). 2026-11-24 CI run `45370553005` 16개 Pass로 위임 수락 Closed |
-| [REV-073 요청](../05_verification/reviews/REV-073_REQUEST.md) | `f30ae5a..2632b6c` — REV-072 조치 독립 확인, 시간 의존 시험 수정의 검출력, CI shard·Miri 축소, soak·장애·지연 하네스 판정, README 지연 수치·해석, `rt-boot.sh generic`(5대 중점) | **Requested** | 2026-11-26 요청서 작성. 리뷰 세션이 `REV-073_<목적>.md`(RV-202~)를 쓰고 여기를 갱신 |
+| [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) | `f30ae5a..2632b6c` — 플랫폼 후속·시험 검출력·CI·하네스·README 지연 수치 | **Open** | Conditional. RV-202 F3 채움·삭제 경로(P1), RV-203~209 하네스 판정·종료·증거와 공개 해석(P2), RV-210~212 회귀·실행 확인(P3). CI 19/19 Pass |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **다음 세션 시작(2026-11-26 Human):** ① ~~CI run `45796420659`(`2632b6c`)~~ — 2026-11-26 19개 작업 모두 Pass ② **InfluxDB 연동 시험·샘플 코드 작성 논의**(범위·Task 등록·TASK-041과의 순서). 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 별도 리뷰 세션에서 받는다.
+0. **다음 세션 시작(2026-11-26 Human):** ① ~~CI run `45796420659`(`2632b6c`)~~ — 2026-11-26 19개 작업 모두 Pass ② **InfluxDB 연동 시험·샘플 코드 작성 논의**(범위·Task 등록·TASK-041과의 순서). 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
 0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
 1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
@@ -139,6 +139,8 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 리스크 RSK-001~007은 [risk_register](../02_project_definition/risk_register.md) 유지. 특히 borrowed API의 실제 앱 수명 적합성, MCAP active reader/인덱스 예산, DB timestamp 충돌, gRPC 복사 비용은 해당 Task에서 검증한다.
 
 ## 최근 작업·이력
+
+- 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
 
 - 2026-11-26 #001 — REV-073 리뷰 요청서(`f30ae5a..2632b6c`)·세션 마감. TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).
 - 2026-11-25 #001 — 재부팅 뒤 TASK-042 S2 ③-a generic·`powersave` 측정(RT 대비 꼬리 2~3배, TASK-042 문서)(비공개 세션 로그: `session_logs/session_2026-11-25_001.md`).

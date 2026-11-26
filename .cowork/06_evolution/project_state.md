@@ -9,13 +9,13 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
-| 활성 Task | **다음 세션: InfluxDB 연동 시험·샘플 코드 논의**(2026-11-26 Human 지시, Task 미등록) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(태그는 Human 확인 뒤, InfluxDB 작업과의 순서는 논의 때) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. [MS-012](../04_implementation/milestones/MS-012.md) InfluxDB 연동 재검증과 사용 안내 Planned(2026-11-26 설계·M1·M2 승인). MS-009 Done |
+| 활성 Task | **진행 중: REV-073 반입·조치 → MS-012 [TASK-045](../04_implementation/tasks/TASK-045.md)(v2 실DB 재검증·`Writer` 예제)·[046](../04_implementation/tasks/TASK-046.md)(v3 Core 호환)·[047](../04_implementation/tasks/TASK-047.md)(장시간 DB 단절) → TASK-041**(2026-11-26 Human: 시험 3종·`Writer` 예제·v0.1.1 전·Docker) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(REV-073·MS-012 뒤, 태그는 Human 확인 뒤) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
 | 미처리 리뷰 | **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Open** — Conditional, P1 1건·P2 7건·P3 3건(RV-202~212). REV-001~072 Closed |
-| 상태 | 39/44 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`2632b6c` run `45796420659` 19개 작업, 약 56분, 2026-11-26). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 상태 | 39/47 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`2632b6c` run `45796420659` 19개 작업, 약 56분, 2026-11-26). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-26 / #002 — REV-073 독립 리뷰, CI 19/19 Pass 확인, RV-202~212 등록. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
+| 갱신 | 2026-11-26 / #003 — InfluxDB 논의, MS-012·TASK-045~047 설계·승인, REV-073 반입 착수. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
 | 세션 상태 | **마감 — 2026-11-26 #002(리뷰).** generic 커널 1회 부팅 중(다음 재부팅은 RT, governor `powersave` 원복 확인). REV-073 Open, CI `45796420659` 19/19 Pass. 다음 세션은 InfluxDB 연동 시험·샘플 코드 논의 |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
@@ -57,7 +57,10 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | 다음 작업(TASK-042 2026-11-26 Done). 태그는 Human 확인 뒤 |
+| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | AI | Planned | 2026-11-26 | REV-073 조치 뒤 S1 |
+| TASK-046 | InfluxDB 3 Core 호환 확인 | AI | Planned | 2026-11-26 | TASK-045 뒤 |
+| TASK-047 | 장시간 DB 단절 시험 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정 |
+| TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-26 | REV-073·MS-012 뒤. 태그는 Human 확인 뒤 |
 | TASK-043 | RT용 미룬 서식 로그 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
 | TASK-044 | `Record` derive 또는 prost 연동 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
@@ -87,9 +90,9 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **다음 세션 시작(2026-11-26 Human):** ① ~~CI run `45796420659`(`2632b6c`)~~ — 2026-11-26 19개 작업 모두 Pass ② **InfluxDB 연동 시험·샘플 코드 작성 논의**(범위·Task 등록·TASK-041과의 순서). 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
+0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
 0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
-1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
+1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **REV-073 반입·조치 → MS-012(TASK-045~047)**(2026-11-26) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).
@@ -101,7 +104,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 선택 로딩
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
-- [MS 목록](../04_implementation/milestone_registry.md): 11개 MS, [Task 목록](../04_implementation/task_registry.md): 44개 Task(TASK-018 Cancelled). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
+- [MS 목록](../04_implementation/milestone_registry.md): 12개 MS, [Task 목록](../04_implementation/task_registry.md): 47개 Task(TASK-018 Cancelled). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
 - [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 8 + CON 7 = 34행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
 - 2026-10-26 조사(비공개 원시 근거: `imported_context/research_2026-10-26_detailed_design.md`): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.

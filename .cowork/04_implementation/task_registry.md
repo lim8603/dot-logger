@@ -55,10 +55,13 @@
 | TASK-038 | calibrate 여유 공간 시험 간헐 실패 견고화 | MS-007 | INT-001 | US-004 | AI | Done | 2026-11-24 | Done — `84d247b`, 18/1000 → 0/1000(EV-121). CI run `45370553005`(`641929c`) 16개 작업 모두 Pass | 없음 | [상세](tasks/TASK-038.md) | 0.25 |
 | TASK-039 | 대표 부하의 할당 경로 확인 | MS-007 | INT-001 | US-001 | AI | Done | 2026-11-24 | Done(EV-125) — 대표 부하에서 RT 제어·프레임 스레드 할당·해제 0, host 10,011/s·IO 3,158/s. soak `run`에 RT heap 0 판정 추가 | 없음 | [상세](tasks/TASK-039.md) | 0.5~1 |
 | TASK-040 | 조회·전송을 섞은 장시간 실행 | MS-007 | INT-001 | US-002·003 | AI | Done | 2026-11-25 | 4h 혼합 실행(외부 조회·구독 2·상태·이벤트 보호) 12/13 Pass, 1건 하네스 크기 오류 수정([EV-126](../05_verification/verification_evidence.md#ev-126)). 24h는 T8 | TASK-024 S4 | [상세](tasks/TASK-040.md) | 0.5+실행 |
-| TASK-041 | v0.1.1 패치 릴리즈 | MS-010 | INT-001 | US-001·003 | AI | Planned | 2026-11-23 | macOS·Windows 파일 출력 수정(ADR-009 개정 2)·24h 결과. 태그는 Human 확인 뒤 | TASK-037 | [상세](tasks/TASK-041.md) | 0.5 |
+| TASK-041 | v0.1.1 패치 릴리즈 | MS-010 | INT-001 | US-001·003 | AI | Planned | 2026-11-26 | macOS·Windows 파일 출력 수정(ADR-009 개정 2)·24h 결과·REV-073 조치·MS-012 InfluxDB 결과. 태그는 Human 확인 뒤 | TASK-037·MS-012 | [상세](tasks/TASK-041.md) | 0.5 |
 | TASK-042 | `try_log` 지연 분포 측정과 README 공개 | MS-011 | INT-001 | US-001·004 | AI | Done | 2026-11-26 | D1=둘 다·D2=A·D3=A. S1 하네스·S2 4개 조건(RT/generic × `powersave`/`performance`)·S3 README 요약 5행, [EV-129](../05_verification/verification_evidence.md#ev-129). 50건 묶음 드문 꼬리는 이 PC의 주기적 코어 감속([EV-130](../05_verification/verification_evidence.md#ev-130), dot-logger 무관). 레벨 skip 비용은 기능 논의 안건. 외부 관점 지적 1(RT 로거 비교 입장권) | TASK-024 S2, TASK-039(하네스 공유) | [상세](tasks/TASK-042.md) | 1.5~2.5+실행 |
 | TASK-043 | RT용 미룬 서식 로그(서식 id + 인자) | MS-011 | INT-001 | US-001·002 | AI | Planned | 2026-11-23 | 0.2 후보. MS-010 2단계 전 기능 논의에서 채택 → 설계·ADR | 기능 논의 | [상세](tasks/TASK-043.md) | 4~7+ADR |
 | TASK-044 | `Record` derive 또는 prost 연동 | MS-011 | INT-001 | US-001 | AI | Planned | 2026-11-23 | 0.2 후보. 기능 논의에서 A(prost)/B(derive)/C 결정 | 기능 논의 | [상세](tasks/TASK-044.md) | 2~4 |
+| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | REV-073 조치 뒤 S1 기준선 재실행(두 Rust). D1=A crate 예제·D2=A 현재 API(2026-11-26 Human) | REV-073 조치 | [상세](tasks/TASK-045.md) | 0.5~1 |
+| TASK-046 | InfluxDB 3 Core 호환 확인 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-045 뒤. v3 digest 고정·쓰기 호환·Flux 조회 여부, 지원표 | TASK-045 | [상세](tasks/TASK-046.md) | 0.5~1.5 |
+| TASK-047 | 장시간 DB 단절 시험 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정(DB 경로·장애 길이·판정). pause·stop·network disconnect | REV-073 RV-202~204·TASK-045 | [상세](tasks/TASK-047.md) | 1.5~2.5+실행 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

@@ -289,6 +289,36 @@ hardware):
 | 256-byte records, 10,000 per second, 60,000 in total | All acknowledged by the receiver; acknowledgement p99 4.12 ms |
 | 8 MiB records over gRPC | 115.9–116.4 MB/s, 99–100 % of a raw TCP baseline |
 
+Latency of `try_log` on the same PC (AMD Ryzen 7 H 255, SMT and boost on,
+`performance` CPU governor). The calling thread runs at `SCHED_FIFO` 70,
+pinned to one core, with its memory locked, and records go to a 1 GiB ring on
+tmpfs. Each figure is the median of three runs; the maximum is the largest of
+the three. Call times include the two clock reads around the call, which take
+about 20 ns.
+
+| Measurement | PREEMPT_RT kernel: p50 / p99 / p99.99 / max | Generic kernel: p50 / p99 / p99.99 / max |
+|---|---|---|
+| One 256-byte call in a warm loop (10 million calls) | 251 / 375 / 4,031 / 49,361 ns | 263 / 375 / 3,711 / 122,739 ns |
+| One 256-byte call after a 32 MiB cache sweep (20,000 calls) | 767 / 1,407 / 6,655 / 19,466 ns | 831 / 1,311 / 6,271 / 8,476 ns |
+| 50 calls in one cycle of a 1 kHz control loop (60,000 cycles) | 11.0 / 15.1 / 92.2 / 116.7 µs | 11.0 / 14.6 / 86.0 / 115.6 µs |
+| 50 calls in one cycle of a 10 ms control loop (6,000 cycles) | 11.5 / 17.9 / 102.4 / 106.2 µs | 11.8 / 22.0 / 31.1 / 34.7 µs |
+| Wake-up delay of the 10 ms loop, with the 50 calls and another thread logging 6.5 MB/s to an SSD | 23.0 / 112.6 / 116.7 / 117.3 µs | 23.0 / 112.6 / 116.7 / 195.8 µs |
+
+For single calls the two kernels agree up to p99.99; the difference is in the
+maximum. In the warm loop, five of the six generic-kernel results (three
+sizes, two governors) exceeded 85 µs, against at most 54 µs on PREEMPT_RT. In
+about one cycle in a thousand, the 50 calls of a cycle take 75–115 µs instead
+of about 11 µs, on both kernels; the cause has not been identified yet. With
+6,000 cycles per run, the 10 ms loop's p99.99 is close to each run's maximum,
+so it depends on whether a run met one of those cycles. Logging does not
+change the loop's wake-up delay, which comes from the kernel and the CPU's
+idle states. Adding the SSD load raises the 1 kHz row's p99 by up to 20 % and
+its maximum to about 145 µs on both kernels. With the default `powersave`
+governor, call p50 is 15–45 % higher and p99 about 40 % higher. Every row,
+both governors, the rejection path and multiple writers are in
+[EV-129](.cowork/05_verification/verification_evidence.md#ev-129), together
+with the raw results and the commands to reproduce them.
+
 ## Development
 
 The development toolchain is Rust 1.96.0 (`rust-toolchain.toml`); the minimum

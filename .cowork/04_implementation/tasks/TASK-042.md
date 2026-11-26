@@ -8,9 +8,9 @@
 | 설계 | [MS-011](../milestones/MS-011.md) · [API §18](../../03_design_artifacts/interface_contract.md#13-상세-api-설계안) · [TASK-022 local-pc-v1](TASK-022.md) |
 | ADR | ADR-011(현재 PC 실측·RT 부팅 절차) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | Done |
 | 마지막 갱신일 | 2026-11-26 |
-| 다음 액션 | S3 README·EV(D3: H·C1·J 요약 3~5행, 전 행은 EV·perf_runs). 순서: TASK-041(v0.1.1) 전 |
+| 다음 액션 | 없음 — Done(2026-11-26, [EV-129](../../05_verification/verification_evidence.md#ev-129)). 다음은 TASK-041(v0.1.1). 50건 묶음 꼬리·레벨 skip 비용은 기능 논의 안건 |
 | 의존 | TASK-024 S2(같은 PC·RT 측정 창 겹치지 않게), TASK-039와 하네스 공유 |
 | 예상 소요 | 1.5~2.5 인일 + 실행(각 10~15분 이하) |
 
@@ -38,7 +38,7 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 | S0 | 결정 | 아래 D1~D3 Human 결정 | Done — D1·D2 2026-11-23, D3 2026-11-25 |
 | S1 | 하네스 | `examples/support/perf`의 `call_cost`·`LatencyHistogram` 확장(최대·꼬리 분위수·식은 캐시·지터 행), JSON 원시 결과 | Done — `b94964b`·`0012ef8`(아래) |
 | S2 | 실행 | 행 H~M, 각 10~15분 이하, 반복 3회, 원시 결과를 `05_verification/perf_runs/`에 | Done — ①·② RT(2026-11-25), ③-a generic·`powersave`(2026-11-25), ③-b generic·`performance`(2026-11-26) |
-| S3 | 공개 | README 「Verification」에 조건·방법이 붙은 표(비교 대상 수치는 출처·환경이 다르면 같은 표에 섞지 않음), EV, 추적표 NFR-001 | Planned |
+| S3 | 공개 | README 「Verification」에 조건·방법이 붙은 표(비교 대상 수치는 출처·환경이 다르면 같은 표에 섞지 않음), EV, 추적표 NFR-001 | Done — 2026-11-26, 아래 |
 
 ## 결정(Human, 2026-11-23 「D1은 둘 다, D2는 A」, 2026-11-25 D3 「A. 요약 3~5행」)
 
@@ -50,10 +50,10 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 
 ## 완료 기준
 
-- [ ] 조건(하드웨어·커널·governor·크기·반복)과 방법이 함께 적힌 분포 표가 README에 있다.
-- [ ] 최대값과 식은 캐시 행이 포함된다.
-- [ ] 제어 루프 지터에서 기록 유무 차이가 분포로 보고된다.
-- [ ] 원시 결과·EV·재현 명령이 있다.
+- [x] 조건(하드웨어·커널·governor·크기·반복)과 방법이 함께 적힌 분포 표가 README에 있다.
+- [x] 최대값과 식은 캐시 행이 포함된다.
+- [x] 제어 루프 지터에서 기록 유무 차이가 분포로 보고된다(README는 결론 문장, 0건·50건 분포는 EV-129).
+- [x] 원시 결과·EV·재현 명령이 있다([EV-129](../../05_verification/verification_evidence.md#ev-129)).
 
 ## S1 하네스 — 2026-11-25
 
@@ -138,5 +138,14 @@ RT 로거는 호출 한 번의 지연 분포로 비교된다(NanoLog·Quill·LTT
 - `performance`에서도 ③-a와 같은 모양이다 — p50·p99·p99.99는 두 커널이 거의 같고(일부 행은 generic이 조금 낮음), 차이는 최대에서 난다. 호출 최대는 RT 약 40~50 µs, generic 약 80~140 µs(2~3배, R 거절은 5 µs 대 80 µs).
 - 가장 큰 차이는 1 kHz 루프 깨어남(IO 부하) 최대 729 µs — 주기 1 ms·일 50 µs라 놓침은 없었지만 RT(72 µs)의 약 10배다. 3회 중 2회째의 단일 사건이다(나머지 42·91 µs, p99.99는 세 회 모두 약 28 µs).
 - 같은 generic 커널에서 `powersave`(③-a) → `performance`로 J 10 ms 50건 묶음(IO)의 p99.99·최대가 100 µs대에서 30 µs로 줄었다. 반면 호출 최대는 governor와 무관하게 100 µs대로 남는다 — 호출 최대를 정하는 것은 커널(선점)이고 governor가 아니다.
+- 측정 중 외부 접속 없음: sshd 기록이 측정 구간에 없다(192.168.0.135 접속은 측정 전 17:28·17:29). 유선 NIC(`enp4s0`) 인터럽트는 모두 CPU 15라 측정 CPU 2·SMT 짝 10과 겹치지 않는다. 큰 최대는 1·2·3회 모두에 고르게 나와 단일 사건이 아니다(Human 질문으로 확인).
 - 원시 결과 `perf_runs/task042-2026-11-25/generic-performance.jsonl`(같은 디렉터리에 4개 조건). IO 부하 출력 2.3 GB(`/data/db/task042-load`)는 삭제.
 - 원복: 측정 뒤 Human이 governor `powersave`·EPP `balance_performance`로 되돌렸고 AI가 16개 모두 확인했다(「③ 실행 절차」 4단계). 다음 재부팅은 기본 항목(RT 커널).
+
+## S3 공개 — 2026-11-26
+
+- README 「Verification」에 요약 5행(D3: H·C1·J), 두 커널 열, `performance` 기준. 조건(CPU·SMT·boost·governor·FIFO 70·고정 CPU·mlock·tmpfs 링)·집계(3회 중앙값, 최대는 3회 중 최대)·시계 두 번 포함을 표 위에 적었다. 비교 대상 수치는 넣지 않았다(D2).
+- 행 선택: J는 처음에 SSD 부하가 있는 10 ms 묶음 행을 골랐으나, 부하 없는 같은 행의 꼬리가 더 크다(RT p99.99 102 µs 대 24 µs)는 것을 보고 유리한 행만 싣지 않도록 바꿨다 — 1 kHz(60,000주기)·10 ms(6,000주기) 묶음을 부하 없이 싣고, 부하의 영향(1 kHz p99 최대 +20 %, 최대 약 145 µs)은 문장으로, 깨어남 행은 50건 + SSD 부하로 실었다.
+- 문장으로 적은 것: 단일 호출의 커널 차이는 최대뿐(H에서 generic 6개 중 5개가 85 µs 초과, RT 최대 54 µs), 약 1,000주기에 한 번 50건 묶음이 75~115 µs(두 커널, 원인 미확인), 기록은 깨어남 지연을 바꾸지 않음, `powersave`의 p50 15~45 %·p99 약 40 % 증가. 수치는 집계 스크립트 결과와 대조했다.
+- 전 행·4개 조건·관찰·재현 명령은 [EV-129](../../05_verification/verification_evidence.md#ev-129). 추적표 NFR-001에 MS-011 행을 더했다.
+- 기능 논의 안건으로 올린 것: ① 50건 묶음의 드문 75~115 µs 꼬리 원인(worker 경합·SMT 짝 CPU 등) ② 레벨 skip 호출의 시계 읽기 약 100 ns.

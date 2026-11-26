@@ -448,6 +448,19 @@ def assert_tmpfs(args, soak, parent):
         raise RuntimeError(f"refusing to fill {parent}: {kind}, {total} bytes")
 
 
+# F3 fill and cleanup scripts: the tmpfs-checked directory is "$1", never
+# text in the script, so spaces or glob characters cannot move the target
+# (REV-073 RV-202). Both only touch `fill-*` directly below it.
+TAKE_INODES = ('i=0; while [ "$i" -lt 1000 ] && touch -- "$1/fill-$i" 2>/dev/null; '
+               'do i=$((i+1)); done')
+REMOVE_FILLS = 'rm -f -- "$1"/fill-*'
+
+
+def fill_argv(script, parent):
+    """`sh` running `script` with `parent` as its single argument."""
+    return ["sh", "-c", script, "sh", str(parent)]
+
+
 def tmpfs_free(soak, parent):
     df = soak.exec("df", "-B1", "--output=avail", str(parent)).split()
     return int(df[-1])
@@ -485,7 +498,8 @@ def f3a(args, out):
     during = soak.last_sample()
     deleted_all = closed_bytes(soak, parent) == 0
     phase(marks, "free")
-    soak.exec("sh", "-c", f"rm -f {fill}-*")
+    assert_tmpfs(args, soak, parent)
+    soak.exec(*fill_argv(REMOVE_FILLS, parent))
     freed_at = now()
     wait_samples(soak, 15)
     settled = soak.last_sample()
@@ -531,8 +545,7 @@ def f3b(args, out):
     wait_samples(soak, args.pre)
     phase(marks, "take all inodes")
     assert_tmpfs(args, soak, parent)
-    soak.exec("sh", "-c", f"i=0; while [ $i -lt 1000 ] && touch {parent}/fill-$i 2>/dev/null; "
-              "do i=$((i+1)); done")
+    soak.exec(*fill_argv(TAKE_INODES, parent))
     free_bytes = tmpfs_free(soak, parent)
     poisoned_at = None
     end_wait = now() + args.f3_fault
@@ -544,7 +557,8 @@ def f3b(args, out):
     phase(marks, "poisoned" if poisoned_at else "not poisoned in time")
     at_poison = soak.last_sample()
     # Give the inodes back: the output stays failed for the session.
-    soak.exec("sh", "-c", f"rm -f {parent}/fill-*")
+    assert_tmpfs(args, soak, parent)
+    soak.exec(*fill_argv(REMOVE_FILLS, parent))
     phase(marks, "inodes freed")
     wait_samples(soak, 20)
     later = soak.last_sample()

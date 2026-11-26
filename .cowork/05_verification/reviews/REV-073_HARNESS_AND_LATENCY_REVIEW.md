@@ -5,7 +5,7 @@
 | 일자 / 리뷰어 | 2026-11-26 / Codex |
 | 대상 | [REV-073 요청](REV-073_REQUEST.md), `f30ae5a..2632b6c`. TASK-024 S2, TASK-038~040, TASK-042 및 CI |
 | 종합 판정 | **Conditional** |
-| 상태 | **Open — 반입 완료(11건 수용, 2026-11-26), 조치 중** |
+| 상태 | **Closed**(2026-11-26 위임 수락 — 11건 수용·조치, [EV-131](../verification_evidence.md#ev-131), CI run `45822618242` 19/19 Pass) |
 | 범위 | `.cowork/` 밖 44개 파일(+3,277/−188). EV·Task 문서는 대조 근거로 사용 |
 
 ## 1. 요약정리
@@ -66,17 +66,17 @@
 
 | ID | 중요도 | 위치 | 문제 | 처리담당 판정 | 상태 |
 |---|---|---|---|---|---|
-| RV-202 | **P1** | [soak-faults.py:488](../../../scripts/soak-faults.py#L488), [534](../../../scripts/soak-faults.py#L534), [547](../../../scripts/soak-faults.py#L547) | tmpfs 확인을 거친 경로를 shell에서 다시 분리·확장해 채움·삭제 대상이 달라질 수 있음 | 수용·조치 | Open(CI 대기) |
-| RV-203 | P2 | [soak-faults.py:241](../../../scripts/soak-faults.py#L241), [387](../../../scripts/soak-faults.py#L387), [784](../../../scripts/soak-faults.py#L784) | F2a Gap 누락, 힙 증거 누락, producer 오류가 Pass 가능 | 수용·조치 | Open(CI 대기) |
-| RV-204 | P2 | [soak-faults.py:674](../../../scripts/soak-faults.py#L674), [698](../../../scripts/soak-faults.py#L698) | F5가 sync 완료 시점의 내구성 하한과 실제 SIGKILL 종료를 확인하지 못함 | 수용·조치(표현 좁힘) | Open(CI 대기) |
-| RV-205 | P2 | [soak-mixed.py:127](../../../scripts/soak-mixed.py#L127), [193](../../../scripts/soak-mixed.py#L193), [323](../../../scripts/soak-mixed.py#L323) | 조회·구독 워커가 중도 종료돼도 누적 성공 표본으로 통과 | 수용·조치 | Open(CI 대기) |
-| RV-206 | P2 | [soak-mixed.py:215](../../../scripts/soak-mixed.py#L215), [294](../../../scripts/soak-mixed.py#L294), [321](../../../scripts/soak-mixed.py#L321) | 보존·외부 파일 읽기의 실제 커버리지와 손실 판독 실패를 판정하지 않음 | 수용·조치 | Open(CI 대기) |
-| RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용·조치 | Open(CI 대기) |
-| RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용·조치 | Open(CI 대기) |
-| RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용·조치 | Open |
-| RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용·조치 | Open(CI 대기) |
-| RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용·조치 | Open |
-| RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용·조치 | Open(CI 대기) |
+| RV-202 | **P1** | [soak-faults.py:488](../../../scripts/soak-faults.py#L488), [534](../../../scripts/soak-faults.py#L534), [547](../../../scripts/soak-faults.py#L547) | tmpfs 확인을 거친 경로를 shell에서 다시 분리·확장해 채움·삭제 대상이 달라질 수 있음 | 수용·조치 | Closed |
+| RV-203 | P2 | [soak-faults.py:241](../../../scripts/soak-faults.py#L241), [387](../../../scripts/soak-faults.py#L387), [784](../../../scripts/soak-faults.py#L784) | F2a Gap 누락, 힙 증거 누락, producer 오류가 Pass 가능 | 수용·조치 | Closed |
+| RV-204 | P2 | [soak-faults.py:674](../../../scripts/soak-faults.py#L674), [698](../../../scripts/soak-faults.py#L698) | F5가 sync 완료 시점의 내구성 하한과 실제 SIGKILL 종료를 확인하지 못함 | 수용·조치(표현 좁힘) | Closed |
+| RV-205 | P2 | [soak-mixed.py:127](../../../scripts/soak-mixed.py#L127), [193](../../../scripts/soak-mixed.py#L193), [323](../../../scripts/soak-mixed.py#L323) | 조회·구독 워커가 중도 종료돼도 누적 성공 표본으로 통과 | 수용·조치 | Closed |
+| RV-206 | P2 | [soak-mixed.py:215](../../../scripts/soak-mixed.py#L215), [294](../../../scripts/soak-mixed.py#L294), [321](../../../scripts/soak-mixed.py#L321) | 보존·외부 파일 읽기의 실제 커버리지와 손실 판독 실패를 판정하지 않음 | 수용·조치 | Closed |
+| RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용·조치 | Closed |
+| RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용·조치 | Closed |
+| RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용·조치 | Closed |
+| RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용·조치 | Closed |
+| RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용·조치 | Closed |
+| RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용·조치 | Closed |
 
 ### 개별 지적
 
@@ -152,4 +152,4 @@ F3 경로가 안전하게 처리되기 전에는 이 하네스로 채움 시험�
 
 **[처리담당] 반입(2026-11-26):** 11건 모두 코드에서 지적 위치를 확인하고 수용했다. 조치 순서: RV-202(P1) → RV-203·204(장애 하네스, TASK-047 선행) → RV-205·206(혼합 하네스, T8 24h에 반영) → RV-207·208·212(지연 하네스) → RV-209(README, v0.1.1) → RV-210·211. 검증은 판정 함수의 짧은 실패 fixture와 오류 주입으로 하고, 장시간 soak·채움·재부팅·지연 재측정은 하지 않는다(README 표 숫자 변경 없음).
 
-**[처리담당] 조치 완료(2026-11-26):** RV-202~212 11건 조치. 로컬: Rust 1.96.0·1.85.0 workspace all-features 각 **750 Pass·실패 0·5 ignored**, 두 Rust workspace Clippy(all targets/features, `-D warnings`)·fmt Pass, `scripts/test_soak_harness.py` 21건·`test_check_integration_surface.py` Pass. 짧은 실제 확인: F5 1회(`/dev/shm`), 혼합 2분(`/dev/shm`). 장시간 soak·F3 채움·재부팅·지연 재측정은 실행하지 않음. 남은 것: 푸시 뒤 CI Pass 확인 → 위임 수락·Closed.
+**[처리담당] 조치 완료(2026-11-26):** RV-202~212 11건 조치. 로컬: Rust 1.96.0·1.85.0 workspace all-features 각 **750 Pass·실패 0·5 ignored**, 두 Rust workspace Clippy(all targets/features, `-D warnings`)·fmt Pass, `scripts/test_soak_harness.py` 21건·`test_check_integration_surface.py` Pass. 짧은 실제 확인: F5 1회(`/dev/shm`), 혼합 2분(`/dev/shm`). 장시간 soak·F3 채움·재부팅·지연 재측정은 실행하지 않음. CI run `45822618242`(`e2e30fa`) 19/19 Pass → 위임 수락·Closed([EV-131](../verification_evidence.md#ev-131)).

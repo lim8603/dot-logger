@@ -2023,6 +2023,15 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **판정:** EV-129 50건 묶음 꼬리는 dot-logger 호출 비용이 아니라 측정 PC의 주기적 코어 감속(약 600 ms마다 약 0.5 ms, 약 9배)이 묶음에 걸린 것이다. 감속이 없는 실행에서 1 kHz 50건 묶음 p99.9는 31~36 µs, 최대 39~62 µs(generic·`powersave`, 진단 끔 a3·c1: 32~35 µs·48~54 µs). README 문구를 이에 맞춰 고쳤다. EV-129의 다른 행(H·C1·R·M)은 짧은 실행이라 영향이 작지만 같은 백그라운드 조건이었다 — 최대값에는 이 감속이 섞였을 수 있다.
 - **측정 절차 교훈:** 이 PC의 지연 측정은 실행 방식(세션 작업 중/대기)에 따라 꼬리가 달라진다. 이후 측정은 조건에 실행 방식을 기록하고, 응답 시간(기록 0건 행)으로 감속 사건 유무를 함께 본다.
 
+
+<a id="ev-131"></a>
+### EV-131 — REV-073 조치: 장애·혼합·지연 하네스 판정, 러너·부팅 스크립트 입력, README 지연 해석
+
+- **대상:** [REV-073](reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) RV-202~212(P1 1·P2 7·P3 3) 전부 수용·조치. 커밋 `7224a60`(RV-202)·`bc14a50`(203·204)·`4dab67e`(205·206)·`ee9e47e`(207·208·211·212)·`9f7de65`(209)·`6caa227`(210). 제품 라이브러리 코드 변경 없음 — 하네스(`soak-faults.py`·`soak-mixed.py`·`examples/soak.rs`·`examples/support/perf/latency.rs`)·러너(`run-latency.sh`)·부팅 스크립트(`rt-boot.sh`)·클라이언트 단위 시험·README 문단·CI 자가 시험 단계.
+- **검출력(Red → Green 또는 변이):** `scripts/test_soak_harness.py` 21건(CI `integration-surface`에 단계 추가) — F3 경로 인수(공백·glob), 공통 필수 검사·F2a Gap·F5 sync 시각, 혼합 워커 timeout·예외·조용한 `tail` 종료, 꼬리·보호 창·reader 범위. tc_012 `latency_rows_end_when_a_measuring_thread_fails`(M 오프라인 CPU·J 패닉, 수정 전 60 s 초과). 클라이언트 `handoff_on_a_closed_connection_reports_unsettled_acks_as_unknown`(변이 Fail). 러너 행 필터 5경우·사전 검사 3경우, `rt-boot.sh` dry-run 7경우.
+- **짧은 실제 실행(`/dev/shm`, SSD 쓰기 없음):** F5 1회(`--no-rt`, 7 s) Pass — SIGKILL 인식, sync 6회, 하한 4,950 ≤ 복구 15,100. 혼합 2분(링 2 GiB, `--events 40,60,20`, reader 20 s, status 10 s) Pass — 보호 중 창 1개 온전, 상태 12회, reader 6회차 85 파일, 손실 판독 오류 0. 링 256 MiB로 잘못 잡은 첫 혼합 실행은 기록 실패 202,313건을 새 판정이 Fail로 잡음(시험 조건 오류).
+- **회귀:** 로컬 Rust 1.96.0·1.85.0 workspace all-features 각 **750 Pass·실패 0·5 ignored**, 두 Rust workspace Clippy(all targets/features, `-D warnings`)·fmt Pass. **CI run `45822618242`**(`e2e30fa`, workflow_dispatch — 푸시 HEAD가 `[skip ci]`라 수동 실행) **19/19 Pass**(2026-11-26 12:45~13:35 UTC), 새 자가 시험 단계 성공.
+- **범위·한계:** 장시간 soak·F3 채움·재부팅·지연 재측정은 하지 않았다. 기존 EV-123(F1~F5)·EV-126(혼합 4h)·EV-129(지연)는 당시 판정이며 각 EV에 보강 사실을 적었다. T8 24h 재검증은 보강된 판정으로 한다. README 지연 표 숫자는 변경 없음.
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

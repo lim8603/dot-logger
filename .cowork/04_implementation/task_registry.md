@@ -59,7 +59,7 @@
 | TASK-042 | `try_log` 지연 분포 측정과 README 공개 | MS-011 | INT-001 | US-001·004 | AI | Done | 2026-11-26 | D1=둘 다·D2=A·D3=A. S1 하네스·S2 4개 조건(RT/generic × `powersave`/`performance`)·S3 README 요약 5행, [EV-129](../05_verification/verification_evidence.md#ev-129). 50건 묶음 드문 꼬리는 이 PC의 주기적 코어 감속([EV-130](../05_verification/verification_evidence.md#ev-130), dot-logger 무관). 레벨 skip 비용은 기능 논의 안건. 외부 관점 지적 1(RT 로거 비교 입장권) | TASK-024 S2, TASK-039(하네스 공유) | [상세](tasks/TASK-042.md) | 1.5~2.5+실행 |
 | TASK-043 | RT용 미룬 서식 로그(서식 id + 인자) | MS-011 | INT-001 | US-001·002 | AI | Planned | 2026-11-23 | 0.2 후보. MS-010 2단계 전 기능 논의에서 채택 → 설계·ADR | 기능 논의 | [상세](tasks/TASK-043.md) | 4~7+ADR |
 | TASK-044 | `Record` derive 또는 prost 연동 | MS-011 | INT-001 | US-001 | AI | Planned | 2026-11-23 | 0.2 후보. 기능 논의에서 A(prost)/B(derive)/C 결정 | 기능 논의 | [상세](tasks/TASK-044.md) | 2~4 |
-| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | REV-073 조치 뒤 S1 기준선 재실행(두 Rust). D1=A crate 예제·D2=A 현재 API(2026-11-26 Human) | REV-073 조치 | [상세](tasks/TASK-045.md) | 0.5~1 |
+| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | 다음 — S1 기준선 재실행(두 Rust, REV-073 Closed). D1=A crate 예제·D2=A 현재 API(2026-11-26 Human) | REV-073 조치 | [상세](tasks/TASK-045.md) | 0.5~1 |
 | TASK-046 | InfluxDB 3 Core 호환 확인 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-045 뒤. v3 digest 고정·쓰기 호환·Flux 조회 여부, 지원표 | TASK-045 | [상세](tasks/TASK-046.md) | 0.5~1.5 |
 | TASK-047 | 장시간 DB 단절 시험 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정(DB 경로·장애 길이·판정). pause·stop·network disconnect | REV-073 RV-202~204·TASK-045 | [상세](tasks/TASK-047.md) | 1.5~2.5+실행 |
 

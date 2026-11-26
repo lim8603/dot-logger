@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. [MS-012](../04_implementation/milestones/MS-012.md) InfluxDB 연동 재검증과 사용 안내 Planned(2026-11-26 설계·M1·M2 승인). MS-009 Done |
-| 활성 Task | **진행 중: REV-073 조치 완료·CI 대기 → MS-012 [TASK-045](../04_implementation/tasks/TASK-045.md)(v2 실DB 재검증·`Writer` 예제)·[046](../04_implementation/tasks/TASK-046.md)(v3 Core 호환)·[047](../04_implementation/tasks/TASK-047.md)(장시간 DB 단절) → TASK-041**(2026-11-26 Human: 시험 3종·`Writer` 예제·v0.1.1 전·Docker) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(REV-073·MS-012 뒤, 태그는 Human 확인 뒤) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Open — 11건 수용·조치 완료(2026-11-26), CI 확인 대기** — 로컬 두 Rust 각 750 Pass·Clippy·자가 시험 Pass. CI Pass 뒤 위임 수락·Closed. REV-001~072 Closed |
-| 상태 | 39/47 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`2632b6c` run `45796420659` 19개 작업, 약 56분, 2026-11-26). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
+| 활성 Task | **다음: MS-012 TASK-045 S1**(REV-073 Closed 2026-11-26) · 계획: REV-073 조치 → MS-012 [TASK-045](../04_implementation/tasks/TASK-045.md)(v2 실DB 재검증·`Writer` 예제)·[046](../04_implementation/tasks/TASK-046.md)(v3 Core 호환)·[047](../04_implementation/tasks/TASK-047.md)(장시간 DB 단절) → TASK-041**(2026-11-26 Human: 시험 3종·`Writer` 예제·v0.1.1 전·Docker) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(REV-073·MS-012 뒤, 태그는 Human 확인 뒤) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 미처리 리뷰 | 없음 — **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Closed**(2026-11-26 위임 수락: RV-202~212 조치 [EV-131](../05_verification/verification_evidence.md#ev-131), CI run `45822618242` 19/19 Pass). REV-001~073 Closed |
+| 상태 | 39/47 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`e2e30fa` run `45822618242` 19개 작업, 약 50분, 2026-11-26 — REV-073 조치). 최신 회귀 [EV-131](../05_verification/verification_evidence.md#ev-131): 두 Rust 각 750 Pass·5 ignored(이전 EV-115 742), Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-26 / #003 — InfluxDB 논의, MS-012·TASK-045~047 설계·승인, REV-073 반입·조치(RV-202~212), 출력 구성 기능 안건 기록. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
-| 세션 상태 | **마감 — 2026-11-26 #002(리뷰).** generic 커널 1회 부팅 중(다음 재부팅은 RT, governor `powersave` 원복 확인). REV-073 Open, CI `45796420659` 19/19 Pass. 다음 세션은 InfluxDB 연동 시험·샘플 코드 논의 |
+| 세션 상태 | **마감 — 2026-11-26 #003(개발·논의).** generic 커널 1회 부팅 상태(다음 재부팅은 RT), governor `powersave`. REV-073 Closed, CI `45822618242` 19/19 Pass. 다음 세션은 TASK-045 S1(v2.9.1 실DB 재실행) |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -57,7 +57,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
-| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | AI | Planned | 2026-11-26 | REV-073 조치 뒤 S1 |
+| TASK-045 | v2 실DB 재검증과 `Writer` 예제 | AI | Planned | 2026-11-26 | 다음 — S1 v2.9.1 실DB 재실행(REV-073 Closed) |
 | TASK-046 | InfluxDB 3 Core 호환 확인 | AI | Planned | 2026-11-26 | TASK-045 뒤 |
 | TASK-047 | 장시간 DB 단절 시험 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정 |
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-26 | REV-073·MS-012 뒤. 태그는 Human 확인 뒤 |
@@ -70,27 +70,14 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | ID | 범위 | 상태 | 현재 처리/후속 |
 |---|---|---|---|
 | REV-001~058 | 완료된 core·파일·조회·운영·facade·preset·통합 가드 및 ADR-013 A/B/C 개발 자가검토 | Closed | 회차별 근거는 [리뷰 문서](../05_verification/reviews/)(EV-082~085). native·실앱·성능 이월은 각 Task에 유지 |
-| [REV-059](../05_verification/reviews/REV-059_NATIVE_REVISION_LOSS_REVIEW.md) | `fa72a1a..5be17b5` 통합 코드리뷰·후속 `ca89b69` 조치 | **Closed** | RV-149~152 전부 수용·수정·자가검토·위임 수락(EV-086). 복구 완결·손실 관측·종료 경계·등록 검증, 두 Rust 각672 Pass·5 ignored |
-| [REV-060](../05_verification/reviews/REV-060_RUNTIME_CONFIG_D.md) | WIP36c1724 기반 runtime D 개발 자가검토·제품3254b81 | **Closed** | RV-153 pending 보존/기한·RV-154 무대기 ack 조치·위임 수락(EV-087), 두 Rust 각684·18 feature·Miri13·표면35/60 Pass |
-| [REV-061](../05_verification/reviews/REV-061_ADR_013_E.md) | ADR-013 E 최종 통합·tracing 경합/패닉 복구 회귀 | **Closed** | EV-088, RV-155 두 변이 Red·현행 Green, 기존 위임 수락 |
-| [REV-062](../05_verification/reviews/REV-062_DOT_LOGGER_NAMESPACE.md) | .logger 예약 토픽·호스트 예제·standard/2 | **Closed** | EV-090, 두 Rust 각685 Pass·CLI/Foxglove 확인 |
-| [REV-063](../05_verification/reviews/REV-063_TASK_031_LIVE_VIEWER.md) | TASK-031 S2 WS bridge·카탈로그·ACK/수명 | **Closed** | EV-092·위임 로컬 수락. Foxglove 실시간·T7 정량 잔여 |
-| [REV-064](../05_verification/reviews/REV-064_TASK_031_MCAP_COMPATIBILITY.md) | TASK-031 S3 MCAP 등록 배치 | **Closed** | EV-093·위임 로컬 수락 |
-| [REV-065](../05_verification/reviews/REV-065_TASK_031_QUERY_REPLAY.md) | TASK-031 S3 원격 기록 재생 | **Closed** | EV-094·위임 로컬 수락 |
-| [REV-066](../05_verification/reviews/REV-066_RUNTIME_NAMESPACE_VIEWER_REVIEW.md) | Viewer 구독·재생 수명, MCAP 등록 검증, IO 작업자 실패 처리 | **Closed** | RV-156~159 수정·자가검토·위임 수락([EV-095](../05_verification/verification_evidence.md#ev-095)) |
-| [REV-067](../05_verification/reviews/REV-067_TASK_031_T7_STORAGE.md) | T7 저장 시작·동시 부하 | **Closed** | RV-160·161 Closed. 손실 checkpoint 0 행 생략 뒤 8 GiB P3·P5 Pass(EV-101·103) |
-| [REV-068](../05_verification/reviews/REV-068_TASK_031_T7_ACK_CRC.md) | T7 마감 변경(0 행 생략·묶음 ACK·CRC) | **Closed** | RV-162 ACK 기한 starvation 조치·위임 수락 |
-| [REV-069](../05_verification/reviews/REV-069_T7_STORAGE_REMOTE_ACK_CRC_REVIEW.md) | `b016fe8..98aa5bd` T7 저장·0 행 생략·묶음/파이프라인 ACK·CRC-32 독립 리뷰 | **Closed** | RV-163~165 수용(RV-164 일부 조정)·`0a9bc4d` 수정·위임 수락([EV-106](../05_verification/verification_evidence.md#ev-106)) |
-| [REV-070](../05_verification/reviews/REV-070_TASK_032_DASHBOARD.md) | TASK-032 viewer 내장 대시보드 S2·S3 (`0a9bc4d..97ece7f`) | **Closed** | RV-166~170 수용(RV-170 기준 조정)·`007b25c` 수정·위임 수락([EV-109](../05_verification/verification_evidence.md#ev-109)) |
-| [REV-071](../05_verification/reviews/REV-071_WHOLE_CODEBASE_GATE4_REVIEW.md) | 코드 전체 독립 리뷰 — 많이 지적된 3개 영역·보안·신뢰성 및 조치 보충 리뷰 | **Closed** | 1차 `RV-171~188`([EV-111](../05_verification/verification_evidence.md#ev-111))·보충 `RV-189~192`(`9622e94`, [EV-112](../05_verification/verification_evidence.md#ev-112)) 조치. 2026-11-21 Human 수락 |
-| [REV-072](../05_verification/reviews/REV-072_POST_GATE4_PLATFORM_SOAK_S2_REVIEW.md) | `ae22f9d..f30ae5a` 코드 변경 및 TASK-024 S2 설계 독립 리뷰(5대 중점) | **Closed** | 9건 수용(RV-196 범위 확대, RV-201 `version`은 MS-010 3단계로)·조치([EV-122](../05_verification/verification_evidence.md#ev-122)). 새로 켠 macOS·Windows 시험 중 플랫폼 차이 3건(f9·f11·f15)은 해당 플랫폼으로 한정. RV-199 후속 macOS viewer 회귀 수정(EV-124). 2026-11-24 CI run `45370553005` 16개 Pass로 위임 수락 Closed |
-| [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) | `f30ae5a..2632b6c` — 플랫폼 후속·시험 검출력·CI·하네스·README 지연 수치 | **Open** | Conditional. RV-202 F3 채움·삭제 경로(P1), RV-203~209 하네스 판정·종료·증거와 공개 해석(P2), RV-210~212 회귀·실행 확인(P3). CI 19/19 Pass |
+| REV-059~072 | 네이티브 복구·runtime·ADR-013 E·`.logger`·viewer·MCAP·재생·T7 저장/ACK/CRC·대시보드·전체 코드·Gate 4 뒤 플랫폼/soak 리뷰 | **Closed** | 회차별 처리·EV는 각 [리뷰 문서](../05_verification/reviews/). 표 원문은 [상태 아카이브](state_archive.md) #035 |
+| [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) | `f30ae5a..2632b6c` — 플랫폼 후속·시험 검출력·CI·하네스·README 지연 수치 | **Closed** | 11건 수용·조치([EV-131](../05_verification/verification_evidence.md#ev-131)), CI run `45822618242` 19/19 Pass로 위임 수락 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
 ## 다음 시작점
 
-0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 11건 조치·커밋, 푸시 뒤 CI 확인 → Closed → 다음은 TASK-045 S1(v2.9.1 실DB 재실행, 두 Rust). 출력 구성 기능 안건은 아래 상세 절(우려 검토 대기). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
+0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 Closed(EV-131, CI 19/19) → **다음은 TASK-045 S1**(v2.9.1 실DB 재실행, 두 Rust: `python3 scripts/check-influxdb.py --pipeline-example --toolchain <tc> --output <비공개 폴더>`). 출력 구성 기능 안건은 아래 상세 절(우려 검토 대기). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
 0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
 1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **REV-073 반입·조치 → MS-012(TASK-045~047)**(2026-11-26) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·**출력 구성 선택·네트워크 전용 연구 모드(2026-11-26 Human R1~R3, 아래 [상세](#기능-논의-안건-상세--출력-구성-선택과-네트워크-전용-모드-2026-11-26) — 우려 검토 뒤 MS/Task화)**·B1/B2.
@@ -99,7 +86,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ### 기능 논의 안건 상세 — 출력 구성 선택과 네트워크 전용 모드 (2026-11-26)
 
-계기: InfluxDB 논의 중 Human이 연구개발용 구조를 제안. 상태: **안건(우려 검토 중)** — MS/Task·ADR 전. 다음 행동: 아래 우려 C1~C11을 Human과 검토 → 범위·순서 결정 → MS 등록·ADR.
+계기: InfluxDB 논의 중 Human이 연구개발용 구조를 제안. 상태: **안건(우려 검토 중)** — MS/Task·ADR 전. MS로 등록할 때 이 절을 MS 문서로 옮긴다(project_state 크기 경고선 초과의 주원인). 다음 행동: 아래 우려 C1~C11을 Human과 검토 → 범위·순서 결정 → MS 등록·ADR.
 
 **요구(Human):**
 - **R1 출력 선택:** 시작 때 옵션 파일로 파일·네트워크·DB를 배타적으로 또는 동시에 선택.
@@ -189,11 +176,9 @@ C5·C6·C8·C9·C11은 위 표의 질문으로 검토한다. 검토 시점: REV-
 
 ## 최근 작업·이력
 
+- 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
 - 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
 
 - 2026-11-26 #001 — REV-073 리뷰 요청서(`f30ae5a..2632b6c`)·세션 마감. TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).
-- 2026-11-25 #001 — 재부팅 뒤 TASK-042 S2 ③-a generic·`powersave` 측정(RT 대비 꼬리 2~3배, TASK-042 문서)(비공개 세션 로그: `session_logs/session_2026-11-25_001.md`).
-- 2026-11-24 #001(~11-25) — CI 근본 수정(RV-199, EV-124)·REV-072 Closed, TASK-024 S5·TASK-038·039·040 Done(EV-125·126), CI 시간 의존 시험 5건 정리·CI 151 → 56분(EV-127·128), TASK-042 D3·S1 하네스·S2 RT 측정 ①②(비공개 세션 로그: `session_logs/session_2026-11-24_001.md`).
-- 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).
 
-완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033·#034 및 관련 EV·세션 로그에 보존한다.
+완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033~035 및 관련 EV·세션 로그에 보존한다.

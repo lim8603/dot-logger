@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -152,6 +153,122 @@ class SyncCompletions(unittest.TestCase):
 
     def test_no_sync_yet(self):
         self.assertEqual(faults.sync_completions([sample(100), sample(300)]), [])
+
+
+mixed = load("soak_mixed", "soak-mixed.py")
+
+
+def fake_cli(directory, body):
+    """A stand-in for the `dot-logger` CLI: an sh script with `body`."""
+    path = Path(directory) / "fake-cli"
+    path.write_text("#!/bin/sh\n" + body + "\n")
+    path.chmod(0o755)
+    return path
+
+
+class FakeArgs:
+    def __init__(self, cli):
+        self.cli, self.port = cli, 1
+
+
+class MixedWorkers(unittest.TestCase):
+    """RV-205: a worker that dies or hangs can no longer pass."""
+
+    def test_status_timeout_is_recorded_and_fails(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH, prefix="rv205-") as tmp:
+            # First call answers, every later call hangs past the timeout.
+            cli = fake_cli(tmp, 'if [ -f "$0.done" ]; then sleep 5; '
+                                'else touch "$0.done"; fi')
+            status = mixed.Status(FakeArgs(cli), 0.05, timeout=0.3)
+            status.start()
+            deadline = time.monotonic() + 10
+            while len(status.calls) < 3 and time.monotonic() < deadline:
+                time.sleep(0.05)
+            status.finish()
+            self.assertGreaterEqual(len(status.calls), 3, status.calls)
+            self.assertEqual(status.calls[0]["code"], 0)
+            self.assertIn("timeout", status.calls[1]["error"])
+            ok, _ = mixed.judge_status(status, expected=3)
+            self.assertFalse(ok)
+
+    def test_status_too_few_calls_fails(self):
+        status = mixed.Status(FakeArgs("unused"), 60)
+        status.calls = [{"code": 0, "ms": 1.0}]
+        self.assertFalse(mixed.judge_status(status, expected=10)[0])
+        status.calls = [{"code": 0, "ms": 1.0}] * 10
+        self.assertTrue(mixed.judge_status(status, expected=10)[0])
+
+    def test_finish_stops_a_quiet_subscriber(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH, prefix="rv205-") as tmp:
+            cli = fake_cli(tmp, "exec sleep 60")
+            sub = mixed.Subscriber(FakeArgs(cli), Path(tmp), "control", [])
+            sub.start()
+            time.sleep(0.5)
+            started = time.monotonic()
+            sub.finish()
+            self.assertLess(time.monotonic() - started, 5)
+            self.assertFalse(sub.is_alive())
+            self.assertFalse(sub.join_timed_out)
+
+    def test_subscriber_error_is_recorded(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH, prefix="rv205-") as tmp:
+            # A record line without `data` breaks the reader loop.
+            cli = fake_cli(tmp, 'echo \'{"kind":"record"}\'; exec sleep 60')
+            sub = mixed.Subscriber(FakeArgs(cli), Path(tmp), "control", [])
+            sub.start()
+            deadline = time.monotonic() + 5
+            while not sub.errors and time.monotonic() < deadline:
+                time.sleep(0.05)
+            sub.finish()
+            self.assertTrue(sub.errors)
+
+
+class KeptRecords(unittest.TestCase):
+    """RV-206: both channels' suffix and live protection windows."""
+
+    side = mixed.EVENT_SIDE_S * mixed.CONTROL_HZ
+
+    def test_review_counterexample_fails(self):
+        ok, _ = mixed.judge_kept({"control": [[4999, 4999]], "frames": []},
+                                 {"control": 5000, "frames": 10},
+                                 [{"ok": True, "control": 2500, "n": 1, "t_ms": 1}], [],
+                                 hold_s=3600, seconds=10)
+        self.assertFalse(ok)
+
+    def test_frame_suffix_required(self):
+        ok, note = mixed.judge_kept({"control": [[0, 4999]], "frames": [[0, 7]]},
+                                    {"control": 5000, "frames": 10}, [], [],
+                                    hold_s=60, seconds=10)
+        self.assertFalse(ok)
+        self.assertIn("frames", note)
+
+    def test_active_window_must_be_whole(self):
+        n = 1_000_000
+        mark = {"ok": True, "control": 600_000, "n": 2, "t_ms": 120_000}
+        runs = {"control": [[600_000 - self.side, 600_000 + 10], [700_000, n - 1]],
+                "frames": [[0, 99]]}
+        counts = {"control": n, "frames": 100}
+        # Even marks are held: still protected at the end of a 200 s run.
+        ok, note = mixed.judge_kept(runs, counts, [mark], [], hold_s=600, seconds=200)
+        self.assertFalse(ok, note)
+        runs["control"][0] = [600_000 - self.side, 600_000 + self.side]
+        ok, note = mixed.judge_kept(runs, counts, [mark], [], hold_s=600, seconds=200)
+        self.assertTrue(ok, note)
+        # The same partial window is fine once the hold has expired.
+        runs["control"][0] = [600_000 - self.side, 600_000 + 10]
+        ok, note = mixed.judge_kept(runs, counts, [mark], [], hold_s=30, seconds=200)
+        self.assertTrue(ok, note)
+
+    def test_reader_coverage(self):
+        good = {"passes": 10, "failed_passes": 0,
+                "total": {"files": 30, "control": 10, "frames": 5, "loss_errors": 0}}
+        self.assertTrue(mixed.judge_reader(0, good, expected=10)[0])
+        for bad in ({**good, "passes": 3},
+                    {**good, "total": {**good["total"], "files": 0}},
+                    {**good, "total": {**good["total"], "control": 0}},
+                    {**good, "total": {**good["total"], "loss_errors": 1}}):
+            self.assertFalse(mixed.judge_reader(0, bad, expected=10)[0], bad)
+        self.assertFalse(mixed.judge_reader(1, good, expected=10)[0])
 
 
 if __name__ == "__main__":

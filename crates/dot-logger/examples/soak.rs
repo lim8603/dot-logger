@@ -859,6 +859,10 @@ mod linux {
         corrupt_payloads: u64,
         loss_reports: u64,
         nonzero_loss_rows: u64,
+        /// Loss parts that failed to decode in closed files (a failure), and
+        /// in `.active` files (a killed writer's torn tail; observed only).
+        loss_errors: u64,
+        loss_errors_active: u64,
         /// `.active` files read (only with `--active`) and how many end torn.
         active_files: usize,
         torn_active: usize,
@@ -934,28 +938,41 @@ mod linux {
                     None => found.foreign += 1,
                 }
             }
-            if let Ok(losses) = LossReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
-                for report in losses {
-                    let Ok(report) = report else { break };
-                    found.loss_reports += 1;
-                    found.nonzero_loss_rows +=
-                        report.counts.iter().filter(|c| c.count != 0).count() as u64;
-                    let latest = found
-                        .losses
-                        .entry(report.observer)
-                        .or_insert_with(|| (report.checkpoint, Default::default()));
-                    if report.checkpoint > latest.0 {
-                        *latest = (report.checkpoint, Default::default());
-                    }
-                    if report.checkpoint == latest.0 {
-                        for c in &report.counts {
-                            *latest
-                                .1
-                                .entry(format!("{:?}/{:?}", c.scope, c.cause))
-                                .or_default() += c.count;
+            // Decode errors are counted, never skipped (REV-073 RV-206).
+            let mut loss_error = false;
+            match LossReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
+                Err(_) => loss_error = true,
+                Ok(losses) => {
+                    for report in losses {
+                        let Ok(report) = report else {
+                            loss_error = true;
+                            break;
+                        };
+                        found.loss_reports += 1;
+                        found.nonzero_loss_rows +=
+                            report.counts.iter().filter(|c| c.count != 0).count() as u64;
+                        let latest = found
+                            .losses
+                            .entry(report.observer)
+                            .or_insert_with(|| (report.checkpoint, Default::default()));
+                        if report.checkpoint > latest.0 {
+                            *latest = (report.checkpoint, Default::default());
+                        }
+                        if report.checkpoint == latest.0 {
+                            for c in &report.counts {
+                                *latest
+                                    .1
+                                    .entry(format!("{:?}/{:?}", c.scope, c.cause))
+                                    .or_default() += c.count;
+                            }
                         }
                     }
                 }
+            }
+            if loss_error && is_active {
+                found.loss_errors_active += 1;
+            } else if loss_error {
+                found.loss_errors += 1;
             }
         }
         Ok(found)
@@ -1029,6 +1046,7 @@ mod linux {
         control: u64,
         frames: u64,
         nonzero_loss_rows: u64,
+        loss_errors: u64,
     }
     impl Pass {
         fn intact(&self) -> bool {
@@ -1038,6 +1056,7 @@ mod linux {
                 + self.foreign
                 + self.file_holes
                 + self.nonzero_loss_rows
+                + self.loss_errors
                 == 0
         }
         fn json(&self) -> Value {
@@ -1045,7 +1064,7 @@ mod linux {
                 "deleted_while_open":self.deleted_while_open,"unreadable":self.unreadable,
                 "torn":self.torn,"corrupt":self.corrupt,"foreign":self.foreign,
                 "file_holes":self.file_holes,"control":self.control,"frames":self.frames,
-                "nonzero_loss_rows":self.nonzero_loss_rows})
+                "nonzero_loss_rows":self.nonzero_loss_rows,"loss_errors":self.loss_errors})
         }
     }
 
@@ -1116,11 +1135,19 @@ mod linux {
                     pass.frames += 1;
                 }
             }
-            if let Ok(losses) = LossReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
-                for report in losses.flatten() {
-                    pass.nonzero_loss_rows +=
-                        report.counts.iter().filter(|c| c.count != 0).count() as u64;
+            // Decode errors are counted, never skipped (REV-073 RV-206).
+            match LossReader::new(&bytes, FRAME_BYTES, MAX_PRODUCERS) {
+                Ok(losses) => {
+                    for report in losses {
+                        let Ok(report) = report else {
+                            pass.loss_errors += 1;
+                            break;
+                        };
+                        pass.nonzero_loss_rows +=
+                            report.counts.iter().filter(|c| c.count != 0).count() as u64;
+                    }
                 }
+                Err(_) => pass.loss_errors += 1,
             }
         }
         Ok(pass)
@@ -1159,6 +1186,7 @@ mod linux {
                 (&mut total.control, pass.control),
                 (&mut total.frames, pass.frames),
                 (&mut total.nonzero_loss_rows, pass.nonzero_loss_rows),
+                (&mut total.loss_errors, pass.loss_errors),
             ] {
                 *sum += add;
             }
@@ -1182,6 +1210,7 @@ mod linux {
             "torn_files":found.torn_files,"foreign":found.foreign,
             "duplicates":found.duplicates,"corrupt_payloads":found.corrupt_payloads,
             "loss_reports":found.loss_reports,"nonzero_loss_rows":found.nonzero_loss_rows,
+            "loss_errors":found.loss_errors,"loss_errors_active":found.loss_errors_active,
             "control":{"expected":found.control.len(),"missing_prefix":control_prefix,
                 "missing_gaps":control_gaps},
             "frames":{"expected":found.frames.len(),"missing_prefix":frame_prefix,
@@ -1197,6 +1226,7 @@ mod linux {
             && found.corrupt_payloads == 0
             && found.loss_reports > 0
             && found.nonzero_loss_rows == 0
+            && found.loss_errors == 0
     }
 
     fn verify(dir: &Path, control: u64, frames: u64, ring: bool) -> Result<(), Error> {

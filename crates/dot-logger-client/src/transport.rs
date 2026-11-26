@@ -967,6 +967,129 @@ mod tests {
             );
         });
     }
+    // A record ready for handoff on `sub`'s own receiver connection.
+    fn pending(sub: &mut RemoteSubscription) -> PendingRecord {
+        use dot_logger::{
+            capture::*,
+            config::*,
+            platform::{PlatformCapabilities, Requirement},
+        };
+        let mib = 1024 * 1024;
+        let plan = SessionBuilder::new(SessionConfig {
+            memory: MemoryBudget {
+                total_bytes: 8 * mib,
+                input_bytes: mib,
+                raw_bytes: 0,
+                output_bytes: mib,
+                external_bytes: 4 * mib,
+                control_bytes: mib,
+                worker_bytes: mib,
+            },
+            producers: vec![ProducerQuota {
+                small: PoolQuota {
+                    slots: 8,
+                    slot_bytes: 256,
+                    important_slots: 0,
+                },
+                raw: None,
+            }],
+            importance: ImportancePolicy::TreatEqually,
+            workers: WorkerThreadingConfig {
+                count: 1,
+                stack_bytes: 4096,
+                cpu_ids: vec![],
+                affinity: Requirement::Optional,
+            },
+            capabilities: vec![],
+        })
+        .validate(&PlatformCapabilities::default())
+        .unwrap();
+        let config = ReceiverConfig {
+            records: 2,
+            record_bytes: 8,
+            ttl: Duration::from_secs(10),
+        };
+        sub.id = sub
+            .receiver
+            .begin_connection(&QueryBudget::new(&plan), config)
+            .unwrap();
+        let record = CapturedRecord {
+            receipt: CaptureReceipt {
+                session_id: 42,
+                producer_id: 0,
+                accepted_seq: 1,
+            },
+            metadata: RecordMetadata {
+                channel_id: 7,
+                schema_id: 99,
+                schema_version: 1,
+                mono_ns: 1,
+                real_ns: 1,
+                source_time: None,
+                level: Level::Info,
+                importance: Some(Importance::Normal),
+            },
+            revision: 1,
+            payload_len: 1,
+        };
+        let chunk = Chunk::single(1, 1, 1, record, &[9], false);
+        sub.receiver
+            .push(&sub.id, chunk, Instant::now())
+            .unwrap()
+            .unwrap()
+    }
+    // REV-073 RV-210: `handoff` on a closed connection reports handed-off ACKs
+    // still queued or in flight as unknown, never hands the new record to the
+    // consumer and confirms nothing; with nothing unsettled it is a plain
+    // disconnect. The ACK RPC timing is fixed here; in the loopback test the
+    // ACK may settle first and only the disconnect branch runs.
+    #[test]
+    fn handoff_on_a_closed_connection_reports_unsettled_acks_as_unknown() {
+        runtime().block_on(async {
+            let cancel = Cancellation::new();
+            let mut called = false;
+
+            let mut queued = detached();
+            let record = pending(&mut queued);
+            queued.acks.push(wire::AckItem::default());
+            queued.oldest = Some(Instant::now());
+            queued.state.close();
+            let result = queued
+                .handoff(record, |_, _| std::mem::replace(&mut called, true), &cancel)
+                .await;
+            assert_eq!(result, Err(ClientError::AcknowledgementUnknown));
+            assert_eq!(queued.acknowledged(), 0);
+            assert_eq!(
+                queued.flush(&cancel).await,
+                Err(ClientError::AcknowledgementUnknown)
+            );
+
+            let mut in_flight = detached();
+            let record = pending(&mut in_flight);
+            let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), ClientError>>();
+            in_flight
+                .in_flight
+                .push_back(tokio::spawn(async move { rx.await.unwrap() }));
+            in_flight.state.close();
+            let result = in_flight
+                .handoff(record, |_, _| std::mem::replace(&mut called, true), &cancel)
+                .await;
+            assert_eq!(result, Err(ClientError::AcknowledgementUnknown));
+            assert_eq!(in_flight.acknowledged(), 0);
+            drop(tx);
+
+            let mut confirmed = detached();
+            let record = pending(&mut confirmed);
+            confirmed.in_flight.push_back(finished(Ok(())));
+            settled(&confirmed).await;
+            confirmed.state.close();
+            let result = confirmed
+                .handoff(record, |_, _| std::mem::replace(&mut called, true), &cancel)
+                .await;
+            assert_eq!(result, Err(ClientError::Disconnected));
+            assert!(!called, "a closed connection must not hand records over");
+        });
+    }
     // RV-163: the frame stream ended (EOF or a stream error) while a handed-off
     // record's ACK was still queued; flush must not claim it was confirmed.
     #[test]

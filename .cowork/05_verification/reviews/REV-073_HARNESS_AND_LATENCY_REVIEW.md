@@ -74,7 +74,7 @@
 | RV-207 | P2 | [latency.rs:602](../../../crates/dot-logger/examples/support/perf/latency.rs#L602), [630](../../../crates/dot-logger/examples/support/perf/latency.rs#L630) | M 설정 실패 시 barrier 정지, J 측정 패닉 시 IO 스레드 미종료 | 수용·조치 | Open(CI 대기) |
 | RV-208 | P2 | [run-latency.sh:26](../../../scripts/run-latency.sh#L26), [47](../../../scripts/run-latency.sh#L47), [60](../../../scripts/run-latency.sh#L60) | 확인 불가인 커널, 오래된 바이너리, 실패·빈 행도 정상 실행 기록으로 남음 | 수용·조치 | Open(CI 대기) |
 | RV-209 | P2 | [README.md:307](../../../README.md#L307), [320](../../../README.md#L320) | 측정된 분포를 무영향·단일 원인으로 단정 | 수용·조치 | Open |
-| RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용 | Open |
+| RV-210 | P3 | [client transport.rs:938](../../../crates/dot-logger-client/src/transport.rs#L938) | 미확인 상태의 `handoff`를 고정하는 단위 회귀가 없음 | 수용·조치 | Open(CI 대기) |
 | RV-211 | P3 | [rt-boot.sh:80](../../../scripts/rt-boot.sh#L80) | generic 확인에서 설정 읽기 실패를 허용 | 수용·조치 | Open |
 | RV-212 | P3 | [latency.rs:383](../../../crates/dot-logger/examples/support/perf/latency.rs#L383) | R 시계 대조는 호출과 다른 스레드에서 측정하고 첫 번째 종료 결과를 덮어씀 | 수용·조치 | Open(CI 대기) |
 
@@ -132,7 +132,7 @@
 
 **[리뷰어]** 새 단위 시험은 `next`의 queued/in-flight/confirmed 세 조건을 고정한다. `handoff` 통합 시험은 ACK가 확정돼 `Disconnected`가 맞는 흐름도 허용하므로 CI 한 번으로 미확인 ACK 분기의 실행을 보장할 수 없다. 기존 preflight fixture나 고정 ACK RPC 상태로 연결을 닫고, `AcknowledgementUnknown`과 미확정 개수를 함께 단정하는 회귀가 RV-191 범위를 완결한다.
 
-**[처리담당]** **수용**(2026-11-26). 조치: preflight fixture 또는 고정 ACK 상태로 연결을 닫아 `handoff`의 `AcknowledgementUnknown`과 미확정 개수를 함께 단정하는 시간 무관 단위 회귀 추가(RV-191 범위 완결).
+**[처리담당]** **수용**(2026-11-26). 조치: preflight fixture 또는 고정 ACK 상태로 연결을 닫아 `handoff`의 `AcknowledgementUnknown`과 미확정 개수를 함께 단정하는 시간 무관 단위 회귀 추가(RV-191 범위 완결). **조치(2026-11-26):** `transport::tests::handoff_on_a_closed_connection_reports_unsettled_acks_as_unknown` — `detached()` 구독에 실제 `ClientReceiver` 연결로 만든 `PendingRecord`를 두고 ① 대기열 ACK ② 진행 중(미완료) ACK RPC ③ 확정만 남은 상태에서 연결을 닫은 뒤 `handoff`: ①② `AcknowledgementUnknown`·`acknowledged() == 0`(①은 이후 `flush`도 Unknown), ③ `Disconnected`, 세 경우 모두 소비자 미호출. 동작을 고정하는 회귀라 Red 단계 대신 변이 확인: `handoff`의 `unsettled()` 분기를 끈 변이에서 Fail, 복원 뒤 Pass.
 
 #### RV-211 — generic 설정 검증 (P3)
 
@@ -151,3 +151,5 @@
 F3 경로가 안전하게 처리되기 전에는 이 하네스로 채움 시험을 실행하지 않는다. 후속 개발 세션에서 장애·혼합 판정에 짧은 실패 fixture를 추가해 검출력을 먼저 확인한다. T8의 24시간 재검증에는 보완된 혼합 판정을 반영한다.
 
 **[처리담당] 반입(2026-11-26):** 11건 모두 코드에서 지적 위치를 확인하고 수용했다. 조치 순서: RV-202(P1) → RV-203·204(장애 하네스, TASK-047 선행) → RV-205·206(혼합 하네스, T8 24h에 반영) → RV-207·208·212(지연 하네스) → RV-209(README, v0.1.1) → RV-210·211. 검증은 판정 함수의 짧은 실패 fixture와 오류 주입으로 하고, 장시간 soak·채움·재부팅·지연 재측정은 하지 않는다(README 표 숫자 변경 없음).
+
+**[처리담당] 조치 완료(2026-11-26):** RV-202~212 11건 조치. 로컬: Rust 1.96.0·1.85.0 workspace all-features 각 **750 Pass·실패 0·5 ignored**, 두 Rust workspace Clippy(all targets/features, `-D warnings`)·fmt Pass, `scripts/test_soak_harness.py` 21건·`test_check_integration_surface.py` Pass. 짧은 실제 확인: F5 1회(`/dev/shm`), 혼합 2분(`/dev/shm`). 장시간 soak·F3 채움·재부팅·지연 재측정은 실행하지 않음. 남은 것: 푸시 뒤 CI Pass 확인 → 위임 수락·Closed.

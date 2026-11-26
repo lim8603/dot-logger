@@ -56,3 +56,14 @@ Call to Reboot failed: Operation denied due to active block inhibitor
 2026-11-25T23:09:07+09:00 user=lim8603 kernel=7.0.0-44-generic realtime=absent boot_id=256aa56e-4601-447a-861e-b3f8b4998936
 2026-11-25T23:09:07+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-44-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
 2026-11-25T23:09:07+09:00 grubenv: next_entry= 
+2026-11-26T17:28:36+09:00 === generic
+2026-11-26T17:28:36+09:00 user=lim8603 kernel=7.0.0-44-realtime realtime=1 boot_id=8c3f1cf4-39b4-4f7a-8543-8082f0429fd1
+2026-11-26T17:28:36+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-44-realtime root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-26T17:28:36+09:00 grubenv: next_entry= 
+2026-11-26T17:28:36+09:00 kernel=7.0.0-44-generic target=gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-44-generic-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3
+2026-11-26T17:28:37+09:00 OK: next boot only -> gnulinux-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3>gnulinux-7.0.0-44-generic-advanced-ad27c772-d070-494f-bd47-8a24e33f2eb3 (default unchanged)
+2026-11-26T17:28:41+09:00 reboot requested
+2026-11-26T17:30:01+09:00 === status
+2026-11-26T17:30:01+09:00 user=lim8603 kernel=7.0.0-44-generic realtime=absent boot_id=157d5c05-54ec-41b4-86b6-f13f73a8f6f1
+2026-11-26T17:30:01+09:00 cmdline: BOOT_IMAGE=/boot/vmlinuz-7.0.0-44-generic root=UUID=ad27c772-d070-494f-bd47-8a24e33f2eb3 ro quiet splash crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+2026-11-26T17:30:01+09:00 grubenv: next_entry= 

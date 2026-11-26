@@ -10,13 +10,13 @@
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
 | 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 진행 중, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. MS-009 Done |
-| 활성 Task | **[TASK-042](../04_implementation/tasks/TASK-042.md) In Progress** — S1 하네스 Done, S2 ①RT·`powersave` ②RT·`performance` Done, ③-a generic·`powersave` Done, ③-b generic·`performance`는 Human governor 전환부터(TASK-042 「③ 실행 절차」 3단계) → S3 README·EV · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
+| 활성 Task | **[TASK-042](../04_implementation/tasks/TASK-042.md) In Progress** — S1 하네스·S2 4개 조건(RT/generic × `powersave`/`performance`) Done(③-b 2026-11-26) → S3 README·EV · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
 | 미처리 리뷰 | 없음 — REV-001~072 Closed |
 | 상태 | 38/44 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`1795bc1`, 약 50분, [EV-128](../05_verification/verification_evidence.md#ev-128)). 최신 회귀 [EV-115](../05_verification/verification_evidence.md#ev-115): 두 Rust 각 742 Pass·5 ignored, Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-25 / #001 — TASK-042 S2 ③-a generic·`powersave` 측정. 이전 #001(11-24~25)은 [최근 작업·이력](#최근-작업이력) / AI |
-| 세션 상태 | **마감 — 2026-11-25 #001(개발).** 다음 세션은 TASK-042 ③-b: generic 부팅 확인(재부팅했으면 `sudo scripts/rt-boot.sh generic`) → Human governor `performance` 전환 |
+| 갱신 | 2026-11-26 / #001 — TASK-042 S2 ③-b generic·`performance` 측정, S2 Done. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
+| 세션 상태 | **진행 — 2026-11-26 #001(개발).** generic 커널 1회 부팅 중(다음 재부팅은 RT). 다음은 TASK-042 S3 README·EV |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -57,7 +57,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-23 | TASK-042 뒤. 태그는 Human 확인 뒤 |
-| TASK-042 | `try_log` 지연 분포 측정과 README 공개 | AI | In Progress | 2026-11-25 | S2 ③-b generic·`performance`(Human governor 전환부터) → S3 README·EV. D1 둘 다·D2 A·D3 A |
+| TASK-042 | `try_log` 지연 분포 측정과 README 공개 | AI | In Progress | 2026-11-26 | S3 README·EV(S2 4개 조건 Done). D1 둘 다·D2 A·D3 A |
 | TASK-043 | RT용 미룬 서식 로그 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
 | TASK-044 | `Record` derive 또는 prost 연동 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
 | TASK-026 | dot-probe 실제 첫 적용과 화면 연동 | AI | Planned | 2026-11-13 | 프로젝트 마지막 단계(일정 판단 밖) |
@@ -87,7 +87,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 ## 다음 시작점
 
 0. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
-1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → **TASK-042** `try_log` 지연 분포(진행 중: S2 ③-b generic·`performance` → S3 README·EV) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
+1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → **TASK-042** `try_log` 지연 분포(진행 중: S3 README·EV) → TASK-041 v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).
@@ -138,6 +138,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 최근 작업·이력
 
+- 2026-11-26 #001 — TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대 2~3배, 1 kHz 깨어남 단일 729 µs), S2 Done.
 - 2026-11-25 #001 — 재부팅 뒤 TASK-042 S2 ③-a generic·`powersave` 측정(RT 대비 꼬리 2~3배, TASK-042 문서)(비공개 세션 로그: `session_logs/session_2026-11-25_001.md`).
 - 2026-11-24 #001(~11-25) — CI 근본 수정(RV-199, EV-124)·REV-072 Closed, TASK-024 S5·TASK-038·039·040 Done(EV-125·126), CI 시간 의존 시험 5건 정리·CI 151 → 56분(EV-127·128), TASK-042 D3·S1 하네스·S2 RT 측정 ①②(비공개 세션 로그: `session_logs/session_2026-11-24_001.md`).
 - 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).

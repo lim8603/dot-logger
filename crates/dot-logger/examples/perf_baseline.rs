@@ -505,6 +505,12 @@ mod linux {
                 value["releases"] = json!(releases);
                 value["load"] = json!(load.map(|l| json!({"dir":l.dir.display().to_string(),
                     "bytes":l.bytes,"per_second":l.per_second})));
+                // TASK-042 diagnosis: record batches slower than this.
+                let slow = std::env::var("DOT_LOGGER_PERF_SLOW_US")
+                    .ok()
+                    .map(|v| v.parse().map(Duration::from_micros))
+                    .transpose()?;
+                value["slow_threshold_ns"] = json!(slow.map(|d| d.as_nanos().to_string()));
                 let j = jitter(
                     target,
                     payload,
@@ -513,8 +519,20 @@ mod linux {
                     work,
                     per_release,
                     load,
+                    slow,
                     rt,
                 )?;
+                value["slow"] = j
+                    .slow
+                    .iter()
+                    .map(|b| {
+                        json!({"release":b.release,"at_ns":b.at_ns.to_string(),"wake_ns":b.wake_ns,
+                            "work_ns":b.work_ns,"seq":b.seq,
+                            "batch_ns":b.batch_ns,"max_call_ns":b.max_call_ns,
+                            "max_call_index":b.max_call_index,"calls_over_2us":b.calls_over_2us})
+                    })
+                    .collect();
+                value["slow_dropped"] = json!(j.slow_dropped);
                 value["wake"] = distribution(&j.wake);
                 value["response"] = distribution(&j.response);
                 value["calls_per_release"] = distribution(&j.calls);

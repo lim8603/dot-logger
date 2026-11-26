@@ -403,9 +403,39 @@ pub struct Jitter {
     pub work_iterations: u64,
     /// Load records written.
     pub load_records: u64,
+    /// Batches slower than the `slow` threshold, when one was given.
+    pub slow: Vec<SlowBatch>,
+    /// Slow batches beyond the preallocated capacity (counted only).
+    pub slow_dropped: u64,
     /// Shutdown report was a success.
     pub success: bool,
 }
+/// A J batch slower than the diagnostic threshold: when it ran and whether
+/// one call or many made it slow.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SlowBatch {
+    /// Release index.
+    pub release: u64,
+    /// CLOCK_MONOTONIC at the batch start.
+    pub at_ns: u64,
+    /// Release to wake-up of this cycle.
+    pub wake_ns: u64,
+    /// The cycle's fixed computation (no memory traffic): slower too when
+    /// the whole core was slow, unchanged when only the calls were.
+    pub work_ns: u64,
+    /// Sequence of the batch's first call.
+    pub seq: u64,
+    /// The whole batch.
+    pub batch_ns: u64,
+    /// Slowest single call.
+    pub max_call_ns: u64,
+    /// Position of the slowest call in the batch.
+    pub max_call_index: u64,
+    /// Calls over 2 µs.
+    pub calls_over_2us: u64,
+}
+/// Most slow batches one J row keeps; more are only counted.
+const SLOW_CAPACITY: usize = 4096;
 /// IO load of row J.
 #[derive(Clone, Copy, Debug)]
 pub struct IoLoad<'a> {
@@ -425,8 +455,10 @@ pub fn jitter(
     work_time: Duration,
     per_release: u64,
     load: Option<IoLoad<'_>>,
+    slow: Option<Duration>,
     rt: Rt,
 ) -> Result<Jitter, Error> {
+    let slow_ns = slow.map(|d| u64::try_from(d.as_nanos())).transpose()?;
     require_tmpfs(target)?;
     let options = ChannelOptions::new().outputs(&[0]);
     let mut builder = Logger::builder()
@@ -462,6 +494,8 @@ pub fn jitter(
         capacity: 0,
         work_iterations: 0,
         load_records: 0,
+        slow: Vec::with_capacity(if slow_ns.is_some() { SLOW_CAPACITY } else { 0 }),
+        slow_dropped: 0,
         success: false,
     };
     let period_ns = u64::try_from(period.as_nanos())?;
@@ -509,17 +543,52 @@ pub fn jitter(
                     let wake = now_ns();
                     work(j.work_iterations);
                     let t0 = now_ns();
-                    for _ in 0..per_release {
+                    let first = seq;
+                    // Diagnostic mode times each call too (one extra clock
+                    // read per call); the slowest call says whether one stall
+                    // or a general slowdown made a batch slow.
+                    let (mut max_call, mut max_index, mut over) = (0, 0, 0);
+                    let mut last = t0;
+                    for i in 0..per_release {
                         match control.try_log(channel, &Seq(seq)) {
                             Ok(_) => {}
                             Err(LogError::Capacity) => j.capacity += 1,
                             Err(e) => return Err(format!("try_log: {e:?}").into()),
                         }
                         seq += 1;
+                        if slow_ns.is_some() {
+                            let now = now_ns();
+                            let call = now - last;
+                            last = now;
+                            if call > max_call {
+                                (max_call, max_index) = (call, i);
+                            }
+                            over += u64::from(call > 2_000);
+                        }
                     }
                     let done = now_ns();
                     if per_release > 0 {
                         j.calls.record(done - t0);
+                    }
+                    // No let chain: the MSRV is 1.85.
+                    if slow_ns.is_some_and(|limit| per_release > 0 && done - t0 > limit) {
+                        let b = SlowBatch {
+                            release: k,
+                            at_ns: t0,
+                            wake_ns: wake.saturating_sub(release),
+                            work_ns: t0 - wake,
+                            seq: first,
+                            batch_ns: done - t0,
+                            max_call_ns: max_call,
+                            max_call_index: max_index,
+                            calls_over_2us: over,
+                        };
+                        // Never grows past the preallocation inside the loop.
+                        if j.slow.len() < SLOW_CAPACITY {
+                            j.slow.push(b);
+                        } else {
+                            j.slow_dropped += 1;
+                        }
                     }
                     j.wake.record(wake.saturating_sub(release));
                     j.response.record(done.saturating_sub(release));

@@ -1022,6 +1022,8 @@ fn latency_rows_time_every_requested_call_by_outcome() {
         Duration::from_micros(100),
         5,
         None,
+        // A zero threshold records every batch in the diagnostic list.
+        Some(Duration::ZERO),
         rt,
     )
     .unwrap();
@@ -1029,6 +1031,13 @@ fn latency_rows_time_every_requested_call_by_outcome() {
         (j.wake.count(), j.response.count(), j.calls.count()),
         (20, 20, 20)
     );
+    assert_eq!((j.slow.len(), j.slow_dropped), (20, 0));
+    assert!(j.slow.iter().enumerate().all(|(k, b)| {
+        b.release == k as u64
+            && b.seq == 5 * k as u64
+            && b.max_call_index < 5
+            && b.max_call_ns <= b.batch_ns
+    }));
     assert!(j.success);
     let m = multi(target, 16, 1000, &[0, 1], rt).unwrap();
     assert_eq!(m.len(), 2);

@@ -85,7 +85,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ### 기능 논의 안건 — 출력 구성 선택과 네트워크 전용 모드 → [MS-013](../04_implementation/milestones/MS-013.md)
 
-2026-11-26 Human 제안(R1~R3), 2026-11-27 우려 C1~C11 검토·결정. 2026-11-27 Human 「요구사항과 리팩토링 계획을 한 문서에 작성하고, 리뷰 세션으로 리뷰 받고, 수정하고 다시 리뷰 받는 과정을 한번 거치자」 → 요구·결정·계획을 MS-013(Draft)에 쓰고 이 절의 원문은 MS-013 부록 A로 옮겼다. 독립 리뷰 1회차 [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md)는 Conditional / Open. 다음은 RV-213~224 설계 반영 → 재리뷰(REV-075) → Human 승인 → ADR-017·018·FR 반영·TASK 등록. 구현 착수 시점은 MS-013 §9 Q1(권고: MS-012 → TASK-041 뒤).
+2026-11-26 Human 제안(R1~R3), 2026-11-27 우려 C1~C11 검토·결정. 2026-11-27 Human 「요구사항과 리팩토링 계획을 한 문서에 작성하고, 리뷰 세션으로 리뷰 받고, 수정하고 다시 리뷰 받는 과정을 한번 거치자」 → 요구·결정·계획을 MS-013(Draft)에 쓰고 이 절의 원문은 MS-013 부록 A로 옮겼다. 독립 리뷰 1회차 [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md)는 Conditional / Resolved(12건 모두 수용, **r2 반영 2026-11-27**). 다음은 **재리뷰 [REV-075 요청](../05_verification/reviews/REV-075_REQUEST.md)**(Human이 리뷰 세션을 연다) → 반영 → Human 승인(MS-013 §2.3 H1~H5·§9.2 Q1~Q8) → ADR-017~019·FR 반영·TASK 등록. 구현 착수 시점은 MS-013 §9 Q1(권고: MS-012 → TASK-041 뒤).
 
 ## 승인·재개 제약
 

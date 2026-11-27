@@ -8,9 +8,9 @@
 | 설계 | [API §14.6](../../03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01) · [`adapters::influxdb`](../../../crates/dot-logger/src/adapters/influxdb/mod.rs) rustdoc · [TASK-019](TASK-019.md) · API §18.6(레시피 한도) |
 | ADR | ADR-009(InfluxDB v2·선택 feature·일반 경로) |
 | 담당 | AI |
-| 상태 | Planned |
-| 마지막 갱신일 | 2026-11-26 |
-| 다음 액션 | S1 v2.9.1 실DB 재실행(REV-073 Closed 2026-11-26, D1·D2 결정 완료) |
+| 상태 | In Progress |
+| 마지막 갱신일 | 2026-11-27 |
+| 다음 액션 | S2 Red — 하네스 `--example` 옵션 |
 | 의존 | REV-073 조치(MS-012 M2) |
 | 예상 소요 | 0.5~1 인일 |
 
@@ -33,7 +33,7 @@
 
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
-| S1 | 기준선 재실행 | `python3 scripts/check-influxdb.py --pipeline-example --toolchain {1.96.0, 1.85.0}` — live 4개 + pipeline 시험·예제 Pass, cleanup 0. 실패하면 원인 처리 뒤 이 Task 계속. 출력은 비공개 증거 폴더 | Planned |
+| S1 | 기준선 재실행 | `python3 scripts/check-influxdb.py --pipeline-example --toolchain {1.96.0, 1.85.0}` — live 4개 + pipeline 시험·예제 Pass, cleanup 0. 실패하면 원인 처리 뒤 이 Task 계속. 출력은 비공개 증거 폴더 | **Done** 2026-11-27 — 두 Rust live 4·pipeline 1·CLI Pass, 잔여 컨테이너 0([EV-132](../../05_verification/verification_evidence.md#ev-132)) |
 | S2 | Red | 하네스에 `--example` 옵션(같은 일회용 DB에서 `influxdb_write` 예제 실행·결과 확인). 예제가 없어 실패하는 것을 확인 | Planned |
 | S3 | Green | 예제: `Config`(환경 변수 URL·org·bucket·token) → `Writer::new` → 숫자·이벤트 `Point` 몇 개 `write` → 결과(`Outcome`) 출력 → `query_numeric`으로 읽어 확인. 환경 변수가 없으면 사용법을 출력하고 종료 코드로 구분. 두 Rust에서 `--example` Pass. 줄 수 기록 | Planned |
 | S4 | 문서 | README: Integrations 줄과 feature 표에 "고급 경로(`adapters::influxdb`)"임을 명시, 예제 표에 `influxdb_write` 추가. `adapters::influxdb` rustdoc에 예제 링크. CHANGELOG Unreleased | Planned |
@@ -41,6 +41,6 @@
 
 ## 완료 기준
 
-- [ ] S1 v2.9.1 실DB 두 Rust Pass·EV.
+- [x] S1 v2.9.1 실DB 두 Rust Pass·EV([EV-132](../../05_verification/verification_evidence.md#ev-132)).
 - [ ] 예제 실DB 실행 Pass(두 Rust)·CI 컴파일.
 - [ ] README·rustdoc 정정.

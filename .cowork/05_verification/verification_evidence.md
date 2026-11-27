@@ -2032,6 +2032,13 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **짧은 실제 실행(`/dev/shm`, SSD 쓰기 없음):** F5 1회(`--no-rt`, 7 s) Pass — SIGKILL 인식, sync 6회, 하한 4,950 ≤ 복구 15,100. 혼합 2분(링 2 GiB, `--events 40,60,20`, reader 20 s, status 10 s) Pass — 보호 중 창 1개 온전, 상태 12회, reader 6회차 85 파일, 손실 판독 오류 0. 링 256 MiB로 잘못 잡은 첫 혼합 실행은 기록 실패 202,313건을 새 판정이 Fail로 잡음(시험 조건 오류).
 - **회귀:** 로컬 Rust 1.96.0·1.85.0 workspace all-features 각 **750 Pass·실패 0·5 ignored**, 두 Rust workspace Clippy(all targets/features, `-D warnings`)·fmt Pass. **CI run `45822618242`**(`e2e30fa`, workflow_dispatch — 푸시 HEAD가 `[skip ci]`라 수동 실행) **19/19 Pass**(2026-11-26 12:45~13:35 UTC), 새 자가 시험 단계 성공.
 - **범위·한계:** 장시간 soak·F3 채움·재부팅·지연 재측정은 하지 않았다. 기존 EV-123(F1~F5)·EV-126(혼합 4h)·EV-129(지연)는 당시 판정이며 각 EV에 보강 사실을 적었다. T8 24h 재검증은 보강된 판정으로 한다. README 지연 표 숫자는 변경 없음.
+### EV-132 — TASK-045 S1: InfluxDB OSS 2.9.1 실DB 기준선 재실행(두 Rust)
+
+- **대상:** `0d6be49`(REV-073 조치 뒤, 제품 코드 변경 없음). 마지막 실DB 실행은 2026-11-01(TASK-019·020, EV-037 무렵).
+- **실행:** `python3 scripts/check-influxdb.py --pipeline-example --toolchain {1.96.0, 1.85.0}` — digest 고정 `influxdb@sha256:a66a9e8b…6a36205`(health v2.9.1), loopback 임시 포트·tmpfs 일회용 컨테이너. 2026-11-27 17:49, 빌드 캐시 사용으로 각 11 s·30 s.
+- **결과(두 Rust 같음):** `tc_008_influx_live` **4 Pass**(타입·나노초 왕복, ACK/실패 완료 식별, 부분 타입 실패 → Unknown·유효 행 유지, 중복 병합 ≠ 원본 보존) · `dot-logger-client` `pipeline` 실DB 시험 **1 Pass** · `dot_probe_pipeline` CLI `functional_pass: true`(파일·원격 각 45 확인, 숫자 조회 10, DB 완료 20/20, Unknown 0). 실행 뒤 남은 컨테이너 0.
+- **원시 근거(비공개):** `imported_context/task_045_s1_2026-11-27/{1.96.0,1.85.0}/`(environment.json·live.log·pipeline-*.log·protocol.csv).
+- **범위·한계:** Linux amd64 일회용 DB 기능 확인이며 성능·native OS 수락이 아니다. InfluxDB 3 Core는 TASK-046, 장시간 단절은 TASK-047.
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

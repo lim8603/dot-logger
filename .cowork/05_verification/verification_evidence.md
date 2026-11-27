@@ -2063,6 +2063,23 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **원시 근거(비공개):** `imported_context/task_046_s1_2026-11-27/`, `task_046_s2_2026-11-27/{1.96.0,1.85.0}/`(environment.json·live.log·example*.log·protocol.jsonl·sql-dump.jsonl), `task_046_s2_v2_2026-11-27/`.
 - **CI:** CI run `45976241015`(`e097c61`) 19/19 Pass(2026-11-27 09:44~10:39 UTC).
 - **범위·한계:** Linux amd64 일회용 DB 기능 확인. v3 조회(SQL/InfluxQL) 지원은 기능 논의 안건(MS-012 M3). InfluxDB 3 Enterprise·Cloud는 미확인.
+### EV-135 — TASK-047: InfluxDB 장시간 단절(멈춤·재기동·경로 단절) 장애 주입
+
+- **대상:** `7584cfb`(soak `run --influx`, `soak-faults.py` f6a/b/c, 판정 자가 시험 12개). CI run `45990805261`(`762e384`) 19/19 Pass.
+- **설정(D1~D3 2026-11-27 Human 「권고대로」):** 대표 부하(제어 256 B 5,000건/s + 프레임 64 KiB 10건/s, 링 256 MiB, `/dev/shm`) 옆에 앱 스레드 DB 작업자(채널 2개 각 100 Hz, 100 ms 배치, `request_timeout` 2 s·시도 2회·TTL 5 s, 밀린 점은 건너뛰고 집계). DB는 `influxdb@sha256:a66a9e8b…`(2.9.1), 데이터 `/dev/shm` 바인드(stop/start 뒤 유지), 고정 루프백 포트. RT 모드(SCHED_FIFO), 커널 7.0.0-44-realtime, governor `powersave`, AI 세션 백그라운드 대기(EV-130 조건). SSD 쓰기 약 0.
+- **실행:** 2026-11-27 20:32~21:33, 시나리오마다 앞 5분 → 장애 10분 → 뒤 5분(각 1,222 s). 그 전에 짧은 실행(장애 2분)으로 하네스 확인: `--no-rt` 1회(f6a 판정 오류 발견·수정), RT 재실행 f6a Pass.
+
+| 장애 | 판정 | 장애 중 완료 배치 | 걸친 배치 | 회복 | DB 대조 | DB 작업자 |
+|---|---|---|---|---|---|---|
+| f6a `docker pause`(조용한 단절) | **Pass** | Unknown 142(호출당 4.2 s = 2회 × 2 s + 0.2 s) | Acknowledged 1(재개 직후 응답) | 0.12 s | Ack 점 누락 0, 보고 밖 점 0. Unknown 점 7,060개는 실제 저장됨 | 호출 6,343, Ack 6,201, 건너뜀 105,724점, Busy 0 |
+| f6b `docker stop`→`start`(재기동) | **Pass** | Unknown 2,976(연결 거부, 호출당 약 0.2 s) | Unknown 1 | 0.45 s | 누락 0, 보고 밖 0, Unknown 저장 0 | 호출 9,174, Ack 6,192, 건너뜀 0 |
+| f6c `network disconnect`(경로 단절) | **Pass** | Unknown 2,976(즉시 거부) | Acknowledged 1 | 0.12 s | 누락 0, 보고 밖 0 | 호출 9,176, Ack 6,196, 건너뜀 0 |
+
+- **세 장애 공통:** 제어 주기 놓침 0, 제어·프레임 수락 거절 0, RT 스레드 heap 할당·해제 0, 파일 failed 0·구멍 0·찢긴 파일 0, 종료 성공, heap 증가 49~76 KB(한도 16 MiB 안), 데이터 재기동 뒤 유지(f6b 장애 전 Ack 점 모두 존재).
+- **관찰:** ① 연결 거부(f6b·f6c)도 `Writer`는 `Unknown`으로 보고한다(요청 전송 전 거부를 `NotSent`로 구분하지 않음, 보수적). ② 조용한 단절(f6a)에서 시간 초과로 `Unknown`이 된 점 중 일부가 재개 뒤 실제 저장됐다 — `Unknown` 계약(「저장 여부 모름」) 그대로. ③ `network disconnect`는 Docker 사용자 공간 프록시 때문에 시간 초과가 아니라 즉시 거부로 나타난다.
+- **판정 오류 수정(S2):** 「장애 중 *시작한* 배치는 Ack 아님」은 재개 직후 응답한 재시도를 잘못 셌다 → 「장애 중 *완료된* 배치」로 고치고 걸친 배치는 따로 기록(Red→Green 시험 추가).
+- **원시 근거(비공개):** `imported_context/task_047_s2_2026-11-27/`(짧은 실행), `task_047_s2_rerun_2026-11-27/`, `task_047_s3_2026-11-27/{f6a,f6b,f6c}/`(soak JSON 줄·`batches.jsonl`·`result.json`).
+- **범위·한계:** 고급 경로 `Writer`를 앱 스레드에서 쓰는 형태(facade DB 출력 없음). InfluxDB 3 Core 장애는 미실행. 장시간 단일 장애 1 h(D2-B)는 하지 않았다.
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

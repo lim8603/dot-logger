@@ -110,7 +110,7 @@ native CI(3 OS × 2 Rust)는 T3로 끝났다([EV-116](../../05_verification/veri
 | F3a | 공간 부족(probe) | Docker `--tmpfs size=512m`(또는 `unshare -rm`)·링 256 MiB(세그먼트 32 MiB, `reserve` 0), 채움 파일로 여유 축소 → 삭제. `Capacity`에 닿으려면 자기 닫힌 파일을 다 지운 뒤에도 `free < reserve + 32 MiB`여야 하므로 채움 > 512 MiB − reserve − 32 MiB − active(reserve 0이면 약 450~480 MiB), 또는 `.reserve(...)`를 크게 둔다 | 자기 오래된 파일 삭제 → `Capacity` 실패 → 손실 보고 `OutputFailed`·`Cause::Adapter` = `failed_records` → 채움 삭제 뒤 `failed_records` 증가 멈춤·이후 기록 전부 존재. 종료 보고 `is_success() == false`(실패 기록이 있으므로 정상) |
 | F3b | 공간 부족(실제 ENOSPC) | probe 뒤 쓰기 전에 채우는 경합 또는 reserve 0·세그먼트보다 작은 여유 | `IoPoisoned` 고착, 세션 안 회복 없음, RT `try_log`는 계속 수락 — 현재 설계 동작 기록(D3). 대조는 메모리 값만: `OutputHealth.failed_records` = `ShutdownReport` 필수 출력 실패 수(파일 손실 checkpoint는 쓰이지 않음) |
 | F4 | 네트워크 단절 | F2a 구성 + socat 프록시 SIGSTOP / kill | 파일 손실 0, 구독자 끊김 감지·재접속 뒤 계속 |
-| F4-DB | DB 단절 | D2 | — |
+| F4-DB | DB 단절 | D2(tc_008 갈음) → **2026-11-27 TASK-047로 실행: f6a 멈춤·f6b 재기동·f6c 경로 단절 각 10분 모두 Pass**([EV-135](../../05_verification/verification_evidence.md#ev-135)) | Pass |
 | F5 | 강제 종료 → 복구 | 경보 없이 SIGKILL 6회(시점 변경) → `.active`를 `recover_segment`로 복구 → 같은 디렉터리에서 재시작 | 닫힌 파일 전부 온전. `.active`: (마지막으로 완료된 sync 전에 수락된 수) ≤ 복구된 수 ≤ (SIGKILL 시점 수락 수), 복구분 안에 중간 빈칸 0, 잘린 꼬리만 제외. SIGKILL은 페이지 캐시를 버리지 않으므로 마지막 `flush_chunk`까지 남을 수 있다. 재시작 시 새 세션 디렉터리 정상 생성 |
 
 공통 Pass: 제어 루프 deadline miss 0(장애가 RT 스레드를 막지 않음), 살아 있는 heap·RSS 상한 안, 장애 구간 밖 거절·실패 0, 회복 뒤 기록 전부 존재. **실패 기록 수 = 파일 손실 보고 합계**는 파일이 마지막 checkpoint를 쓸 수 있는 F1·F2·F3a·F4에만 적용한다. F3b는 메모리 대조(위), F5는 sync 하한·수락 상한 대조(위)로 판정한다. sync 지연은 상태가 아니라 `since_sync`로 본다(전제 3).

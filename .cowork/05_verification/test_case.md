@@ -169,6 +169,8 @@ TASK-020 S3 [EV-042](verification_evidence.md#ev-042): 신규8개·실제 loopba
 
 원본 bytes를 DB로 몰래 전송하지 않음. retry 배치 불변·queue/TTL 상한. v3 호환은 별도 프로필.
 
+2026-11-27: 실DB 재실행 [EV-132](verification_evidence.md#ev-132)(2.9.1), v3 Core 3.12.3 호환 범위 [EV-134](verification_evidence.md#ev-134), 장시간 DB 단절 [EV-135](verification_evidence.md#ev-135)(f6a/b/c Pass).
+
 <a id="tc-009"></a>
 ### TC-009 — 운영 리포트·변경·전후 비교
 

@@ -19,11 +19,18 @@ version.
 - `influxdb_write` example (`--features influxdb`): the advanced-path
   InfluxDB v2 `Writer` writes a few points and reads the numeric ones back.
   `scripts/check-influxdb.py --example` runs it against a throwaway DB.
+- `scripts/check-influxdb.py --server v3`: runs the live InfluxDB tests and
+  the example against InfluxDB 3 Core 3.12.3 and checks the stored rows
+  with SQL.
 
 ### Changed
 
 - README: InfluxDB output is on the advanced path (`adapters::influxdb`),
   not the default `Logger`.
+- `adapters::influxdb` and README: server version table. InfluxDB 3 Core
+  takes the same writes through its v2-compatible API but has no Flux, so
+  `query_numeric` needs InfluxDB 2.x. On 3 Core a batch with a type conflict
+  is rejected whole (still reported as `Unknown`).
 
 ### Fixed
 

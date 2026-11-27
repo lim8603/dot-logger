@@ -53,6 +53,19 @@
 //! The `influxdb_write` example (`crates/dot-logger/examples/influxdb_write.rs`)
 //! builds the session budget, writes a few points and reads them back; run it
 //! against a throwaway DB with `python3 scripts/check-influxdb.py --example`.
+//!
+//! # Server versions
+//!
+//! | Server | Writes | `query_numeric` |
+//! |---|---|---|
+//! | InfluxDB OSS 2.9.1 | Supported | Supported (Flux) |
+//! | InfluxDB 3 Core 3.12.3 | Same results through its v2-compatible API | Not available: v3 has no Flux endpoint (HTTP 404, reported as `QueryError::Http(404)`) |
+//!
+//! On InfluxDB 3 Core, a batch with a field type conflict is rejected as a
+//! whole, valid rows included; 2.9.1 keeps the valid rows. Both are reported
+//! as `Unknown`. The `influxdb` Docker image tag `latest` is InfluxDB 3 Core
+//! since 2026-04; pin `influxdb:2` for queries. Checked with
+//! `python3 scripts/check-influxdb.py --server v3`.
 mod numeric;
 mod routed;
 use crate::{

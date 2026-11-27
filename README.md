@@ -241,7 +241,7 @@ No feature is enabled by default.
 | Feature | Adds |
 |---|---|
 | `remote` | gRPC server and client types (tonic, Tokio) |
-| `influxdb` | Bounded InfluxDB v2 writes and numeric queries on the advanced path, `adapters::influxdb` (reqwest, Tokio) |
+| `influxdb` | Bounded InfluxDB v2 writes and numeric queries on the advanced path, `adapters::influxdb` (reqwest, Tokio). Writes also work on InfluxDB 3 Core 3.12.3 through its v2-compatible API; queries need 2.x (v3 has no Flux). The Docker tag `influxdb:latest` is 3 Core |
 | `tracing-adapter` | `tracing` and `log` input |
 | `compression-zstd` | zstd support in the MCAP dependency (dot-logger itself writes uncompressed chunks) |
 | `calibrate` | Machine calibration and JSON profiles for presets |

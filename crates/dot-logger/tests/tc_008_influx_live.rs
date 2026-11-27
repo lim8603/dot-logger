@@ -1,4 +1,7 @@
 //! Explicit real DB tests; scripts/check-influxdb.py owns setup and cleanup.
+//! They target InfluxDB OSS 2.9.1. On InfluxDB 3 Core (`--server v3`) every
+//! write assertion holds and each test fails at its Flux read-back (HTTP 404);
+//! the harness checks that and compares the stored rows with SQL instead.
 #![cfg(feature = "influxdb")]
 #![allow(clippy::unwrap_used)]
 mod support;

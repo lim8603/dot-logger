@@ -5,7 +5,7 @@
 | 일자 / 리뷰어 | 2026-11-27 / Codex, 독립 리뷰 세션 |
 | 대상 | [MS-013 r4](../../04_implementation/milestones/MS-013.md), [REV-077 요청서](REV-077_REQUEST.md), [REV-076](REV-076_MS013_R3_DESIGN_REVIEW.md) |
 | 기준 | r4 `3901fa3b5b3952f656ef2c2cc83d1a1b13dbf8f7`, 검토 시 HEAD `6ae7314` |
-| 판정 / 상태 | **Conditional / Open** |
+| 판정 / 상태 | **Conditional / Resolved**(2026-11-27 처리담당: 6건 모두 수용, MS-013 r5 반영 — REV-078 대조 대기) |
 
 ## 1. 요약정리
 
@@ -32,51 +32,53 @@ REV-074·075의 파일 tap 유지, 단일 네트워크 출력, DB 단계 6 수�
 
 | ID | 중요도 | 위치 | 계약 공백 | 처리 제안 | 처리담당 판정 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-245 | **P1** | §5.6 | CAS 성공과 상태·표시 게시 사이에 기한을 넘길 수 있음 | bounded 응답과 적용 여부의 공개 상태를 정의 | 대기 | Open |
-| RV-246 | **P1** | §5.4, §5.9 | L3 최종 등식에 cut이 빠지고 offer 직후 중단을 정확히 한 번 정산할 근거가 없음 | 보존식과 복구 가능한 커밋 경계를 고정 | 대기 | Open |
-| RV-247 | **P1** | §5.9 | core Closed를 파일 성공으로 발표하면 최종 파일 발행 실패를 놓치고, host 무응답 시 Incomplete에 담을 상태가 없음 | 파일 최종 발행 ACK와 기한 시 보고 원천 정의 | 대기 | Open |
-| RV-248 | P2 | H8, §5.1, §7 | 기존 NoRoute가 관측 출력 성공에도 붙으며, 0 target 구성에는 명시적으로 바꿔야 하는 시작 계약이 있음 | Core와 네트워크 보고의 의미 정의 및 시작 gate | 대기 | Open |
-| RV-249 | P2 | §5.6, §6 | End를 보내고 구독을 닫을 때 기존 ACK 확정·오류 계약이 열려 있음 | End/EOF/ACK의 종료 상태표와 호환 시험 | 대기 | Open |
-| RV-250 | P2 | §5.6, §5.10 | 표시 protobuf의 상한 산식에 반복 항목의 인코딩 오버헤드가 빠질 수 있음 | 형식을 결정하고 실제 인코딩 길이로 상한 확인 | 대기 | Open |
+| RV-245 | **P1** | §5.6 | CAS 성공과 상태·표시 게시 사이에 기한을 넘길 수 있음 | bounded 응답과 적용 여부의 공개 상태를 정의 | 수용 | Resolved |
+| RV-246 | **P1** | §5.4, §5.9 | L3 최종 등식에 cut이 빠지고 offer 직후 중단을 정확히 한 번 정산할 근거가 없음 | 보존식과 복구 가능한 커밋 경계를 고정 | 수용 | Resolved |
+| RV-247 | **P1** | §5.9 | core Closed를 파일 성공으로 발표하면 최종 파일 발행 실패를 놓치고, host 무응답 시 Incomplete에 담을 상태가 없음 | 파일 최종 발행 ACK와 기한 시 보고 원천 정의 | 수용 | Resolved |
+| RV-248 | P2 | H8, §5.1, §7 | 기존 NoRoute가 관측 출력 성공에도 붙으며, 0 target 구성에는 명시적으로 바꿔야 하는 시작 계약이 있음 | Core와 네트워크 보고의 의미 정의 및 시작 gate | 수용 | Resolved |
+| RV-249 | P2 | §5.6, §6 | End를 보내고 구독을 닫을 때 기존 ACK 확정·오류 계약이 열려 있음 | End/EOF/ACK의 종료 상태표와 호환 시험 | 수용 | Resolved |
+| RV-250 | P2 | §5.6, §5.10 | 표시 protobuf의 상한 산식에 반복 항목의 인코딩 오버헤드가 빠질 수 있음 | 형식을 결정하고 실제 인코딩 길이로 상한 확인 | 수용 | Resolved |
 
 ### RV-245 — 「host 한 단계」는 응답 기한 상한이 아님
 
 - **[리뷰어]** r4의 ④ `Pending → Committed` CAS 직후 host가 선점되면 호출자의 280행 설명과 달리 ⑤ 상태 변경과 표시 게시가 아직 되지 않았을 수 있다. 이때 취소 CAS는 실패하고 영수증 대기가 host 재개 시점까지 연장된다. 기한 확인과 CAS 사이에 선점되면 호출자가 먼저 취소하지 않은 경우 기한 뒤 CAS도 가능하다. 같은 상태 명령에서 CAS를 생략할 경우에도 취소와 응답 중 어느 것이 최종 결과인지 정해야 한다. [커밋과 호출자 계약](../../04_implementation/milestones/MS-013.md#L275)
 - **처리 제안** — `Timeout`의 미적용 보장은 취소가 확정된 경우로 유지하고, 기한에 host가 이미 권리를 얻었으나 게시·영수증이 미확정이면 호출자가 반환할 상태와 명령별 재조회 방법을 정의한다. 다른 방식을 택한다면 상태·표시가 관측되는 단일 커밋과 기한 보장의 근거를 문서에 명시한다. 단계 0의 핵심 판정은 CAS 직후 host 정지 상태에서도 API가 정해진 기한에 반환하고 재개 후 한 번만 효과가 나타나는지다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 커밋 지점을 `Pending → Committed` CAS **하나**로 정의하고 host의 기한 확인은 최적화로 낮췄다(보장은 CAS 경합). 호출자는 기한에 취소 CAS: 이기면 `Timeout` = 미적용, 지면 100 ms 유예 뒤 영수증 또는 `SwitchError::Pending(CommandId)`를 반환하고 `Logger::switch_status(id)`(최근 8개)로 `Applied`를 재확인한다. 반환 상한 = 기한 + 100 ms, 효과는 host 재개 뒤 정확히 1회, host 사망 시 `Pending` + `WorkerFailed`. 같은 상태 요청은 CAS 없이 무효과 응답. 단계 0 spike 판정에 「CAS 직후 host 정지」를 넣었다. MS-013 r5 §5.6·§6·§7.
 
 ### RV-246 — 손실 보존식과 offer의 복구 가능한 전이
 
 - **[리뷰어]** L3에서 `offered=1, queued=1`인 사본을 구독 close에서 `cut`으로 옮기면 현재 식의 우변이 0이 된다. `sent`를 누적값으로 유지하는지, ACK 후 다른 상태로 옮기는지도 식에 함께 표시해야 한다. 또한 hub에서 offer가 실제로 성공한 직후 네트워크 스레드가 `Progress.next_offer_index`를 갱신하기 전에 실패하면 감독자는 이미 큐에 넣은 구독까지 `not_offered`로 세게 된다. 링 pop과 Progress 등록 사이에도 같은 공백이 있다. 단일 완료 플래그는 감독자가 두 번 실행하는 경우를 막을 수 있으나 이 중간 경계의 완료 여부를 담지 않는다. [회계와 Progress](../../04_implementation/milestones/MS-013.md#L200), [hub offer의 상태 변경](../../../crates/dot-logger/src/adapters/remote/hub.rs#L414)
 - **처리 제안** — 누적 수량과 순간 상태를 구분하고, 최소한 L3 우변에 `cut`을 포함하며 ACK 식을 명시한다. 예를 들어 누적 `sent = acked + unacked + ack_pending`으로 둔다. 링 소비권 이전과 구독별 offer가 감독자에게 복구 가능하도록 링 항목·구독 ID별 커밋 또는 동등한 원자적 소유권 계약을 제시한다. 취소 이후 늦게 재개한 worker가 확정 계수를 변경할 권한도 정한다. 경계 사이 중단, hub 성공 직후 중단 및 취소 후 재개에서 각 단위를 정확히 한 번 정산하는지 검증한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. L3를 누적식(`offered = gap + too_large + adapter_failed + enqueued`, `enqueued = cut + sent + in_queue`, `sent = acked + unacked + ack_pending`)과 순간값(`in_queue`·`ack_pending`, 최종 0)으로 나눴다. 정확히 한 번 정산은 플래그가 아니라 단조 위치로: `Progress.current`를 처리 전 기록, 링 읽기 위치는 모든 eligible offer 뒤 전진, hub는 구독별 `last_offered_seq`를 offer와 같은 잠금 구간에서 갱신. 감독자는 먼저 hub를 봉인(늦게 재개한 worker의 offer·계수 변경 거절)한 뒤 위치 비교로 `not_offered`·`abandoned`를 계산하므로 재실행해도 같다. 경계 사이·offer 직후·취소 뒤 재개 시험. MS-013 r5 §5.4.
 
 ### RV-247 — 기한 보고가 실제 파일 완료와 같은 사실을 말해야 함
 
 - **[리뷰어]** r4는 core Closed 직후 `FilesClosed`를 보낸다. 현재 host에서는 core Closed 이후에 IO 스레드가 `target.log.finish()`로 마지막 세그먼트를 발행하고, 실패하면 `io_failed`를 올린다. `FilesClosed`를 먼저 보낸 뒤 이 발행이 실패하면 호출자가 이미 파일 성공을 관측할 수 있다. 반대로 host가 최초 진행 메시지 전에 멈춘 경우 호출자는 채널 수신 기한은 지킬 수 있으나 현재 공개 `Incomplete`가 요구하는 `FacadeReport`를 채울 원천이 없다. 기존 API는 이 경우 `Unresponsive(PendingShutdown)`을 반환한다. 기한 이후 동기 감독 정산까지 호출자가 맡으면 잠금 재시도 외에 링·구독 순회 시간도 반환 기한에서 빠진다. [core 종료 후 파일 finish](../../../crates/dot-logger/src/logger/host.rs#L639), [최종 발행 실패 처리](../../../crates/dot-logger/src/logger/host.rs#L943), [PendingShutdown::wait](../../../crates/dot-logger/src/logger/mod.rs#L379)
 - **처리 제안** — `FilesClosed`가 마지막 파일 발행 결과까지 포함하도록 순서를 명시하고 완료 시각을 함께 기록한다. 기한까지 보고가 하나도 없으면 기존 `Unresponsive`를 유지하거나 관측 가능한 불완전 상태를 별도로 정의한다. 호출자의 기한 경로에서는 확정 스냅샷만 읽고, 시간이 남지 않으면 `finalized=false`로 반환해 정산을 `PendingShutdown`에 맡긴다. 단계 0에서 무보고 host 정지, core Closed 뒤 파일 finish 실패, 정산 중 기한 만료를 각각 판정한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. `FilesClosed`는 IO 스레드의 `log.finish()` 결과와 `io_failed`·시각까지 모은 뒤 보낸다(최종 발행 실패를 파일 성공으로 발표하지 않음). 기한까지 host 보고가 하나도 없으면 기존 `ShutdownError::Unresponsive(PendingShutdown)`를 그대로 쓴다. 감독 정산은 host가 하고 호출자는 게시된 스냅샷만 읽으며, 정산이 안 끝났으면 `finalized = false`로 반환해 `PendingShutdown`에 넘긴다. MS-013 r5 §5.9.
 
 ### RV-248 — observer-only의 공개 의미와 0 target 시작 기준
 
 - **[리뷰어]** 현 `Cause::NoRoute`는 기록이 명시적으로 **어느 출력에도** 라우팅되지 않았다는 뜻이며 producer commit 때 채널 단위로 센다. 특정 파일만 피한 기록을 파일별로 센다는 H8 설명과 다르다. 기존 파일 A/B에서 B만 선택한 기록은 NoRoute가 아니지만, 파일+observer 구성에서 성공적으로 네트워크에 전달한 observer-only 기록은 r4대로라면 NoRoute다. 또 기존 `Router`와 completion Registry 생성부는 `targets.is_empty()`를 명시적으로 거절한다. 이는 지금 코드의 실행 결과가 불확실한 경우가 아니라 새 모드가 의도적으로 변경할 검증 경계다. [NoRoute 정의](../../../crates/dot-logger/src/loss.rs#L49), [입구 계수](../../../crates/dot-logger/src/completion/mod.rs#L934), [Router 검증](../../../crates/dot-logger/src/routing/mod.rs#L536), [Registry 검증](../../../crates/dot-logger/src/completion/mod.rs#L144)
 - **처리 제안** — H8에서 observer-only를 기존 `NoRoute`로 보고할 경우 「tracked 출력 없음」이라는 공개 의미·혼합 파일 판독 안내·네트워크 계수와 대조하는 기준을 명시한다. 기존 의미를 그대로 보존하려면 observer 성공과 무출력을 구분한다. 0 target 허용은 observer가 실제 구성된 경우로 범위를 정하고, 시작·입구 수락·raw 회수·주기 sync 생략·네트워크 단절 중 종료 및 기존 빈 구성 거절을 spike의 합격 조건으로 명시한다. 구현 방식은 spike에 맡길 수 있다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. H8을 개정했다: observer-only 기록은 `NoRoute`로 세지 않고 **core 손실·완료 집계에서 제외**(셀 없음, `NoRoute`의 「어느 출력에도 없음」 의미 보존), 결과는 네트워크 L1 `observed`. `Router::new`·`Registry`의 target 0 거절은 observer가 구성된 경우에만 완화하고 observer 없는 빈 route·빈 구성 거절은 유지. spike 합격 조건(시작·입구 수락·raw 회수·주기 sync 생략·단절 중 종료·빈 구성 거절 유지)을 명시. MS-013 r5 §2.3 H8·§5.1·§8.1.
 
 ### RV-249 — End 알림과 미확정 ACK를 함께 처리해야 함
 
 - **[리뷰어]** 기존 client는 EOF에서 남은 ACK RPC를 정리한 뒤에만 정상 종료한다. 기존 hub는 구독을 닫으면서 pending을 폐기하며, 닫힌 구독에 새 ACK를 받으면 Gone을 돌려준다. r4가 `End(MarkerOverflow)`를 보낼 때 어느 시점에 ACK 접수를 닫는지, client가 End를 보고 바로 루프를 끝내도 되는지 비어 있다. ACK RPC 오류와 End가 동시에 오면 기존 client의 `reap()`이 먼저 실패하며 End를 읽지 못할 수도 있다. [EOF와 ACK](../../../crates/dot-logger-client/src/transport.rs#L751), [hub close](../../../crates/dot-logger/src/adapters/remote/hub.rs#L170), [ACK에 대한 Gone](../../../crates/dot-logger/src/adapters/remote/hub.rs#L248)
 - **처리 제안** — 정상 drain/강제 종료별로 End, 새 payload 차단, ACK 허용 종료, EOF의 순서를 명시한다. 확정되지 않은 ACK와 End 이유를 둘 다 사용자에게 보존하거나 우선순위를 공개한다. End는 살아 있는 스트림에서 전달할 수 있는 상태로 정의하고, 전달 불가 시 transport 오류가 어떻게 보이는지 명시한다. 마지막 레코드의 ACK가 남은 경우와 ACK RPC 오류가 먼저 도착한 경우를 wire 호환 시험에 더한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 표시 요청 구독의 End·ACK·EOF 순서표(정상 drain: 새 payload 중지 → 큐 송신 → ACK 창이 빌 때까지 접수 → `End{Shutdown, unconfirmed}` → EOF / 강제: 즉시 중지 → `End{reason, unconfirmed}` → EOF, 뒤늦은 ACK는 `Gone`·서버 `unacked` / 전달 불가: 지금 transport 오류). client는 표시 요청 구독에서 ACK `Gone`을 바로 오류로 내지 않고 다음 항목을 한 번 읽어 End를 우선한다. 옛 client는 지금 EOF 그대로. 시험 3종 추가. MS-013 r5 §5.6·§6.
 
 ### RV-250 — 표시의 wire 길이는 12P 메모리 산식과 별도로 검증
 
 - **[리뷰어]** §5.6의 「머리 + P × (5+10)」는 varint 값 길이만 합친다. 생산자별 항목을 protobuf repeated message로 인코딩하면 각 항목의 필드 태그와 바깥 길이 prefix도 반복된다. packed scalar 배열 또는 byte blob을 쓸 경우의 길이는 또 다르다. 표시가 실제 한도를 넘으면 기존 서버의 encoding 한도 때문에 시작은 통과해도 구독이 표시에서 끊길 수 있다. [표시 상한](../../04_implementation/milestones/MS-013.md#L275), [gRPC encoding 한도](../../../crates/dot-logger/src/adapters/remote/server.rs#L313)
 - **처리 제안** — 표시 필드 표현을 먼저 고정하고 최악 값으로 만든 실제 frame의 encoded length나 그에 대한 검증된 checked 상한으로 시작 조건을 판정한다. 최대 producer 수와 최소 메시지 한도에서 경계값을 시험한다. 저장용 packed 메모리 크기 산식은 그대로 별도 검증한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 표시 표현을 고정했다: `boundary`는 packed `bytes` 하나(생산자별 LE `u32` + `u64`, repeated message 아님). 시작 때 최악값(모든 정수 최대, P = 생산자 수) frame을 **실제 encoder로 인코딩한 길이**를 `message_bytes`와 비교해 태그·길이 prefix·frame 머리를 모두 포함한다. 메모리 산식과 별도 검증. MS-013 r5 §5.6·§5.10.
 
 ## 4. 수렴 기준과 다음 회차
 
 RV-245~250은 공개 계약·상태 전이·정산식의 결정 사항이다. 정확한 Rust 원자 순서, ring 구현 방식, 복사 처리량, 스레드 깨우기 방식 및 허용치 충족 여부는 골든과 단계 0 spike에서 판정하면 된다. H6의 조기 go/no-go와 기존 구성 회귀가 이미 있으므로 이 측정 결과를 설계 재리뷰의 선행 조건으로 요구하지 않는다.
 
 RV-245~250을 다음 개정에서 반영한 뒤 REV-078에서 대조한다. 이전 지적이 해소되고 새 지적이 0건인 회차까지 반복한다.
+
+**[처리담당] 2026-11-27:** 6건 모두 수용해 MS-013 r5에 반영했다(반영표 MS-013 §14). §4의 구분(계약 vs spike 판정)을 따라 계약만 닫았고 구현 세부는 단계 0 spike 판정 기준으로 두었다. 재리뷰: [REV-078 요청](REV-078_REQUEST.md).

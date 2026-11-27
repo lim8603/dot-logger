@@ -9,9 +9,9 @@
 | 현재 Phase | Verify — Gate 4 Pass(이 PC 로컬 범위, 2026-11-21 Human 수락). MS-001~006·008·009 Done, MS-007 In Progress |
 | 개발 방식 | TDD Approved — 실패 테스트 → 최소 구현 → 리팩토링 |
 | 활성 Intent | INT-001 Approved |
-| 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. [MS-012](../04_implementation/milestones/MS-012.md) InfluxDB 연동 재검증과 사용 안내 Planned(2026-11-26 설계·M1·M2 승인). MS-009 Done |
+| 활성 Milestone | MS-007 In Progress — 실사용처(TASK-026) 잔여(TASK-024·038·039 2026-11-24, TASK-040 2026-11-25 Done). [MS-011](../04_implementation/milestones/MS-011.md) RT 로거 비교 근거와 채택 편의 In Progress(2026-11-23 등록, TASK-042 2026-11-26 Done, 043·044 Planned). [MS-010](../04_implementation/milestones/MS-010.md) 릴리즈와 배포 In Progress — 0·1단계 Done(2026-11-22 [v0.1.0 미리보기](https://github.com/lim8603/dot-logger/releases/tag/v0.1.0)), 1a v0.1.1(TASK-041) Planned, 2단계부터 TASK-026 뒤이고 그 전에 추가 기능 논의(2026-11-23 Human). 3a 1.0.0 직전 재검증(24h·멀티 OS CI·게이트, T8) 2026-11-24 추가. [MS-012](../04_implementation/milestones/MS-012.md) InfluxDB 연동 재검증과 사용 안내 In Progress(TASK-045 CI 대기, TASK-046 S0 Done). [MS-013](../04_implementation/milestones/MS-013.md) 출력 구성 선택과 네트워크 전용 모드 **Draft**(2026-11-27, REV-074 설계 리뷰 대기). MS-009 Done |
 | 활성 Task | **TASK-045 S5 CI 대기 → 다음 TASK-046**(S1 실DB [EV-132](../05_verification/verification_evidence.md#ev-132), S2~S4 `influxdb_write` 예제 [EV-133](../05_verification/verification_evidence.md#ev-133) 2026-11-27) · 계획: REV-073 조치 → MS-012 [TASK-045](../04_implementation/tasks/TASK-045.md)(v2 실DB 재검증·`Writer` 예제)·[046](../04_implementation/tasks/TASK-046.md)(v3 Core 호환)·[047](../04_implementation/tasks/TASK-047.md)(장시간 DB 단절) → TASK-041**(2026-11-26 Human: 시험 3종·`Writer` 예제·v0.1.1 전·Docker) · [TASK-041](../04_implementation/tasks/TASK-041.md) v0.1.1 Planned(REV-073·MS-012 뒤, 태그는 Human 확인 뒤) · TASK-042 Done(2026-11-26, README 지연 표·[EV-129](../05_verification/verification_evidence.md#ev-129)) · TASK-041 Planned · TASK-043·044 Planned(0.2 후보, 기능 논의) · TASK-018 Cancelled(B2) |
-| 미처리 리뷰 | 없음 — **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Closed**(2026-11-26 위임 수락: RV-202~212 조치 [EV-131](../05_verification/verification_evidence.md#ev-131), CI run `45822618242` 19/19 Pass). REV-001~073 Closed |
+| 미처리 리뷰 | **REV-074 요청됨**(2026-11-27, MS-013 설계 리뷰 1회차 — [요청서](../05_verification/reviews/REV-074_REQUEST.md), Human이 리뷰 세션을 열면 시작) · 이전 — **[REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) Closed**(2026-11-26 위임 수락: RV-202~212 조치 [EV-131](../05_verification/verification_evidence.md#ev-131), CI run `45822618242` 19/19 Pass). REV-001~073 Closed |
 | 상태 | 39/47 Task Done(TASK-018 Cancelled), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`e2e30fa` run `45822618242` 19개 작업, 약 50분, 2026-11-26 — REV-073 조치). 최신 회귀 [EV-131](../05_verification/verification_evidence.md#ev-131): 두 Rust 각 750 Pass·5 ignored(이전 EV-115 742), Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
@@ -58,7 +58,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 | Task | 제목 | 담당 | 상태 | 갱신 | 다음 액션 |
 |---|---|---|---|---|---|
 | TASK-045 | v2 실DB 재검증과 `Writer` 예제 | AI | In Progress | 2026-11-27 | S1~S4 Done(EV-132·133) → S5 CI 확인 뒤 Done |
-| TASK-046 | InfluxDB 3 Core 호환 확인 | AI | Planned | 2026-11-26 | TASK-045 뒤 |
+| TASK-046 | InfluxDB 3 Core 호환 확인 | AI | In Progress | 2026-11-27 | S0 Done(3.12.3 고정, v2 쓰기 204·Flux 404·타입 충돌 배치 전체 거절) → S1 하네스 `--server v3` |
 | TASK-047 | 장시간 DB 단절 시험 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정 |
 | TASK-041 | v0.1.1 패치 릴리즈 | AI | Planned | 2026-11-26 | REV-073·MS-012 뒤. 태그는 Human 확인 뒤 |
 | TASK-043 | RT용 미룬 서식 로그 | AI | Planned | 2026-11-23 | MS-011, 0.2 후보 — 기능 논의 |
@@ -77,59 +77,16 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(3
 
 ## 다음 시작점
 
-0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 Closed(EV-131, CI 19/19) → TASK-045 S1 Done(2026-11-27, EV-132: 두 Rust live 4·pipeline Pass) → S2~S4 `influxdb_write` 예제 Done(EV-133) → **TASK-045 S5 CI 확인 → TASK-046**. 출력 구성 기능 안건은 아래 상세 절(2026-11-27 우려 검토 완료, TASK-041 뒤 계획서). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
+0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 Closed(EV-131, CI 19/19) → TASK-045 S1 Done(2026-11-27, EV-132: 두 Rust live 4·pipeline Pass) → S2~S4 `influxdb_write` 예제 Done(EV-133) → **TASK-045 S5 CI 확인 → TASK-046**. 출력 구성 기능 안건은 [MS-013](../04_implementation/milestones/MS-013.md) Draft(2026-11-27, REV-074 리뷰 대기). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
 0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
 1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **REV-073 반입·조치 → MS-012(TASK-045~047)**(2026-11-26) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
-   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·**출력 구성 선택·네트워크 전용 연구 모드(2026-11-26 Human R1~R3, 아래 [상세](#기능-논의-안건-상세--출력-구성-선택과-네트워크-전용-모드-2026-11-26) — 2026-11-27 우려 검토 완료, 상세 리팩토링 계획서 뒤 MS/Task화)**·B1/B2.
+   - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·**출력 구성 선택·네트워크 전용 연구 모드(2026-11-26 Human R1~R3 → [MS-013](../04_implementation/milestones/MS-013.md) Draft, REV-074 리뷰 대기)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
 2. **마지막 단계:** TASK-026 실사용처 적용은 일정 판단 밖이다. TASK-024는 2026-11-24 Done이고, 24h·멀티 OS CI·게이트는 1.0.0 직전에 다시 한다(MS-010 3a, T8). TASK-018은 Cancelled(B2).
 
-### 기능 논의 안건 상세 — 출력 구성 선택과 네트워크 전용 모드 (2026-11-26)
+### 기능 논의 안건 — 출력 구성 선택과 네트워크 전용 모드 → [MS-013](../04_implementation/milestones/MS-013.md)
 
-계기: InfluxDB 논의 중 Human이 연구개발용 구조를 제안. 상태: **우려 검토 완료(2026-11-27), 계획서 작성 대기** — MS/Task·ADR 전. MS로 등록할 때 이 절을 MS 문서로 옮긴다(project_state 크기 경고선 초과의 주원인). 다음 행동: TASK-041 뒤 상세 리팩토링 계획서(MS 문서·ADR·TASK) 작성 → Human 승인.
-
-**요구(Human):**
-- **R1 출력 선택:** 시작 때 옵션 파일로 파일·네트워크·DB를 배타적으로 또는 동시에 선택.
-- **R2 네트워크 전용 고부하 모드:** 초당 ~100 MB 단위동작 기록을 SSD에 쓰지 않고 정해진 메모리 안에서 네트워크로만 보내 원격(예: 원격 PC Redis)에서 분석.
-- **R3 외부 전송 스위치:** 원하는 순간에 네트워크 전송을 켜고 끔.
-
-**확인한 현재 동작(코드):**
-- 흐름: 입력(`try_log`) → writer 링·raw 풀 → host 스레드 Router 분배 → 출력별 큐 → 파일 IO / 원격 tap.
-- 파일 출력은 facade에서 모두 `required`·`pending_slots 0`·`max_attempts 1`, 공유 한도가 먼저 차 느린 파일이 입구 RT `Capacity` 거절로 역류(`logger/budget.rs` 주석). 거절은 모든 파일에서 빠지고 손실 보고에 남는다(EV-123 F1).
-- 원격은 Router target이 아니라 **첫 번째 파일 출력이 쓴 것의 tap**(`logger/host.rs`)이고 `Tap::offer` 결과를 버린다. 구독별 예산 초과 시 그 구독만 Gap/Disconnect. **로거 쪽 원격 손실 집계 없음**(Health·종료 보고·`.logger` 모두), 구독자만 Gap을 앎. 고급 경로에는 `PendingAck`·`RemoteDelivery`(전송별 Acknowledged/Unknown/Dropped)가 있다.
-- 파일 출력 없으면 `start()`가 `Missing::FileOutput`. DB는 facade에 없음. 옵션 파일 로딩 없음(코드 builder만), 실행 중 패치는 레벨·샘플링만. 원격 버퍼는 `remote_with(RemoteLimits)`로 키울 수 있음(기본 구독당 ≤ 4 MiB·`max_age` 10 s).
-- 성능 근거: 유선 1 GbE gRPC 대용량 116 MB/s(TCP와 같은 수준, TLS), 256 B 1만 건/s ACK p99 4 ms(EV-105).
-- 정확도: 파일(+종료 보고) > DB(`Acknowledged`만 확실) > 원격(구독자만 손실 인지).
-
-**필요한 변경(초안):** 원격을 Router 독립 출력으로(파일 없는 시작 허용) · 필수가 아닌 출력과 출력별 버림 정책 · 원격 손실 집계(Health·종료 보고) · 옵션 파일 형식·로딩 · 외부 전송 스위치 · facade DB 출력(MS-012 결과 뒤).
-
-**우려(초안, 검토 대상):**
-
-| ID | 우려 | 내용 | 검토할 질문 |
-|---|---|---|---|
-| C1 | 손실 근거 상실 | 파일이 없으면 기준 기록이 없다. 지금 원격 손실은 로거에 남지 않아 「무엇이 빠졌는지」 답할 근거가 없다 | 로봇 쪽 원격 집계(보냄·Gap·끊김·Unknown)를 필수로 할지, 작은 로컬 손실 기록(파일 1개)을 남길지 |
-| C2 | 링크 여유 | 1 GbE 실측 상한 ~117 MB/s에 100 MB/s는 85%. 버스트·재전송 여유가 거의 없다 | 2.5/10 GbE 전제인지, 채널 선택·압축으로 줄일지 |
-| C3 | 메모리 상한과 버스트 | 로봇 쪽 버퍼 N MB는 100 MB/s에서 N/100 초의 정지만 흡수. 수신(Redis)이 같은 속도를 못 따라가면 Gap. Redis는 메모리 DB(100 MB/s ≈ 6 GB/분) | 버퍼 크기·정지 허용 시간 목표, 수신 쪽 상한·보관 정책 |
-| C4 | 구독 전·스위치 전 데이터 | 구독자가 없을 때는 버려진다. 스위치를 켠 순간 구독이 아직 없으면 시작 부분을 잃는다 | 「구독 먼저 → 트리거」 순서 규약인지, 트리거 이전 일정 시간을 메모리에 들고 있다 보내는 pre-trigger 창이 필요한지 |
-| C5 | 의미 변경 | 원격이 「파일이 쓴 것」의 tap에서 Router 출력으로 바뀌면 viewer 등 기존 구독자가 보는 순서·내용 보장이 달라진다 | 파일+원격 동시 구성에서 기존 tap 의미를 유지할지 |
-| C6 | 완료·종료 판정 | 파일 없는 구성에서 「완료」와 종료 성공의 기준이 없다(지금은 sync) | 수신자 ACK(기존 ACK RPC)를 완료로 볼지, 보냄까지로 볼지 |
-| C7 | 옵션 파일 소유와 비밀 | 라이브러리가 파일을 읽으면 형식·버전·검증·비밀(TLS 키·토큰·DB 토큰) 취급이 라이브러리 책임이 된다. 범용 라이브러리 방향과 충돌 가능 | 라이브러리가 읽을지, 직렬화 가능한 설정 타입만 주고 앱이 읽을지 |
-| C8 | 외부 스위치 권한·경합 | 원격에서 켜고 끄려면 쓰기 권한(ApplyConfig와 같은 수준)·상태 보고가 필요. 끌 때 진행 중 기록 처리, 꺼진 동안 분배 비용 0 여부 | 스위치 주체(로봇 API / 원격 명령 / 구독 자체)와 끈 동안의 처리 |
-| C9 | 호스트 CPU | 100 MB/s 복사·인코딩·TLS가 관리 스레드 CPU를 쓴다. RT 경로는 설계상 분리되지만 같은 PC의 코어 경합·affinity 영향 | 원격 전용 스레드·CPU 배치, 측정 기준 |
-| C10 | UPS·내구 보장 범위 | UPS 경보 뒤 3 s 마감·sync 내구 보장은 파일 전제. 네트워크 전용에서는 적용되지 않는다 | 모드별 보장 범위를 문서·Health에 명시 |
-| C11 | 버전·검증 비용 | 공개 API·출력 모델 변경이라 0.2. 100 MB/s 네트워크 전용은 새 성능·장애 시험(수신 정지·단절·장시간)이 필요하고 이 PC 네트워크가 1 GbE일 수 있다 | 시험 장비(링크 속도·수신 PC), MS-012·keepalive·facade 원격 재생 안건과 묶을지 |
-
-**검토 결과(2026-11-27 #001 Human 「모두 권고대로」):**
-- **C1:** 로봇 쪽 원격 집계(구독별 보냄·Gap·끊김·Unknown 건수·바이트)를 Health·종료 보고에 필수로 넣는다. 손실 구간만 남기는 로컬 요약 파일은 선택 옵션.
-- **C2·C3 재정의(Human):** 링크 속도·수신 쪽 정지·Redis 보관량은 사용자 책임이라 라이브러리가 전제하지 않는다. 사용자가 궁금한 것은 「어디까지 지원하냐」이므로, 우리 일은 **최대 처리량을 측정해 조건과 함께 공개**하는 것이다(2.5 GbE 카드 사용도 일반적). 버퍼 크기와 정지 흡수 시간의 관계(N MB ÷ 속도)는 문서에 쓴다. 이 PC는 `enp4s0` 1 GbE라 링크 측정은 1 GbE 상한에 묶이고, 라이브러리 상한은 loopback으로 따로 잰다.
-- **C4:** 0.2는 「구독 먼저 → 스위치 켜기」 규약과 켤 때 시작 위치 반환. pre-trigger 메모리 창은 후속 옵션.
-- **C7 변경(Human 「재빌드 없이 쓰려고 파일로 하는 것」):** 코드 builder와 옵션 파일을 **둘 다** 지원한다. 두 경로는 같은 설정 타입으로 모이고, 파일 로딩은 선택 feature(log4rs의 설정 파일 feature와 같은 방식). 비밀은 파일에 값으로 넣지 않고 경로·환경 변수 참조로 받는다. 형식·버전·검증 세부는 계획서·ADR에서 승인.
-- **C10:** 모드별 보장표를 문서에 두고, Health에 내구 보장 수준(파일 sync / 없음)을 표시.
-- **C5·C6·C8·C9·C11:** 초안 권고 수락 — C5 파일+원격 구성에서 기존 tap 의미 유지, C6 기본 완료는 「보냄」·ACK 완료는 옵션, C8 스위치는 로봇 API 먼저, C9 원격 전용 스레드와 affinity 영향 측정, C11 0.2에서 keepalive·원격 실패 원인 구분·facade DB 출력과 묶음.
-- **범위 단계:** ① 원격 독립 출력·손실 집계·설정 타입과 옵션 파일(R1) → ② 전송 스위치(R3) → ③ 최대 처리량 측정·공개(R2).
-- **상세 리팩토링 계획서(Human 제안, 2026-11-27):** 새 문서 종류를 만들지 않고 MS 상세 문서(현재 구조·목표 구조·단계별 이행·API 변경과 호환·시험·측정 계획·위험)와 ADR, 단계별 TASK로 쓴다. 시점은 정해진 순서대로 TASK-041 뒤 기능 논의 첫 항목이며, MS-012 결과(facade DB 출력 범위)를 반영한다.
-
-관련 기존 안건: keepalive(EV-123 F4) · facade 원격 재생(지금 Query/Replay는 facade에서 `Unsupported`) · 원격 실패 원인 구분(EV-124·126) · facade DB 출력.
+2026-11-26 Human 제안(R1~R3), 2026-11-27 우려 C1~C11 검토·결정. 2026-11-27 Human 「요구사항과 리팩토링 계획을 한 문서에 작성하고, 리뷰 세션으로 리뷰 받고, 수정하고 다시 리뷰 받는 과정을 한번 거치자」 → 요구·결정·계획을 MS-013(Draft)에 쓰고 이 절의 원문은 MS-013 부록 A로 옮겼다. 다음: **독립 리뷰 1회차 [REV-074 요청](../05_verification/reviews/REV-074_REQUEST.md)**(Human이 리뷰 세션을 연다) → 반영 → 재리뷰(REV-075) → Human 승인 → ADR-017·018·FR 반영·TASK 등록. 구현 착수 시점은 MS-013 §9 Q1(권고: MS-012 → TASK-041 뒤).
 
 ## 승인·재개 제약
 

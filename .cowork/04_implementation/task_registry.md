@@ -60,7 +60,7 @@
 | TASK-043 | RT용 미룬 서식 로그(서식 id + 인자) | MS-011 | INT-001 | US-001·002 | AI | Planned | 2026-11-23 | 0.2 후보. MS-010 2단계 전 기능 논의에서 채택 → 설계·ADR | 기능 논의 | [상세](tasks/TASK-043.md) | 4~7+ADR |
 | TASK-044 | `Record` derive 또는 prost 연동 | MS-011 | INT-001 | US-001 | AI | Planned | 2026-11-23 | 0.2 후보. 기능 논의에서 A(prost)/B(derive)/C 결정 | 기능 논의 | [상세](tasks/TASK-044.md) | 2~4 |
 | TASK-045 | v2 실DB 재검증과 `Writer` 예제 | MS-012 | INT-001 | US-002·003 | AI | In Progress | 2026-11-27 | S1~S4 Done(EV-132·133) → S5 CI 확인 뒤 Done. D1=A crate 예제·D2=A 현재 API(2026-11-26 Human) | REV-073 조치 | [상세](tasks/TASK-045.md) | 0.5~1 |
-| TASK-046 | InfluxDB 3 Core 호환 확인 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-045 뒤. v3 digest 고정·쓰기 호환·Flux 조회 여부, 지원표 | TASK-045 | [상세](tasks/TASK-046.md) | 0.5~1.5 |
+| TASK-046 | InfluxDB 3 Core 호환 확인 | MS-012 | INT-001 | US-002·003 | AI | In Progress | 2026-11-27 | S0 Done(3.12.3 digest 고정) → S1 하네스 `--server v3`. 지원표 | TASK-045 | [상세](tasks/TASK-046.md) | 0.5~1.5 |
 | TASK-047 | 장시간 DB 단절 시험 | MS-012 | INT-001 | US-002·003 | AI | Planned | 2026-11-26 | TASK-046 뒤 S0 결정(DB 경로·장애 길이·판정). pause·stop·network disconnect | REV-073 RV-202~204·TASK-045 | [상세](tasks/TASK-047.md) | 1.5~2.5+실행 |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.

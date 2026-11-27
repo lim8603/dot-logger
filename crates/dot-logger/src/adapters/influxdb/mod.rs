@@ -49,6 +49,10 @@
 //! guard; dropping an unpublished attempt is Unknown. File output runs in a
 //! separate host worker. A real DB check: `python3 scripts/check-influxdb.py`
 //! (needs Docker; `cargo test` ignores the four live tests).
+//!
+//! The `influxdb_write` example (`crates/dot-logger/examples/influxdb_write.rs`)
+//! builds the session budget, writes a few points and reads them back; run it
+//! against a throwaway DB with `python3 scripts/check-influxdb.py --example`.
 mod numeric;
 mod routed;
 use crate::{

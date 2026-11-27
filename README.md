@@ -32,7 +32,9 @@ counted rather than silently lost.
 - **Operations.** Runtime level and sampling changes, telemetry windows,
   before/after comparison, file-system checks, and an emergency flush on a
   power alarm.
-- **Integrations.** `tracing`/`log` input and InfluxDB v2 output.
+- **Integrations.** `tracing`/`log` input. InfluxDB v2 writes and numeric
+  queries on the advanced path (`adapters::influxdb`); the default `Logger`
+  has no database output.
 
 ## Workspace
 
@@ -239,7 +241,7 @@ No feature is enabled by default.
 | Feature | Adds |
 |---|---|
 | `remote` | gRPC server and client types (tonic, Tokio) |
-| `influxdb` | Bounded InfluxDB v2 writes and numeric queries (reqwest, Tokio) |
+| `influxdb` | Bounded InfluxDB v2 writes and numeric queries on the advanced path, `adapters::influxdb` (reqwest, Tokio) |
 | `tracing-adapter` | `tracing` and `log` input |
 | `compression-zstd` | zstd support in the MCAP dependency (dot-logger itself writes uncompressed chunks) |
 | `calibrate` | Machine calibration and JSON profiles for presets |
@@ -254,6 +256,7 @@ No feature is enabled by default.
 | [`ups_simulation`](crates/dot-logger/examples/ups_simulation.rs) | Power-alarm and shutdown-deadline simulation (`--plan`, `--run DIR`) |
 | [`soak`](crates/dot-logger/examples/soak.rs) | Long-run load with resource samples, and an external power cut: alarm, then a kill 3 s later (Linux) |
 | [`os_exchange`](crates/dot-logger/examples/os_exchange.rs) | Files written on one OS and checked record by record on another (`write DIR`, `verify DIR...`) |
+| [`influxdb_write`](crates/dot-logger/examples/influxdb_write.rs) | Advanced-path InfluxDB v2 `Writer`: write a few points, read the numeric ones back (`--features influxdb`, settings from `INFLUX_HOST`, `INFLUX_ORG`, `INFLUX_BUCKET`, `INFLUX_TOKEN`) |
 | [`live_host`](crates/dot-logger-viewer/examples/live_host.rs), [`operations_host`](crates/dot-logger-viewer/examples/operations_host.rs) | Demo hosts for the viewer and dashboard |
 | [`tests/api-consumer`](tests/api-consumer/src/main.rs) | Using the public API from a separate crate |
 

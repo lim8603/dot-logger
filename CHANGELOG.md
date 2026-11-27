@@ -16,6 +16,14 @@ version.
   reserves. Size a `LiveBudget` or `QueryBudget` as subscriptions times this
   value; the receiver's bookkeeping differs by platform, so a formula built
   from the payload size alone can fall short on macOS.
+- `influxdb_write` example (`--features influxdb`): the advanced-path
+  InfluxDB v2 `Writer` writes a few points and reads the numeric ones back.
+  `scripts/check-influxdb.py --example` runs it against a throwaway DB.
+
+### Changed
+
+- README: InfluxDB output is on the advanced path (`adapters::influxdb`),
+  not the default `Logger`.
 
 ### Fixed
 

@@ -95,3 +95,9 @@ required-features = ["remote"]
 name = "dot_probe_facade"
 path = "../../examples/dot_probe_facade.rs"
 required-features = ["remote", "tracing-adapter"]
+
+# TASK-045: advanced-path InfluxDB write and read-back; run against a real DB
+# with `python3 scripts/check-influxdb.py --example`.
+[[example]]
+name = "influxdb_write"
+required-features = ["influxdb"]

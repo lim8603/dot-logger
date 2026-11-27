@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
 import time
@@ -20,6 +21,8 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--pipeline-example', action='store_true',
                         help='also verify TASK-020 S2 integration and its CLI against this owned DB')
+    parser.add_argument('--example', action='store_true',
+                        help='also run the influxdb_write example against this owned DB (TASK-045)')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     name = 'dot-logger-tc008-' + secrets.token_hex(6)
@@ -111,6 +114,29 @@ def main():
                     print(log.decode()[-6000:])
                     raise RuntimeError('TASK-020 S2 failed; see ' + label + '.log')
             print(f"InfluxDB {VERSION}: TASK-020 S2 integration and CLI passed")
+        if args.example:
+            command = ['cargo', '+' + args.toolchain, 'run', '--locked', '-p', 'dot-logger',
+                       '--features', 'influxdb', '--example', 'influxdb_write']
+            example_env = {key: value for key, value in env.items() if not key.startswith('INFLUX_')}
+            # Without its settings the example must print usage and exit 2, not touch any DB.
+            usage = subprocess.run(command, env=example_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            args.output.joinpath('example-usage.log').write_bytes(usage.stdout)
+            example_env.update(INFLUX_HOST=endpoint, INFLUX_TOKEN=token,
+                               INFLUX_ORG=setup['org'], INFLUX_BUCKET=setup['bucket'])
+            run = subprocess.run(command, env=example_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            log = run.stdout.replace(token.encode(), b'[REDACTED]')
+            args.output.joinpath('example.log').write_bytes(log)
+            read_back = re.search(rb'^read back (\d+)/(\d+) numeric points$', log, re.MULTILINE)
+            evidence['example'] = {'command': command, 'usage_exit_code': usage.returncode,
+                                   'exit_code': run.returncode,
+                                   'read_back': read_back.group(0).decode() if read_back else None}
+            if usage.returncode != 2 or b'INFLUX_HOST' not in usage.stdout:
+                print(usage.stdout.decode()[-6000:])
+                raise RuntimeError('influxdb_write without settings must print usage and exit 2; see example-usage.log')
+            if run.returncode or not read_back or read_back.group(1) != read_back.group(2) or read_back.group(1) == b'0':
+                print(log.decode()[-6000:])
+                raise RuntimeError('influxdb_write example failed; see example.log')
+            print(f"InfluxDB {VERSION}: influxdb_write example passed ({read_back.group(0).decode()})")
     finally:
         if created:
             cleanup = subprocess.run(['docker', 'rm', '--force', '--volumes', name],

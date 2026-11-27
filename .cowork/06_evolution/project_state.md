@@ -71,7 +71,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 | REV-059~072 | 네이티브 복구·runtime·ADR-013 E·`.logger`·viewer·MCAP·재생·T7 저장/ACK/CRC·대시보드·전체 코드·Gate 4 뒤 플랫폼/soak 리뷰 | **Closed** | 회차별 처리·EV는 각 [리뷰 문서](../05_verification/reviews/). 표 원문은 [상태 아카이브](state_archive.md) #035 |
 | [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) | `f30ae5a..2632b6c` — 플랫폼 후속·시험 검출력·CI·하네스·README 지연 수치 | **Closed** | 11건 수용·조치([EV-131](../05_verification/verification_evidence.md#ev-131)), CI run `45822618242` 19/19 Pass로 위임 수락 |
 | [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md) | MS-013 요구사항·리팩토링 설계 1회차, 기준 `da5f6c9` | **Resolved** | 12건 r2 반영. REV-075에서 잔여 P1 연결, Human 판단 대기 |
-| [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) | MS-013 r2 독립 재리뷰, 기준 `d9c2da7` | **Open** | Conditional. P1 4·P2 5·P3 1, RV-225~234 후속 반영과 Human 승인 대기 |
+| [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) | MS-013 r2 독립 재리뷰, 기준 `d9c2da7` | **Open** | Conditional. P1 4·P2 5·P3 1, RV-225~234 반영 뒤 REV-076. 지적 0건까지 반복 |
 
 이전 회차별 대상·판정·처리 이력은 [리뷰 문서](../05_verification/reviews/)와 [상태 아카이브](state_archive.md)의 #014·#024·#029 이관을 따른다.
 
@@ -86,7 +86,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ### 기능 논의 안건 — 출력 구성 선택과 네트워크 전용 모드 → [MS-013](../04_implementation/milestones/MS-013.md)
 
-2026-11-26 Human 제안(R1~R3), 2026-11-27 우려 C1~C11 검토·결정. 2026-11-27 Human 「요구사항과 리팩토링 계획을 한 문서에 작성하고, 리뷰 세션으로 리뷰 받고, 수정하고 다시 리뷰 받는 과정을 한번 거치자」 → 요구·결정·계획을 MS-013(Draft)에 쓰고 이 절의 원문은 MS-013 부록 A로 옮겼다. 독립 리뷰 1회차 [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md)는 Conditional / Resolved(12건 모두 수용, **r2 반영 2026-11-27**). 독립 재리뷰 [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md)는 Conditional / Open(RV-225~234). 다음은 잔여 지적 처리와 Human 승인(MS-013 §2.3 H1~H5·§9.2 Q1~Q8) → ADR-017~019·FR 반영·TASK 등록. 구현 착수 시점은 MS-013 §9 Q1(권고: MS-012 → TASK-041 뒤).
+2026-11-26 Human 제안(R1~R3), 2026-11-27 우려 C1~C11 검토·결정. 2026-11-27 Human 「요구사항과 리팩토링 계획을 한 문서에 작성하고, 리뷰 세션으로 리뷰 받고, 수정하고 다시 리뷰 받는 과정을 한번 거치자」 → 요구·결정·계획을 MS-013(Draft)에 쓰고 이 절의 원문은 MS-013 부록 A로 옮겼다. 독립 리뷰 1회차 [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md)는 Conditional / Resolved(12건 모두 수용, **r2 반영 2026-11-27**). 독립 재리뷰 [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md)는 Conditional / Open(RV-225~234). 2026-11-27 Human 후속 결정으로 **이전 지적이 해소되고 새 지적이 0건인 회차까지 설계 수정과 독립 재리뷰를 반복**한다. 다음은 RV-225~234 반영 → REV-076. 리뷰 종료 뒤 Human 승인(MS-013 §2.3 H1~H5·§9.2 Q1~Q8) → ADR-017~019·FR 반영·TASK 등록. 구현 착수 시점은 MS-013 §9 Q1(권고: MS-012 → TASK-041 뒤).
 
 ## 승인·재개 제약
 
@@ -134,7 +134,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ## 최근 작업·이력
 
-- 2026-11-27 — [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) MS-013 r2 독립 재리뷰 마감. Conditional, RV-225~234 Open. 잔여 지적 처리와 프로젝트 오너의 설계 승인 대기.
+- 2026-11-27 — [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) MS-013 r2 독립 재리뷰 마감. Conditional, RV-225~234 Open. Human 후속 결정으로 지적 0건까지 반복. 다음은 설계 반영과 REV-076.
 - 2026-11-27 — [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md) 독립 설계 리뷰 1회차 마감. Conditional, RV-213~224 Open. 다음은 MS-013 설계 반영과 REV-075.
 - 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
 - 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.

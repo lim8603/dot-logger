@@ -8,7 +8,7 @@
 | 기준 | 이 요청서와 MS-013 r2를 넣은 `main` 커밋(`git log -1 -- .cowork/04_implementation/milestones/MS-013.md`). r1은 `da5f6c9`, REV-074 기준도 같다 |
 | 결과물 | 이 폴더에 `REV-075_<목적>.md`(초기 상태 `Open`), 지적 번호는 `RV-225`부터. 형식은 [REV-074](REV-074_MS013_OUTPUT_DESIGN_REVIEW.md)와 같게(요약 → 절·코드 대조 → 리뷰 포인트, P1/P2/P3, 종합 판정 Pass/Conditional/Reject) |
 | 상태 동기화 | 리뷰 세션이 [project_state.md](../../06_evolution/project_state.md)의 미처리 리뷰·코드리뷰 현황에 REV-075를 등록한다 |
-| 이후 | 2026-11-27 Human 결정에 따라 **재리뷰는 이번 1회**다. 결과를 반영한 뒤 Human이 MS-013(§2.3 H1~H5, §9.2 Q1~Q8 포함)을 승인하면 ADR-017~019·요구사항·TASK로 넘어간다. 남은 P1이 있으면 Human 판단으로 넘긴다 |
+| 이후 | 2026-11-27 Human 후속 결정에 따라 이전 지적이 해소되고 새 지적이 0건인 회차까지 수정·재리뷰를 반복한다. 이후 Human이 MS-013(§2.3 H1~H5, §9.2 Q1~Q8 포함)을 승인하면 ADR-017~019·요구사항·TASK로 넘어간다 |
 
 ## 1. 무엇을 보나
 

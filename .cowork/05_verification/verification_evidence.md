@@ -2039,6 +2039,14 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **결과(두 Rust 같음):** `tc_008_influx_live` **4 Pass**(타입·나노초 왕복, ACK/실패 완료 식별, 부분 타입 실패 → Unknown·유효 행 유지, 중복 병합 ≠ 원본 보존) · `dot-logger-client` `pipeline` 실DB 시험 **1 Pass** · `dot_probe_pipeline` CLI `functional_pass: true`(파일·원격 각 45 확인, 숫자 조회 10, DB 완료 20/20, Unknown 0). 실행 뒤 남은 컨테이너 0.
 - **원시 근거(비공개):** `imported_context/task_045_s1_2026-11-27/{1.96.0,1.85.0}/`(environment.json·live.log·pipeline-*.log·protocol.csv).
 - **범위·한계:** Linux amd64 일회용 DB 기능 확인이며 성능·native OS 수락이 아니다. InfluxDB 3 Core는 TASK-046, 장시간 단절은 TASK-047.
+### EV-133 — TASK-045 S2~S5: `influxdb_write` 예제·하네스 `--example`·문서
+
+- **대상:** `crates/dot-logger/examples/influxdb_write.rs`(신규, `required-features = ["influxdb"]`)·`scripts/check-influxdb.py --example`·README(Integrations 줄·feature 표·예제 표)·`adapters::influxdb` rustdoc·CHANGELOG Unreleased. 제품 라이브러리 동작 변경 없음(rustdoc 문단만).
+- **Red(S2):** 하네스에 `--example` 추가 — 설정 환경 변수 없이 실행하면 사용법·종료 코드 2, 설정하면 종료 0과 `read back N/N numeric points`(N > 0)를 요구. 예제가 없을 때 하네스 Fail(`must print usage and exit 2`), 잔여 컨테이너 0.
+- **Green(S3):** OSS 2.9.1 일회용 DB에서 두 Rust(1.96.0·1.85.0) 모두 Pass — `write: Acknowledged after 1 attempt(s), HTTP 204, 4 points`, `read back 3/3 numeric points`, 사용법 경로 종료 2, 잔여 컨테이너 0. 원시 근거(비공개) `imported_context/task_045_s3_2026-11-27/`. 환경 변수는 `INFLUX_HOST`·`INFLUX_ORG`·`INFLUX_BUCKET`·`INFLUX_TOKEN`, 로그의 토큰은 하네스가 가림.
+- **D2 근거(줄 수):** 예제 189줄(주석·빈 줄 제외 166). 그중 `QueryBudget`을 얻기 위한 세션 계획(`SessionConfig` → `validate`)이 28줄로, 쓰기·조회와 무관한 준비 비용이다 — facade DB 출력 기능 논의 안건의 근거.
+- **회귀(로컬):** 두 Rust workspace all-features 각 **750 Pass·실패 0·5 ignored**(EV-131과 같음), Clippy(all targets/features, `-D warnings`)·rustdoc(`-D warnings`)·fmt·`check-integration-surface.py` Pass.
+- **범위·한계:** CI는 예제를 컴파일만 한다(실DB 실행은 하네스). InfluxDB 3 Core는 TASK-046.
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

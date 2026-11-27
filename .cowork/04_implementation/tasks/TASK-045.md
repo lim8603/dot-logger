@@ -10,7 +10,7 @@
 | 담당 | AI |
 | 상태 | In Progress |
 | 마지막 갱신일 | 2026-11-27 |
-| 다음 액션 | S2 Red — 하네스 `--example` 옵션 |
+| 다음 액션 | S5 CI 확인 뒤 Done |
 | 의존 | REV-073 조치(MS-012 M2) |
 | 예상 소요 | 0.5~1 인일 |
 
@@ -34,13 +34,13 @@
 | 단계 | 목표 | 종료 상태 | 상태 |
 |---|---|---|---|
 | S1 | 기준선 재실행 | `python3 scripts/check-influxdb.py --pipeline-example --toolchain {1.96.0, 1.85.0}` — live 4개 + pipeline 시험·예제 Pass, cleanup 0. 실패하면 원인 처리 뒤 이 Task 계속. 출력은 비공개 증거 폴더 | **Done** 2026-11-27 — 두 Rust live 4·pipeline 1·CLI Pass, 잔여 컨테이너 0([EV-132](../../05_verification/verification_evidence.md#ev-132)) |
-| S2 | Red | 하네스에 `--example` 옵션(같은 일회용 DB에서 `influxdb_write` 예제 실행·결과 확인). 예제가 없어 실패하는 것을 확인 | Planned |
-| S3 | Green | 예제: `Config`(환경 변수 URL·org·bucket·token) → `Writer::new` → 숫자·이벤트 `Point` 몇 개 `write` → 결과(`Outcome`) 출력 → `query_numeric`으로 읽어 확인. 환경 변수가 없으면 사용법을 출력하고 종료 코드로 구분. 두 Rust에서 `--example` Pass. 줄 수 기록 | Planned |
-| S4 | 문서 | README: Integrations 줄과 feature 표에 "고급 경로(`adapters::influxdb`)"임을 명시, 예제 표에 `influxdb_write` 추가. `adapters::influxdb` rustdoc에 예제 링크. CHANGELOG Unreleased | Planned |
-| S5 | 마감 | 전체 회귀(두 Rust)·clippy·feature 조합·CI Pass, EV, 자가검토 | Planned |
+| S2 | Red | 하네스에 `--example` 옵션(같은 일회용 DB에서 `influxdb_write` 예제 실행·결과 확인). 예제가 없어 실패하는 것을 확인 | **Done** 2026-11-27 — 사용법·종료 2 검사 포함, Fail 확인([EV-133](../../05_verification/verification_evidence.md#ev-133)) |
+| S3 | Green | 예제: `Config`(환경 변수 URL·org·bucket·token) → `Writer::new` → 숫자·이벤트 `Point` 몇 개 `write` → 결과(`Outcome`) 출력 → `query_numeric`으로 읽어 확인. 환경 변수가 없으면 사용법을 출력하고 종료 코드로 구분. 두 Rust에서 `--example` Pass. 줄 수 기록 | **Done** 2026-11-27 — 두 Rust Pass, 189줄(실행 줄 166, 세션 계획 28)(EV-133) |
+| S4 | 문서 | README: Integrations 줄과 feature 표에 "고급 경로(`adapters::influxdb`)"임을 명시, 예제 표에 `influxdb_write` 추가. `adapters::influxdb` rustdoc에 예제 링크. CHANGELOG Unreleased | **Done** 2026-11-27 |
+| S5 | 마감 | 전체 회귀(두 Rust)·clippy·feature 조합·CI Pass, EV, 자가검토 | 로컬 Pass(두 Rust 각 750)·자가검토 지적 없음, **CI 대기** |
 
 ## 완료 기준
 
 - [x] S1 v2.9.1 실DB 두 Rust Pass·EV([EV-132](../../05_verification/verification_evidence.md#ev-132)).
-- [ ] 예제 실DB 실행 Pass(두 Rust)·CI 컴파일.
-- [ ] README·rustdoc 정정.
+- [x] 예제 실DB 실행 Pass(두 Rust)(EV-133) · [ ] CI 컴파일.
+- [x] README·rustdoc 정정.

@@ -8,9 +8,9 @@
 | 설계 | [`adapters::influxdb`](../../../crates/dot-logger/src/adapters/influxdb/mod.rs) rustdoc · [TASK-045](TASK-045.md) |
 | ADR | ADR-009(InfluxDB v2 선택) — 지원 범위 기록만, 변경 없음 |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | **Done** |
 | 마지막 갱신일 | 2026-11-27 |
-| 다음 액션 | S4 CI 확인 뒤 Done |
+| 다음 액션 | 없음 — 2026-11-27 Done(EV-134). 다음 TASK-047 S0 |
 | 의존 | TASK-045(하네스 `--example`·예제) |
 | 예상 소요 | 0.5~1.5 인일 |
 
@@ -38,7 +38,7 @@ Docker Hub `influxdb:latest`는 2026-04부터 InfluxDB 3 Core를 가리킨다. �
 | S1 | 하네스 | `check-influxdb.py --server v3`: 같은 격리 조건(루프백·tmpfs·CPU/메모리/pids 상한·무작위 토큰·redaction·cleanup). 결과 확인용 SQL 조회(`/api/v3/query_sql`)는 하네스(Python)에서 | **Done** 2026-11-27 — v3 모드는 시험별 결과 기록·SQL 덤프·기대 판정([EV-134](../../05_verification/verification_evidence.md#ev-134)) |
 | S2 | 실행 | v3에서 live 4개 + `influxdb_write` 예제 실행, 시험별 결과 분류(Pass / v3 차이로 실패 / 결함). 쓰기 결과는 하네스 SQL 조회로 값·타입·ns·태그 대조. 차이가 제품 결함이면 원인 보고 뒤 처리 범위를 Human과 정함 | **Done** 2026-11-27 — 4개 모두 「v3 차이(Flux 404)」, 쓰기 값 일치, 결함 0. 부분 배치만 의미 차이([EV-134](../../05_verification/verification_evidence.md#ev-134)) |
 | S3 | 문서 | 지원표(v2 2.9.1: 쓰기·조회 / v3 Core x.y: 쓰기 범위·조회 여부·차이)를 rustdoc·README에. `latest` 태그 주의. live 시험 v3 차이는 시험 이름·ignore 사유로 남김 | **Done** 2026-11-27 — rustdoc·README 표, 시험 머리 주석(이름은 이미 `real_v2_*`) |
-| S4 | 마감 | EV, 자가검토, 기능 논의 안건 갱신(필요 시) | EV-134·자가검토(1.85 패닉 형식 거짓 Fail 수정)·안건 등록(v3 조회), **CI 대기** |
+| S4 | 마감 | EV, 자가검토, 기능 논의 안건 갱신(필요 시) | EV-134·자가검토(1.85 패닉 형식 거짓 Fail 수정)·안건 등록(v3 조회), CI run `45976241015`(`e097c61`) 19/19 Pass(2026-11-27 09:44~10:39 UTC) — **Done** |
 
 ## S0 확인 (2026-11-27, 3.12.3 일회용 컨테이너, `curl` 수동)
 

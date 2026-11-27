@@ -2061,6 +2061,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **검출력:** v3 판정 함수에 변형 6종 — 조회 전 실패(404 → 500), 저장값 변경, 부분 배치 유효 행 저장, 예제 비확인, ns 1 차이 — 모두 Fail, 변형 없음 Pass. 처음 1.85 실행에서 패닉 줄 형식 차이(스레드 번호 없음)로 거짓 Fail이 났고 정규식을 고친 뒤 Pass. ns 비교는 초 경계를 넘어도 맞게 정수 ns로 계산.
 - **회귀:** v2 모드(`--example --pipeline-example`) Pass, fmt·두 Rust rustdoc(`-D warnings`)·Clippy·`check-integration-surface.py`·자가 시험 Pass. 잔여 컨테이너 0.
 - **원시 근거(비공개):** `imported_context/task_046_s1_2026-11-27/`, `task_046_s2_2026-11-27/{1.96.0,1.85.0}/`(environment.json·live.log·example*.log·protocol.jsonl·sql-dump.jsonl), `task_046_s2_v2_2026-11-27/`.
+- **CI:** CI run `45976241015`(`e097c61`) 19/19 Pass(2026-11-27 09:44~10:39 UTC).
 - **범위·한계:** Linux amd64 일회용 DB 기능 확인. v3 조회(SQL/InfluxQL) 지원은 기능 논의 안건(MS-012 M3). InfluxDB 3 Enterprise·Cloud는 미확인.
 ## Open Evidence Gaps
 

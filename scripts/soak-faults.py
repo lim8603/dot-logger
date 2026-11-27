@@ -14,6 +14,15 @@ Scenarios (design: .cowork/04_implementation/tasks/TASK-024.md, S2):
   f3b  a real ENOSPC on write (IoPoisoned), recorded as current behavior (D3)
   f4   network: a socat proxy stopped silently, then killed
   f5   SIGKILL without warning, unfinished files read back, restart
+  f6a  InfluxDB paused (silent: requests hang), then resumed (TASK-047)
+  f6b  InfluxDB stopped (connections refused), then started again
+  f6c  InfluxDB's network disconnected, then connected again
+
+f6 runs a digest-pinned InfluxDB 2.9.1 container (the image of
+scripts/check-influxdb.py) on a fixed loopback port with its data in a
+/dev/shm directory, so it survives stop/start without SSD writes, and the soak
+`--influx` writer thread beside the load. After recovery the stored points are
+read back with Flux and compared with the writer's batch log.
 
 f1, f3a and f3b run the harness in a Docker container that chroots into the
 host root (`--image` only provides the container; the host binaries run).
@@ -22,11 +31,12 @@ container, because `--device-write-bps` is fixed at start. f2, f4 and f5 run
 on the host with output in /dev/shm.
 
 Build first:
-  cargo +1.96.0 build --release --locked -p dot-logger --example soak --features remote
+  cargo +1.96.0 build --release --locked -p dot-logger --example soak --features remote,influxdb
   cargo +1.96.0 build --release --locked -p dot-logger-cli
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import pathlib
@@ -37,6 +47,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TARGET = pathlib.Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
@@ -102,7 +114,7 @@ class Soak:
     """One `soak run`, on the host or inside a chrooting container."""
 
     def __init__(self, args, out, name, parent, seconds, ring_mib, extra=(),
-                 docker=None):
+                 docker=None, env_extra=None):
         self.name = name
         self.docker = docker
         self.container = f"dot-logger-s2-{name}-{os.getpid()}" if docker is not None else None
@@ -110,6 +122,7 @@ class Soak:
         run = [soak, "run", str(parent), str(seconds), "1", str(ring_mib),
                "--sample-ms", str(args.sample_ms), *extra]
         env = dict(os.environ)
+        env.update(env_extra or {})
         if args.rt:
             env["DOT_LOGGER_PERF_RT"] = "fifo"
         else:
@@ -770,14 +783,229 @@ def f5(args, out):
     return marks, checks, {"trials": trials, "restart_end": end}
 
 
-SCENARIOS = {"f1": f1, "f2": f2, "f3a": f3a, "f3b": f3b, "f4": f4, "f5": f5}
+# --- f6: InfluxDB outage (TASK-047) -------------------------------------------
+
+def f6_window(batches, fault_start_ms, fault_end_ms, recover_s, grace_ms=1000):
+    """Judge the writer's batch log around one DB fault (unix ms). A batch
+    that ends inside the fault (after `grace_ms`, the time Docker needs to
+    apply it) must not be Acknowledged: no DB could answer then. A batch begun
+    during the fault may end after it, for example a retry the resumed DB
+    answers; those are reported apart (`straddling_outcomes`). The first
+    Acknowledged batch begun after the fault must end within `recover_s`, and
+    every later batch must be Acknowledged. `Busy` is the writer's bounded
+    refusal and is allowed; other preflight errors are not."""
+    attempts = [b for b in batches if "at_unix_ms" in b]
+
+    def ends(b):
+        return b["at_unix_ms"] + b.get("ms", 0)
+
+    def tally(group):
+        counted = {}
+        for b in group:
+            key = b.get("outcome") or b.get("error")
+            counted[key] = counted.get(key, 0) + 1
+        return counted
+
+    fault = [b for b in attempts if fault_start_ms + grace_ms <= ends(b) < fault_end_ms]
+    straddling = [b for b in attempts if b["at_unix_ms"] < fault_end_ms <= ends(b)
+                  and b["at_unix_ms"] >= fault_start_ms]
+    outcomes = tally(fault)
+    after = [b for b in attempts if b["at_unix_ms"] >= fault_end_ms]
+    first = next((b for b in after if b.get("outcome") == "Acknowledged"), None)
+    recovery_s = None if first is None else (first["at_unix_ms"] + first.get("ms", 0) - fault_end_ms) / 1000
+    later = [b for b in after if first is not None and b["at_unix_ms"] > first["at_unix_ms"]]
+    return {
+        "pre_acknowledged": any(b.get("outcome") == "Acknowledged" and b["at_unix_ms"] < fault_start_ms
+                                for b in attempts),
+        "fault_attempted": bool(fault),
+        "fault_no_ack": not any(b.get("outcome") == "Acknowledged" for b in fault),
+        "fault_outcomes": outcomes,
+        "straddling_outcomes": tally(straddling),
+        "recovered": recovery_s is not None and recovery_s <= recover_s,
+        "recovery_s": recovery_s,
+        "post_all_acknowledged": first is not None and all(b.get("outcome") == "Acknowledged" for b in later),
+        "worker_errors_0": all(b.get("error") in (None, "Busy") for b in attempts),
+    }
+
+
+def f6_db_checks(batches, stored):
+    """Channel 1 stores each point's index. Every Acknowledged point must be
+    stored, and a stored point must come from an Acknowledged or Unknown
+    batch (never from a skipped, NotSent, Rejected or refused one)."""
+    acked, unknown = set(), set()
+    for b in batches:
+        if b.get("outcome") == "Acknowledged":
+            acked.update(range(b["from"], b["to"]))
+        elif b.get("outcome") == "Unknown":
+            unknown.update(range(b["from"], b["to"]))
+    return {
+        "db_acked_present": acked <= stored,
+        "db_acked_missing": len(acked - stored),
+        "db_only_attempted": stored <= acked | unknown,
+        "db_unexpected": len(stored - acked - unknown),
+        "db_unknown_stored": len(stored & unknown),
+        "db_points": len(stored),
+    }
+
+
+def flux_values(csv_text):
+    """`_value` of every row of a Flux CSV answer (one or more tables)."""
+    values, column = set(), None
+    for line in csv_text.splitlines():
+        cells = line.split(",")
+        if not line.strip():
+            column = None
+        elif column is None:
+            column = cells.index("_value")
+        else:
+            values.add(int(cells[column]))
+    return values
+
+
+def influx_pin():
+    spec = importlib.util.spec_from_file_location("check_influxdb", ROOT / "scripts/check-influxdb.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.IMAGE, module.VERSION
+
+
+class Influx:
+    """One InfluxDB 2.9.1 container on a fixed loopback port, data in /dev/shm."""
+
+    def __init__(self, args, name):
+        import secrets
+        image, self.version = influx_pin()
+        self.port = args.port + 10
+        self.container = f"dot-logger-s2-{name}-{os.getpid()}"
+        self.data = pathlib.Path(args.shm_dir) / f"{name}-influx"
+        out = subprocess.run(["stat", "-f", "-c", "%T", args.shm_dir], capture_output=True, text=True)
+        if out.stdout.strip() != "tmpfs":
+            raise RuntimeError(f"{args.shm_dir} is not tmpfs; the DB must not write to disk")
+        shutil.rmtree(self.data, ignore_errors=True)
+        (self.data / "data").mkdir(parents=True)
+        (self.data / "etc").mkdir()
+        subprocess.run(["docker", "run", "-d", "--name", self.container,
+                        "--label", "dot-logger.test=tc008", "--cpus", "2", "--memory", "512m",
+                        "--pids-limit", "128", "-p", f"127.0.0.1:{self.port}:8086",
+                        "-v", f"{self.data / 'data'}:/var/lib/influxdb2",
+                        "-v", f"{self.data / 'etc'}:/etc/influxdb2", image],
+                       check=True, capture_output=True)
+        self.endpoint = f"http://127.0.0.1:{self.port}"
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self.wait_ready(45)
+        self.token = secrets.token_urlsafe(48)
+        self.org, self.bucket = "dot-logger-test", "soak"
+        setup = {"username": "soak", "password": secrets.token_urlsafe(24), "org": self.org,
+                 "bucket": self.bucket, "token": self.token, "retentionPeriodSeconds": 0}
+        request = urllib.request.Request(self.endpoint + "/api/v2/setup", data=json.dumps(setup).encode(),
+                                         headers={"Content-Type": "application/json"})
+        with self.opener.open(request, timeout=15) as response:
+            assert response.status == 201
+
+    def env(self):
+        return {"INFLUX_HOST": self.endpoint, "INFLUX_ORG": self.org,
+                "INFLUX_BUCKET": self.bucket, "INFLUX_TOKEN": self.token}
+
+    def wait_ready(self, seconds):
+        end = now() + seconds
+        while now() < end:
+            try:
+                with self.opener.open(self.endpoint + "/health", timeout=1) as response:
+                    health = json.load(response)
+                if health.get("status") == "pass" and health.get("version", "").lstrip("v") == self.version:
+                    return True
+            except (OSError, ValueError, urllib.error.URLError):
+                pass
+            time.sleep(0.2)
+        return False
+
+    def docker(self, *command):
+        subprocess.run(["docker", *command], check=True, capture_output=True)
+
+    def stored_indices(self):
+        flux = ('from(bucket: "soak") |> range(start: 0) '
+                '|> filter(fn: (r) => r._measurement == "soak_db" and r._field == "integer" and r.channel == "1") '
+                '|> keep(columns: ["_value"])')
+        request = urllib.request.Request(
+            self.endpoint + "/api/v2/query?org=" + self.org, data=flux.encode(),
+            headers={"Authorization": "Token " + self.token, "Content-Type": "application/vnd.flux",
+                     "Accept": "text/csv"})
+        with self.opener.open(request, timeout=120) as response:
+            return flux_values(response.read().decode())
+
+    def remove(self):
+        subprocess.run(["docker", "rm", "-f", self.container], capture_output=True)
+        shutil.rmtree(self.data, ignore_errors=True)
+
+
+F6_FAULTS = {
+    "f6a": (lambda db: db.docker("pause", db.container), lambda db: db.docker("unpause", db.container)),
+    "f6b": (lambda db: db.docker("stop", db.container), lambda db: db.docker("start", db.container)),
+    "f6c": (lambda db: db.docker("network", "disconnect", "bridge", db.container),
+            lambda db: db.docker("network", "connect", "bridge", db.container)),
+}
+
+
+def f6(args, out, name):
+    """InfluxDB outage beside the soak load; the logger itself has no DB output."""
+    parent = pathlib.Path(args.shm_dir) / name
+    parent.mkdir(parents=True)
+    db = Influx(args, name)
+    marks = []
+    try:
+        log = out / "batches.jsonl"
+        total = args.pre + args.f6_fault + args.post + 20
+        soak = Soak(args, out, "soak", parent, total, 256, ["--influx", str(log)], env_extra=db.env())
+        soak.start_event()
+        phase(marks, "pre")
+        wait_samples(soak, args.pre)
+        begin, end_fault = F6_FAULTS[name]
+        phase(marks, "fault")
+        fault_start = time.time()
+        begin(db)
+        wait_samples(soak, args.f6_fault)
+        phase(marks, "recover")
+        fault_end = time.time()
+        end_fault(db)
+        checks = {"db_ready_after_fault": db.wait_ready(60)}
+        code = soak.wait(total + 120)
+        end = soak.lines.wait_for("end", 1)
+        control, frames = counts(end)
+        found = inspect(args, parent, control, frames)
+        batches = [json.loads(line) for line in log.read_text().splitlines()]
+        checks.update(f6_window(batches, fault_start * 1000, fault_end * 1000, args.f6_recover))
+        checks.update(f6_db_checks(batches, db.stored_indices()))
+        influx = end.get("influx") or {}
+        checks.update({
+            "batch_log_complete": bool(batches) and batches[-1].get("end") is True,
+            "file_failed_records_0": end["outputs"][0]["failed_records"] == 0,
+            "file_rejected_0": end["counts"]["control_rejected"] + end["counts"]["frames_rejected"] == 0,
+            "files_gapless": holes(found) == 0 and found["found"]["torn_files"] == 0,
+            "shutdown_success": end["success"] is True,
+            "influx_points_skipped": influx.get("points_skipped"),
+            "influx_max_call_ms": influx.get("max_call_ms"),
+            "influx_busy": influx.get("busy"),
+        })
+        common_checks(soak, end, checks, code)
+        return marks, checks, {"exit": code, "end": end, "inspect": found,
+                               "fault_unix": [fault_start, fault_end]}
+    finally:
+        db.remove()
+        shutil.rmtree(parent, ignore_errors=True)
+
+
+SCENARIOS = {"f1": f1, "f2": f2, "f3a": f3a, "f3b": f3b, "f4": f4, "f5": f5,
+             "f6a": lambda a, o: f6(a, o, "f6a"), "f6b": lambda a, o: f6(a, o, "f6b"),
+             "f6c": lambda a, o: f6(a, o, "f6c")}
 # Values that are observations, not pass/fail conditions.
 OBSERVED = {"rejected_during_fault", "failed_records", "heap_growth_bytes",
             "f2a_gap_events_after_stops", "f2a_disconnect_outcome", "f2b_gap_outcome",
             "f2b_disconnect_outcome", "silent_stop_outcome", "kill_outcome",
             "after_resume_ended", "after_resume_outcome",
             "report_failed_counts", "trials_passed", "trials",
-            "bytes_free_at_fault"}
+            "bytes_free_at_fault", "fault_outcomes", "straddling_outcomes", "recovery_s", "db_acked_missing",
+            "db_unexpected", "db_unknown_stored", "db_points", "influx_points_skipped",
+            "influx_max_call_ms", "influx_busy"}
 
 def judge(name, checks):
     """Pass only when every pass/fail check is True and, except for F5 (its
@@ -822,6 +1050,9 @@ def main():
     parser.add_argument("--f4-fault", type=int, default=15)
     parser.add_argument("--f5-delays", type=lambda s: [int(x) for x in s.split(",")],
                         default=[7, 13, 19, 23, 29, 37])
+    parser.add_argument("--f6-fault", type=int, default=600, help="seconds of each DB outage")
+    parser.add_argument("--f6-recover", type=int, default=30,
+                        help="seconds after the outage within which writes must be acknowledged again")
     parser.add_argument("--heap-slack-mib", type=int, default=16)
     parser.add_argument("--keep", action="store_true", help="keep f1 files on disk")
     args = parser.parse_args()

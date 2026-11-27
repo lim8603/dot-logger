@@ -271,5 +271,85 @@ class KeptRecords(unittest.TestCase):
         self.assertFalse(mixed.judge_reader(1, good, expected=10)[0])
 
 
+def batch(start, end, at, outcome="Acknowledged", ms=5):
+    return {"from": start, "to": end, "outcome": outcome, "at_unix_ms": at, "ms": ms}
+
+
+class InfluxOutage(unittest.TestCase):
+    """TASK-047 f6: DB outage judgment from the writer's batch log."""
+
+    FAULT = (10_000, 20_000)  # unix ms: fault start, fault end
+
+    def clean(self):
+        return [batch(0, 10, 9_000), batch(10, 20, 9_100),
+                batch(20, 30, 11_100, "Unknown", 4_200), batch(30, 40, 15_300, "Unknown", 4_200),
+                {"from": 40, "to": 50, "error": "Busy", "at_unix_ms": 18_600, "ms": 0},
+                batch(50, 60, 21_000), batch(60, 70, 21_100), {"end": True}]
+
+    def window(self, batches):
+        return faults.f6_window(batches, *self.FAULT, recover_s=10)
+
+    def test_clean_outage_passes(self):
+        checks = self.window(self.clean())
+        self.assertTrue(all(v for k, v in checks.items() if isinstance(v, bool)), checks)
+        self.assertEqual(checks["fault_outcomes"], {"Unknown": 2, "Busy": 1})
+
+    def test_acknowledged_during_fault_fails(self):
+        batches = self.clean()
+        batches[3]["outcome"] = "Acknowledged"
+        self.assertFalse(self.window(batches)["fault_no_ack"])
+
+    def test_retry_answered_after_resume_is_not_a_fault_ack(self):
+        # f6a 2026-11-27: a batch begun during the pause retried, and the
+        # resumed DB answered it 45 ms after the fault ended.
+        batches = self.clean()
+        batches[4] = batch(40, 50, 17_700, "Acknowledged", 2_345)
+        checks = self.window(batches)
+        self.assertTrue(checks["fault_no_ack"], checks)
+        self.assertEqual(checks["fault_outcomes"], {"Unknown": 2})
+        self.assertEqual(checks["straddling_outcomes"], {"Acknowledged": 1})
+
+    def test_no_recovery_fails(self):
+        batches = [b for b in self.clean() if b.get("at_unix_ms", 0) < 20_000] + [{"end": True}]
+        self.assertFalse(self.window(batches)["recovered"])
+
+    def test_slow_recovery_fails(self):
+        batches = self.clean()
+        batches[5]["at_unix_ms"] = batches[6]["at_unix_ms"] = 31_000
+        self.assertFalse(self.window(batches)["recovered"])
+
+    def test_unknown_after_recovery_fails(self):
+        batches = self.clean()
+        batches[6]["outcome"] = "Unknown"
+        self.assertFalse(self.window(batches)["post_all_acknowledged"])
+
+    def test_worker_error_other_than_busy_fails(self):
+        batches = self.clean()
+        batches[4]["error"] = "Collision"
+        self.assertFalse(self.window(batches)["worker_errors_0"])
+
+    def test_nothing_before_fault_fails(self):
+        batches = [b for b in self.clean() if b.get("at_unix_ms", 99_999) >= 10_000]
+        self.assertFalse(self.window(batches)["pre_acknowledged"])
+
+    def test_db_matches_reported_attempts(self):
+        checks = faults.f6_db_checks(self.clean(), set(range(0, 20)) | {25, 26} | set(range(50, 70)))
+        self.assertTrue(checks["db_acked_present"] and checks["db_only_attempted"], checks)
+        self.assertEqual(checks["db_unknown_stored"], 2)
+
+    def test_db_missing_acknowledged_point_fails(self):
+        db = set(range(0, 20)) | set(range(50, 69))
+        self.assertFalse(faults.f6_db_checks(self.clean(), db)["db_acked_present"])
+
+    def test_db_point_from_skipped_or_failed_batch_fails(self):
+        db = set(range(0, 20)) | set(range(50, 70)) | {45}
+        self.assertFalse(faults.f6_db_checks(self.clean(), db)["db_only_attempted"])
+
+    def test_flux_csv_values(self):
+        csv = ("\r\n,result,table,_value\r\n,_result,0,3\r\n,_result,0,4\r\n\r\n"
+               ",result,table,_value\r\n,_result,1,7\r\n")
+        self.assertEqual(faults.flux_values(csv), {3, 4, 7})
+
+
 if __name__ == "__main__":
     unittest.main()

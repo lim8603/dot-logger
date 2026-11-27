@@ -16,6 +16,10 @@
 //! For fault injection (TASK-024 S2) `run` also takes `--sample-ms`,
 //! `--reserve-mib` and, with the `remote` feature, `--remote <port>`; samples
 //! then carry each output's failed records and time since its last sync.
+//! With the `influxdb` feature, `--influx <batch_log>` also runs an
+//! application thread that writes two 100 Hz channels to InfluxDB (settings
+//! from `INFLUX_HOST`, `INFLUX_ORG`, `INFLUX_BUCKET`, `INFLUX_TOKEN`) and
+//! adds its cumulative results to every sample (TASK-047).
 //! `inspect` reports what a directory holds (closed and, with `--active`,
 //! unfinished files) and the latest cumulative loss checkpoint, without a
 //! pass/fail judgment: the S2 driver (`scripts/soak-faults.py`) judges.
@@ -30,6 +34,9 @@
 #[cfg(target_os = "linux")]
 #[path = "support/perf/mod.rs"]
 mod perf;
+#[cfg(all(target_os = "linux", feature = "influxdb"))]
+#[path = "support/soak_influx.rs"]
+mod soak_influx;
 
 /// Heap accounting for the RSS judgment (TASK-024 S4, EV-120): live bytes
 /// and their lowest point between samples, so a leak (live bytes rising)
@@ -309,7 +316,7 @@ mod linux {
     const POWER_RING_MIB: u64 = 1024;
     const MAX_PRODUCERS: usize = 8;
     const USAGE: &str = "usage: soak run <parent> <seconds> <sample_s> <ring_mib> \
-        [--sample-ms <ms>] [--reserve-mib <mib>] [--remote <port>] \
+        [--sample-ms <ms>] [--reserve-mib <mib>] [--remote <port>] [--influx <batch_log>] \
         [--events <every_s>,<hold_s>,<release_s>] | \
         power <parent> <delay_s>[,<delay_s>...] | \
         verify <dir> <control_records> <frames> [--ring] | \
@@ -322,6 +329,8 @@ mod linux {
         sample_ms: Option<u64>,
         reserve_mib: u64,
         remote: Option<u16>,
+        /// TASK-047: batch log of the InfluxDB writer thread.
+        influx: Option<PathBuf>,
         /// TASK-040: mark an event every `every`, protect it for `hold`
         /// after its window, and release odd-numbered marks after `release`.
         events: Option<Events>,
@@ -342,6 +351,7 @@ mod linux {
                     "--sample-ms" => options.sample_ms = Some(value.parse()?),
                     "--reserve-mib" => options.reserve_mib = value.parse()?,
                     "--remote" => options.remote = Some(value.parse()?),
+                    "--influx" => options.influx = Some(PathBuf::from(value)),
                     "--events" => {
                         let parts: Vec<u64> =
                             value.split(',').map(str::parse).collect::<Result<_, _>>()?;
@@ -362,6 +372,9 @@ mod linux {
             }
             if options.remote.is_some() && !cfg!(feature = "remote") {
                 return Err(invalid("--remote needs the remote feature"));
+            }
+            if options.influx.is_some() && !cfg!(feature = "influxdb") {
+                return Err(invalid("--influx needs the influxdb feature"));
             }
             Ok(options)
         }
@@ -619,6 +632,12 @@ mod linux {
                     .limits(EVENT_LIMIT, (ring_mib << 20) / 2),
             );
         }
+        // Read the DB settings before anything starts, so a missing one fails early.
+        #[cfg(feature = "influxdb")]
+        let influx_settings = match &options.influx {
+            Some(_) => Some(super::soak_influx::Settings::from_env().map_err(invalid)?),
+            None => None,
+        };
         let builder = Logger::builder()
             .preset(Preset::sensor(FRAME_HZ, FRAME_BYTES).small(CONTROL_HZ, CONTROL_BYTES))
             .file_output(parent, retention)
@@ -646,7 +665,7 @@ mod linux {
         let started = Instant::now();
         emit(json!({"event":"start","kernel":perf::kernel()?,
             "realtime":perf::realtime_kernel(),"rt_mode":rt,"ring_mib":ring_mib,
-            "reserve_mib":options.reserve_mib,"remote":options.remote,
+            "reserve_mib":options.reserve_mib,"remote":options.remote,"influx":options.influx,
             "seconds":seconds,"dirs":dirs,
             "load":{"control_hz":CONTROL_HZ,"control_bytes":CONTROL_BYTES,
                 "frame_hz":FRAME_HZ,"frame_bytes":FRAME_BYTES}}))?;
@@ -664,6 +683,20 @@ mod linux {
                     .spawn(move || frame_loop(frame_writer, frame, &stats, &stop))?
             },
         ];
+        #[cfg(feature = "influxdb")]
+        let influx = match (influx_settings, &options.influx) {
+            (Some(settings), Some(log)) => {
+                let stats = Arc::new(super::soak_influx::Stats::default());
+                let handle =
+                    super::soak_influx::spawn(settings, log.clone(), stats.clone(), stop.clone())?;
+                Some((stats, handle))
+            }
+            _ => None,
+        };
+        #[cfg(feature = "influxdb")]
+        let influx_sample = || influx.as_ref().map(|(stats, _)| stats.sample());
+        #[cfg(not(feature = "influxdb"))]
+        let influx_sample = || None::<Value>;
         let (alarm_tx, alarm_rx) = mpsc::channel();
         thread::spawn(move || {
             for line in io::stdin().lock().lines() {
@@ -761,7 +794,8 @@ mod linux {
                     "rss_anon_kib":status_kib("RssAnon:"),"rss_file_kib":status_kib("RssFile:"),
                     "heap":super::heap::sample(),"fds":fds(),"disk_bytes":bytes,"files":count,
                     "health":format!("{:?}",health.state),
-                    "worker_failed":logger.worker_failed(),"counts":counts}))?;
+                    "worker_failed":logger.worker_failed(),"counts":counts,
+                    "influx":influx_sample()}))?;
             }
         };
         if alarm.is_none() {
@@ -789,6 +823,21 @@ mod linux {
                 Err(_) => failures.push("worker panicked".into()),
             }
         }
+        // Final DB results once the writer thread stopped; its last call ends
+        // within the writer's 5 s TTL. After an alarm it is left to the kill.
+        #[cfg(feature = "influxdb")]
+        let influx_end = influx.map(|(stats, handle)| {
+            if alarm.is_none() {
+                match handle.join() {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => failures.push(e),
+                    Err(_) => failures.push("influx worker panicked".into()),
+                }
+            }
+            stats.sample()
+        });
+        #[cfg(not(feature = "influxdb"))]
+        let influx_end = None::<Value>;
         if let Some(received) = alarm {
             emit(
                 json!({"event":"alarm","counts":stats.counts(),"failures":failures,
@@ -836,6 +885,7 @@ mod linux {
         emit(json!({"event":"end","success":shutdown.is_success(),
             "elapsed_s":started.elapsed().as_secs(),"counts":stats.counts(),
             "failures":failures,"rt_heap":rt_heap,"disk_bytes":bytes,"files":count,
+            "influx":influx_end,
             "health":format!("{:?}",health.state),"outputs":outputs,
             "rss_kib":status_kib("VmRSS:"),"hwm_kib":status_kib("VmHWM:"),"fds":fds(),
             "report":format!("{shutdown:?}")}))?;

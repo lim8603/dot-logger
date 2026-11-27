@@ -8,9 +8,9 @@
 | 설계 | [API §14.6](../../03_design_artifacts/interface_contract.md#146-task-019-s1-influxdb-v2-유한-write--2026-11-01) · [`adapters::influxdb`](../../../crates/dot-logger/src/adapters/influxdb/mod.rs) rustdoc · [TASK-019](TASK-019.md) · API §18.6(레시피 한도) |
 | ADR | ADR-009(InfluxDB v2·선택 feature·일반 경로) |
 | 담당 | AI |
-| 상태 | In Progress |
+| 상태 | **Done** |
 | 마지막 갱신일 | 2026-11-27 |
-| 다음 액션 | S5 CI 확인 뒤 Done |
+| 다음 액션 | 없음 — 2026-11-27 Done(EV-132·133). 다음 TASK-046 |
 | 의존 | REV-073 조치(MS-012 M2) |
 | 예상 소요 | 0.5~1 인일 |
 
@@ -37,10 +37,10 @@
 | S2 | Red | 하네스에 `--example` 옵션(같은 일회용 DB에서 `influxdb_write` 예제 실행·결과 확인). 예제가 없어 실패하는 것을 확인 | **Done** 2026-11-27 — 사용법·종료 2 검사 포함, Fail 확인([EV-133](../../05_verification/verification_evidence.md#ev-133)) |
 | S3 | Green | 예제: `Config`(환경 변수 URL·org·bucket·token) → `Writer::new` → 숫자·이벤트 `Point` 몇 개 `write` → 결과(`Outcome`) 출력 → `query_numeric`으로 읽어 확인. 환경 변수가 없으면 사용법을 출력하고 종료 코드로 구분. 두 Rust에서 `--example` Pass. 줄 수 기록 | **Done** 2026-11-27 — 두 Rust Pass, 189줄(실행 줄 166, 세션 계획 28)(EV-133) |
 | S4 | 문서 | README: Integrations 줄과 feature 표에 "고급 경로(`adapters::influxdb`)"임을 명시, 예제 표에 `influxdb_write` 추가. `adapters::influxdb` rustdoc에 예제 링크. CHANGELOG Unreleased | **Done** 2026-11-27 |
-| S5 | 마감 | 전체 회귀(두 Rust)·clippy·feature 조합·CI Pass, EV, 자가검토 | 로컬 Pass(두 Rust 각 750)·자가검토 지적 없음, **CI 대기** |
+| S5 | 마감 | 전체 회귀(두 Rust)·clippy·feature 조합·CI Pass, EV, 자가검토 | 로컬 Pass(두 Rust 각 750)·자가검토 지적 없음, CI run `45969430420`(`a9082bc`) 19/19 Pass(2026-11-27 08:55~09:39 UTC) — **Done** |
 
 ## 완료 기준
 
 - [x] S1 v2.9.1 실DB 두 Rust Pass·EV([EV-132](../../05_verification/verification_evidence.md#ev-132)).
-- [x] 예제 실DB 실행 Pass(두 Rust)(EV-133) · [ ] CI 컴파일.
+- [x] 예제 실DB 실행 Pass(두 Rust)(EV-133) · [x] CI 컴파일(CI run `45969430420`(`a9082bc`) 19/19 Pass(2026-11-27 08:55~09:39 UTC)).
 - [x] README·rustdoc 정정.

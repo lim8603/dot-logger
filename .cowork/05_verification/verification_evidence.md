@@ -2046,6 +2046,7 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **Green(S3):** OSS 2.9.1 일회용 DB에서 두 Rust(1.96.0·1.85.0) 모두 Pass — `write: Acknowledged after 1 attempt(s), HTTP 204, 4 points`, `read back 3/3 numeric points`, 사용법 경로 종료 2, 잔여 컨테이너 0. 원시 근거(비공개) `imported_context/task_045_s3_2026-11-27/`. 환경 변수는 `INFLUX_HOST`·`INFLUX_ORG`·`INFLUX_BUCKET`·`INFLUX_TOKEN`, 로그의 토큰은 하네스가 가림.
 - **D2 근거(줄 수):** 예제 189줄(주석·빈 줄 제외 166). 그중 `QueryBudget`을 얻기 위한 세션 계획(`SessionConfig` → `validate`)이 28줄로, 쓰기·조회와 무관한 준비 비용이다 — facade DB 출력 기능 논의 안건의 근거.
 - **회귀(로컬):** 두 Rust workspace all-features 각 **750 Pass·실패 0·5 ignored**(EV-131과 같음), Clippy(all targets/features, `-D warnings`)·rustdoc(`-D warnings`)·fmt·`check-integration-surface.py` Pass.
+- **CI:** CI run `45969430420`(`a9082bc`) 19/19 Pass(2026-11-27 08:55~09:39 UTC) — 예제 컴파일 포함.
 - **범위·한계:** CI는 예제를 컴파일만 한다(실DB 실행은 하네스). InfluxDB 3 Core는 TASK-046.
 ## Open Evidence Gaps
 

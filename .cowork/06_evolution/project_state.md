@@ -15,8 +15,8 @@
 | 상태 | 42/47 Task Done(TASK-018 Cancelled, TASK-045·046·047 2026-11-27), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`e097c61` run `45976241015` 19개 작업, 약 55분, 2026-11-27 — TASK-046 v3 하네스). 최신 회귀 [EV-133](../05_verification/verification_evidence.md#ev-133)(두 Rust 각 750 Pass·5 ignored), 이전 [EV-131](../05_verification/verification_evidence.md#ev-131): 두 Rust 각 750 Pass·5 ignored(이전 EV-115 742), Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-26 / #003 — InfluxDB 논의, MS-012·TASK-045~047 설계·승인, REV-073 반입·조치(RV-202~212), 출력 구성 기능 안건 기록. 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
-| 세션 상태 | **마감 — 2026-11-26 #003(개발·논의).** generic 커널 1회 부팅 상태(다음 재부팅은 RT), governor `powersave`. REV-073 Closed, CI `45822618242` 19/19 Pass. 다음 세션은 TASK-045 S1(v2.9.1 실DB 재실행) |
+| 갱신 | 2026-11-27 / #001 — 출력 구성 안건 우려 검토·MS-013 요구·리팩토링 계획 r1~r5(REV-074~077 반영), MS-012 Done(TASK-045~047, EV-132~135). 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
+| 세션 상태 | **마감 — 2026-11-27 #001(개발·설계).** RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass. 다음 세션은 **REV-078 재리뷰 반입**(MS-013 r5) → 지적 0건까지 반복, 구현은 TASK-041 v0.1.1 |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -135,10 +135,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ## 최근 작업·이력
 
-- 2026-11-27 — [REV-077](../05_verification/reviews/REV-077_MS013_R4_DESIGN_REVIEW.md) MS-013 r4 독립 재리뷰 마감. Conditional, RV-245~250 Open. 다음은 설계 반영과 REV-078.
-- 2026-11-27 — [REV-076](../05_verification/reviews/REV-076_MS013_R3_DESIGN_REVIEW.md) MS-013 r3 독립 재리뷰 마감. Conditional, RV-235~244 Open. 다음은 설계 반영과 REV-077.
-- 2026-11-27 — [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) MS-013 r2 독립 재리뷰 마감. Conditional, RV-225~234 Open. Human 후속 결정으로 지적 0건까지 반복. 다음은 설계 반영과 REV-076.
-- 2026-11-27 — [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md) 독립 설계 리뷰 1회차 마감. Conditional, RV-213~224 Open. 다음은 MS-013 설계 반영과 REV-075.
+- 2026-11-27 #001 — 출력 구성 안건 우려 검토(C2·C3 재정의, C7 코드+파일) → [MS-013](../04_implementation/milestones/MS-013.md) 요구·리팩토링 계획 r1~r5, 독립 리뷰 REV-074~077(Codex, 12→10→10→6건, 모두 수용·반영), Human 「지적 0건까지 반복」. MS-012 Done: TASK-045 실DB 재실행·`influxdb_write` 예제(EV-132·133), TASK-046 v3 Core 3.12.3 호환(쓰기 동일·Flux 404, EV-134), TASK-047 DB 장애 f6a/b/c 각 10분 Pass(EV-135). 비공개 세션 로그 `session_logs/session_2026-11-27_001.md`.
 - 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
 - 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
 

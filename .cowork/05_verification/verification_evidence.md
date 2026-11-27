@@ -2048,6 +2048,20 @@ Gate 4/5: Not Ready — 구현/실제 환경 검증 전. Gate 3는 quality_gate.
 - **회귀(로컬):** 두 Rust workspace all-features 각 **750 Pass·실패 0·5 ignored**(EV-131과 같음), Clippy(all targets/features, `-D warnings`)·rustdoc(`-D warnings`)·fmt·`check-integration-surface.py` Pass.
 - **CI:** CI run `45969430420`(`a9082bc`) 19/19 Pass(2026-11-27 08:55~09:39 UTC) — 예제 컴파일 포함.
 - **범위·한계:** CI는 예제를 컴파일만 한다(실DB 실행은 하네스). InfluxDB 3 Core는 TASK-046.
+### EV-134 — TASK-046: InfluxDB 3 Core 3.12.3 호환 범위(쓰기 동일·Flux 조회 없음)
+
+- **대상:** `scripts/check-influxdb.py --server v3`(신규 모드), `adapters::influxdb` rustdoc 서버 버전 표, README feature 표, `tc_008_influx_live` 머리 주석, CHANGELOG. 제품 동작 변경 없음.
+- **고정(S0):** `influxdb@sha256:9eb55d1873ea629e497179cc465d1d345a78f4bce5c5bc318d3d3ac0b8647022`(`3-core`, 3.12.3, 이미지 생성 2026-11-20). `influxdb3 serve --object-store file`을 tmpfs(256 MiB, `mode=1777`)에, 헬스만 인증 해제, 관리자 토큰은 HTTP `POST /api/v3/configure/token/admin`, DB는 `/api/v3/configure/database`. 루프백 임시 포트·CPU 2·512 MiB·pids 256, 토큰은 로그에서 가림.
+- **결과(두 Rust 1.96.0·1.85.0 같음, 하네스 판정 Pass):**
+  - live 4개 모두 **쓰기 단언은 통과하고 Flux 조회 단계에서 `Http(404)`로 실패**(roundtrip Acknowledged, 부분 실패 Unknown·400·1회, 중복 병합 쓰기, routed 완료 보고).
+  - SQL 대조: `i64` 최대·최소, 불리언, 실수, 따옴표 이벤트, `u32`·`u64` 최대 receipt, 연속 ns 시각(0~4 ns 간격), 태그 `channel`·`device` 그대로. 중복은 v2처럼 병합(값 9, 원 receipt).
+  - **차이:** 타입 충돌이 섞인 배치는 유효 행까지 저장되지 않음(v2는 유효 행 유지). `Writer`는 둘 다 `Unknown`이라 계약 위반 아님.
+  - `influxdb_write` 예제: 쓰기 `Acknowledged`(HTTP 204, 4점) 뒤 `query_numeric` `Http(404)`로 종료 1. SQL에 4행이 값 그대로.
+  - 없는 bucket으로 쓰면 v3가 DB를 자동 생성(S0, 수동 확인), `org`는 무시.
+- **검출력:** v3 판정 함수에 변형 6종 — 조회 전 실패(404 → 500), 저장값 변경, 부분 배치 유효 행 저장, 예제 비확인, ns 1 차이 — 모두 Fail, 변형 없음 Pass. 처음 1.85 실행에서 패닉 줄 형식 차이(스레드 번호 없음)로 거짓 Fail이 났고 정규식을 고친 뒤 Pass. ns 비교는 초 경계를 넘어도 맞게 정수 ns로 계산.
+- **회귀:** v2 모드(`--example --pipeline-example`) Pass, fmt·두 Rust rustdoc(`-D warnings`)·Clippy·`check-integration-surface.py`·자가 시험 Pass. 잔여 컨테이너 0.
+- **원시 근거(비공개):** `imported_context/task_046_s1_2026-11-27/`, `task_046_s2_2026-11-27/{1.96.0,1.85.0}/`(environment.json·live.log·example*.log·protocol.jsonl·sql-dump.jsonl), `task_046_s2_v2_2026-11-27/`.
+- **범위·한계:** Linux amd64 일회용 DB 기능 확인. v3 조회(SQL/InfluxQL) 지원은 기능 논의 안건(MS-012 M3). InfluxDB 3 Enterprise·Cloud는 미확인.
 ## Open Evidence Gaps
 
 | ID | 미검증 범위/마지막 revision | 담당·다음 조건 | 상태 |

@@ -851,3 +851,18 @@ project_state가 크기 경고선(24 KiB)을 넘어 완료·문서화된 결정�
 - 2026-11-25 #001 — 재부팅 뒤 TASK-042 S2 ③-a generic·`powersave` 측정(RT 대비 꼬리 2~3배, TASK-042 문서)(비공개 세션 로그: `session_logs/session_2026-11-25_001.md`).
 - 2026-11-24 #001(~11-25) — CI 근본 수정(RV-199, EV-124)·REV-072 Closed, TASK-024 S5·TASK-038·039·040 Done(EV-125·126), CI 시간 의존 시험 5건 정리·CI 151 → 56분(EV-127·128), TASK-042 D3·S1 하네스·S2 RT 측정 ①②(비공개 세션 로그: `session_logs/session_2026-11-24_001.md`).
 - 2026-11-23 #002 — REV-072 반입·조치(EV-122, CI에서 macOS·Windows 새 시험 플랫폼 차이 3건 정리), TASK-024 S2 하네스·F1~F5(EV-123, 하네스 채움 사고 포함), MS-011·TASK-042~044 등록(비공개 세션 로그: `session_logs/session_2026-11-23_002.md`).
+
+## #036 — 2026-11-27 #002 세션 마감 R1 하베스트
+
+크기 정리(24 KiB 경고선 초과: 마감 전 29.9 KB).
+
+다음 시작점에서 이관(원문):
+
+0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 Closed(EV-131, CI 19/19) → TASK-045 S1 Done(2026-11-27, EV-132: 두 Rust live 4·pipeline Pass) → S2~S4 `influxdb_write` 예제 Done(EV-133) → TASK-045 Done(CI 19/19) → TASK-046 S0~S3 Done(EV-134) → TASK-046 Done(CI 19/19) → TASK-047 Done(EV-135, f6a/b/c 각 10분 Pass) → **MS-012 Done → 다음 구현은 TASK-041 v0.1.1**(태그는 Human 확인)(장시간 DB 단절, 실행 전 시간·쓰기량 승인). 출력 구성 기능 안건은 [MS-013](../04_implementation/milestones/MS-013.md) Draft r6(2026-11-27, REV-079 재리뷰 대기). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
+0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
+
+최근 작업·이력에서 이관:
+
+- 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
+- 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
+- 2026-11-26 #001 — REV-073 리뷰 요청서(`f30ae5a..2632b6c`)·세션 마감. TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).

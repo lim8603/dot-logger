@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-27 / #002 — REV-078 반입·MS-013 r6(5건 수용), REV-079 요청. #001 — 출력 구성 안건 우려 검토·MS-013 요구·리팩토링 계획 r1~r5(REV-074~077 반영), MS-012 Done(TASK-045~047, EV-132~135). 이전 세션은 [최근 작업·이력](#최근-작업이력) / AI |
-| 세션 상태 | **마감 — 2026-11-27 #001(개발·설계).** RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass. #002(설계): REV-078 반입 → MS-013 r6. 다음 세션은 **REV-079 재리뷰 반입**(MS-013 r6) → 지적 0건까지 반복, 구현은 TASK-041 v0.1.1 |
+| 세션 상태 | **마감 — 2026-11-27 #002(설계 — REV-078 반입·MS-013 r6).** RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass(이후 문서 커밋만). 다음 세션은 **REV-079 재리뷰 반입**(MS-013 r6) → 지적 0건까지 반복, 구현은 TASK-041 v0.1.1 |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -79,8 +79,7 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ## 다음 시작점
 
-0. **InfluxDB 논의 결과(2026-11-26 #003):** 시험 3종(v2 실DB 재실행·v3 Core 호환·장시간 DB 단절)·`Writer` 직접 예제·v0.1.1 전·Docker 일회용 컨테이너 결정 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계·승인(M1=새 MS·M2=REV-073 선행·TASK-045 D1=crate 예제·D2=현재 API, TASK-047 D는 그 S0). 순서: **REV-073 반입·조치**(하네스 겹침·README RV-209) → TASK-045 → 046 → 047 → TASK-041. **현재(#003 끝):** REV-073 Closed(EV-131, CI 19/19) → TASK-045 S1 Done(2026-11-27, EV-132: 두 Rust live 4·pipeline Pass) → S2~S4 `influxdb_write` 예제 Done(EV-133) → TASK-045 Done(CI 19/19) → TASK-046 S0~S3 Done(EV-134) → TASK-046 Done(CI 19/19) → TASK-047 Done(EV-135, f6a/b/c 각 10분 Pass) → **MS-012 Done → 다음 구현은 TASK-041 v0.1.1**(태그는 Human 확인)(장시간 DB 단절, 실행 전 시간·쓰기량 승인). 출력 구성 기능 안건은 [MS-013](../04_implementation/milestones/MS-013.md) Draft r6(2026-11-27, REV-079 재리뷰 대기). 이전 메모: 현재 InfluxDB 관련: `influxdb` feature, 시험 `tc_008_influxdb`·`_query`·`_routed`(가짜 서버)와 `tc_008_influx_live`(실제 DB, 기본 ignore — `scripts/check-influxdb.py`로 digest 고정 격리 DB에서 실행), 예제 없음, facade DB 출력 없음(기능 논의 안건), TASK-024 S2 F4-DB 미실행(tc_008 갈음). REV-073은 Open이며 F3 채움 재실행 전 RV-202 처리.
-0-1. ~~CI 확인~~ — 2026-11-24 완료: run `45197725224`의 macOS viewer 실패는 RV-199 회귀였고 수정 뒤 run `45370553005` 16개 Pass → REV-072 Closed·TASK-038 Done(EV-124).
+0. **현재(2026-11-27 #002 끝):** MS-012 Done(EV-132~135) → 출력 구성 안건 [MS-013](../04_implementation/milestones/MS-013.md) **Draft r6**, 다음은 **REV-079 재리뷰 반입**([요청서](../05_verification/reviews/REV-079_REQUEST.md)) → 지적 0건까지 반복 → Human 승인(H1·H3~H8·Q1~Q8). 구현 다음은 **TASK-041 v0.1.1**(태그는 Human 확인). 이전 시작점 원문은 [상태 아카이브](state_archive.md) #036.
 1. **순서(2026-11-23 Human):** ~~TASK-024 S5~~(2026-11-24 Done) → ~~TASK-039 할당 경로~~(2026-11-24 Done, EV-125) → ~~TASK-040 혼합 장시간~~(2026-11-25 Done, EV-126) → ~~TASK-042 `try_log` 지연 분포~~(2026-11-26 Done, EV-129) → **REV-073 반입·조치 → MS-012(TASK-045~047)**(2026-11-26) → **TASK-041** v0.1.1(태그 Human 확인) → **MS-010 2단계 전 추가 기능 개발 논의** → TASK-026.
    - 기능 논의 안건: facade DB 출력·재시작 자동 복구·ENOSPC 뒤 회복과 `IoPoisoned` 뒤 RT 수락 정책·Health 회복 표시(`RecordsFailed`가 `SyncOverdue`를 가림)·외부 공간 압박 시 링 최소 보존·**원격 구독 keepalive(조용한 단절 미감지, EV-123 F4)**·CLI `tail` 종료 결과 구분(`Gone`/초과 끊김이 `unknown`)·**원격 구독 실패 원인 구분(로컬 예산 부족과 서버 구독 한도가 같은 `ClientError::Remote(Limit)`, viewer는 둘 다 「upstream unavailable」로 알리고 재시도 — 설정 오류가 시간 초과로만 보임, EV-124. CLI `tail`도 출력 상한 도달과 서버 한도가 같은 `limit`·exit 3, EV-126)**·**Windows·macOS 짧은 대기 해상도(작은 슬롯 처리량 — Windows CI에서 작은 기록 약 1,300건/s, 링·이벤트 시험 5개가 조합당 약 6분, EV-128)**·**레벨 skip 호출의 시계 읽기 약 100 ns(레벨 확인을 앞당기면 거의 0, TASK-042 S1)**·**TASK-043 RT 미룬 서식 로그·TASK-044 derive/prost(0.2 후보)**·**`Writer` 연결 거부(요청 전송 전)도 `Unknown` — `NotSent` 구분 여부(EV-135 관찰 ①)**·**InfluxDB 3 조회(SQL/InfluxQL) — `query_numeric`은 v3에서 Flux 404(TASK-046, EV-134, MS-012 M3)**·**출력 구성 선택·네트워크 전용 연구 모드(2026-11-26 Human R1~R3 → [MS-013](../04_implementation/milestones/MS-013.md) Draft r6, REV-079 재리뷰 대기)**·B1/B2.
    - 장시간·대용량 실행은 시간·쓰기량을 먼저 알리고 승인받는다. 채움 시험은 같은 실행 맥락에서 대상 tmpfs를 확인한 뒤에만.
@@ -136,12 +135,9 @@ Done Task는 [Task 목록](../04_implementation/task_registry.md)을 따른다(4
 
 ## 최근 작업·이력
 
-- 2026-11-27 #002 — REV-078 반입: RV-251~255 5건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r6(명령 결과 CAS 하나·`HostFailed`, 구독별 정산 상태·생산 닫기 → 봉인, `files_late` 판정표(기존 host 기한 보고 포함), End 서버 관점 수·client `ack_unknown`, §5.1 route 경우표), [REV-079 요청](../05_verification/reviews/REV-079_REQUEST.md).
+- 2026-11-27 #002 — REV-078 반입: RV-251~255 5건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r6(명령 결과 CAS 하나·`HostFailed`, 구독별 정산 상태·생산 닫기 → 봉인, `files_late` 판정표(기존 host 기한 보고 포함), End 서버 관점 수·client `ack_unknown`, §5.1 route 경우표), [REV-079 요청](../05_verification/reviews/REV-079_REQUEST.md)(비공개 세션 로그: `session_logs/session_2026-11-27_002.md`).
 - 2026-11-27 — [REV-078](../05_verification/reviews/REV-078_MS013_R5_DESIGN_REVIEW.md) MS-013 r5 독립 재리뷰 마감. Conditional, RV-251~255 Open. 다음은 설계 반영과 REV-079.
 - 2026-11-27 #001 — 출력 구성 안건 우려 검토(C2·C3 재정의, C7 코드+파일) → [MS-013](../04_implementation/milestones/MS-013.md) 요구·리팩토링 계획 r1~r5, 독립 리뷰 REV-074~077(Codex, 12→10→10→6건, 모두 수용·반영), Human 「지적 0건까지 반복」. MS-012 Done: TASK-045 실DB 재실행·`influxdb_write` 예제(EV-132·133), TASK-046 v3 Core 3.12.3 호환(쓰기 동일·Flux 404, EV-134), TASK-047 DB 장애 f6a/b/c 각 10분 Pass(EV-135). 비공개 세션 로그 `session_logs/session_2026-11-27_001.md`.
-- 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
-- 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
 
-- 2026-11-26 #001 — REV-073 리뷰 요청서(`f30ae5a..2632b6c`)·세션 마감. TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).
 
-완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033~035 및 관련 EV·세션 로그에 보존한다.
+완료 상세 원문과 이전 이력은 [상태 아카이브](state_archive.md) #030~031·#033~036 및 관련 EV·세션 로그에 보존한다.

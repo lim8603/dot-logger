@@ -18,7 +18,7 @@
 | MS-010 | 릴리즈와 배포 | Verify→Deliver | In Progress(0·1단계 Done) | TASK-036·TASK-037·TASK-041 (2~4단계 Task는 착수 때 등록) | 외부 소비자 빌드·v0.1.0 미리보기·crates.io(TASK-026 뒤)·1.0 직전 재검증(24h·멀티 OS CI·게이트, T8)·1.0(Gate 5) | 미정 | [상세](milestones/MS-010.md) |
 | MS-011 | RT 로거 비교 근거와 채택 편의 | Verify→Build | In Progress(2026-11-23 등록, TASK-042 Done 2026-11-26) | TASK-042·TASK-043·TASK-044 | `try_log` 지연 분포 공개, RT 미룬 서식 로그·`Record` derive/prost(0.2 후보, 기능 논의에서 채택) | 7.5~13.5 | [상세](milestones/MS-011.md) |
 | MS-012 | InfluxDB 연동 재검증과 사용 안내 | Verify | **Done**(2026-11-27, EV-132~135) | TASK-045·TASK-046·TASK-047 | v2 실DB 재검증·`Writer` 예제·v3 Core 호환 범위·장시간 DB 단절(F4-DB). REV-073 조치 선행, v0.1.1 전 | 2.5~5+실행 | [상세](milestones/MS-012.md) |
-| MS-013 | 출력 구성 선택과 네트워크 전용 모드 | Design→Build | **Draft r7**(2026-11-28, REV-074~079 반영, [REV-080 요청](../05_verification/reviews/REV-080_REQUEST.md) — 지적 0건까지 재리뷰) | 승인 뒤 채번(단계 0~6) | 파일·네트워크·DB 출력 조합, 파일 없는 네트워크 전용 시작, 원격 손실 집계, 코드+옵션 파일 구성, 전송 스위치, 최대 처리량 공개. 0.2 | 20~25 + 단계 6 미정 | [상세](milestones/MS-013.md) |
+| MS-013 | 출력 구성 선택과 네트워크 전용 모드 | Design→Build | **Draft r7**(2026-11-28, REV-074~079 반영, [REV-080](../05_verification/reviews/REV-080_MS013_R7_DESIGN_REVIEW.md) Conditional / Open — RV-261~264 처리 후 독립 재리뷰) | 승인 뒤 채번(단계 0~6) | 파일·네트워크·DB 출력 조합, 파일 없는 네트워크 전용 시작, 원격 손실 집계, 코드+옵션 파일 구성, 전송 스위치, 최대 처리량 공개. 0.2 | 20~25 + 단계 6 미정 | [상세](milestones/MS-013.md) |
 
 필수 합계 **61~102 인일**(주 5일 전담 기준 약 12.2~20.4주; 2026-11-04 MS-008/009 16~26 인일 추가), FR-015 선택 작업 1~2 인일 별도. 가용 시간이 적거나 장비/리뷰 대기가 있으면 달력 기간은 늘어난다. 납기 약속이 아니다.
 

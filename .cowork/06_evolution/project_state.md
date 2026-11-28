@@ -16,7 +16,7 @@
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
 | 갱신 | 2026-11-28 / #001 — REV-083 반입(MS-013 리뷰 수렴), ADR-017~019·FR-019a~023·NFR-009·010·TC-015·TASK-048~054 등록, MS-013 일정(§7.1) / AI |
-| 세션 상태 | **2026-11-28 #001(설계 — REV-079~083 반입, MS-013 승인·등록·일정화).** 다음은 **TASK-041 v0.1.1**(태그 Human 확인) → MS-013 TASK-048. RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass(이후 문서 커밋만) |
+| 세션 상태 | **마감 — 2026-11-28 #001(설계 — REV-079~083 반입, MS-013 승인·등록·일정화, Human 「여기서 마무리」).** 다음 세션은 **TASK-041 v0.1.1**(태그 Human 확인) → MS-013 TASK-048. RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass(이후 문서 커밋만) |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 
 ## 현재 결정과 제약
@@ -96,7 +96,7 @@ Human 요구 R1~R3, 결정 C1~C11, 설계와 회차별 반영 이력은 [MS-013]
 
 - [도메인](../03_design_artifacts/domain_model.md), [API §13~17](../03_design_artifacts/interface_contract.md#13-상세-api-설계안), [데이터](../03_design_artifacts/data_model.md), [CLI](../03_design_artifacts/ui_spec.md).
 - [MS 목록](../04_implementation/milestone_registry.md): 12개 MS, [Task 목록](../04_implementation/task_registry.md): 47개 Task(TASK-018 Cancelled). 선행조건·변경 대상·첫 실패/DoD·상대 인일 추정(계획 승인, 납기 확정 아님).
-- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 18 + NFR 8 + CON 7 = 34행. MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
+- [요구 추적표](../05_verification/test_case.md#3-요구사항설계구현테스트-추적-체크리스트): INT 1 + FR 24 + NFR 10 + CON 7 = 42행(2026-11-28 MS-013 FR-019a~023·NFR-009·010 추가, Not Run). MS별 구현/테스트 체크·코드/EV 연결. TC-001의 TASK-002 하위 EV-001 로컬/native, TC-002 소형 EV-002 로컬/native·원본 EV-003 로컬, TC-003 분배 EV-004·완료/제어 EV-005 로컬 Pass; 후속/native/장비 시험 잔여.
 - 2026-10-26 조사(비공개 원시 근거: `imported_context/research_2026-10-26_detailed_design.md`): 공식 자료와 dot-probe 코드 관측, 기술 후보/사실/미검증 분리.
 - 이전 결정 근거가 필요할 때만 ADR-003~006·요구 §12~17·Story 상세·개인 로그를 추가로 읽는다.
 

@@ -15,7 +15,7 @@
 | 상태 | 42/47 Task Done(TASK-018 Cancelled, TASK-045·046·047 2026-11-27), MS-009 Done. CI(3 OS × 2 Rust·exchange·audit·Miri) 최근 코드 커밋 모두 Pass(`e097c61` run `45976241015` 19개 작업, 약 55분, 2026-11-27 — TASK-046 v3 하네스). 최신 회귀 [EV-133](../05_verification/verification_evidence.md#ev-133)(두 Rust 각 750 Pass·5 ignored), 이전 [EV-131](../05_verification/verification_evidence.md#ev-131): 두 Rust 각 750 Pass·5 ignored(이전 EV-115 742), Clippy(Linux·macOS·Windows 교차)·외부 소비자·feature 조합·CI 범위 Miri 통과. T3 해소: `a0fcfcf`에서 CI 9개 작업 Pass, macOS ignore 없음([EV-116](../05_verification/verification_evidence.md#ev-116)), GAP-004 Closed. **Gate 4 Pass(로컬 범위)·Gate 5 Not Ready** |
 | 언어 | 대화·작업 문서 한국어. 공식 산출물 언어는 생성 전 확인 |
 | 보고 형식 | 요약정리 → 파일 변경표 → 클래스 변경표 → 리뷰 포인트 — [소통 규칙](../01_cowork_protocol/communication_convention.md) |
-| 갱신 | 2026-11-28 / #001 — REV-079·080·081 반입(r7·r8·r9), REV-082 요청. 독립 리뷰 세션이 REV-079~[081](../05_verification/reviews/REV-081_MS013_R8_DESIGN_REVIEW.md) 기록 / AI |
+| 갱신 | 2026-11-28 — REV-081 처리담당 보완. MS-013 r9의 IO 스레드별 발행 기준, `Incomplete` 설명, `AckGone` 기한 뒤 조회 동작을 정렬. REV-082 요청 유지 / AI |
 | 세션 상태 | **2026-11-28 #001(설계 — REV-079~081 반입, MS-013 r9).** 다음은 **REV-082 재리뷰 반입**(MS-013 r9) → 지적 0건까지 반복, 구현은 TASK-041 v0.1.1. RT 커널(7.0.0-44-realtime), governor `powersave`. 최근 코드 CI `45990805261`(`762e384`) 19/19 Pass(이후 문서 커밋만) |
 | 최근 완료 세션 | [최근 작업·이력](#최근-작업이력) 참조 |
 

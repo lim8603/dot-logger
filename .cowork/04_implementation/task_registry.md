@@ -62,6 +62,13 @@
 | TASK-045 | v2 실DB 재검증과 `Writer` 예제 | MS-012 | INT-001 | US-002·003 | AI | Done | 2026-11-27 | Done(EV-132·133, CI `45969430420` 19/19). D1=A crate 예제·D2=A 현재 API(2026-11-26 Human) | REV-073 조치 | [상세](tasks/TASK-045.md) | 0.5~1 |
 | TASK-046 | InfluxDB 3 Core 호환 확인 | MS-012 | INT-001 | US-002·003 | AI | Done | 2026-11-27 | Done(EV-134: v3 쓰기 동일·Flux 404, CI `45976241015` 19/19) | TASK-045 | [상세](tasks/TASK-046.md) | 0.5~1.5 |
 | TASK-047 | 장시간 DB 단절 시험 | MS-012 | INT-001 | US-002·003 | AI | Done | 2026-11-27 | Done(EV-135: f6a/b/c 각 10분 장애 모두 Pass) | REV-073 RV-202~204·TASK-045 | [상세](tasks/TASK-047.md) | 1.5~2.5+실행 |
+| TASK-048 | MS-013 단계 0: 레거시 고정·spike·H6 1차 판정 | MS-013 | INT-001 | US-001·003·004 | AI | Planned | 2026-11-28 | S1 — TASK-041 v0.1.1 뒤 착수. 골든 → spike ①~⑤ → H6 go/no-go(Human 보고) → 재산정 | TASK-041 | [상세](tasks/TASK-048.md) | 3~4 |
+| TASK-049 | MS-013 단계 1: core 복사 observer와 내부 출력 모델 | MS-013 | INT-001 | US-001·003 | AI | Planned | 2026-11-28 | S1 — TASK-048 go 뒤. core `Route.observe`(breaking), 단독 독립 리뷰 | TASK-048 | [상세](tasks/TASK-049.md) | 3~4 |
+| TASK-050 | MS-013 단계 2: 네트워크 출력·파일 없는 시작·손실 회계·종료 | MS-013 | INT-001 | US-001·003·004 | AI | Planned | 2026-11-28 | S0 — TASK-049 뒤. FR-019a·021·022·NFR-010 | TASK-049 | [상세](tasks/TASK-050.md) | 5~6 |
+| TASK-051 | MS-013 단계 3: 설정 타입과 옵션 파일 | MS-013 | INT-001 | US-001·004 | AI | Planned | 2026-11-28 | S0 — TASK-050 뒤. FR-020, `toml` 의존성 확인 | TASK-050 | [상세](tasks/TASK-051.md) | 3~3.5 |
+| TASK-052 | MS-013 단계 4: 전송 스위치·표시·heartbeat·End frame | MS-013 | INT-001 | US-003·004 | AI | Planned | 2026-11-28 | S1 — TASK-051 뒤. FR-023, wire 호환 행렬, 끝나면 0.2.0-alpha 여부 Human 결정 | TASK-050·TASK-051 | [상세](tasks/TASK-052.md) | 4~5 |
+| TASK-053 | MS-013 단계 5: 무손실 최대 처리량 측정·공개, H6 확정 | MS-013 | INT-001 | US-001·004 | AI | Planned | 2026-11-28 | S1 — TASK-052 뒤. NFR-009, 실행 1~2 h 사전 알림 | TASK-052 | [상세](tasks/TASK-053.md) | 2~2.5+실행 |
+| TASK-054 | MS-013 단계 6: DB 출력 설계 게이트 | MS-013 | INT-001 | US-002·003 | AI | Planned | 2026-11-28 | S1 — TASK-050 뒤(기본 TASK-053 뒤). FR-019b 범위 Human 결정, 구현 Task는 게이트 뒤 | TASK-050·TASK-044 결정 | [상세](tasks/TASK-054.md) | 1~2(설계) |
 
 2026-10-30 Human 「승인, TASK-008 진행하자.」: TASK-007 최신 구현 승인·REV-008 Closed, native 이월 상태로 TASK-008 착수.
 

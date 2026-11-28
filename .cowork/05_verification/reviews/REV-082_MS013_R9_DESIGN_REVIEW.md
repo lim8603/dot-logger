@@ -5,7 +5,7 @@
 | 일자 / 리뷰어 | 2026-11-28 / Codex, 독립 리뷰 세션 |
 | 대상 | [MS-013 r9](../../04_implementation/milestones/MS-013.md), [REV-082 요청서](REV-082_REQUEST.md), [REV-081](REV-081_MS013_R8_DESIGN_REVIEW.md) |
 | 기준 | r9 도입 `6b8f760`, 처리담당 보완 및 검토 시 HEAD `963b2227c505412678173011eab3125c5743bae3` |
-| 판정 / 상태 | **Conditional / Resolved**(2026-11-28 처리담당: 2건 모두 수용, MS-013 r10 반영 — REV-083 대조 대기) |
+| 판정 / 상태 | **Conditional / Closed**(2026-11-28 처리담당: 2건 모두 수용, MS-013 r10 반영 — 2026-11-28 [REV-083](REV-083_MS013_R10_DESIGN_REVIEW.md) Pass로 반복 종료) |
 
 ## 1. 요약정리
 

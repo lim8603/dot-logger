@@ -866,3 +866,30 @@ project_state가 크기 경고선(24 KiB)을 넘어 완료·문서화된 결정�
 - 2026-11-26 #003 — InfluxDB 논의 → [MS-012](../04_implementation/milestones/MS-012.md)·TASK-045~047 설계, REV-073 11건 반입·조치(두 Rust 각 750 Pass), 출력 구성 선택·네트워크 전용 모드 기능 안건(R1~R3·C1~C11) 기록(비공개 세션 로그: `session_logs/session_2026-11-26_003.md`).
 - 2026-11-26 #002 — [REV-073](../05_verification/reviews/REV-073_HARNESS_AND_LATENCY_REVIEW.md) 독립 리뷰 마감. Conditional, RV-202~212 Open. CI 19/19 Pass, README 지연 5행 재계산 일치.
 - 2026-11-26 #001 — REV-073 리뷰 요청서(`f30ae5a..2632b6c`)·세션 마감. TASK-042 S2 ③-b generic·`performance` 측정(RT 대비 p50~p99.99 같고 최대에서 차이, 1 kHz 깨어남 단일 729 µs), S3 README 지연 표·EV-129, TASK-042 Done. 50건 묶음 꼬리 원인 분석 — 이 PC가 쉬는 동안의 주기적 코어 감속(약 600 ms마다 0.5 ms·9배), dot-logger 무관(EV-130).
+
+## #037 — 2026-11-28 #001 MS-013 리뷰 수렴 하베스트
+
+코드리뷰 현황에서 이관(원문, REV-074~083을 한 행으로 합침):
+
+| ID | 범위 | 상태 | 현재 처리/후속 |
+|---|---|---|---|
+| [REV-074](../05_verification/reviews/REV-074_MS013_OUTPUT_DESIGN_REVIEW.md) | MS-013 요구사항·리팩토링 설계 1회차, 기준 `da5f6c9` | **Resolved** | 12건 r2 반영. REV-075에서 잔여 P1 연결, Human 판단 대기 |
+| [REV-075](../05_verification/reviews/REV-075_MS013_R2_DESIGN_REVIEW.md) | MS-013 r2 독립 재리뷰, 기준 `d9c2da7` | **Resolved** | Conditional. P1 4·P2 5·P3 1, RV-225~234 10건 수용·**r3 반영**(MS-013 §12) → [REV-076](../05_verification/reviews/REV-076_MS013_R3_DESIGN_REVIEW.md)에서 잔여 항목 대조 |
+| [REV-076](../05_verification/reviews/REV-076_MS013_R3_DESIGN_REVIEW.md) | MS-013 r3 독립 재리뷰, 기준 `cda0161` | **Resolved** | Conditional. P1 5·P2 5, RV-235~244 10건 수용·**r4 반영**(MS-013 §13) → [REV-077](../05_verification/reviews/REV-077_MS013_R4_DESIGN_REVIEW.md)에서 잔여 항목 대조 |
+| [REV-077](../05_verification/reviews/REV-077_MS013_R4_DESIGN_REVIEW.md) | MS-013 r4 독립 재리뷰, 기준 `3901fa3` | **Resolved** | Conditional. P1 3·P2 3, RV-245~250 6건 수용·**r5 반영**(MS-013 §14) → [REV-078](../05_verification/reviews/REV-078_MS013_R5_DESIGN_REVIEW.md)에서 잔여 항목 대조 |
+| [REV-078](../05_verification/reviews/REV-078_MS013_R5_DESIGN_REVIEW.md) | MS-013 r5 독립 재리뷰, 기준 `fe0f8d5` | **Resolved** | Conditional. P1 3·P2 2, RV-251~255 5건 수용·**r6 반영**(MS-013 §15) → [REV-079](../05_verification/reviews/REV-079_MS013_R6_DESIGN_REVIEW.md)에서 대조 |
+| [REV-079](../05_verification/reviews/REV-079_MS013_R6_DESIGN_REVIEW.md) | MS-013 r6 독립 재리뷰, 기준 `7fe024c` | **Resolved** | Conditional. P1 3·P2 2, RV-256~260 5건 수용·**r7 반영**(MS-013 §16) → [REV-080](../05_verification/reviews/REV-080_MS013_R7_DESIGN_REVIEW.md)에서 대조 |
+| [REV-080](../05_verification/reviews/REV-080_MS013_R7_DESIGN_REVIEW.md) | MS-013 r7 독립 재리뷰, 기준 `405cf39` | **Resolved** | Conditional. P1 3·P2 1, RV-261~264 4건 수용·**r8 반영**(MS-013 §17) → [REV-081](../05_verification/reviews/REV-081_MS013_R8_DESIGN_REVIEW.md)에서 대조 |
+| [REV-081](../05_verification/reviews/REV-081_MS013_R8_DESIGN_REVIEW.md) | MS-013 r8 독립 재리뷰, 기준 `b392eb7` | **Resolved** | Conditional. P1 2·P2 1, RV-265~267 3건 수용·**r9 반영**(MS-013 §18) → [REV-082](../05_verification/reviews/REV-082_MS013_R9_DESIGN_REVIEW.md)에서 대조 |
+| [REV-082](../05_verification/reviews/REV-082_MS013_R9_DESIGN_REVIEW.md) | MS-013 r9 독립 재리뷰, 기준 `963b222` | **Resolved** | Conditional. P1 1·P2 1, RV-268~269 2건 수용·**r10 반영**(MS-013 §19) → [REV-083](../05_verification/reviews/REV-083_MS013_R10_DESIGN_REVIEW.md)에서 해소 확인 |
+| [REV-083](../05_verification/reviews/REV-083_MS013_R10_DESIGN_REVIEW.md) | MS-013 r10 독립 재리뷰, 기준 `346a993` | **Open** | Pass·새 지적 0건. RV-268·269 해소. 개발 세션 반입 뒤 승인 범위 ADR·FR/NFR·TASK 등록 |
+
+최근 작업·이력에서 이관(원문):
+
+- 2026-11-28 — [REV-083](../05_verification/reviews/REV-083_MS013_R10_DESIGN_REVIEW.md) MS-013 r10 독립 재리뷰 Pass·새 지적 0건.
+- 2026-11-28 #001(이어서) — MS-013 설계 결정 Human 「모두 권고대로 승인」(§2.2~2.4·§9.2), REV-082 반입: RV-268·269 수용 → r10(셀 CAS = IO 스레드 마지막 동작·판정 단조, 호출 기한 `TimedOut`과 `AckGone` 기한 구분), [REV-083 요청](../05_verification/reviews/REV-083_REQUEST.md).
+- 2026-11-28 #001(이어서) — REV-081 반입: RV-265~267 3건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r9(IO 스레드별 발행 셀·종결 4경로·`files_published`/`files_reclaimed`, 모드별 `Closed` 조건·`network: Option`·`is_lossless()` 구성 출력 기준, `AckGone` 기한 = 첫 `Gone` + `timeout`), [REV-082 요청](../05_verification/reviews/REV-082_REQUEST.md).
+- 2026-11-28 #001 — REV-079 반입: RV-256~260 5건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r7(host 종료 관측 시 `WorkerFailed`/`HostFailed { id, epoch }`·epoch 판별, L3 `offer_pending`, §5.9 수신 상한 기한 + `REPORT_GRACE`·호출자 보고 2종·두 판정표, End·ACK 오류 선착 순서표·`ack_unknown` End 시점 확정, route revision 단위), [REV-080 요청](../05_verification/reviews/REV-080_REQUEST.md)(비공개 세션 로그: `session_logs/session_2026-11-28_001.md`).
+- 2026-11-28 #001(이어서) — REV-080 반입: RV-261~264 4건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r8(명령 셀 외부 종결 근거 `host_exited`, 발행 셀·`files_late: Option<bool>`·`files_settled()`, 네트워크 `finalized`/`reclaimed`·host join, client 구독 상태 `Open`/`AckGone`/`Ended`/`Failed`), [REV-081 요청](../05_verification/reviews/REV-081_REQUEST.md).
+- 2026-11-27 #002 — REV-078 반입: RV-251~255 5건 모두 수용 → [MS-013](../04_implementation/milestones/MS-013.md) r6(명령 결과 CAS 하나·`HostFailed`, 구독별 정산 상태·생산 닫기 → 봉인, `files_late` 판정표(기존 host 기한 보고 포함), End 서버 관점 수·client `ack_unknown`, §5.1 route 경우표), [REV-079 요청](../05_verification/reviews/REV-079_REQUEST.md)(비공개 세션 로그: `session_logs/session_2026-11-27_002.md`).
+- 2026-11-27 #001 — 출력 구성 안건 우려 검토(C2·C3 재정의, C7 코드+파일) → [MS-013](../04_implementation/milestones/MS-013.md) 요구·리팩토링 계획 r1~r5, 독립 리뷰 REV-074~077(Codex, 12→10→10→6건, 모두 수용·반영), Human 「지적 0건까지 반복」. MS-012 Done: TASK-045 실DB 재실행·`influxdb_write` 예제(EV-132·133), TASK-046 v3 Core 3.12.3 호환(쓰기 동일·Flux 404, EV-134), TASK-047 DB 장애 f6a/b/c 각 10분 Pass(EV-135). 비공개 세션 로그 `session_logs/session_2026-11-27_001.md`.

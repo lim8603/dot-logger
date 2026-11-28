@@ -5,7 +5,7 @@
 | 일자 / 리뷰어 | 2026-11-27 / Codex, 독립 리뷰 세션 |
 | 대상 | [MS-013 Draft](../../04_implementation/milestones/MS-013.md), [REV-074 요청서](REV-074_REQUEST.md) |
 | 기준 | `da5f6c9616a9e902f27a3a379049670be61e9997`. 검토 시 HEAD는 `4f7ec58`. 이후 MS-012 변경과 작업 트리의 TASK-047 변경은 검토 범위 밖 |
-| 판정 / 상태 | **Conditional / Resolved**(2026-11-27 처리담당: 12건 모두 수용, MS-013 r2 반영 — REV-075 재리뷰 대조 대기) |
+| 판정 / 상태 | **Conditional / Closed**(2026-11-27 처리담당: 12건 모두 수용, MS-013 r2 반영 — 2026-11-28 [REV-083](REV-083_MS013_R10_DESIGN_REVIEW.md) Pass로 반복 종료) |
 
 ## 1. 요약정리
 

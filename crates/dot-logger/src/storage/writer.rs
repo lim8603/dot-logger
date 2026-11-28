@@ -453,7 +453,7 @@ impl<W: SyncSink> SegmentWriter<W> {
             .chunk_size(None)
             .chunk_registrations(false)
             .profile(codec::PROFILE)
-            .library("dot-logger/0.1.0")
+            .library(concat!("dot-logger/", env!("CARGO_PKG_VERSION")))
             .calculate_chunk_crcs(true)
             .calculate_data_section_crc(true)
             .calculate_summary_section_crc(true)

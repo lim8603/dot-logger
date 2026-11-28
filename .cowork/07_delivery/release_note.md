@@ -9,8 +9,8 @@
 | 항목 | 내용 |
 | --- | --- |
 | 프로젝트 | dot-logger |
-| 버전 | 0.1.0 (첫 릴리즈 후보, 미리보기) |
-| 릴리즈 일자 | 2026-11-22 — 주석 태그 `v0.1.0`, GitHub pre-release([TASK-037](../04_implementation/tasks/TASK-037.md), Human 「CI 통과하면 진행해」) |
+| 버전 | 0.1.1 (패치 미리보기). 이전 0.1.0 (첫 릴리즈, 미리보기) |
+| 릴리즈 일자 | 0.1.1: 2026-11-28 예정 — 주석 태그 `v0.1.1`은 CI Pass와 Human 확인 뒤([TASK-041](../04_implementation/tasks/TASK-041.md)). 0.1.0: 2026-11-22 — 주석 태그 `v0.1.0`, GitHub pre-release([TASK-037](../04_implementation/tasks/TASK-037.md), Human 「CI 통과하면 진행해」) |
 | 상태 | **초안.** 2026-11-22 TASK-036·T3 결과로 배포 대상·알려진 이슈를 갱신했다. 외부 공개본은 저장소의 `CHANGELOG.md`(영어, FR 번호 없음) |
 
 ---
@@ -30,12 +30,76 @@
 - **버전 규칙:** SemVer. 1.0 전까지 워크스페이스의 공개 crate(`dot-logger`·`-client`·`-cli`·`-viewer`, 그리고 vendor 별칭 crate)는 같은 버전(`workspace.package.version`)을 쓴다. 0.x에서 호환이 깨지는 변경은 minor(0.1 → 0.2), 그 밖은 patch.
 - **형식·프로토콜 버전은 crate 버전과 따로 둔다:** 파일 `dot-logger/standard/2`·manifest v2·손실 보고 v2, 원격 gRPC `PROTOCOL_MAJOR`, viewer WebSocket v1·대시보드 v1. 형식이 바뀌면 형식 버전과 crate minor를 함께 올리고, 각 릴리즈에 호환표를 적는다.
 - **MSRV:** 현재 1.85. 올리면 minor로 취급한다.
-- **배포 형태:** v0.1.0은 GitHub의 미리보기(pre-release)와 주석 태그 `v0.1.0`으로 내고, 사용자는 git `tag = "v0.1.0"`으로 의존한다. crates.io 게시는 TASK-026 뒤. 1.0은 Gate 5 Pass 뒤.
+- **배포 형태:** v0.1.x는 GitHub의 미리보기(pre-release)와 주석 태그(`v0.1.0`·`v0.1.1`)로 내고, 사용자는 git `tag = "v0.1.1"`처럼 의존한다. crates.io 게시는 TASK-026 뒤. 1.0은 Gate 5 Pass 뒤.
 - **저장소 안 변경 기록:** 공개용 `CHANGELOG.md`(영어)를 두고, 이 문서는 한국어 작업 문서로 유지한다.
 
 ---
 
 ## 릴리즈 이력
+
+### v0.1.1 — 2026-11-28 (패치 미리보기)
+
+#### 핵심 요약
+
+- v0.1.0 알려진 이슈 K1(macOS·Windows에서 facade 파일 출력이 `start()`부터 `Unsupported`)을 고친 패치다(ADR-009 개정 2, `9f687dd`·`ad11ba3`).
+- 검증 범위에 24h soak(EV-120), 4시간 혼합 실행(EV-126), 장애 주입 F1~F5(EV-123), 세 OS 간 파일 교환(EV-119)을 더했다.
+- API 호환이 깨지는 변경은 없다(patch). 형식·프로토콜 버전은 0.1.0과 같다.
+
+#### 릴리즈 범위
+
+| 항목 | 내용 |
+| --- | --- |
+| 관련 Milestone / Intent | INT-001 / MS-010 1a(TASK-041). 포함 작업: TASK-024·038·039·040·042·045~047, REV-072·073 조치 |
+| 배포 대상 | GitHub pre-release와 주석 태그 `v0.1.1`, git 의존성 `tag = "v0.1.1"`. crates.io 미게시 |
+| 버전 | 워크스페이스 공개 crate와 vendor 별칭 crate `dot-logger-mcap` 모두 0.1.1. MCAP 헤더 `library`는 `dot-logger/<crate 버전>`(이전 `0.1.0` 고정 문자열) |
+| 외부 공개본 | `CHANGELOG.md` `[0.1.1]` 절(영어) |
+
+#### 신규 기능 (Features)
+
+| ID | 기능 | 사용자/운영 영향 | 관련 근거 |
+| --- | --- | --- | --- |
+| R12 | `diagnostics::available_bytes` — Linux·macOS·Windows 여유 공간, 없는 경로는 모든 OS에서 오류 | 세 OS에서 같은 방식으로 공간을 본다 | ADR-009 개정 2 / REV-072 RV-195 |
+| R13 | `ReceiverConfig::reservation_bytes`(client)·`Reassembler::reservation_bytes`(core) | 구독 수 × 이 값으로 `LiveBudget`·`QueryBudget`을 잡는다(macOS 잠금 바이트 포함) | REV-072 RV-199 / `e20aef4` |
+| R14 | `influxdb_write` 예제, `scripts/check-influxdb.py --example`·`--server v3` | 고급 경로 InfluxDB 쓰기·조회 사용법과 InfluxDB 3 Core 확인 | TASK-045·046 / EV-133·134 |
+
+#### 개선 사항 (Improvements)
+
+| ID | 내용 | 기대 효과 | 관련 근거 |
+| --- | --- | --- | --- |
+| I5 | README·`adapters::influxdb`: InfluxDB 출력은 고급 경로이며 기본 `Logger`에는 DB 출력이 없음, 서버 버전 표(3 Core는 쓰기 동일·Flux 조회 없음·형 충돌 묶음 전체 거절) | 지원 범위를 사실대로 안다 | EV-134 |
+| I6 | README 지연 분포 표(`try_log`, governor 2종) | RT 수집 비용을 숫자로 본다 | TASK-042 / EV-129·130 |
+
+#### 버그 수정 (Bug Fixes)
+
+| ID | 내용 | 영향 범위 | 관련 이슈 |
+| --- | --- | --- | --- |
+| F1 | macOS·Windows facade 파일 출력 `start()` `Unsupported` — 여유 공간을 Unix `statvfs`·Windows `fs4`로, Windows는 디렉터리 sync 생략(NTFS 저널, 로컬 NTFS 권장) | macOS·Windows 파일 출력 | v0.1.0 K1 / ADR-009 개정 2 / EV-119 |
+| F2 | macOS 메모리 회계 — Apple std가 첫 잠금 때 할당하는 잠금 저장소(64 B)를 facade·원격 hub·receiver 예약에 포함 | macOS에서 예약이 실제보다 작던 문제. 0.1.0 공식에 딱 맞춘 예산은 조금 늘려야 할 수 있다 | REV-072 RV-199 / `156bd68`·`e20aef4` |
+| F3 | MCAP 헤더 `library`가 버전과 무관하게 `dot-logger/0.1.0`이던 것 | 파일 출처 표시 | TASK-041 |
+| S1 | 보안: `Cargo.lock` `url` 2.5.9(RUSTSEC-2026-0592, `reqwest` 경유, `influxdb` feature). 의존성은 범위라 자체 lock이 있는 사용자는 `cargo update -p url` | `influxdb` 사용 시 | `f30ae5a` |
+
+#### Breaking Changes
+
+- 없음. 단 F2로 macOS 예약 바이트가 늘어 경계에 딱 맞춘 예산은 `Limit`이 될 수 있다.
+
+#### 알려진 이슈 (Known Issues)
+
+| ID | 내용 | 심각도 | 우회 방법 |
+| --- | --- | --- | --- |
+| K1' | Windows·macOS 성능 실측 없음(CI·파일 교환만) | 낮음 | 운영 전 대상 OS에서 자체 확인 |
+| K2' | 「회전·조회·전송 포함 24h」는 1.0.0 직전 재검증(T8)에서 충족 예정. 현재 근거는 24h 기록·회전(EV-120)과 4시간 혼합(EV-126) | 낮음 | — |
+| K3 | 실사용처 적용 전 | 중간 | 예제로 통합 지점 확인 |
+| K4 | 전원 경보는 시뮬레이션 신호 검증 | 중간 | 장비별 확인 |
+| K5 | `paste` 유지보수 중단 경고 | 낮음 | 상위 갱신 시 재확인 |
+| K6 | 이전 `standard/2` 일부 파일 Lichtblick 1970 시작 | 낮음 | `recover` |
+| K7 | 재열기·압축·원격 일시정지/분할 범위 밖(B1) | 낮음 | 재시작 |
+| K9 | 원격 구독 조용한 단절 미감지(keepalive 없음, EV-123 F4) | 중간 | 명령 기한(`--timeout-ms`) |
+| K10 | 실제 ENOSPC 뒤 `IoPoisoned` 고착, RT 수락은 계속하고 실패로 집계(EV-123 F3b) | 중간 | 공간 회복 뒤 재시작 |
+| K11 | InfluxDB 3 Core에서 `query_numeric` 불가(Flux 없음, EV-134) | 낮음 | 조회는 InfluxDB 2.x |
+
+#### 업그레이드 / 배포 메모
+
+- `tag = "v0.1.0"` → `tag = "v0.1.1"`. 코드 변경은 필요 없다(macOS 예산 경계는 Breaking Changes 참조).
 
 ### v0.1.0 — 2026-11-22 (미리보기)
 

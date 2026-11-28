@@ -53,7 +53,7 @@ use it as a git dependency pinned to a release tag (see
 
 ```toml
 [dependencies]
-dot-logger = { git = "https://github.com/lim8603/dot-logger", tag = "v0.1.0" }
+dot-logger = { git = "https://github.com/lim8603/dot-logger", tag = "v0.1.1" }
 ```
 
 dot-logger's dependencies are version ranges, so Cargo picks their newest
@@ -262,7 +262,7 @@ No feature is enabled by default.
 
 ## Verification
 
-- **Tests.** The workspace has about 740 unit and integration tests, run with
+- **Tests.** The workspace has about 750 unit and integration tests, run with
   Rust 1.96.0 and the 1.85 MSRV. The library's unit tests and its pool,
   routing, completion, control, retention, storage-fault, query and replay
   tests also run under Miri.
@@ -280,6 +280,18 @@ No feature is enabled by default.
   and the live heap stayed flat; the resident size rose 1% over 22 hours as
   the system allocator kept freed pages. It covered recording and rotation;
   queries and remote streaming were not running at the same time.
+- **4-hour mixed run** with the same load, adding another process that reads
+  closed files, two remote subscribers, status polling and event protection
+  while the ring deletes old files: no loss, no rejected record, no missed
+  deadline, no allocation on the real-time threads, and every file read was
+  intact.
+- **Fault injection** on the same PC: a slow disk, stalled subscribers, a
+  full disk, a dropped network link and repeated `SIGKILL`, with no missed
+  deadline in any of them. On the slow and full disk the loss report matched
+  the gaps in the files; the other faults lost no record from the files, and
+  after each `SIGKILL` the closed files were intact and the recovered records
+  had no gaps. A connection that stops silently is not detected by a
+  subscriber (no keepalive yet).
 - **Not yet done:** a production integration.
 - **Dependencies** are audited with RustSec. One indirect dependency, `paste`,
   is reported as unmaintained.

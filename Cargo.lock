@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "dot-logger"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "crc32fast",
@@ -308,14 +308,14 @@ dependencies = [
 
 [[package]]
 name = "dot-logger-api-consumer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dot-logger",
 ]
 
 [[package]]
 name = "dot-logger-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "dot-logger",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "dot-logger-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dot-logger",
  "dot-logger-mcap",
@@ -343,7 +343,7 @@ dependencies = [
 
 [[package]]
 name = "dot-logger-mcap"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bimap",
  "binrw",
@@ -360,14 +360,14 @@ dependencies = [
 
 [[package]]
 name = "dot-logger-rt-allocation"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "dot-logger",
 ]
 
 [[package]]
 name = "dot-logger-viewer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "clap",

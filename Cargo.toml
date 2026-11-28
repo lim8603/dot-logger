@@ -5,7 +5,7 @@ exclude = ["vendor"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -21,7 +21,7 @@ rtrb = "0.4.0"
 # vendor/mcap-0.26.0 as the `dot-logger-mcap` package. A workspace [patch]
 # would not reach downstream users (ADR-010 amendment 2, TASK-036); see
 # VENDORED.md and local-changes.patch.
-mcap = { package = "dot-logger-mcap", version = "0.1.0", path = "vendor/mcap-0.26.0", default-features = false }
+mcap = { package = "dot-logger-mcap", version = "0.1.1", path = "vendor/mcap-0.26.0", default-features = false }
 prost = "0.13.5"
 # Same version the MCAP writer uses; hardware CRC-32 (EV-105).
 crc32fast = "1.5.3"

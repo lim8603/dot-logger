@@ -5,7 +5,7 @@
 | 일자 / 리뷰어 | 2026-11-28 / Codex, 독립 리뷰 세션 |
 | 대상 | [MS-013 r7](../../04_implementation/milestones/MS-013.md), [REV-080 요청서](REV-080_REQUEST.md), [REV-079](REV-079_MS013_R6_DESIGN_REVIEW.md) |
 | 기준 | r7 및 검토 시 HEAD `405cf39607273cd5f8d85d77e4ab0775020c1be8` |
-| 판정 / 상태 | **Conditional / Open** |
+| 판정 / 상태 | **Conditional / Resolved**(2026-11-28 처리담당: 4건 모두 수용, MS-013 r8 반영 — REV-081 대조 대기) |
 
 ## 1. 요약정리
 
@@ -27,35 +27,37 @@ REV-074~078의 원본 guard 미전달, 같은 분배 안 복사 예산과 드롭
 
 | ID | 중요도 | 위치 | 계약 공백 | 처리 제안 | 처리담당 판정 | 상태 |
 |---|---|---|---|---|---|---|
-| RV-261 | **P1** | §5.6 | 파일 IO 실패를 host 종료로 해석해 살아 있는 host의 명령을 종결할 수 있다 | host가 더는 게시할 수 없음을 증명하는 종료 신호를 지정한다 | — | Open |
-| RV-262 | **P1** | §5.9 | 기한 내 발행됐지만 host가 완료 이벤트를 읽기 전이면 지연 발행으로 확정할 수 있다 | 발행 상태·host 관측·보고 시각을 구분한다 | — | Open |
-| RV-263 | **P1** | §5.4·§5.9 | 감독 정산 뒤 정상 종료 이벤트를 낼 worker가 없으면 최종 `Closed` 근거가 비어 있다 | 정상 완료, 실패 후 회수, 분리 시 종료 조건을 명시한다 | — | Open |
-| RV-264 | P2 | §5.6·§6 | ACK 실패를 `flush()`나 `handoff()`에서 먼저 관측할 때와 End 이후 ACK API의 동작이 빠져 있다 | 구독 종료 상태를 공개 메서드 전체에 적용한다 | — | Open |
+| RV-261 | **P1** | §5.6 | 파일 IO 실패를 host 종료로 해석해 살아 있는 host의 명령을 종결할 수 있다 | host가 더는 게시할 수 없음을 증명하는 종료 신호를 지정한다 | 수용 | Resolved |
+| RV-262 | **P1** | §5.9 | 기한 내 발행됐지만 host가 완료 이벤트를 읽기 전이면 지연 발행으로 확정할 수 있다 | 발행 상태·host 관측·보고 시각을 구분한다 | 수용 | Resolved |
+| RV-263 | **P1** | §5.4·§5.9 | 감독 정산 뒤 정상 종료 이벤트를 낼 worker가 없으면 최종 `Closed` 근거가 비어 있다 | 정상 완료, 실패 후 회수, 분리 시 종료 조건을 명시한다 | 수용 | Resolved |
+| RV-264 | P2 | §5.6·§6 | ACK 실패를 `flush()`나 `handoff()`에서 먼저 관측할 때와 End 이후 ACK API의 동작이 빠져 있다 | 구독 종료 상태를 공개 메서드 전체에 적용한다 | 수용 | Resolved |
 
 ### RV-261 — 명령을 종결하려면 host의 게시 권한이 끝났음이 확인돼야 한다
 
 - **[리뷰어]** §5.6은 `worker_failed`를 10 ms마다 확인해 host 종료로 처리한다. 현재 이 플래그는 파일 IO 스레드가 panic한 경우에도 설정된다. 이때 host는 입구를 닫고 실패를 정산하며 계속 살아 있다. 예를 들어 host가 스위치 `Committed` 상태에서 선점되고 IO 스레드가 이 플래그를 세우면, 호출자는 epoch 게시 전이라 `HostFailed`를 반환할 수 있다. 이후 host가 재개하면 표시와 epoch를 게시할 수 있어 종결 결과와 관측된 효과가 어긋난다. [명령 종료 규칙](../../04_implementation/milestones/MS-013.md#L320), [IO 실패 플래그](../../../crates/dot-logger/src/logger/host.rs#L818), [살아 있는 host의 실패 처리](../../../crates/dot-logger/src/logger/host.rs#L538)
 - **처리 제안** — 명령 종결에 사용할 host 전용 종료 증거를 명시한다. 파일 실패 시 살아 있는 host가 처리하는 거절·종료 진입과, 실제 host 종료 시 외부에서 하는 셀 종결을 각각 시험한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 셀을 host 밖에서 종결하는 근거를 `worker_failed`에서 **host 전용 종료 표시 `host_exited`**로 바꿨다. host 스레드가 `run`의 반환 또는 unwind를 모두 마친 뒤(`catch_unwind` 밖 — 지금 `host.rs`가 host 실패 때 `worker_failed`를 세우는 자리, 정상 종료 포함) 세우므로, 보이면 host 코드는 더 실행되지 않아 셀·observe·링·epoch를 쓰지 않는다. `worker_failed`(IO 스레드 panic 포함)는 근거가 아니다 — 그동안 host는 살아서 명령을 처리해 커밋 전 명령은 ①에서 `Rejected(Closing)`(지금 `ConfigError::Closing` 판정과 같음), `Committed` 명령은 ⑥⑦을 마쳐 `Applied`. 대기 중 호출자는 `worker_failed`만으로 셀을 바꾸지 않는다. 시험: `Committed`에서 host 선점 중 IO panic → host 재개 뒤 `Applied`·효과 1회, IO panic 뒤 새 명령 `Closing`, 실제 host 종료 → `host_exited`로 셀 종결. MS-013 r8 §5.6·§6·§7 단계 0·§8.1.
 
 ### RV-262 — 아직 읽지 못한 완료 이벤트로 발행 기한을 확정할 수 없다
 
 - **[리뷰어]** IO 스레드가 기한 D 전에 `finish`를 완료하고 `at ≤ D`인 이벤트를 보냈으나, host가 D 뒤 첫 턴에서 그 이벤트를 반영하기 전에 기한 보고를 만든 경우다. 표에 따르면 host가 아는 상태는 core Closed와 파일 완료 미확인이어서 `files_late = true`로 확정될 수 있다. 후속 최종 보고에서는 동일한 발행이 기한 내 성공으로 바뀐다. 이벤트가 발행 완료 뒤 늦게 게시되는 경우도 수신 순서를 정하는 것만으로는 해소되지 않는다. [내부 완료 이벤트](../../04_implementation/milestones/MS-013.md#L392), [기한 보고 파일 판정](../../04_implementation/milestones/MS-013.md#L397)
 - **처리 제안** — 기한 보고에서 발행 완료 시각을 읽을 수 있는 경계를 정한다. 아직 결과를 알 수 있는 근거가 없다면 미확인 상태와 확정 지연을 구분한다. 발행 직후 게시 전 정지 및 이벤트 게시 직후 host 확인 지연을 시험한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. IO 스레드만 쓰는 **발행 셀**(`Pending` → `Published { at }`/`Failed`, 한 번만 전이)을 두고 `at`을 「`finish` 반환 직후 IO 스레드가 읽은 단조 시각」으로 정의했다. host는 이벤트를 기다리지 않고 보고를 작성할 때마다 셀을 직접 읽으므로, IO 스레드가 기한 전에 쓴 결과를 host가 아직 처리하지 못한 상태가 없다. 셀이 아직 `Pending`이면(시각을 읽었지만 셀 기록 전 정지 포함) `files_late = None`(미확인)으로 두고 지연으로 확정하지 않는다(r7의 「`finish` 진행 중이면 지연 확정」 철회). `FacadeReport::files_settled()`로 확정 여부를 구분하고 `files_complete()`는 `files_late == Some(false)`를 요구하며, `Closed`는 늘 확정 상태다. 판정표 행을 셀 상태(`Pending`·`Published ≤/>` 기한·`Failed`)로 다시 썼다. 시험: 셀 기록 전 IO 정지(기한 보고 `None` → 최종 성공), 셀 기록 뒤 host 턴 지연(기한 보고가 바로 확정). MS-013 r8 §5.9·§6·§7 단계 0·§8.1.
 
 ### RV-263 — 감독 정산과 최종 종료의 조건을 연결해야 한다
 
 - **[리뷰어]** 네트워크 스레드가 실패해 정상 경로의 `NetworkFinalized`를 보낼 수 없다고 하자. host는 봉인·위치 정산을 완료할 수 있고 파일도 성공할 수 있다. §5.4는 이때 네트워크 집계가 `finalized = true`일 수 있다고 정하지만, §5.9는 내부 이벤트 대기와 「파일·네트워크 모두 끝난 뒤」만 명시한다. 실패한 worker가 회수돼도 어떤 증거로 정상 완료 이벤트 없이 `Closed`에 도달하는지, 회수가 장기간 끝나지 않을 때 호출자가 받는 상태는 무엇인지 정해져 있지 않다. [집계 확정 조건](../../04_implementation/milestones/MS-013.md#L243), [내부 이벤트와 최종 보고](../../04_implementation/milestones/MS-013.md#L392)
 - **처리 제안** — 계수 확정과 리소스 회수의 완료 조건을 정하고, 실패·강제 종료에서 누가 완료를 통지하는지 명시한다. `NetworkFinalized` 없이 worker를 회수한 경우와 계수 확정 뒤에도 worker가 살아 있는 경우의 `wait(timeout)`을 시험한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 네트워크 쪽 완료를 **계수 확정 `finalized`**(§5.4)와 **자원 회수 `reclaimed`**(네트워크·`loss_file` 스레드 join)로 나눴다. host가 매 턴 스레드 핸들의 `is_finished`를 확인해 join하므로 정상 종료·panic·취소 뒤 종료가 같은 경로이고, `NetworkFinalized` 없이 끝난 스레드는 host가 그 턴에 감독 정산(멱등)으로 계수를 확정한다. 완료 판정·통지는 항상 host다. 실행 중 실패면 그때 정산·join이 끝나 종료 때 L1 고정만 남는다. `Closed` 조건 = core Closed && 발행 셀 non-`Pending` && `finalized` && `reclaimed`. 회수는 상한이 없다: 계수 확정 뒤 스레드가 끝나지 않으면 `finalized` 참·`reclaimed` 거짓 `Incomplete`, `wait(timeout)`은 `Unresponsive(self)`, 끝나면 `Closed`, `pending`을 버리면 분리. 시험: `NetworkFinalized` 없는 panic → 정산·join·`Closed`, 실행 중 실패 뒤 종료, 회수 지연 중 `wait`·분리. MS-013 r8 §5.4·§5.9·§6·§7 단계 0·§8.1.
 
 ### RV-264 — End 우선 정책과 최종 ACK 수를 공개 메서드 전체에 적용해야 한다
 
 - **[리뷰어]** 현재 client는 `next()`뿐 아니라 `handoff()`와 `flush()`에서도 ACK 실패를 읽어 `unknown()`으로 스트림을 닫는다. 예를 들어 마지막 `handoff()` 뒤 `flush()`가 `Gone`을 먼저 받으면, 스트림에 End가 도착해도 이후 `next()`로 볼 수 없다. r7의 표는 `next()`에서 먼저 관측하는 경우만 다룬다. 반대로 End를 먼저 받았을 때는 늦은 RPC 성공을 반영하지 않는다고 했지만, 현행 `acknowledged()`는 백그라운드 RPC 성공이 올리는 누적값을 읽고 `flush()`는 미확인 handoff가 있으면 오류를 돌려준다. End의 `ack_unknown`을 확정한 뒤 이 두 메서드가 어떤 상태를 보고하는지 계약이 필요하다. [End 우선순위](../../04_implementation/milestones/MS-013.md#L357), [ACK 성공의 공개 계수와 flush](../../../crates/dot-logger-client/src/transport.rs#L665), [handoff의 ACK 확인](../../../crates/dot-logger-client/src/transport.rs#L874)
 - **처리 제안** — 먼저 `Gone`을 관측한 메서드가 `flush()` 또는 `handoff()`인 경우의 반환과 후속 End 관측 가능성을 정한다. End 뒤 `next()`·`flush()`·`acknowledged()`가 공유하는 종료 상태를 정의하고, 늦은 ACK 응답 경합과 함께 시험한다.
-- **[처리담당]** 대기.
+- **[처리담당]** 수용. 표시 요청 구독에 상태 하나(`Open` → `AckGone` → `Ended`, 또는 → `Failed`)를 두고 `next`·`handoff`·`flush`·`acknowledged`가 공유한다(내부 reap 포함 어느 메서드가 먼저 관측해도 같은 전이). `flush()`·`handoff()`가 `Gone`을 먼저 받으면 그 호출은 `AcknowledgementUnknown`이지만 **스트림을 닫지 않아** 이후 `next()`가 End·EOF·timeout을 본다. `AckGone` 중 `handoff()`는 data를 전달하되 ACK를 보내지 않고 미확인으로 세며, `flush()`는 즉시 `AcknowledgementUnknown`. End 뒤: `next` `Ok(None)`, `handoff` consumer 미호출 `Disconnected`, `flush`는 End 시점 `ack_unknown`으로 즉시(0이면 `Ok`), `acknowledged()`는 End 때 고정(응답 대기 RPC 중단, 늦은 성공 미반영) — 불변식 `acknowledged() + ack_unknown` = handoff한 사본 수. Gone 아닌 실패는 어느 메서드든 지금처럼 `Failed`(스트림 닫음, End 없음). 시험: `flush`/`handoff`가 `Gone` 선착 뒤 End, `AckGone` 중 메서드, End 뒤 네 메서드·불변식, 늦은 RPC 성공. MS-013 r8 §5.6·§6.
 
 ## 4. 다음 회차
 
 개발 세션에서 RV-261~264의 처리 결과를 기록한다. 개정 뒤 독립 재리뷰에서 이전 지적 해소와 새 지적 0건을 확인한 뒤 Human 승인으로 넘긴다.
+
+- **[처리담당] 2026-11-28:** 4건 모두 수용, MS-013 r8 반영(§17 반영표). 재리뷰는 [REV-081 요청서](REV-081_REQUEST.md).

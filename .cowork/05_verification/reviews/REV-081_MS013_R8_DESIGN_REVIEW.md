@@ -1,0 +1,53 @@
+# REV-081 — MS-013 r8 설계 재리뷰
+
+| 항목 | 내용 |
+|---|---|
+| 일자 / 리뷰어 | 2026-11-28 / Codex, 독립 리뷰 세션 |
+| 대상 | [MS-013 r8](../../04_implementation/milestones/MS-013.md), [REV-081 요청서](REV-081_REQUEST.md), [REV-080](REV-080_MS013_R7_DESIGN_REVIEW.md) |
+| 기준 | r8 및 검토 시 HEAD `b392eb7f183fd2b0848f040d8834a0dfe84ea5dd` |
+| 판정 / 상태 | **Conditional / Open** |
+
+## 1. 요약정리
+
+**P1 2건, P2 1건.** r8은 host 종료 증거를 분리하고 발행 결과 미확인 상태를 표현한다. 네트워크 계수 확정과 스레드 회수도 분리했다. 파일 작업자 실패 및 출력 종류가 없는 구성에서의 `Closed` 조건, `AckGone`의 대기 기한에 관측 가능한 계약 공백이 남았다. r7→r8 변경과 현재 Rust 소스를 정적으로 대조했다. 제품 시험과 성능 측정은 요청 범위 밖이다.
+
+## 2. 이전 지적 대조
+
+| 이전 지적 | r8 대조 결과 |
+|---|---|
+| RV-261 · host 종료 증거 | 해소. 실제 host의 `run` 종료 뒤 `host_exited`가 공개된다. IO panic이 `worker_failed`만 세운 경우에는 외부 호출자가 명령 셀을 종결하지 않는다. |
+| RV-262 · 파일 기한 판정 | 발행 셀 `Pending`을 기한 초과로 확정하던 문제는 해소됐다. IO panic에서 셀을 종결하는 경로와 실제 회수 조건은 RV-265. |
+| RV-263 · 감독 정산 뒤 종료 | 네트워크 출력이 있는 경로에서 `finalized`와 `reclaimed`를 분리했고, 정상 이벤트 없이 종료한 스레드도 host가 회수한다. 한쪽 출력 종류가 없는 구성 적용은 RV-266. |
+| RV-264 · 공개 ACK API | `flush()`·`handoff()` 관측 시 `AckGone` 전이와 End 이후 ACK 수 고정이 명시됐다. 메서드 간 End 대기 기한은 RV-267. |
+
+RV-256의 epoch 게시 판별과 명령 반환 상한, RV-258의 최초 수신 유예와 후속 대기, RV-259의 End와 비-Gone ACK 실패 선착 경로를 확인했다. 원본 guard 미전달, 복사 예산, 완료·관리 wire 분리, route revision과 빈 route, 설정 교체 시 숫자 index 거절, DB 단계 6과 H6 조기 판정은 유지된다.
+
+## 3. 리뷰 포인트
+
+| ID | 중요도 | 위치 | 계약 공백 | 처리 제안 | 처리담당 판정 | 상태 |
+|---|---|---|---|---|---|---|
+| RV-265 | **P1** | §5.9 | 파일 작업자가 발행 없이 끝날 때 셀의 종결이 정의되지 않고, 셀 기록만으로 `Closed`가 가능하다 | 파일 발행 결과와 IO 작업자 회수를 모두 최종 종료 조건에 연결한다 | — | Open |
+| RV-266 | **P1** | §5.8·§5.9 | 파일 또는 네트워크 출력이 없는 유효 구성에서 양쪽의 완료 조건을 충족하는 방법이 빠졌다 | 실제로 구성된 출력과 legacy tap을 기준으로 종료 분기를 명시한다 | — | Open |
+| RV-267 | P2 | §5.6 | `flush()`나 `handoff()`가 `Gone`을 먼저 받으면 End 대기 기한의 시작과 재설정 규칙이 없다 | `AckGone`의 기한 기준과 후속 호출의 결과를 명시한다 | — | Open |
+
+### RV-265 — 파일 작업자 실패와 회수를 최종 종료에 연결해야 한다
+
+- **[리뷰어]** 파일 IO 스레드가 `finish` 전에 panic하면 현재 `io_main`은 `worker_failed`·`io_failed`를 세우고 `drain_failed`로 빠진다. 이 경로에는 정상 `finish` 호출이 없지만, 현행 host는 IO 스레드를 회수해 실패를 담은 `Closed`를 보낼 수 있다. r8은 IO 스레드만 쓰는 발행 셀을 `finish` 결과로 종결한다고 규정한다. 따라서 IO 실패가 알려지고 스레드가 끝나도 셀이 `Pending`이면 r8의 `Closed` 조건을 영구히 충족하지 못한다. 반대로 셀이 종결된 직후 IO 스레드가 정지하면, 회수 조건이 없는 r8 표는 기존의 「모든 정리 완료」보다 일찍 `Closed`를 허용한다. [발행 셀과 Closed 조건](../../04_implementation/milestones/MS-013.md#L405), [IO panic 경로](../../../crates/dot-logger/src/logger/host.rs#L818), [발행 후 IO 정리](../../../crates/dot-logger/src/logger/host.rs#L948), [기존 최종 보고](../../../crates/dot-logger/src/logger/host.rs#L662)
+- **처리 제안** — 발행 없이 IO 작업자가 끝나는 경우에 결과를 `Failed`로 확정할 주체와 증거를 정한다. 기한 보고에서 해당 실패가 이미 확정됐으면 `files_settled()`와 표의 판정을 일치시킨다. 발행·실패 확인과 IO 회수 완료를 구분하고, `finish` 전 panic 및 셀 게시 직후 회수 지연에서 최종 반환을 시험한다.
+- **[처리담당]** 대기.
+
+### RV-266 — 출력 종류가 빠진 구성의 종료 상태를 정의해야 한다
+
+- **[리뷰어]** FR-019a와 §5.8은 파일만, 파일 + legacy tap, 네트워크만을 지원한다. §5.9의 `Closed` 조건은 발행 셀의 종결과 `network.finalized && network.reclaimed`를 모두 요구한다. 네트워크만 구성에는 `finish`를 수행할 파일이 없고, 파일만 구성에는 회계 완료 이벤트를 낼 네트워크 출력 스레드가 없다. legacy tap은 새 회계의 대상이 아니면서 기존 리스너 종료는 필요하다. 없는 출력의 완료값과 공개 보고 표현이 비어 있어 정상 종료와 파일 성공 여부가 구현 선택에 맡겨진다. 특히 네트워크 전용에서 `files_late`가 `None`이면 현재 성공식으로는 네트워크 수신에 손실이 0이어도 `is_lossless()`가 성공할 수 없다. [모드별 보장표](../../04_implementation/milestones/MS-013.md#L390), [Closed·파일 성공 조건](../../04_implementation/milestones/MS-013.md#L410), [무손실 판정](../../04_implementation/milestones/MS-013.md#L246)
+- **처리 제안** — 실제로 구성된 자원만 기다리도록 파일 없음·네트워크 출력 없음의 완료 조건과 보고 값을 정의한다. 네트워크 전용의 정상 종료·무손실 판정과 legacy tap 리스너 회수 후 `Closed`를 모드별로 대조한다.
+- **[처리담당]** 대기.
+
+### RV-267 — AckGone의 timeout 경계가 공개 메서드 사이에서 비어 있다
+
+- **[리뷰어]** `flush()`가 먼저 `Gone`을 관측한 후 즉시 `AcknowledgementUnknown`을 반환하면, End를 읽는 것은 나중의 `next()`다. 표의 「기존 client timeout 안에」가 `Gone` 관측부터인지, 첫 `next()` 호출부터인지, 매 `next()`마다 시작하는지 정해져 있지 않다. 현재 타이머는 `next()` 호출별이다. `AckGone`에서 첫 `next()`가 이미 도착한 Record를 반환하고, 그 뒤 End가 최초 기한 밖이지만 두 번째 `next()`의 기한 안에 도착하면 선택한 기준에 따라 End 또는 sticky `AcknowledgementUnknown`으로 갈린다. [End 대기와 공개 상태표](../../04_implementation/milestones/MS-013.md#L358), [현행 next 대기](../../../crates/dot-logger-client/src/transport.rs#L710)
+- **처리 제안** — `Gone`의 최초 관측 메서드, 후속 `next()`의 시작, 중간 이벤트가 타이머에 미치는 영향을 명시한다. `flush()`에서 `Gone`을 본 뒤 두 번의 `next()`에 Record와 End가 나뉘어 도착하는 시험에서 기대 결과를 고정한다.
+- **[처리담당]** 대기.
+
+## 4. 다음 회차
+
+개발 세션에서 RV-265~267의 처리 결과를 기록한다. 개정 뒤 독립 재리뷰에서 이전 지적 해소와 새 지적 0건을 확인한 뒤 Human 승인으로 넘긴다.
